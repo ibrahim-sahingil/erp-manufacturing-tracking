@@ -38,9 +38,8 @@ public class WorkOrderPartController {
         } else if (partId != null) {
             result = workOrderPartService.listByPart(partId);
         } else {
-            return ResponseEntity.badRequest().body(
-                    ApiResponse.error("workOrderId veya partId parametresi zorunlu", "MISSING_PARAM")
-            );
+            // Filtre verilmezse tum liste (frontend filtreyi client-side uyguluyor)
+            result = workOrderPartService.listAll();
         }
 
         return ResponseEntity.ok(ApiResponse.success(result));

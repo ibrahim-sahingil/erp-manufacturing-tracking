@@ -21,6 +21,14 @@ public class WorkspaceMemberService {
     private final WorkspaceMemberRepository memberRepository;
 
     @Transactional(readOnly = true)
+    public List<WorkspaceMemberResponse> listAll() {
+        return memberRepository.findAll()
+                .stream()
+                .map(WorkspaceMemberResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<WorkspaceMemberResponse> listByWorkspace(UUID workspaceId) {
         return memberRepository.findByWorkspaceId(workspaceId)
                 .stream()

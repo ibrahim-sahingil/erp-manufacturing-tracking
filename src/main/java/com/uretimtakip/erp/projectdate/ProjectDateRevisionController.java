@@ -45,9 +45,8 @@ public class ProjectDateRevisionController {
         } else if (userId != null) {
             result = revisionService.listByUser(userId);
         } else {
-            return ResponseEntity.badRequest().body(
-                    ApiResponse.error("projectDateId veya userId parametresi zorunlu", "MISSING_PARAM")
-            );
+            // Filtre verilmezse tum liste (frontend filtreyi client-side uyguluyor)
+            result = revisionService.listAll();
         }
 
         return ResponseEntity.ok(ApiResponse.success(result));

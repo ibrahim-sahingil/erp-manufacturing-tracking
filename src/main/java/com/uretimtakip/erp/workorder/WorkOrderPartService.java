@@ -24,6 +24,14 @@ public class WorkOrderPartService {
     private final PartRepository partRepository;
 
     @Transactional(readOnly = true)
+    public List<WorkOrderPartResponse> listAll() {
+        return workOrderPartRepository.findAll()
+                .stream()
+                .map(WorkOrderPartResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<WorkOrderPartResponse> listByWorkOrder(UUID workOrderId) {
         return workOrderPartRepository.findByWorkOrderId(workOrderId)
                 .stream()

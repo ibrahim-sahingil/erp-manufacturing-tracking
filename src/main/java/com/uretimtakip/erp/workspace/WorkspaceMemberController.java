@@ -45,9 +45,8 @@ public class WorkspaceMemberController {
         } else if (userId != null) {
             members = memberService.listByUser(userId);
         } else {
-            return ResponseEntity.badRequest().body(
-                    ApiResponse.error("workspaceId veya userId parametresi zorunlu", "MISSING_PARAM")
-            );
+            // Filtre verilmezse tum liste (frontend filtreyi client-side uyguluyor)
+            members = memberService.listAll();
         }
 
         return ResponseEntity.ok(ApiResponse.success(members));

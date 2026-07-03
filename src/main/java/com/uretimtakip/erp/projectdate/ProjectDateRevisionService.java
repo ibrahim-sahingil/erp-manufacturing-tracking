@@ -34,6 +34,14 @@ public class ProjectDateRevisionService {
     private final ProjectDateRepository projectDateRepository;
 
     @Transactional(readOnly = true)
+    public List<ProjectDateRevisionResponse> listAll() {
+        return revisionRepository.findAll()
+                .stream()
+                .map(ProjectDateRevisionResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<ProjectDateRevisionResponse> listByProjectDate(UUID projectDateId) {
         return revisionRepository.findByProjectDateIdOrderByCreatedAtDesc(projectDateId)
                 .stream()
