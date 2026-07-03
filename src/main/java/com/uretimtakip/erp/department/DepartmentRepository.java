@@ -32,6 +32,12 @@ public interface DepartmentRepository extends JpaRepository<Department, UUID> {
     boolean existsByName(String name);
 
     /**
+     * Ayni siparis (proje) icindeki isim cakismasi kontrolu.
+     * Farkli projelerde ayni bolum adi (ör. "Kaynak") kullanilabilir.
+     */
+    boolean existsByNameAndOrderId(String name, UUID orderId);
+
+    /**
      * Tum departmanlari sort_order'a gore getir.
      */
     List<Department> findAllByOrderBySortOrderAsc();

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ÜretimTakip — QR Kontrol Sistemi</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏭</text></svg>">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
@@ -1481,6 +1482,19 @@ const FIELD_XLATE = {
       return o;
     }
   },
+  departments: {
+    async fromApi(r) {
+      const o = { ...r };
+      o.project = await orderIdToProjectName(r.order_id);
+      return o;
+    },
+    async toApi(b) {
+      const o = { ...b };
+      if (o.project && !o.order_id) o.order_id = await projectNameToOrderId(o.project);
+      delete o.project;
+      return o;
+    }
+  },
   logs: {
     async fromApi(r) {
       const o = { ...r };
@@ -1501,6 +1515,8 @@ const FIELD_XLATE = {
       o.items = (r.items || []).map(it => ({
         ...it, name: it.item_name, desc: it.description, qty: it.quantity
       }));
+      // Onaylayan UUID ise ekranda isim goster
+      if (_isUuid(r.approved_by)) o.approved_by = (await userIdToName(r.approved_by)) || r.approved_by;
       return o;
     },
     async toApi(b) {
@@ -1513,7 +1529,13 @@ const FIELD_XLATE = {
           quantity: it.quantity != null ? it.quantity : it.qty
         }));
       }
-      if (o.approved_by && !_isUuid(o.approved_by)) o.approved_by = await userKeyToId(o.approved_by);
+      // Onaylayan: isim girildiyse kullaniciya cozumle; eslesme yoksa bos gonder
+      // (backend UUID bekler, serbest metin kabul edemez)
+      if (o.approved_by && !_isUuid(o.approved_by)) {
+        const us = await getRef('users');
+        const m = us.find(x => x.username === o.approved_by || x.full_name === o.approved_by || x.name === o.approved_by);
+        o.approved_by = m ? m.id : null;
+      }
       delete o.created_at;
       return o;
     }
@@ -3191,10 +3213,10 @@ async function submitRevise(id, oldStart, oldEnd) {
   if(!reason){ toast('Revize açıklaması zorunlu!','error'); return; }
   if(!newStart||!newEnd){ toast('Tarih alanları zorunlu!','error'); return; }
   if(newStart>newEnd){ toast('Bitiş tarihi başlangıçtan önce olamaz!','error'); return; }
-  const [ok, logOk] = await Promise.all([
-    dbUpdate('project_dates', id, {start_date:newStart, end_date:newEnd}),
-    dbInsert('project_date_revisions',{id:genId(),project_date_id:id,old_start:oldStart,old_end:oldEnd,new_start:newStart,new_end:newEnd,reason,revised_by:revisedBy})
-  ]);
+  // Backend revize kaydini islerken ProjectDate tarihlerini de gunceller
+  // (ProjectDateRevisionService) — ayrica PUT gondermeye gerek yok.
+  const rev = await dbInsert('project_date_revisions',{id:genId(),project_date_id:id,old_start:oldStart,old_end:oldEnd,new_start:newStart,new_end:newEnd,reason,revised_by:revisedBy});
+  const ok = Array.isArray(rev) && !!rev[0];
   if(!ok){ toast('Güncelleme hatası!','error'); return; }
   const i=projectDates.findIndex(d=>d.id===id);
   if(i>-1) projectDates[i]={...projectDates[i],start_date:newStart,end_date:newEnd};
@@ -4846,6 +4868,7 @@ async function saveAppUser() {
   const password = document.getElementById('au-password').value;
   const display  = document.getElementById('au-display').value.trim();
   if (!username || !password) { toast('Kullanıcı adı ve şifre zorunlu!','error'); return; }
+  if (password.length < 6) { toast('Şifre en az 6 karakter olmalı!','error'); return; }
 
   const perms = getSelectedPerms();
   const btn = document.getElementById('au-save-btn');

@@ -57,10 +57,11 @@ public class DepartmentService {
 
     @Transactional
     public DepartmentResponse create(DepartmentRequest request) {
-        // Ayni isimde departman var mi kontrol et
-        if (departmentRepository.existsByName(request.getName())) {
+        // Ayni PROJEDE ayni isimde departman var mi kontrol et
+        // (farkli projelerde ayni bolum adi serbest: her projede "Kaynak" olabilir)
+        if (departmentRepository.existsByNameAndOrderId(request.getName(), request.getOrderId())) {
             throw new BusinessException(
-                    "Bu isimde bir departman zaten var: " + request.getName(),
+                    "Bu projede ayni isimde bir departman zaten var: " + request.getName(),
                     "DEPARTMENT_ALREADY_EXISTS"
             );
         }
@@ -81,11 +82,11 @@ public class DepartmentService {
     public DepartmentResponse update(UUID id, DepartmentRequest request) {
         Department department = findEntityById(id);
 
-        // Eger isim degisti VE yeni isim baska bir departmanda kullaniliyorsa hata ver
+        // Eger isim degisti VE yeni isim ayni projede kullaniliyorsa hata ver
         if (!department.getName().equals(request.getName())
-                && departmentRepository.existsByName(request.getName())) {
+                && departmentRepository.existsByNameAndOrderId(request.getName(), request.getOrderId())) {
             throw new BusinessException(
-                    "Bu isimde bir departman zaten var: " + request.getName(),
+                    "Bu projede ayni isimde bir departman zaten var: " + request.getName(),
                     "DEPARTMENT_ALREADY_EXISTS"
             );
         }

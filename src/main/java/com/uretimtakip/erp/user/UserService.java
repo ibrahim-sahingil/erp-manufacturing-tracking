@@ -69,6 +69,7 @@ public class UserService {
         }
 
         String rawPassword = resolveRawPassword(request);
+        validatePasswordStrength(rawPassword);
 
         User user = User.builder()
                 .fullName(fullName)
@@ -129,6 +130,7 @@ public class UserService {
         // Sifre sadece dolu gelirse degisir
         String rawPassword = resolveRawPassword(request);
         if (rawPassword != null && !rawPassword.isBlank()) {
+            validatePasswordStrength(rawPassword);
             user.setPasswordHash(passwordEncoder.encode(rawPassword));
         }
 
@@ -166,6 +168,15 @@ public class UserService {
             return request.getDepartment();
         }
         return request.getDept();
+    }
+
+    private void validatePasswordStrength(String rawPassword) {
+        if (rawPassword != null && rawPassword.length() < 6) {
+            throw new BusinessException(
+                    "Sifre en az 6 karakter olmali",
+                    "PASSWORD_TOO_SHORT"
+            );
+        }
     }
 
     private String resolveRawPassword(UserRequest request) {
