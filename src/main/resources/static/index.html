@@ -1275,7 +1275,12 @@
 
 <script>
 // ─── API SERVİSİ — Java Spring Boot Backend ───
-const API_BASE_URL = 'http://localhost:8080/api';
+// Sayfa hangi adresten servis edildiyse API de oradan çağrılır
+// (telefon/başka bilgisayardan http://<sunucu-ip>:8080 ile erişim çalışır).
+// Dosya doğrudan açılırsa (file://) localhost'a düşer.
+const API_BASE_URL = (typeof location !== 'undefined' && location.origin && location.origin.startsWith('http'))
+  ? location.origin + '/api'
+  : 'http://localhost:8080/api';
 
 // ─── AUTH STATE ───
 let currentUser = null;
