@@ -56,6 +56,10 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
 
+                        // Statik frontend (static/index.html) - login ekrani
+                        // API cagrilari yine JWT ister
+                        .requestMatchers("/", "/index.html", "/favicon.ico").permitAll()
+
                         // Diger her endpoint icin authentication gerekli
                         .anyRequest().authenticated()
                 )
