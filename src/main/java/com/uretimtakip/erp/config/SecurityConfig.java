@@ -102,6 +102,12 @@ public class SecurityConfig {
                 "http://localhost:8080"
         ));
 
+        // Desen bazli izinler: Cloudflare Tunnel (demo) ve yerel ag erisimi
+        configuration.setAllowedOriginPatterns(List.of(
+                "https://*.trycloudflare.com",
+                "http://192.168.*.*:8080"
+        ));
+
         configuration.setAllowedMethods(Arrays.asList(
                 "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
         ));
