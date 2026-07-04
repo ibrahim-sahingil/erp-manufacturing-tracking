@@ -1,7 +1,5 @@
 package com.uretimtakip.erp.projectbom.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -40,11 +39,15 @@ import java.util.UUID;
 @Builder
 public class ProjectBomRequest {
 
-    @NotBlank(message = "Proje adi bos olamaz")
+    /**
+     * CREATE'te zorunlu (service kontrol eder). UPDATE'te opsiyonel:
+     * frontend yayinlama sirasinda sadece {status, published_at} gonderir,
+     * bos gelen alanlar mevcut degerleriyle korunur.
+     */
     @Size(max = 100, message = "Proje adi en fazla 100 karakter olabilir")
     private String projectName;
 
-    @NotNull(message = "bomProductId zorunlu")
+    /** CREATE'te zorunlu (service kontrol eder). UPDATE'te zaten IMMUTABLE. */
     private UUID bomProductId;
 
     @Size(max = 20, message = "Status en fazla 20 karakter olabilir")
@@ -52,4 +55,7 @@ public class ProjectBomRequest {
 
     @Size(max = 150, message = "createdBy en fazla 150 karakter olabilir")
     private String createdBy;
+
+    /** Yayinlanma zamani (opsiyonel; frontend published_at olarak gonderir). */
+    private LocalDateTime publishedAt;
 }

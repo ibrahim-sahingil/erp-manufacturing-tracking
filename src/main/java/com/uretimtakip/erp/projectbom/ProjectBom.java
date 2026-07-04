@@ -10,6 +10,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -60,4 +61,8 @@ public class ProjectBom extends BaseEntity {
 
     @Column(name = "created_by", length = 150)
     private String createdBy;
+
+    /** Yayinlanma zamani (status 'published' oldugunda dolar). */
+    @Column(name = "published_at")
+    private LocalDateTime publishedAt;
 }

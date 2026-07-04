@@ -30,6 +30,7 @@ public class ProjectBomResponse {
     private String status;
     private String createdBy;
     private LocalDateTime createdAt;
+    private LocalDateTime publishedAt;
 
     /**
      * Sadece CREATE response'unda dolu olur (otomatik kopyalanan parca sayisi).
@@ -44,6 +45,7 @@ public class ProjectBomResponse {
                 .status(e.getStatus())
                 .createdBy(e.getCreatedBy())
                 .createdAt(e.getCreatedAt())
+                .publishedAt(e.getPublishedAt())
                 .build();
     }
 

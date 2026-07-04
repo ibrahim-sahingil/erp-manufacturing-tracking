@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -103,6 +104,14 @@ public class ProjectBomService {
      */
     @Transactional
     public ProjectBomResponse create(ProjectBomRequest request) {
+        // 0. CREATE'te zorunlu alanlar (DTO'da NotBlank yok - kismi update icin)
+        if (request.getProjectName() == null || request.getProjectName().isBlank()) {
+            throw new BusinessException("Proje adi bos olamaz", "VALIDATION_ERROR");
+        }
+        if (request.getBomProductId() == null) {
+            throw new BusinessException("bomProductId zorunlu", "VALIDATION_ERROR");
+        }
+
         // 1. BomProduct var mi?
         if (!bomProductRepository.existsById(request.getBomProductId())) {
             throw new ResourceNotFoundException(
@@ -152,8 +161,12 @@ public class ProjectBomService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "ProjectBom", "id", id));
 
-        // Eger projectName degisiyorsa UNIQUE kontrolu lazim
-        if (!pb.getProjectName().equals(request.getProjectName())) {
+        // KISMI GUNCELLEME: bos gelen alanlar mevcut degerleriyle korunur
+        // (frontend yayinlarken sadece {status, published_at} gonderir)
+
+        // Eger projectName geldiyse VE degisiyorsa UNIQUE kontrolu lazim
+        if (request.getProjectName() != null && !request.getProjectName().isBlank()
+                && !pb.getProjectName().equals(request.getProjectName())) {
             if (projectBomRepository.existsByProjectNameAndBomProductId(
                     request.getProjectName(), pb.getBomProductId())) {
                 throw new BusinessException(
@@ -166,11 +179,21 @@ public class ProjectBomService {
         }
 
         // bomProductId IMMUTABLE - request'te gelse de IGNORE
-        // status, createdBy degisebilir
+        // status, createdBy, publishedAt degisebilir
         if (request.getStatus() != null && !request.getStatus().isBlank()) {
             pb.setStatus(request.getStatus());
+            // Yayinlaniyorsa ve zaman verilmemisse simdiki zamani yaz
+            if ("published".equalsIgnoreCase(request.getStatus())
+                    && request.getPublishedAt() == null && pb.getPublishedAt() == null) {
+                pb.setPublishedAt(LocalDateTime.now());
+            }
         }
-        pb.setCreatedBy(request.getCreatedBy());
+        if (request.getPublishedAt() != null) {
+            pb.setPublishedAt(request.getPublishedAt());
+        }
+        if (request.getCreatedBy() != null && !request.getCreatedBy().isBlank()) {
+            pb.setCreatedBy(request.getCreatedBy());
+        }
 
         ProjectBom saved = projectBomRepository.save(pb);
         log.info("ProjectBom updated: id={}, project='{}'",

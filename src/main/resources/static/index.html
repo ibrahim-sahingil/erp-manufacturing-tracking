@@ -1607,6 +1607,21 @@ const FIELD_XLATE = {
       return o;
     }
   },
+  project_bom_parts: {
+    // Backend cozumlenmis degerleri resolved_* alanlarinda doner
+    // (custom_* bos + bom_part sablon referansi varsa sablondan okur).
+    // Frontend custom_* okudugu icin coalesce'i burada yapariz.
+    async fromApi(r) {
+      const o = { ...r };
+      if (!o.custom_name) o.custom_name = r.resolved_name;
+      if (!o.custom_code) o.custom_code = r.resolved_code;
+      if (o.custom_qty == null) o.custom_qty = r.resolved_qty;
+      if (!o.custom_unit) o.custom_unit = r.resolved_unit;
+      if (o.custom_weight == null) o.custom_weight = r.resolved_weight;
+      if (!o.custom_material) o.custom_material = r.resolved_material;
+      return o;
+    }
+  },
   workspace_members: {
     async fromApi(r) {
       const o = { ...r };
