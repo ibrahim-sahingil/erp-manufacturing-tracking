@@ -1,0 +1,934 @@
+--
+-- PostgreSQL database dump
+--
+
+\restrict 1i9FblwI4yco6xnekT1dmBTnCPJeru1jSbmk6S2Sg2IhQFsVnb3VIcZpBS7IDS9
+
+-- Dumped from database version 18.3
+-- Dumped by pg_dump version 18.3
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: uuid-ossp; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
+
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: bom_operations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.bom_operations (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    name character varying(150) NOT NULL,
+    code character varying(50) NOT NULL,
+    description text,
+    sort_order integer DEFAULT 0,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: bom_parts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.bom_parts (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    product_id uuid NOT NULL,
+    parent_id uuid,
+    name character varying(200) NOT NULL,
+    code character varying(100) NOT NULL,
+    quantity numeric(15,4) DEFAULT 1,
+    unit character varying(20) DEFAULT 'adet'::character varying,
+    weight_kg numeric(15,4),
+    material character varying(150),
+    operations jsonb DEFAULT '[]'::jsonb,
+    level integer DEFAULT 0,
+    sort_order integer DEFAULT 0,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: bom_products; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.bom_products (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    name character varying(200) NOT NULL,
+    code character varying(100),
+    unit character varying(20) DEFAULT 'adet'::character varying,
+    description text,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: departments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.departments (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    order_id uuid,
+    name character varying(100) NOT NULL,
+    sort_order integer DEFAULT 1,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: order_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.order_items (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    order_id uuid NOT NULL,
+    item_name character varying(150) NOT NULL,
+    description text,
+    quantity integer DEFAULT 1,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: orders; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.orders (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    project_name character varying(100) NOT NULL,
+    customer_name character varying(150),
+    customer_email character varying(100),
+    customer_phone character varying(50),
+    location character varying(150),
+    delivery_days integer,
+    total_price numeric(15,2),
+    currency character varying(10) DEFAULT 'TRY'::character varying,
+    status character varying(20) DEFAULT 'ACTIVE'::character varying,
+    approved_by uuid,
+    notes text,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: part_logs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.part_logs (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    part_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    qty_done integer DEFAULT 0,
+    qty_pending integer DEFAULT 0,
+    qty_reject integer DEFAULT 0,
+    note text,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: parts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.parts (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    order_id uuid,
+    department_id uuid,
+    name character varying(150) NOT NULL,
+    code character varying(100) NOT NULL,
+    drawing_no character varying(100),
+    material character varying(100),
+    total_qty integer DEFAULT 1,
+    status character varying(20) DEFAULT 'PENDING'::character varying,
+    description text,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    qty_done integer DEFAULT 0 NOT NULL,
+    qty_pending integer DEFAULT 0 NOT NULL,
+    qty_reject integer DEFAULT 0 NOT NULL,
+    CONSTRAINT parts_qty_done_nonneg CHECK ((qty_done >= 0)),
+    CONSTRAINT parts_qty_pending_nonneg CHECK ((qty_pending >= 0)),
+    CONSTRAINT parts_qty_reject_nonneg CHECK ((qty_reject >= 0))
+);
+
+
+--
+-- Name: project_bom; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.project_bom (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    project_name character varying(100) NOT NULL,
+    bom_product_id uuid NOT NULL,
+    status character varying(20) DEFAULT 'draft'::character varying,
+    created_by character varying(150),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: project_bom_parts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.project_bom_parts (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    project_bom_id uuid NOT NULL,
+    bom_part_id uuid,
+    is_excluded boolean DEFAULT false,
+    custom_name character varying(200),
+    custom_code character varying(100),
+    custom_qty numeric(15,4) DEFAULT 1,
+    custom_unit character varying(20),
+    custom_weight numeric(15,4),
+    custom_material character varying(150),
+    dept_id uuid,
+    parent_custom_id uuid,
+    operations jsonb DEFAULT '[]'::jsonb,
+    level integer DEFAULT 0,
+    sort_order integer DEFAULT 0,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: project_date_revisions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.project_date_revisions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    project_date_id uuid NOT NULL,
+    old_start date,
+    old_end date,
+    new_start date NOT NULL,
+    new_end date NOT NULL,
+    reason text NOT NULL,
+    revised_by uuid,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: project_dates; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.project_dates (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    order_id uuid NOT NULL,
+    start_date date NOT NULL,
+    end_date date NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: user_pins; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.user_pins (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid NOT NULL,
+    pin_type character varying(50) NOT NULL,
+    pin_key character varying(100) NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: users; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.users (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    full_name character varying(100) NOT NULL,
+    department character varying(50),
+    role character varying(20) NOT NULL,
+    is_active boolean DEFAULT true,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    username character varying,
+    password_hash character varying(255),
+    pin_code character varying,
+    permissions jsonb DEFAULT '[]'::jsonb
+);
+
+
+--
+-- Name: work_order_parts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.work_order_parts (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    work_order_id uuid NOT NULL,
+    part_id uuid NOT NULL,
+    qty integer DEFAULT 1,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: work_order_revisions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.work_order_revisions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    work_order_id uuid NOT NULL,
+    field_changed character varying(100) NOT NULL,
+    old_value text,
+    new_value text,
+    reason text NOT NULL,
+    revised_by uuid,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: work_orders; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.work_orders (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    order_id uuid NOT NULL,
+    department_id uuid,
+    workspace_id uuid,
+    assigned_user_id uuid,
+    start_datetime timestamp without time zone NOT NULL,
+    end_datetime timestamp without time zone,
+    status character varying(20) DEFAULT 'planned'::character varying,
+    notes text,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: workspace_members; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workspace_members (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    workspace_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    role character varying(100),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: workspaces; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workspaces (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    name character varying(150) NOT NULL,
+    type character varying(50) DEFAULT 'area'::character varying,
+    description text,
+    sort_order integer DEFAULT 1,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: bom_operations bom_operations_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bom_operations
+    ADD CONSTRAINT bom_operations_code_key UNIQUE (code);
+
+
+--
+-- Name: bom_operations bom_operations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bom_operations
+    ADD CONSTRAINT bom_operations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: bom_parts bom_parts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bom_parts
+    ADD CONSTRAINT bom_parts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: bom_products bom_products_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bom_products
+    ADD CONSTRAINT bom_products_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: departments departments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.departments
+    ADD CONSTRAINT departments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: order_items order_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.order_items
+    ADD CONSTRAINT order_items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: orders orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: orders orders_project_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_project_name_key UNIQUE (project_name);
+
+
+--
+-- Name: part_logs part_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.part_logs
+    ADD CONSTRAINT part_logs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: parts parts_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.parts
+    ADD CONSTRAINT parts_code_key UNIQUE (code);
+
+
+--
+-- Name: parts parts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.parts
+    ADD CONSTRAINT parts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: project_bom_parts project_bom_parts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_bom_parts
+    ADD CONSTRAINT project_bom_parts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: project_bom project_bom_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_bom
+    ADD CONSTRAINT project_bom_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: project_bom project_bom_project_product_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_bom
+    ADD CONSTRAINT project_bom_project_product_unique UNIQUE (project_name, bom_product_id);
+
+
+--
+-- Name: project_date_revisions project_date_revisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_date_revisions
+    ADD CONSTRAINT project_date_revisions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: project_dates project_dates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_dates
+    ADD CONSTRAINT project_dates_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: user_pins user_pins_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_pins
+    ADD CONSTRAINT user_pins_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: user_pins user_pins_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_pins
+    ADD CONSTRAINT user_pins_unique UNIQUE (user_id, pin_type, pin_key);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: users users_username_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_username_unique UNIQUE (username);
+
+
+--
+-- Name: work_order_parts work_order_parts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_order_parts
+    ADD CONSTRAINT work_order_parts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: work_order_revisions work_order_revisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_order_revisions
+    ADD CONSTRAINT work_order_revisions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: work_orders work_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_orders
+    ADD CONSTRAINT work_orders_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workspace_members workspace_members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_members
+    ADD CONSTRAINT workspace_members_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workspaces workspaces_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspaces
+    ADD CONSTRAINT workspaces_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_bom_parts_parent_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_bom_parts_parent_id ON public.bom_parts USING btree (parent_id);
+
+
+--
+-- Name: idx_bom_parts_product_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_bom_parts_product_id ON public.bom_parts USING btree (product_id);
+
+
+--
+-- Name: idx_orders_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_created_at ON public.orders USING btree (created_at DESC);
+
+
+--
+-- Name: idx_orders_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_status ON public.orders USING btree (status);
+
+
+--
+-- Name: idx_part_logs_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_part_logs_created_at ON public.part_logs USING btree (created_at DESC);
+
+
+--
+-- Name: idx_part_logs_part_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_part_logs_part_id ON public.part_logs USING btree (part_id);
+
+
+--
+-- Name: idx_part_logs_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_part_logs_user_id ON public.part_logs USING btree (user_id);
+
+
+--
+-- Name: idx_parts_department_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_parts_department_id ON public.parts USING btree (department_id);
+
+
+--
+-- Name: idx_parts_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_parts_order_id ON public.parts USING btree (order_id);
+
+
+--
+-- Name: idx_parts_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_parts_status ON public.parts USING btree (status);
+
+
+--
+-- Name: idx_project_bom_parts_bom_part; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_project_bom_parts_bom_part ON public.project_bom_parts USING btree (bom_part_id);
+
+
+--
+-- Name: idx_project_bom_parts_parent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_project_bom_parts_parent ON public.project_bom_parts USING btree (parent_custom_id);
+
+
+--
+-- Name: idx_project_bom_parts_pbom_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_project_bom_parts_pbom_id ON public.project_bom_parts USING btree (project_bom_id);
+
+
+--
+-- Name: idx_project_bom_product_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_project_bom_product_id ON public.project_bom USING btree (bom_product_id);
+
+
+--
+-- Name: idx_project_bom_project_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_project_bom_project_name ON public.project_bom USING btree (project_name);
+
+
+--
+-- Name: idx_user_pins_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_user_pins_user_id ON public.user_pins USING btree (user_id);
+
+
+--
+-- Name: idx_users_is_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_users_is_active ON public.users USING btree (is_active);
+
+
+--
+-- Name: idx_users_username; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_users_username ON public.users USING btree (username);
+
+
+--
+-- Name: idx_work_orders_department_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_work_orders_department_id ON public.work_orders USING btree (department_id);
+
+
+--
+-- Name: idx_work_orders_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_work_orders_order_id ON public.work_orders USING btree (order_id);
+
+
+--
+-- Name: idx_work_orders_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_work_orders_status ON public.work_orders USING btree (status);
+
+
+--
+-- Name: idx_work_orders_workspace_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_work_orders_workspace_id ON public.work_orders USING btree (workspace_id);
+
+
+--
+-- Name: bom_parts bom_parts_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bom_parts
+    ADD CONSTRAINT bom_parts_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.bom_parts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: bom_parts bom_parts_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bom_parts
+    ADD CONSTRAINT bom_parts_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.bom_products(id) ON DELETE CASCADE;
+
+
+--
+-- Name: departments departments_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.departments
+    ADD CONSTRAINT departments_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: order_items order_items_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.order_items
+    ADD CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: orders orders_approved_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.users(id);
+
+
+--
+-- Name: part_logs part_logs_part_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.part_logs
+    ADD CONSTRAINT part_logs_part_id_fkey FOREIGN KEY (part_id) REFERENCES public.parts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: part_logs part_logs_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.part_logs
+    ADD CONSTRAINT part_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: parts parts_department_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.parts
+    ADD CONSTRAINT parts_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id) ON DELETE SET NULL;
+
+
+--
+-- Name: parts parts_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.parts
+    ADD CONSTRAINT parts_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: project_bom project_bom_bom_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_bom
+    ADD CONSTRAINT project_bom_bom_product_id_fkey FOREIGN KEY (bom_product_id) REFERENCES public.bom_products(id) ON DELETE CASCADE;
+
+
+--
+-- Name: project_bom_parts project_bom_parts_bom_part_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_bom_parts
+    ADD CONSTRAINT project_bom_parts_bom_part_id_fkey FOREIGN KEY (bom_part_id) REFERENCES public.bom_parts(id) ON DELETE SET NULL;
+
+
+--
+-- Name: project_bom_parts project_bom_parts_dept_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_bom_parts
+    ADD CONSTRAINT project_bom_parts_dept_id_fkey FOREIGN KEY (dept_id) REFERENCES public.departments(id) ON DELETE SET NULL;
+
+
+--
+-- Name: project_bom_parts project_bom_parts_parent_custom_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_bom_parts
+    ADD CONSTRAINT project_bom_parts_parent_custom_id_fkey FOREIGN KEY (parent_custom_id) REFERENCES public.project_bom_parts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: project_bom_parts project_bom_parts_project_bom_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_bom_parts
+    ADD CONSTRAINT project_bom_parts_project_bom_id_fkey FOREIGN KEY (project_bom_id) REFERENCES public.project_bom(id) ON DELETE CASCADE;
+
+
+--
+-- Name: project_date_revisions project_date_revisions_project_date_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_date_revisions
+    ADD CONSTRAINT project_date_revisions_project_date_id_fkey FOREIGN KEY (project_date_id) REFERENCES public.project_dates(id) ON DELETE CASCADE;
+
+
+--
+-- Name: project_date_revisions project_date_revisions_revised_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_date_revisions
+    ADD CONSTRAINT project_date_revisions_revised_by_fkey FOREIGN KEY (revised_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: project_dates project_dates_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_dates
+    ADD CONSTRAINT project_dates_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_pins user_pins_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_pins
+    ADD CONSTRAINT user_pins_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: work_order_parts work_order_parts_part_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_order_parts
+    ADD CONSTRAINT work_order_parts_part_id_fkey FOREIGN KEY (part_id) REFERENCES public.parts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: work_order_parts work_order_parts_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_order_parts
+    ADD CONSTRAINT work_order_parts_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.work_orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: work_order_revisions work_order_revisions_revised_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_order_revisions
+    ADD CONSTRAINT work_order_revisions_revised_by_fkey FOREIGN KEY (revised_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: work_order_revisions work_order_revisions_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_order_revisions
+    ADD CONSTRAINT work_order_revisions_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.work_orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: work_orders work_orders_assigned_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_orders
+    ADD CONSTRAINT work_orders_assigned_user_id_fkey FOREIGN KEY (assigned_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: work_orders work_orders_department_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_orders
+    ADD CONSTRAINT work_orders_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id) ON DELETE SET NULL;
+
+
+--
+-- Name: work_orders work_orders_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_orders
+    ADD CONSTRAINT work_orders_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: work_orders work_orders_workspace_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_orders
+    ADD CONSTRAINT work_orders_workspace_id_fkey FOREIGN KEY (workspace_id) REFERENCES public.workspaces(id) ON DELETE SET NULL;
+
+
+--
+-- Name: workspace_members workspace_members_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_members
+    ADD CONSTRAINT workspace_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workspace_members workspace_members_workspace_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_members
+    ADD CONSTRAINT workspace_members_workspace_id_fkey FOREIGN KEY (workspace_id) REFERENCES public.workspaces(id) ON DELETE CASCADE;
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict 1i9FblwI4yco6xnekT1dmBTnCPJeru1jSbmk6S2Sg2IhQFsVnb3VIcZpBS7IDS9
+
