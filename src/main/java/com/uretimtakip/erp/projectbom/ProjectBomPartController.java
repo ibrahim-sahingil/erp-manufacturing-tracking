@@ -3,6 +3,7 @@ package com.uretimtakip.erp.projectbom;
 import com.uretimtakip.erp.common.ApiResponse;
 import com.uretimtakip.erp.projectbom.dto.ProjectBomPartRequest;
 import com.uretimtakip.erp.projectbom.dto.ProjectBomPartResponse;
+import com.uretimtakip.erp.projectbom.dto.ProjectBomPartUpdateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,7 +28,7 @@ import java.util.UUID;
  *   GET    /api/project-bom-parts/by-parent/{parentCustomId}    - alt parcalar
  *   GET    /api/project-bom-parts/{id}                          - tek parca
  *   POST   /api/project-bom-parts                               - yeni parca
- *   PUT    /api/project-bom-parts/{id}                          - guncelle
+ *   PUT    /api/project-bom-parts/{id}                          - PARTIAL guncelle (hiyerarsi dahil)
  *   DELETE /api/project-bom-parts/{id}                          - sil (defensive)
  *
  * NOT: List all endpoint'i koymadik - cunku tum tablonun fiziksel dumpini
@@ -78,7 +79,7 @@ public class ProjectBomPartController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<ProjectBomPartResponse>> update(
             @PathVariable UUID id,
-            @Valid @RequestBody ProjectBomPartRequest request) {
+            @Valid @RequestBody ProjectBomPartUpdateRequest request) {
         ProjectBomPartResponse updated = projectBomPartService.update(id, request);
         return ResponseEntity.ok(ApiResponse.success("Proje parcasi guncellendi", updated));
     }

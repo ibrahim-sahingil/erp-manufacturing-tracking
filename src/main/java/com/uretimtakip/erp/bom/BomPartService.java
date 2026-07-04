@@ -2,6 +2,7 @@ package com.uretimtakip.erp.bom;
 
 import com.uretimtakip.erp.bom.dto.BomPartRequest;
 import com.uretimtakip.erp.bom.dto.BomPartResponse;
+import com.uretimtakip.erp.bom.dto.BomPartUpdateRequest;
 import com.uretimtakip.erp.common.exception.BusinessException;
 import com.uretimtakip.erp.common.exception.ResourceNotFoundException;
 import com.uretimtakip.erp.projectbom.ProjectBomPartRepository;
@@ -19,7 +20,8 @@ import java.util.stream.Collectors;
 /**
  * BomPart is mantigi.
  *
- * Update'te: IMMUTABLE alanlar (productId, parentId, level).
+ * Update PARTIAL calisir: sadece gonderilen alanlar degisir.
+ * parentId/level degistirilebilir (hiyerarsi tasima); productId IMMUTABLE.
  *
  * Delete:
  *   1. Child BomPart var mi? (existsByParentId)
@@ -117,19 +119,29 @@ public class BomPartService {
     }
 
     @Transactional
-    public BomPartResponse update(UUID id, BomPartRequest request) {
+    public BomPartResponse update(UUID id, BomPartUpdateRequest request) {
         BomPart part = findEntityById(id);
 
-        part.setName(request.getName());
-        part.setCode(request.getCode());
+        // PARTIAL update: sadece gonderilen (non-null) alanlar islenir.
+        // Frontend hiyerarsi editoru {parent_id, level} gibi tekil alanlar yollar.
+        if (request.getName() != null && !request.getName().isBlank()) {
+            part.setName(request.getName());
+        }
+        if (request.getCode() != null && !request.getCode().isBlank()) {
+            part.setCode(request.getCode());
+        }
         if (request.getQuantity() != null) {
             part.setQuantity(request.getQuantity());
         }
         if (request.getUnit() != null && !request.getUnit().isBlank()) {
             part.setUnit(request.getUnit());
         }
-        part.setWeightKg(request.getWeightKg());
-        part.setMaterial(request.getMaterial());
+        if (request.getWeightKg() != null) {
+            part.setWeightKg(request.getWeightKg());
+        }
+        if (request.getMaterial() != null) {
+            part.setMaterial(request.getMaterial());
+        }
         if (request.getOperations() != null) {
             part.setOperations(request.getOperations());
         }
@@ -137,9 +149,62 @@ public class BomPartService {
             part.setSortOrder(request.getSortOrder());
         }
 
+        // Hiyerarsi tasima: parent_id JSON'da acikca geldiyse islenir
+        // (null = kok seviyeye cikar). Gelmediyse dokunulmaz.
+        if (request.isParentIdPresent()) {
+            applyParentChange(part, request.getParentId(), request.getLevel());
+        } else if (request.getLevel() != null) {
+            // updateDescendantLevels sadece {level: N} yollar
+            part.setLevel(request.getLevel());
+        }
+
         BomPart saved = bomPartRepository.save(part);
-        log.info("BomPart updated: id={}, name={}", saved.getId(), saved.getName());
+        log.info("BomPart updated: id={}, name={}, parentId={}, level={}",
+                saved.getId(), saved.getName(), saved.getParentId(), saved.getLevel());
         return BomPartResponse.fromEntity(saved);
+    }
+
+    /**
+     * Parcayi yeni parent'in altina tasir (null -> kok seviye).
+     * Ayni urun kontrolu + dongu (kendi alt agacina tasima) kontrolu yapar.
+     */
+    private void applyParentChange(BomPart part, UUID newParentId, Integer requestedLevel) {
+        if (newParentId == null) {
+            part.setParentId(null);
+            part.setLevel(requestedLevel != null ? requestedLevel : 0);
+            return;
+        }
+        if (newParentId.equals(part.getId())) {
+            throw new BusinessException(
+                    "Bir parca kendi kendisinin ustune tasinamaz.",
+                    "BOM_PART_SELF_PARENT");
+        }
+        BomPart parent = bomPartRepository.findById(newParentId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "BomPart (parent)", "id", newParentId));
+        if (!parent.getProductId().equals(part.getProductId())) {
+            throw new BusinessException(
+                    "Parent parca farkli bir urune ait.",
+                    "PARENT_PRODUCT_MISMATCH");
+        }
+        // Dongu kontrolu: yeni parent'in atalari arasinda bu parca varsa
+        // tasima kendi alt agacinin icine yapiliyor demektir.
+        UUID cursor = parent.getParentId();
+        int guard = 0;
+        while (cursor != null && guard++ < 500) {
+            if (cursor.equals(part.getId())) {
+                throw new BusinessException(
+                        "Bir parca kendi alt parcasinin altina tasinamaz.",
+                        "BOM_PART_CYCLE");
+            }
+            cursor = bomPartRepository.findById(cursor)
+                    .map(BomPart::getParentId)
+                    .orElse(null);
+        }
+        part.setParentId(newParentId);
+        part.setLevel(requestedLevel != null
+                ? requestedLevel
+                : (parent.getLevel() != null ? parent.getLevel() : 0) + 1);
     }
 
     @Transactional

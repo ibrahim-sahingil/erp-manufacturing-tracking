@@ -2,6 +2,7 @@ package com.uretimtakip.erp.bom;
 
 import com.uretimtakip.erp.bom.dto.BomPartRequest;
 import com.uretimtakip.erp.bom.dto.BomPartResponse;
+import com.uretimtakip.erp.bom.dto.BomPartUpdateRequest;
 import com.uretimtakip.erp.common.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +29,7 @@ import java.util.UUID;
  *   GET    /api/bom-parts/by-parent/{parentId}   - bir parent'in alt parcalari
  *   GET    /api/bom-parts/{id}                   - tek parca
  *   POST   /api/bom-parts                        - yeni parca (parent+product validation)
- *   PUT    /api/bom-parts/{id}                   - guncelle (productId/parentId/level IGNORE)
+ *   PUT    /api/bom-parts/{id}                   - PARTIAL guncelle (parentId/level dahil; productId IGNORE)
  *   DELETE /api/bom-parts/{id}                   - sil (child'lar kontrolu)
  */
 @RestController
@@ -74,7 +75,7 @@ public class BomPartController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<BomPartResponse>> update(
             @PathVariable UUID id,
-            @Valid @RequestBody BomPartRequest request) {
+            @Valid @RequestBody BomPartUpdateRequest request) {
         BomPartResponse updated = bomPartService.update(id, request);
         return ResponseEntity.ok(ApiResponse.success("Parca guncellendi", updated));
     }

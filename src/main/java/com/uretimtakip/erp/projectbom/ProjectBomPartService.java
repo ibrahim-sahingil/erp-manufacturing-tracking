@@ -7,6 +7,7 @@ import com.uretimtakip.erp.common.exception.ResourceNotFoundException;
 import com.uretimtakip.erp.department.DepartmentRepository;
 import com.uretimtakip.erp.projectbom.dto.ProjectBomPartRequest;
 import com.uretimtakip.erp.projectbom.dto.ProjectBomPartResponse;
+import com.uretimtakip.erp.projectbom.dto.ProjectBomPartUpdateRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -40,8 +41,10 @@ import java.util.stream.Collectors;
  *   5. deptId verilmisse Department var mi?
  *
  * UPDATE:
- *   IMMUTABLE alanlar: projectBomId, bomPartId, parentCustomId, level.
- *   Sadece custom_X, deptId, isExcluded, operations, sortOrder degisir.
+ *   PARTIAL calisir: sadece gonderilen alanlar degisir.
+ *   parentCustomId/level degistirilebilir (hiyerarsi tasima),
+ *   deptId atanabilir/kaldirilabilir (explicit null = kaldir).
+ *   IMMUTABLE alanlar: projectBomId, bomPartId.
  *
  * DELETE:
  *   Defensive - child varsa BusinessException (Soru 4'te se\u00e7tigimiz B).
@@ -191,32 +194,36 @@ public class ProjectBomPartService {
     // ============ UPDATE ============
 
     /**
-     * Update - sadece degisebilir alanlar.
-     * IMMUTABLE: projectBomId, bomPartId, parentCustomId, level.
+     * PARTIAL update - sadece gonderilen alanlar degisir.
+     * parentCustomId/level/deptId dahil. IMMUTABLE: projectBomId, bomPartId.
      */
     @Transactional
-    public ProjectBomPartResponse update(UUID id, ProjectBomPartRequest request) {
+    public ProjectBomPartResponse update(UUID id, ProjectBomPartUpdateRequest request) {
         ProjectBomPart pbp = findEntityById(id);
 
-        // Department degisiyorsa varlik kontrolu
-        if (request.getDeptId() != null
-                && !request.getDeptId().equals(pbp.getDeptId())
-                && !departmentRepository.existsById(request.getDeptId())) {
-            throw new ResourceNotFoundException(
-                    "Department", "id", request.getDeptId());
-        }
-
-        // IMMUTABLE: projectBomId, bomPartId, parentCustomId, level DEGISMIYOR.
+        // PARTIAL update: sadece gonderilen (non-null) alanlar islenir.
+        // IMMUTABLE: projectBomId, bomPartId.
         if (request.getIsExcluded() != null) {
             pbp.setIsExcluded(request.getIsExcluded());
         }
-        pbp.setCustomName(request.getCustomName());
-        pbp.setCustomCode(request.getCustomCode());
-        pbp.setCustomQty(request.getCustomQty());
-        pbp.setCustomUnit(request.getCustomUnit());
-        pbp.setCustomWeight(request.getCustomWeight());
-        pbp.setCustomMaterial(request.getCustomMaterial());
-        pbp.setDeptId(request.getDeptId());
+        if (request.getCustomName() != null && !request.getCustomName().isBlank()) {
+            pbp.setCustomName(request.getCustomName());
+        }
+        if (request.getCustomCode() != null && !request.getCustomCode().isBlank()) {
+            pbp.setCustomCode(request.getCustomCode());
+        }
+        if (request.getCustomQty() != null) {
+            pbp.setCustomQty(request.getCustomQty());
+        }
+        if (request.getCustomUnit() != null && !request.getCustomUnit().isBlank()) {
+            pbp.setCustomUnit(request.getCustomUnit());
+        }
+        if (request.getCustomWeight() != null) {
+            pbp.setCustomWeight(request.getCustomWeight());
+        }
+        if (request.getCustomMaterial() != null) {
+            pbp.setCustomMaterial(request.getCustomMaterial());
+        }
         if (request.getOperations() != null) {
             pbp.setOperations(request.getOperations());
         }
@@ -224,13 +231,77 @@ public class ProjectBomPartService {
             pbp.setSortOrder(request.getSortOrder());
         }
 
+        // Departman atama/kaldirma: dept_id JSON'da acikca geldiyse islenir
+        // (null = departmani kaldir). Gelmediyse dokunulmaz.
+        if (request.isDeptIdPresent()) {
+            if (request.getDeptId() != null
+                    && !request.getDeptId().equals(pbp.getDeptId())
+                    && !departmentRepository.existsById(request.getDeptId())) {
+                throw new ResourceNotFoundException(
+                        "Department", "id", request.getDeptId());
+            }
+            pbp.setDeptId(request.getDeptId());
+        }
+
+        // Hiyerarsi tasima: parent_custom_id acikca geldiyse islenir
+        // (null = kok seviyeye cikar). Gelmediyse dokunulmaz.
+        if (request.isParentCustomIdPresent()) {
+            applyParentChange(pbp, request.getParentCustomId(), request.getLevel());
+        } else if (request.getLevel() != null) {
+            pbp.setLevel(request.getLevel());
+        }
+
         ProjectBomPart saved = projectBomPartRepository.save(pbp);
-        log.info("ProjectBomPart updated: id={}", saved.getId());
+        log.info("ProjectBomPart updated: id={}, parentCustomId={}, level={}",
+                saved.getId(), saved.getParentCustomId(), saved.getLevel());
 
         BomPart bomPart = saved.getBomPartId() != null
                 ? bomPartRepository.findById(saved.getBomPartId()).orElse(null)
                 : null;
         return ProjectBomPartResponse.fromEntity(saved, bomPart);
+    }
+
+    /**
+     * Parcayi yeni parent'in altina tasir (null -> kok seviye).
+     * Ayni projectBom kontrolu + dongu (kendi alt agacina tasima) kontrolu yapar.
+     */
+    private void applyParentChange(ProjectBomPart pbp, UUID newParentId, Integer requestedLevel) {
+        if (newParentId == null) {
+            pbp.setParentCustomId(null);
+            pbp.setLevel(requestedLevel != null ? requestedLevel : 0);
+            return;
+        }
+        if (newParentId.equals(pbp.getId())) {
+            throw new BusinessException(
+                    "Bir parca kendi kendisinin ustune tasinamaz.",
+                    "PROJECT_BOM_PART_SELF_PARENT");
+        }
+        ProjectBomPart parent = projectBomPartRepository.findById(newParentId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "ProjectBomPart (parent)", "id", newParentId));
+        if (!parent.getProjectBomId().equals(pbp.getProjectBomId())) {
+            throw new BusinessException(
+                    "Parent parca farkli bir proje baglantisina ait.",
+                    "PARENT_PROJECT_BOM_MISMATCH");
+        }
+        // Dongu kontrolu: yeni parent'in atalari arasinda bu parca varsa
+        // tasima kendi alt agacinin icine yapiliyor demektir.
+        UUID cursor = parent.getParentCustomId();
+        int guard = 0;
+        while (cursor != null && guard++ < 500) {
+            if (cursor.equals(pbp.getId())) {
+                throw new BusinessException(
+                        "Bir parca kendi alt parcasinin altina tasinamaz.",
+                        "PROJECT_BOM_PART_CYCLE");
+            }
+            cursor = projectBomPartRepository.findById(cursor)
+                    .map(ProjectBomPart::getParentCustomId)
+                    .orElse(null);
+        }
+        pbp.setParentCustomId(newParentId);
+        pbp.setLevel(requestedLevel != null
+                ? requestedLevel
+                : (parent.getLevel() != null ? parent.getLevel() : 0) + 1);
     }
 
     // ============ DELETE (defensive - Soru 4 secimi B) ============
