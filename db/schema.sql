@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gjxQp57JZ4wdLHawuBJIQqD2fGyhlk9ao6mpwbCTCo7DE4s3BlmcKzaI1wcAU0R
+\restrict oJRL8beOgn45yjuTSox2hvCBb16D2UDkH8IoCIVo4c4ybWi7qm6aTetiDsNVdSe
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -245,6 +245,33 @@ CREATE TABLE public.project_dates (
 
 
 --
+-- Name: purchase_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.purchase_items (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    project_name character varying(100) NOT NULL,
+    project_bom_part_id uuid,
+    name character varying(200) NOT NULL,
+    code character varying(100),
+    quantity numeric(15,4) DEFAULT 1,
+    unit character varying(20) DEFAULT 'adet'::character varying,
+    material character varying(150),
+    supplier character varying(150),
+    unit_price numeric(15,2),
+    currency character varying(10) DEFAULT 'TRY'::character varying,
+    expected_date date,
+    status character varying(20) DEFAULT 'PLANNED'::character varying,
+    notes text,
+    ordered_at timestamp without time zone,
+    received_at timestamp without time zone,
+    created_by character varying(150),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT purchase_items_status_check CHECK (((status)::text = ANY ((ARRAY['PLANNED'::character varying, 'ORDERED'::character varying, 'RECEIVED'::character varying, 'IN_WAREHOUSE'::character varying, 'IN_STOCK'::character varying, 'CANCELLED'::character varying])::text[])))
+);
+
+
+--
 -- Name: user_pins; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -478,6 +505,14 @@ ALTER TABLE ONLY public.project_dates
 
 
 --
+-- Name: purchase_items purchase_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.purchase_items
+    ADD CONSTRAINT purchase_items_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: user_pins user_pins_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -652,6 +687,20 @@ CREATE INDEX idx_project_bom_product_id ON public.project_bom USING btree (bom_p
 --
 
 CREATE INDEX idx_project_bom_project_name ON public.project_bom USING btree (project_name);
+
+
+--
+-- Name: idx_purchase_items_project; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_purchase_items_project ON public.purchase_items USING btree (project_name);
+
+
+--
+-- Name: idx_purchase_items_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_purchase_items_status ON public.purchase_items USING btree (status);
 
 
 --
@@ -840,6 +889,14 @@ ALTER TABLE ONLY public.project_dates
 
 
 --
+-- Name: purchase_items purchase_items_pbp_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.purchase_items
+    ADD CONSTRAINT purchase_items_pbp_fkey FOREIGN KEY (project_bom_part_id) REFERENCES public.project_bom_parts(id) ON DELETE SET NULL;
+
+
+--
 -- Name: user_pins user_pins_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -931,5 +988,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gjxQp57JZ4wdLHawuBJIQqD2fGyhlk9ao6mpwbCTCo7DE4s3BlmcKzaI1wcAU0R
+\unrestrict oJRL8beOgn45yjuTSox2hvCBb16D2UDkH8IoCIVo4c4ybWi7qm6aTetiDsNVdSe
 

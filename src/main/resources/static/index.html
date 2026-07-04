@@ -499,6 +499,7 @@
     <button class="nav-tab" data-tab="users" onclick="switchTab('users')">👷 Personel</button>
     <button class="nav-tab" data-tab="stats" onclick="switchTab('stats')">📈 İstatistik</button>
     <button class="nav-tab" data-tab="orders" onclick="switchTab('orders')">📋 Siparişler</button>
+    <button class="nav-tab" data-tab="purchasing" onclick="switchTab('purchasing')">🛒 Satın Alma</button>
     <button class="nav-tab" data-tab="planning" onclick="switchTab('planning')">📅 Planlama</button>
     <button class="nav-tab" data-tab="bom" onclick="switchTab('bom')">🌳 Ürün Ağacı</button>
   </div>
@@ -961,6 +962,59 @@
 </div>
 
 <!-- KULLANICI YÖNETİMİ (sadece geliştirici) -->
+<!-- SATIN ALMA PLANLAMASI -->
+<div class="view" id="view-purchasing">
+  <div class="section-title">SATIN ALMA PLANLAMASI</div>
+  <div class="section-sub">Proje seç · Ürün ağacından aktar veya elle kalem ekle · Sipariş ve teslim durumunu takip et</div>
+
+  <!-- Proje seçimi + aksiyonlar -->
+  <div class="form-card" style="margin-bottom:16px">
+    <div class="form-row">
+      <div class="form-group" style="flex:1"><label>Proje</label>
+        <select id="pur-project-sel" onchange="renderPurchaseList()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+          <option value="">— Tüm projeler —</option>
+        </select>
+      </div>
+      <div class="form-group" style="display:flex;align-items:flex-end;gap:8px">
+        <button class="btn btn-primary" onclick="openPurImport()">🌳 Ürün Ağacından Aktar</button>
+        <button class="btn btn-ghost" onclick="togglePurForm()">+ Elle Kalem Ekle</button>
+      </div>
+    </div>
+    <div id="pur-summary" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>
+  </div>
+
+  <!-- Elle kalem ekleme formu (gizli başlar) -->
+  <div class="form-card" id="pur-add-form" style="display:none;margin-bottom:16px">
+    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:14px">+ Yeni Satın Alma Kalemi</div>
+    <div class="form-row">
+      <div class="form-group"><label>Ad *</label><input type="text" id="pur-name" placeholder="Örn: M12 civata"></div>
+      <div class="form-group"><label>Kod</label><input type="text" id="pur-code" placeholder="Örn: CVT-M12"></div>
+      <div class="form-group"><label>Miktar</label><input type="number" id="pur-qty" placeholder="1" min="0" step="0.01"></div>
+      <div class="form-group"><label>Birim</label><input type="text" id="pur-unit" placeholder="adet"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Malzeme</label><input type="text" id="pur-material" placeholder="Örn: St-37"></div>
+      <div class="form-group"><label>Tedarikçi</label><input type="text" id="pur-supplier" placeholder="Örn: X Metal A.Ş."></div>
+      <div class="form-group"><label>Birim Fiyat</label><input type="number" id="pur-price" placeholder="0.00" min="0" step="0.01"></div>
+      <div class="form-group"><label>Para Birimi</label>
+        <select id="pur-currency" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+          <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Termin Tarihi</label><input type="date" id="pur-date"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1"><label>Not</label><input type="text" id="pur-notes" placeholder="Opsiyonel not"></div>
+      <div class="form-group" style="display:flex;align-items:flex-end">
+        <button class="btn btn-primary" onclick="addPurchaseItem()">🛒 Kalemi Ekle</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kalem listesi -->
+  <div id="pur-list"></div>
+</div>
+
 <div class="view" id="view-appusers">
   <div class="section-title">KULLANICI YÖNETİMİ</div>
   <div class="section-sub">Kullanıcı ekle · Yetki tanımla</div>
@@ -980,6 +1034,7 @@
       <div class="perm-item" data-perm="stats" onclick="togglePerm(this)"><div class="perm-check"></div>📈 İstatistik</div>
       <div class="perm-item" data-perm="orders_view" onclick="togglePerm(this)"><div class="perm-check"></div>📋 Siparişler (Görüntüle)</div>
       <div class="perm-item" data-perm="orders_edit" onclick="togglePerm(this)"><div class="perm-check"></div>📋 Siparişler (Düzenle)</div>
+      <div class="perm-item" data-perm="purchasing" onclick="togglePerm(this)"><div class="perm-check"></div>🛒 Satın Alma</div>
       <div class="perm-item" data-perm="planning" onclick="togglePerm(this)"><div class="perm-check"></div>📅 Planlama</div>
       <div class="perm-item" data-perm="scan" onclick="togglePerm(this)"><div class="perm-check"></div>📷 QR Okutma</div>
     </div>
@@ -1312,7 +1367,8 @@ const TABLE_ENDPOINTS = {
   bom_operations: 'bom-operations',
   bom_parts: 'bom-parts',
   project_bom: 'project-bom',
-  project_bom_parts: 'project-bom-parts'
+  project_bom_parts: 'project-bom-parts',
+  purchase_items: 'purchase-items'
 };
 
 // ─── Ortak fetch: JWT header + ApiResponse unwrap + 401 yönetimi ───
@@ -4887,9 +4943,310 @@ async function switchTab(tab) {
   if(tab==='users')     renderUsers();
   if(tab==='stats')     renderStatsView();
   if(tab==='orders')    renderOrders();
+  if(tab==='purchasing') renderPurchasing();
   if(tab==='planning')  renderPlanning();
   if(tab==='bom')       initBom();
   if(tab==='appusers')  renderAppUsers();
+}
+
+// ═══ SATIN ALMA PLANLAMASI ═══
+let purchaseItems = [];
+
+const PUR_STATUS = {
+  PLANNED:      {label:'Planlandı',        icon:'📝', color:'#f5a623'},
+  ORDERED:      {label:'Sipariş Verildi',  icon:'📦', color:'#2980b9'},
+  RECEIVED:     {label:'Teslim Alındı',    icon:'📥', color:'#27ae60'},
+  IN_STOCK:     {label:'Stokta Var',       icon:'✅', color:'#16a085'},
+  IN_WAREHOUSE: {label:'Üretim Deposunda', icon:'🏭', color:'#2ecc71'},
+  CANCELLED:    {label:'İptal',            icon:'✖',  color:'#e74c3c'}
+};
+// Durum başına sonraki adım butonları: [hedefDurum, buton yazısı]
+const PUR_ACTIONS = {
+  PLANNED:      [['ORDERED','📦 Sipariş Ver'],['IN_STOCK','✅ Stokta Var'],['CANCELLED','✖ İptal']],
+  ORDERED:      [['RECEIVED','📥 Teslim Alındı'],['PLANNED','↩ Geri Al']],
+  RECEIVED:     [['IN_WAREHOUSE','🏭 Depoya Aktar'],['ORDERED','↩ Geri Al']],
+  IN_STOCK:     [['IN_WAREHOUSE','🏭 Depoya Aktar'],['PLANNED','↩ Geri Al']],
+  IN_WAREHOUSE: [['RECEIVED','↩ Geri Al']],
+  CANCELLED:    [['PLANNED','↩ Geri Al']]
+};
+
+async function renderPurchasing(){
+  // Satın alma kalemleri + aktarma için proje BOM verileri
+  const [pi] = await Promise.all([
+    dbGet('purchase_items','order=created_at.asc'),
+    loadProjectBoms()
+  ]);
+  purchaseItems = Array.isArray(pi) ? pi : [];
+
+  // Proje dropdown'u: siparişlerdeki + mevcut kalemlerdeki proje adları
+  const sel = document.getElementById('pur-project-sel');
+  if(sel){
+    const cur = sel.value;
+    const projNames = [...new Set([
+      ...orders.map(o=>o.project_name),
+      ...purchaseItems.map(i=>i.project_name)
+    ].filter(Boolean))].sort();
+    sel.innerHTML = '<option value="">— Tüm projeler —</option>' +
+      projNames.map(n=>`<option value="${n}">${n}</option>`).join('');
+    if(projNames.includes(cur)) sel.value = cur;
+  }
+  renderPurchaseList();
+}
+
+function purFmtMoney(v){ return Number(v).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function renderPurchaseList(){
+  const listEl = document.getElementById('pur-list');
+  const sumEl  = document.getElementById('pur-summary');
+  if(!listEl) return;
+  const proj  = document.getElementById('pur-project-sel')?.value || '';
+  const items = proj ? purchaseItems.filter(i=>i.project_name===proj) : purchaseItems;
+
+  // Durum özet çipleri + para toplamı (birim fiyatı olan kalemler)
+  if(sumEl){
+    const chips = Object.entries(PUR_STATUS).map(([st,m])=>{
+      const n = items.filter(i=>i.status===st).length;
+      if(!n) return '';
+      return `<span style="font-family:var(--font-mono);font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid ${m.color}44;color:${m.color};background:${m.color}11">${m.icon} ${m.label}: ${n}</span>`;
+    }).join('');
+    const totals = {};
+    items.forEach(i=>{
+      if(i.unit_price!=null && i.status!=='CANCELLED'){
+        const cur = i.currency||'TRY';
+        totals[cur] = (totals[cur]||0) + Number(i.unit_price)*Number(i.quantity||1);
+      }
+    });
+    const totalTxt = Object.entries(totals)
+      .map(([c,t])=>`${purFmtMoney(t)} ${c}`).join(' + ');
+    sumEl.innerHTML = chips + (totalTxt
+      ? `<span style="font-family:var(--font-mono);font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid var(--border);color:var(--muted);margin-left:auto">💰 Tahmini toplam: <b style="color:var(--accent)">${totalTxt}</b></span>` : '');
+  }
+
+  if(!items.length){
+    listEl.innerHTML = `<div class="empty-state"><span class="emoji">🛒</span>${proj?'Bu projede satın alma kalemi yok':'Henüz satın alma kalemi eklenmedi'}<br><span style="font-size:12px;color:var(--muted)">Ürün ağacından aktarın veya elle ekleyin</span></div>`;
+    return;
+  }
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  listEl.innerHTML = items.map(i=>{
+    const m = PUR_STATUS[i.status] || PUR_STATUS.PLANNED;
+    const actions = (PUR_ACTIONS[i.status]||[]).map(([st,txt])=>
+      `<button class="btn btn-ghost btn-sm" onclick="purSetStatus('${i.id}','${st}')">${txt}</button>`).join('');
+    const overdue = i.expected_date && !['RECEIVED','IN_WAREHOUSE','CANCELLED'].includes(i.status)
+      && new Date(i.expected_date) < today;
+    const dateTxt = i.expected_date
+      ? `<span style="color:${overdue?'var(--red,#e74c3c)':'var(--muted)'}">${overdue?'⚠ ':''}📆 ${new Date(i.expected_date).toLocaleDateString('tr-TR')}</span>` : '';
+    const priceTxt = i.unit_price!=null ? `💰 ${purFmtMoney(i.unit_price)} ${i.currency||'TRY'}` : '';
+    const meta = [
+      `${Number(i.quantity||1)} ${i.unit||'adet'}`,
+      i.material ? '🔩 '+i.material : '',
+      i.supplier ? '🏢 '+i.supplier : '',
+      priceTxt, dateTxt,
+      i.project_bom_part_id ? '🌳 ağaçtan' : '',
+      i.notes ? '🗒 '+i.notes : ''
+    ].filter(Boolean).join(' · ');
+
+    return `<div class="pbom-card" style="border-left:3px solid ${m.color}">
+      <div class="pbom-card-header">
+        <div style="min-width:0">
+          <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            ${i.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${i.code}</span>`:''}
+            ${i.name}
+            <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${m.color}44;color:${m.color};background:${m.color}11">${m.icon} ${m.label}</span>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
+            📁 ${i.project_name} · ${meta}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          ${actions}
+          <button class="btn btn-ghost btn-sm" onclick="editPurchaseItem('${i.id}')">✏️</button>
+          <button class="btn btn-ghost btn-sm" onclick="deletePurchaseItem('${i.id}')" style="color:var(--red,#e74c3c);border-color:rgba(231,76,60,.3)">🗑️</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function togglePurForm(){
+  const f = document.getElementById('pur-add-form');
+  if(f) f.style.display = f.style.display==='none' ? '' : 'none';
+}
+
+async function addPurchaseItem(){
+  const proj = document.getElementById('pur-project-sel').value;
+  const name = document.getElementById('pur-name').value.trim();
+  if(!proj){ toast('Önce proje seçin!','error'); return; }
+  if(!name){ toast('Kalem adı zorunlu!','error'); return; }
+  const qty   = parseFloat(document.getElementById('pur-qty').value);
+  const price = parseFloat(document.getElementById('pur-price').value);
+  const body = {
+    project_name: proj,
+    name,
+    code:     document.getElementById('pur-code').value.trim() || null,
+    quantity: isNaN(qty) ? 1 : qty,
+    unit:     document.getElementById('pur-unit').value.trim() || 'adet',
+    material: document.getElementById('pur-material').value.trim() || null,
+    supplier: document.getElementById('pur-supplier').value.trim() || null,
+    unit_price: isNaN(price) ? null : price,
+    currency: document.getElementById('pur-currency').value || 'TRY',
+    expected_date: document.getElementById('pur-date').value || null,
+    notes:    document.getElementById('pur-notes').value.trim() || null,
+    created_by: currentUser?.display_name || currentUser?.username || null
+  };
+  const data = await dbInsert('purchase_items', body);
+  if(!Array.isArray(data)||!data[0]){ toast('Kayıt hatası!','error'); return; }
+  purchaseItems.push(data[0]);
+  ['pur-name','pur-code','pur-qty','pur-unit','pur-material','pur-supplier','pur-price','pur-date','pur-notes']
+    .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  toast('Kalem eklendi!','success');
+  renderPurchaseList();
+}
+
+async function purSetStatus(id, status){
+  const ok = await dbUpdate('purchase_items', id, {status});
+  if(!ok){ toast('Durum güncellenemedi!','error'); return; }
+  // Damgalar backend'de atılır — listeyi tazele
+  const fresh = await dbGet('purchase_items','order=created_at.asc');
+  purchaseItems = Array.isArray(fresh) ? fresh : purchaseItems;
+  const m = PUR_STATUS[status];
+  toast(m ? m.icon+' '+m.label : 'Güncellendi','success');
+  renderPurchaseList();
+}
+
+async function deletePurchaseItem(id){
+  const item = purchaseItems.find(i=>i.id===id);
+  if(!item) return;
+  if(!confirm(`"${item.name}" satın alma listesinden silinsin mi?`)) return;
+  const ok = await dbDelete('purchase_items', id);
+  if(!ok){ toast('Silinemedi!','error'); return; }
+  purchaseItems = purchaseItems.filter(i=>i.id!==id);
+  toast('Kalem silindi','success');
+  renderPurchaseList();
+}
+
+function editPurchaseItem(id){
+  const i = purchaseItems.find(x=>x.id===id);
+  if(!i) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'pur-edit-overlay';
+  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 11px;outline:none';
+  overlay.innerHTML = `<div class="modal" style="width:520px;text-align:left">
+    <h3 style="margin-bottom:4px">✏️ Kalemi Düzenle</h3>
+    <p style="margin-bottom:14px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${i.name} · 📁 ${i.project_name}</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label style="font-size:11px;color:var(--muted)">Miktar</label><input type="number" id="pe-qty" value="${i.quantity!=null?Number(i.quantity):1}" min="0" step="0.01" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Birim</label><input type="text" id="pe-unit" value="${i.unit||'adet'}" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Tedarikçi</label><input type="text" id="pe-supplier" value="${(i.supplier||'').replace(/"/g,'&quot;')}" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Termin</label><input type="date" id="pe-date" value="${i.expected_date||''}" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Birim Fiyat</label><input type="number" id="pe-price" value="${i.unit_price!=null?Number(i.unit_price):''}" min="0" step="0.01" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Para Birimi</label>
+        <select id="pe-currency" style="${inp}">
+          ${['TRY','EUR','USD'].map(c=>`<option value="${c}" ${(i.currency||'TRY')===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:10px"><label style="font-size:11px;color:var(--muted)">Not</label><input type="text" id="pe-notes" value="${(i.notes||'').replace(/"/g,'&quot;')}" style="${inp}"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="document.getElementById('pur-edit-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" onclick="savePurchaseEdit('${i.id}')">💾 Kaydet</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function savePurchaseEdit(id){
+  const qty   = parseFloat(document.getElementById('pe-qty').value);
+  const price = parseFloat(document.getElementById('pe-price').value);
+  const body = {
+    quantity: isNaN(qty) ? 1 : qty,
+    unit:     document.getElementById('pe-unit').value.trim() || 'adet',
+    supplier: document.getElementById('pe-supplier').value.trim() || null,
+    unit_price: isNaN(price) ? null : price,
+    currency: document.getElementById('pe-currency').value || 'TRY',
+    expected_date: document.getElementById('pe-date').value || null,
+    notes:    document.getElementById('pe-notes').value.trim() || null
+  };
+  const ok = await dbUpdate('purchase_items', id, body);
+  if(!ok){ toast('Kaydedilemedi!','error'); return; }
+  document.getElementById('pur-edit-overlay')?.remove();
+  const fresh = await dbGet('purchase_items','order=created_at.asc');
+  purchaseItems = Array.isArray(fresh) ? fresh : purchaseItems;
+  toast('Kalem güncellendi!','success');
+  renderPurchaseList();
+}
+
+// ─── Ürün Ağacından Aktarma ───
+function openPurImport(){
+  const proj = document.getElementById('pur-project-sel').value;
+  if(!proj){ toast('Önce proje seçin!','error'); return; }
+
+  // Bu projenin BOM bağlantılarındaki parçalar (hariç tutulanlar dışında)
+  const pbIds = projectBoms.filter(pb=>pb.project_name===proj).map(pb=>pb.id);
+  if(!pbIds.length){ toast('Bu projeye bağlı ürün ağacı yok! Önce Ürün Ağacı sekmesinden bağlayın.','error'); return; }
+  const already = new Set(purchaseItems.map(i=>i.project_bom_part_id).filter(Boolean));
+  const candidates = projectBomParts.filter(p =>
+    pbIds.includes(p.project_bom_id) && !p.is_excluded && !already.has(p.id));
+
+  if(!candidates.length){ toast('Aktarılacak yeni parça yok — hepsi zaten listede.','error'); return; }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'pur-import-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:640px;max-height:80vh;display:flex;flex-direction:column;text-align:left">
+    <h3 style="margin-bottom:4px">🌳 Ürün Ağacından Aktar</h3>
+    <p style="margin-bottom:12px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">📁 ${proj} · ${candidates.length} parça aktarılabilir · Satın alınacakları işaretleyin</p>
+    <div style="margin-bottom:8px;display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="purImportToggleAll(true)">Tümünü Seç</button>
+      <button class="btn btn-ghost btn-sm" onclick="purImportToggleAll(false)">Tümünü Bırak</button>
+    </div>
+    <div id="pur-import-list" style="overflow-y:auto;flex:1;border:1px solid var(--border);border-radius:6px;padding:6px">
+      ${candidates.map(p=>`
+        <label style="display:flex;gap:10px;align-items:center;padding:7px 10px;border-radius:4px;cursor:pointer;font-family:var(--font-mono);font-size:12px" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+          <input type="checkbox" class="pur-import-chk" value="${p.id}" checked>
+          <span style="color:var(--accent);min-width:120px">${p.custom_code||'—'}</span>
+          <span style="flex:1">${'&nbsp;'.repeat((p.level||0)*3)}${p.custom_name||'—'}</span>
+          <span style="color:var(--muted)">${Number(p.custom_qty||1)} ${p.custom_unit||'adet'}${p.custom_material?' · '+p.custom_material:''}</span>
+        </label>`).join('')}
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost" onclick="document.getElementById('pur-import-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" id="pur-import-btn" onclick="purImportSelected('${ea(proj)}')">📥 Seçilenleri Aktar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+function purImportToggleAll(state){
+  document.querySelectorAll('.pur-import-chk').forEach(c=>{ c.checked = state; });
+}
+
+async function purImportSelected(proj){
+  const ids = [...document.querySelectorAll('.pur-import-chk:checked')].map(c=>c.value);
+  if(!ids.length){ toast('Parça seçilmedi!','error'); return; }
+  const btn = document.getElementById('pur-import-btn');
+  btn.disabled = true; btn.textContent = 'Aktarılıyor...';
+
+  let okCount = 0;
+  for(const pid of ids){
+    const p = projectBomParts.find(x=>x.id===pid);
+    if(!p) continue;
+    const data = await dbInsert('purchase_items',{
+      project_name: proj,
+      project_bom_part_id: p.id,
+      name: p.custom_name || '—',
+      code: p.custom_code || null,
+      quantity: p.custom_qty != null ? p.custom_qty : 1,
+      unit: p.custom_unit || 'adet',
+      material: p.custom_material || null,
+      created_by: currentUser?.display_name || currentUser?.username || null
+    });
+    if(Array.isArray(data)&&data[0]){ purchaseItems.push(data[0]); okCount++; }
+  }
+  document.getElementById('pur-import-overlay')?.remove();
+  toast(okCount+' parça satın alma listesine aktarıldı!','success');
+  renderPurchaseList();
 }
 
 // ═══ KULLANICI YÖNETİMİ ═══
@@ -4993,8 +5350,8 @@ function editAppUserPerms(id) {
   const u = appUsers.find(x => x.id === id);
   if (!u) return;
   const perms = Array.isArray(u.permissions) ? u.permissions : JSON.parse(u.permissions||'[]');
-  const allPerms = ['dashboard','parts','users','stats','orders_view','orders_edit','planning','scan'];
-  const labels = {dashboard:'📊 Dashboard',parts:'🔧 Parçalar',users:'👷 Personel',stats:'📈 İstatistik',orders_view:'📋 Siparişler (Görüntüle)',orders_edit:'📋 Siparişler (Düzenle)',planning:'📅 Planlama',scan:'📷 QR Okutma'};
+  const allPerms = ['dashboard','parts','users','stats','orders_view','orders_edit','purchasing','planning','scan'];
+  const labels = {dashboard:'📊 Dashboard',parts:'🔧 Parçalar',users:'👷 Personel',stats:'📈 İstatistik',orders_view:'📋 Siparişler (Görüntüle)',orders_edit:'📋 Siparişler (Düzenle)',purchasing:'🛒 Satın Alma',planning:'📅 Planlama',scan:'📷 QR Okutma'};
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
