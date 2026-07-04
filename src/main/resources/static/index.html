@@ -1662,7 +1662,7 @@ async function genelVeriGetir(tabloAdi, query) {
     const byParent = parsed.filters.find(f => f.field === 'parent_custom_id' && f.op === 'eq');
     if (byBom) path += '/by-project-bom/' + byBom.value;
     else if (byParent) path += '/by-parent/' + byParent.value;
-    else { console.error('project_bom_parts icin project_bom_id filtresi gerekli'); return []; }
+    // filtre yoksa kok endpoint tum listeyi doner (planlama ekrani kullanir)
   } else if (tabloAdi === 'user_pins') {
     const byUser = parsed.filters.find(f => f.field === 'user_id' && f.op === 'eq');
     if (byUser) path += '?userId=' + encodeURIComponent(byUser.value);

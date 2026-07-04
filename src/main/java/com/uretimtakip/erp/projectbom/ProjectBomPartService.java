@@ -59,6 +59,12 @@ public class ProjectBomPartService {
     // ============ LIST / GET ============
 
     @Transactional(readOnly = true)
+    public List<ProjectBomPartResponse> listAll() {
+        // Frontend planlama ekrani tum listeyi ceker, filtreyi client-side uygular
+        return resolveAll(projectBomPartRepository.findAll());
+    }
+
+    @Transactional(readOnly = true)
     public List<ProjectBomPartResponse> listByProjectBom(UUID projectBomId) {
         if (!projectBomRepository.existsById(projectBomId)) {
             throw new ResourceNotFoundException("ProjectBom", "id", projectBomId);

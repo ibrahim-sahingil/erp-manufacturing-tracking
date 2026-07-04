@@ -40,6 +40,12 @@ public class ProjectBomPartController {
 
     private final ProjectBomPartService projectBomPartService;
 
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<ProjectBomPartResponse>>> listAll() {
+        // Frontend planlama ekrani tum listeyi ceker, filtreyi client-side uygular
+        return ResponseEntity.ok(ApiResponse.success(projectBomPartService.listAll()));
+    }
+
     @GetMapping("/by-project-bom/{projectBomId}")
     public ResponseEntity<ApiResponse<List<ProjectBomPartResponse>>> listByProjectBom(
             @PathVariable UUID projectBomId) {
