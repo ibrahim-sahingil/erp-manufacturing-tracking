@@ -1959,14 +1959,97 @@ async function loadLogs(partId){
 // ═══ TABS ═══
 // ═══ DASHBOARD — 3 katman ═══
 async function renderDashboard(){
-  // Taze veri çek
-  const freshParts = await dbGet('parts','order=created_at.asc');
+  // Taze veri çek (iş emirleri de dashboard'da gösterilir — akış adım 6)
+  const [freshParts, freshWo, freshWop] = await Promise.all([
+    dbGet('parts','order=created_at.asc'),
+    dbGet('work_orders','order=start_datetime.asc'),
+    dbGet('work_order_parts','order=created_at.asc')
+  ]);
   if(Array.isArray(freshParts)) parts = freshParts;
+  if(Array.isArray(freshWo))    workOrders = freshWo;
+  if(Array.isArray(freshWop))   workOrderParts = freshWop;
   _activeProject=null; _activeDept=null;
   showLayer('projects');
   renderStats();
   renderBreadcrumb();
   renderProjectCards();
+}
+
+// İş emri rozet yardımcıları (dashboard katmanları için)
+const WO_COLORS = { planned:'#f5a623', inprogress:'#2980b9', done:'#2ecc71', cancelled:'#e74c3c' };
+function woBadgeCounts(list){
+  const c = { planned:0, inprogress:0 };
+  list.forEach(w=>{ if(c[w.status]!==undefined) c[w.status]++; });
+  const parts = [];
+  if(c.planned)    parts.push(`<span style="color:${WO_COLORS.planned}">📅 ${c.planned} planlı</span>`);
+  if(c.inprogress) parts.push(`<span style="color:${WO_COLORS.inprogress}">🔄 ${c.inprogress} devam</span>`);
+  return parts.join(' · ');
+}
+
+// Bölüm detayındaki İş Emirleri şeridi (akış adım 6: planlanan işler
+// bölümün dashboard'ına düşer, oradan kontrol edilir/ilerletilir)
+function deptWoStripHTML(deptId){
+  const deptWos = workOrders
+    .filter(w => w.project_name===_activeProject &&
+      (deptId==='__unassigned__' ? !w.department_id : w.department_id===deptId))
+    .sort((a,b)=> new Date(a.start_datetime||0) - new Date(b.start_datetime||0));
+  if(!deptWos.length) return '';
+
+  const fmtDt = v => v ? new Date(v).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : null;
+  const ACTIONS = {
+    planned:    [['inprogress','▶ Başlat']],
+    inprogress: [['done','✅ Tamamla'],['planned','↩ Geri Al']],
+    done:       [['inprogress','↩ Geri Al']],
+    cancelled:  [['planned','↩ Planla']]
+  };
+
+  const rows = deptWos.map(w=>{
+    const color = WO_COLORS[w.status] || 'var(--muted)';
+    const st    = WO_STATUS[w.status]?.lbl || w.status;
+    const wops  = workOrderParts.filter(p=>p.work_order_id===w.id);
+    const nameOf = p => p.part_name || p.part_code ||
+      (parts.find(x=>x.id===p.part_id)||{}).name || null;
+    const resolved = wops.map(nameOf).filter(Boolean);
+    const partNames = resolved.slice(0,3).join(', ')
+      + (resolved.length>3 ? ` +${resolved.length-3}` : '');
+    const meta = [
+      fmtDt(w.start_datetime) ? '🕐 '+fmtDt(w.start_datetime)+(fmtDt(w.end_datetime)?' → '+fmtDt(w.end_datetime):'') : '',
+      w.assigned_user ? '👷 '+w.assigned_user : '',
+      w.workspace_name ? '📍 '+w.workspace_name : '',
+      wops.length ? '🔧 '+wops.length+' parça' : '',
+      w.notes ? '🗒 '+w.notes : ''
+    ].filter(Boolean).join(' · ');
+    const btns = (ACTIONS[w.status]||[]).map(([s,txt])=>
+      `<button class="btn btn-ghost btn-sm" onclick="dashWoSetStatus('${w.id}','${s}')">${txt}</button>`).join('');
+
+    return `<div class="pbom-card" style="border-left:3px solid ${color}">
+      <div class="pbom-card-header">
+        <div style="min-width:0">
+          <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            📋 İş Emri
+            <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${color}44;color:${color};background:${color}11">${st}</span>
+            ${partNames?`<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${partNames}</span>`:''}
+          </div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">${meta}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${btns}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div style="margin-bottom:24px">
+    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">📋 İş Emirleri (${deptWos.length})</div>
+    ${rows}
+  </div>`;
+}
+
+async function dashWoSetStatus(id, status){
+  const ok = await dbUpdate('work_orders', id, {status});
+  if(!ok){ toast('Durum güncellenemedi!','error'); return; }
+  const w = workOrders.find(x=>x.id===id);
+  if(w) w.status = status;
+  toast((WO_STATUS[status]?.lbl || status),'success');
+  if(_activeDept) openDept(_activeDept.id, _activeDept.name);
 }
 
 function showLayer(layer){
@@ -2060,10 +2143,12 @@ function renderProjectCards(){
       .map(p=>new Date(p.created_at))
       .sort((a,b)=>a-b)[0];
     const firstDateStr = firstDate ? firstDate.toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+    const woLine = woBadgeCounts(workOrders.filter(w=>(w.project_name||'(Proje Yok)')===name));
     return `<div class="project-card${pinned?' pinned':''}" onclick="openProject('${ea(name)}')">
       <button class="pin-btn${pinned?' active':''}" onclick="togglePin('project','${ea(name)}',event)" title="${pinned?'Sabitlemeyi kaldır':'Sabitle'}">📌</button>
       <div class="project-card-name">${name}</div>
       <div class="project-card-count">${t} parça &middot; %${qdp} tamamlandı <span style="font-size:10px;opacity:.6">(adet bazlı)</span></div>
+      ${woLine?`<div style="font-family:var(--font-mono);font-size:10px;margin-top:2px">📋 ${woLine}</div>`:''}
       <div class="project-mini-bars">
         <div class="pmb-done" style="flex:${qdp}"></div>
         <div class="pmb-pending" style="flex:${qpp}"></div>
@@ -2167,6 +2252,8 @@ function openProject(name){
       </div>
       <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:6px;border-top:1px solid var(--border);padding-top:6px">
         Toplam: <b style="color:var(--text)">${qd+qr}</b> / ${qt} adet
+        ${(()=>{ const wl = woBadgeCounts(workOrders.filter(w=>w.project_name===name && w.department_id===dept.id));
+                 return wl ? `<span style="float:right">📋 ${wl}</span>` : ''; })()}
       </div>
     </div>`;
   });
@@ -2231,6 +2318,7 @@ function openDept(deptId, deptName){
         <div class="report-progress"><div class="report-progress-fill" style="width:${pctRej}%"></div></div>
       </div>
     </div>
+    ${deptWoStripHTML(deptId)}
     <!-- Rapor tablosu -->
     <div class="report-table" style="margin-bottom:24px">
       <div class="report-table-header">

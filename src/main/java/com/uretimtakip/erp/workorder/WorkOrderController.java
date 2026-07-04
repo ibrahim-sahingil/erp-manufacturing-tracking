@@ -3,6 +3,7 @@ package com.uretimtakip.erp.workorder;
 import com.uretimtakip.erp.common.ApiResponse;
 import com.uretimtakip.erp.workorder.dto.WorkOrderRequest;
 import com.uretimtakip.erp.workorder.dto.WorkOrderResponse;
+import com.uretimtakip.erp.workorder.dto.WorkOrderUpdateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -68,7 +69,7 @@ public class WorkOrderController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<WorkOrderResponse>> update(
             @PathVariable UUID id,
-            @Valid @RequestBody WorkOrderRequest request) {
+            @Valid @RequestBody WorkOrderUpdateRequest request) {
 
         WorkOrderResponse updated = workOrderService.update(id, request);
         return ResponseEntity.ok(ApiResponse.success("Is emri guncellendi", updated));

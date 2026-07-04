@@ -3,6 +3,7 @@ package com.uretimtakip.erp.workorder;
 import com.uretimtakip.erp.common.exception.ResourceNotFoundException;
 import com.uretimtakip.erp.workorder.dto.WorkOrderRequest;
 import com.uretimtakip.erp.workorder.dto.WorkOrderResponse;
+import com.uretimtakip.erp.workorder.dto.WorkOrderUpdateRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -84,20 +85,24 @@ public class WorkOrderService {
     }
 
     @Transactional
-    public WorkOrderResponse update(UUID id, WorkOrderRequest request) {
+    public WorkOrderResponse update(UUID id, WorkOrderUpdateRequest request) {
         WorkOrder workOrder = findEntityById(id);
 
-        workOrder.setOrderId(request.getOrderId());
-        workOrder.setDepartmentId(request.getDepartmentId());
-        workOrder.setWorkspaceId(request.getWorkspaceId());
-        workOrder.setAssignedUserId(request.getAssignedUserId());
-        workOrder.setStartDatetime(request.getStartDatetime());
-        workOrder.setEndDatetime(request.getEndDatetime());
-        if (request.getStatus() != null) workOrder.setStatus(request.getStatus());
-        workOrder.setNotes(request.getNotes());
+        // PARTIAL update: sadece gonderilen (non-null) alanlar islenir.
+        // Dashboard {status} tek basina yollar; revize modali da kismi yollar.
+        if (request.getOrderId() != null) workOrder.setOrderId(request.getOrderId());
+        if (request.getDepartmentId() != null) workOrder.setDepartmentId(request.getDepartmentId());
+        if (request.getWorkspaceId() != null) workOrder.setWorkspaceId(request.getWorkspaceId());
+        if (request.getAssignedUserId() != null) workOrder.setAssignedUserId(request.getAssignedUserId());
+        if (request.getStartDatetime() != null) workOrder.setStartDatetime(request.getStartDatetime());
+        if (request.getEndDatetime() != null) workOrder.setEndDatetime(request.getEndDatetime());
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            workOrder.setStatus(request.getStatus());
+        }
+        if (request.getNotes() != null) workOrder.setNotes(request.getNotes());
 
         WorkOrder updated = workOrderRepository.save(workOrder);
-        log.info("WorkOrder updated: id={}", updated.getId());
+        log.info("WorkOrder updated: id={}, status={}", updated.getId(), updated.getStatus());
 
         return WorkOrderResponse.fromEntity(updated);
     }
