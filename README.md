@@ -58,6 +58,12 @@ Proje, temiz kod prensiplerine uygun olarak **Katmanlı Mimari (Layered Architec
    VALUES (gen_random_uuid(), 'Yönetici', 'developer', true, 'admin', 'sifreniz', '[]'::jsonb);
    ```
 
+## 📄 Lisans
+
+Bu proje **portföy/inceleme amacıyla** herkese açık yayınlanmıştır — **tüm hakları
+saklıdır**. Kodun kopyalanması, başka projelerde kullanılması veya dağıtılması
+yazılı izin olmadan yasaktır. Ayrıntılar için [LICENSE](LICENSE) dosyasına bakın.
+
 ## 📌 Notlar
 
 - **JDK 22+** ile derlerken `pom.xml`'deki `<proc>full</proc>` ayarı zorunludur
