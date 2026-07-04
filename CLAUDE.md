@@ -1,6 +1,7 @@
 # Üretim Takip ERP — Proje Rehberi
 
-QR kod destekli üretim takip sistemi. İki geliştirici: backend (İbrahim) + frontend.
+QR kod destekli üretim takip sistemi. Tek geliştirici (İbrahim);
+ikinci kişi fikir/test notu sağlar, geliştirme yapmaz.
 
 ## Çalıştırma
 
@@ -42,13 +43,16 @@ QR kod destekli üretim takip sistemi. İki geliştirici: backend (İbrahim) + f
   **Backend'de endpoint/alan değişirse bu adapter da güncellenmeli.**
 - Entity'lerdeki doc comment'ler DB şemasını belgeler — şema sorusu olursa önce oraya bak.
 
-## İş Birliği Kuralları
+## Çalışma Düzeni
 
-- `master` her zaman çalışır durumda; iş feature branch + Pull Request ile birleşir.
-- `static/index.html` frontend geliştiricinin alanıdır; `src/main/java` backend'in.
-  API sözleşmesi değişiklikleri iki tarafın onayıyla yapılır.
+- Tek geliştirici → doğrudan `master`'a commit edilir; büyük/riskli işlerde
+  feature branch açılabilir.
+- Fikir/test notları ikinci kişiden not olarak gelir (veya GitHub Issues);
+  hata bildirimlerinde ekran + adımlar + Console hatası istenir.
 - Commit'lerden önce `./mvnw compile` geçmeli; frontend değişikliğinde
   `node` ile script bloğu syntax kontrolü yapılabilir.
+- Backend'de endpoint/alan değişince index.html'deki adapter (TABLE_ENDPOINTS /
+  FIELD_XLATE) aynı commit'te güncellenmeli.
 
 ## Test
 
