@@ -1337,7 +1337,14 @@ async function apiFetch(path, options = {}) {
   let body = null;
   try { body = await r.json(); } catch(e) {}
   if (!r.ok || (body && body.success === false)) {
-    throw new Error((body && body.message) ? body.message : ('HTTP ' + r.status));
+    let msg = (body && body.message) ? body.message : ('HTTP ' + r.status);
+    // Dogrulama hatalarinda alan detaylari data icinde gelir:
+    // {"message":"Dogrulama hatasi","data":{"customerEmail":"Gecerli bir email girin"}}
+    if (body && body.data && typeof body.data === 'object' && !Array.isArray(body.data)) {
+      const details = Object.values(body.data).filter(v => typeof v === 'string');
+      if (details.length) msg += ': ' + details.join(', ');
+    }
+    throw new Error(msg);
   }
   return body ? body.data : null;
 }
@@ -1629,6 +1636,14 @@ function _maybeInvalidate(tabloAdi){
   }
 }
 
+// Backend'in gercek hata mesajini kullaniciya goster
+// (cagiran yerlerin genel "Kayit hatasi!" toast'ina ek olarak sebep belirtir)
+function _showApiError(e) {
+  if (typeof toast !== 'function' || !e || !e.message) return;
+  if (/^AUTH_/.test(e.message) || /^HTTP \d+$/.test(e.message)) return;
+  toast(e.message, 'error');
+}
+
 // ─── Genel API Fonksiyonları ───
 async function genelVeriGetir(tabloAdi, query) {
   const endpoint = TABLE_ENDPOINTS[tabloAdi];
@@ -1672,6 +1687,7 @@ async function genelVeriEkle(tabloAdi, veri) {
     return rows;
   } catch(e) {
     console.error('POST hatası', tabloAdi, e.message);
+    _showApiError(e);
     return [];
   }
 }
@@ -1686,6 +1702,7 @@ async function genelVeriGuncelle(tabloAdi, id, veri) {
     return true;
   } catch(e) {
     console.error('PUT hatası', tabloAdi, e.message);
+    _showApiError(e);
     return false;
   }
 }
@@ -1699,6 +1716,7 @@ async function genelVeriSil(tabloAdi, id) {
     return true;
   } catch(e) {
     console.error('DELETE hatası', tabloAdi, e.message);
+    _showApiError(e);
     return false;
   }
 }
@@ -3756,10 +3774,8 @@ async function saveWorkOrder() {
   const btn  = document.getElementById('wo-save-btn');
   btn.disabled = true; btn.textContent = 'Kaydediliyor...';
 
-  const woId = genId();
   const [woData] = await Promise.all([
     dbInsert('work_orders', {
-      id: woId,
       project_name:    proj,
       department_id:   deptId||null,
       department_name: dept?.name||null,
@@ -3777,8 +3793,9 @@ async function saveWorkOrder() {
 
   // Parçaları kaydet ve dönen veriyi workOrderParts'a ekle
   const selected = parts.filter(p => _woSelectedParts.has(p.id));
+  // ONEMLI: backend'in dondurdugu GERCEK id kullanilir (genId degil!)
   const partInserts = await Promise.all(selected.map(p => dbInsert('work_order_parts',{
-    id: genId(), work_order_id: woId,
+    work_order_id: woData[0].id,
     part_id: p.id, part_name: p.name, part_code: p.code,
     qty: parseInt(p.qty)||1
   })));
