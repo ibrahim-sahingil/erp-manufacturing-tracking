@@ -1333,7 +1333,12 @@ async function apiFetch(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
   const r = await fetch(API_BASE_URL + path, { ...options, headers });
-  if (r.status === 401 || r.status === 403) { handleUnauthorized(); throw new Error('AUTH_' + r.status); }
+  if (r.status === 401 || r.status === 403) {
+    // Sadece elimizde token VARSA (suresi dolmus demektir) login'e dusur.
+    // Token yokken reload etmek sonsuz yenileme dongusu yaratir (QR akisi).
+    if (authToken) handleUnauthorized();
+    throw new Error('AUTH_' + r.status);
+  }
   let body = null;
   try { body = await r.json(); } catch(e) {}
   if (!r.ok || (body && body.success === false)) {
@@ -1753,15 +1758,17 @@ async function init(){
     document.getElementById('nav-tabs').style.display='none';
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     document.getElementById('view-scan').classList.add('active');
-    await loadAll(); hideLoading();
-    // Session'da kullanıcı var mı?
+    // Session'da kullanıcı var mı? (Veri cekmeden ONCE kontrol edilmeli —
+    // token olmadan loadAll cagirmak 401 dongusune sokar)
     const savedQr = sessionStorage.getItem('ut_user');
-    if(savedQr){
+    if(savedQr && sessionStorage.getItem('ut_token')){
       currentUser = JSON.parse(savedQr);
       document.getElementById('login-screen').style.display='none';
+      await loadAll(); hideLoading();
       renderScan(pid);
     } else {
-      // QR için özel giriş ekranı
+      // QR için özel giriş ekranı — veri girişten sonra yüklenir
+      hideLoading();
       document.getElementById('login-screen').style.display='flex';
       showQrLoginMode(pid);
     }
@@ -4760,6 +4767,10 @@ async function doLogin() {
   document.getElementById('login-screen').style.display = 'none';
 
   if(_qrPartId) {
+    // QR girisinden sonra veriler yuklenmeli (init'te artik yuklenmiyor)
+    showLoading();
+    await loadAll();
+    hideLoading();
     renderScan(_qrPartId);
     _qrPartId = null;
   } else {
