@@ -500,6 +500,7 @@
     <button class="nav-tab" data-tab="stats" onclick="switchTab('stats')">📈 İstatistik</button>
     <button class="nav-tab" data-tab="orders" onclick="switchTab('orders')">📋 Siparişler</button>
     <button class="nav-tab" data-tab="purchasing" onclick="switchTab('purchasing')">🛒 Satın Alma</button>
+    <button class="nav-tab" data-tab="warehouse" onclick="switchTab('warehouse')">🏭 Depo</button>
     <button class="nav-tab" data-tab="planning" onclick="switchTab('planning')">📅 Planlama</button>
     <button class="nav-tab" data-tab="bom" onclick="switchTab('bom')">🌳 Ürün Ağacı</button>
   </div>
@@ -1015,6 +1016,35 @@
   <div id="pur-list"></div>
 </div>
 
+<!-- ÜRETİM DEPOSU -->
+<div class="view" id="view-warehouse">
+  <div class="section-title">ÜRETİM DEPOSU</div>
+  <div class="section-sub">Depoya giren malzemeler · Beklenen girişler · Proje bazında takip</div>
+
+  <div class="form-card" style="margin-bottom:16px">
+    <div class="form-row">
+      <div class="form-group" style="flex:1"><label>Proje</label>
+        <select id="wh-project-sel" onchange="renderWarehouseList()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+          <option value="">— Tüm projeler —</option>
+        </select>
+      </div>
+    </div>
+    <div id="wh-summary" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>
+  </div>
+
+  <!-- Beklenen girişler -->
+  <div id="wh-pending-wrap" style="margin-bottom:20px">
+    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">📦 Beklenen Girişler</div>
+    <div id="wh-pending"></div>
+  </div>
+
+  <!-- Depodakiler -->
+  <div>
+    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">🏭 Depoda</div>
+    <div id="wh-list"></div>
+  </div>
+</div>
+
 <div class="view" id="view-appusers">
   <div class="section-title">KULLANICI YÖNETİMİ</div>
   <div class="section-sub">Kullanıcı ekle · Yetki tanımla</div>
@@ -1035,6 +1065,7 @@
       <div class="perm-item" data-perm="orders_view" onclick="togglePerm(this)"><div class="perm-check"></div>📋 Siparişler (Görüntüle)</div>
       <div class="perm-item" data-perm="orders_edit" onclick="togglePerm(this)"><div class="perm-check"></div>📋 Siparişler (Düzenle)</div>
       <div class="perm-item" data-perm="purchasing" onclick="togglePerm(this)"><div class="perm-check"></div>🛒 Satın Alma</div>
+      <div class="perm-item" data-perm="warehouse" onclick="togglePerm(this)"><div class="perm-check"></div>🏭 Depo</div>
       <div class="perm-item" data-perm="planning" onclick="togglePerm(this)"><div class="perm-check"></div>📅 Planlama</div>
       <div class="perm-item" data-perm="scan" onclick="togglePerm(this)"><div class="perm-check"></div>📷 QR Okutma</div>
     </div>
@@ -4944,6 +4975,7 @@ async function switchTab(tab) {
   if(tab==='stats')     renderStatsView();
   if(tab==='orders')    renderOrders();
   if(tab==='purchasing') renderPurchasing();
+  if(tab==='warehouse') renderWarehouse();
   if(tab==='planning')  renderPlanning();
   if(tab==='bom')       initBom();
   if(tab==='appusers')  renderAppUsers();
@@ -5249,6 +5281,109 @@ async function purImportSelected(proj){
   renderPurchaseList();
 }
 
+// ═══ ÜRETİM DEPOSU ═══
+async function renderWarehouse(){
+  const pi = await dbGet('purchase_items','order=created_at.asc');
+  purchaseItems = Array.isArray(pi) ? pi : purchaseItems;
+
+  const sel = document.getElementById('wh-project-sel');
+  if(sel){
+    const cur = sel.value;
+    const projNames = [...new Set(purchaseItems.map(i=>i.project_name).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="">— Tüm projeler —</option>' +
+      projNames.map(n=>`<option value="${n}">${n}</option>`).join('');
+    if(projNames.includes(cur)) sel.value = cur;
+  }
+  renderWarehouseList();
+}
+
+function whRow(i, actionsHTML){
+  const m = PUR_STATUS[i.status] || PUR_STATUS.PLANNED;
+  const dates = [];
+  if(i.ordered_at)  dates.push('📦 Sipariş: '+new Date(i.ordered_at).toLocaleDateString('tr-TR'));
+  if(i.received_at) dates.push('📥 Teslim: '+new Date(i.received_at).toLocaleDateString('tr-TR'));
+  if(i.expected_date && !i.received_at) dates.push('📆 Termin: '+new Date(i.expected_date).toLocaleDateString('tr-TR'));
+  const meta = [
+    `${Number(i.quantity||1)} ${i.unit||'adet'}`,
+    i.material ? '🔩 '+i.material : '',
+    i.supplier ? '🏢 '+i.supplier : '',
+    ...dates
+  ].filter(Boolean).join(' · ');
+  return `<div class="pbom-card" style="border-left:3px solid ${m.color}">
+    <div class="pbom-card-header">
+      <div style="min-width:0">
+        <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          ${i.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${i.code}</span>`:''}
+          ${i.name}
+          <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${m.color}44;color:${m.color};background:${m.color}11">${m.icon} ${m.label}</span>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">📁 ${i.project_name} · ${meta}</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${actionsHTML}</div>
+    </div>
+  </div>`;
+}
+
+function renderWarehouseList(){
+  const pendEl = document.getElementById('wh-pending');
+  const listEl = document.getElementById('wh-list');
+  const sumEl  = document.getElementById('wh-summary');
+  if(!listEl) return;
+  const proj  = document.getElementById('wh-project-sel')?.value || '';
+  const items = proj ? purchaseItems.filter(i=>i.project_name===proj) : purchaseItems;
+
+  const inWh    = items.filter(i=>i.status==='IN_WAREHOUSE');
+  // Girişi beklenenler: sipariş verildi / teslim alındı / stokta (henüz depoya aktarılmadı)
+  const pending = items.filter(i=>['ORDERED','RECEIVED','IN_STOCK'].includes(i.status));
+
+  if(sumEl){
+    const today = new Date(); today.setHours(0,0,0,0);
+    const late = pending.filter(i=>i.status==='ORDERED' && i.expected_date && new Date(i.expected_date)<today).length;
+    const chip = (icon,txt,color) =>
+      `<span style="font-family:var(--font-mono);font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid ${color}44;color:${color};background:${color}11">${icon} ${txt}</span>`;
+    sumEl.innerHTML =
+      chip('🏭','Depoda: '+inWh.length,'#2ecc71') +
+      chip('📦','Beklenen: '+pending.length,'#2980b9') +
+      (late ? chip('⚠','Termini geçen: '+late,'#e74c3c') : '');
+  }
+
+  if(pendEl){
+    pendEl.innerHTML = pending.length ? pending.map(i=>{
+      const btn = (i.status==='RECEIVED'||i.status==='IN_STOCK')
+        ? `<button class="btn btn-primary btn-sm" onclick="whTransfer('${i.id}')">🏭 Depoya Aktar</button>`
+        : `<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">teslim bekleniyor</span>`;
+      return whRow(i, btn);
+    }).join('')
+    : `<div class="empty-state" style="padding:18px"><span class="emoji">📦</span>Beklenen giriş yok</div>`;
+  }
+
+  listEl.innerHTML = inWh.length
+    ? inWh.map(i=>whRow(i,
+        `<button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)).join('')
+    : `<div class="empty-state" style="padding:18px"><span class="emoji">🏭</span>${proj?'Bu projede depoya girmiş malzeme yok':'Depoda malzeme yok'}</div>`;
+}
+
+async function whTransfer(id){
+  const ok = await dbUpdate('purchase_items', id, {status:'IN_WAREHOUSE'});
+  if(!ok){ toast('Aktarılamadı!','error'); return; }
+  const i = purchaseItems.find(x=>x.id===id);
+  if(i) i.status = 'IN_WAREHOUSE';
+  toast('🏭 Üretim deposuna aktarıldı!','success');
+  renderWarehouseList();
+}
+
+async function whUndo(id){
+  const i = purchaseItems.find(x=>x.id===id);
+  if(!i) return;
+  // Teslim alınmışsa RECEIVED'a, stok kalemiyse IN_STOCK'a geri döner
+  const back = i.received_at ? 'RECEIVED' : 'IN_STOCK';
+  const ok = await dbUpdate('purchase_items', id, {status:back});
+  if(!ok){ toast('Geri alınamadı!','error'); return; }
+  i.status = back;
+  toast('↩ Depodan geri alındı','success');
+  renderWarehouseList();
+}
+
 // ═══ KULLANICI YÖNETİMİ ═══
 let appUsers = [];
 
@@ -5350,8 +5485,8 @@ function editAppUserPerms(id) {
   const u = appUsers.find(x => x.id === id);
   if (!u) return;
   const perms = Array.isArray(u.permissions) ? u.permissions : JSON.parse(u.permissions||'[]');
-  const allPerms = ['dashboard','parts','users','stats','orders_view','orders_edit','purchasing','planning','scan'];
-  const labels = {dashboard:'📊 Dashboard',parts:'🔧 Parçalar',users:'👷 Personel',stats:'📈 İstatistik',orders_view:'📋 Siparişler (Görüntüle)',orders_edit:'📋 Siparişler (Düzenle)',purchasing:'🛒 Satın Alma',planning:'📅 Planlama',scan:'📷 QR Okutma'};
+  const allPerms = ['dashboard','parts','users','stats','orders_view','orders_edit','purchasing','warehouse','planning','scan'];
+  const labels = {dashboard:'📊 Dashboard',parts:'🔧 Parçalar',users:'👷 Personel',stats:'📈 İstatistik',orders_view:'📋 Siparişler (Görüntüle)',orders_edit:'📋 Siparişler (Düzenle)',purchasing:'🛒 Satın Alma',warehouse:'🏭 Depo',planning:'📅 Planlama',scan:'📷 QR Okutma'};
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
