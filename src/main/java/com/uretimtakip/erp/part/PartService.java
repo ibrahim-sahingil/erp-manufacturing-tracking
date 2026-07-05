@@ -59,9 +59,11 @@ public class PartService {
 
     @Transactional
     public PartResponse create(PartRequest request) {
-        if (partRepository.existsByCode(request.getCode())) {
+        // Kod benzersizligi PROJE kapsaminda ve harf duyarsiz:
+        // ayni urun agaci farkli projelere yayinlanabilmeli.
+        if (codeExistsInProject(request.getOrderId(), request.getCode(), null)) {
             throw new BusinessException(
-                    "Bu kodda bir parca zaten var: " + request.getCode(),
+                    "Bu projede bu kodda bir parca zaten var: " + request.getCode(),
                     "PART_CODE_EXISTS"
             );
         }
@@ -94,10 +96,12 @@ public class PartService {
         // PARTIAL update: sadece gonderilen (non-null) alanlar islenir.
         // QR/ilerleme kaydi yalnizca {status, qty_*} yollar.
         if (request.getCode() != null && !request.getCode().isBlank()
-                && !part.getCode().equals(request.getCode())) {
-            if (partRepository.existsByCode(request.getCode())) {
+                && !part.getCode().equalsIgnoreCase(request.getCode())) {
+            UUID targetOrderId = request.getOrderId() != null
+                    ? request.getOrderId() : part.getOrderId();
+            if (codeExistsInProject(targetOrderId, request.getCode(), part.getId())) {
                 throw new BusinessException(
-                        "Bu kodda bir parca zaten var: " + request.getCode(),
+                        "Bu projede bu kodda bir parca zaten var: " + request.getCode(),
                         "PART_CODE_EXISTS"
                 );
             }
@@ -128,6 +132,21 @@ public class PartService {
         Part part = findEntityById(id);
         partRepository.delete(part);
         log.info("Part deleted: id={}, code={}", id, part.getCode());
+    }
+
+    /**
+     * Ayni proje (order) icinde harf duyarsiz kod var mi?
+     * excludeId verilirse o kayit haric tutulur (update senaryosu).
+     */
+    private boolean codeExistsInProject(UUID orderId, String code, UUID excludeId) {
+        if (orderId == null) {
+            return excludeId == null
+                    ? partRepository.existsByOrderIdIsNullAndCodeIgnoreCase(code)
+                    : partRepository.existsByOrderIdIsNullAndCodeIgnoreCaseAndIdNot(code, excludeId);
+        }
+        return excludeId == null
+                ? partRepository.existsByOrderIdAndCodeIgnoreCase(orderId, code)
+                : partRepository.existsByOrderIdAndCodeIgnoreCaseAndIdNot(orderId, code, excludeId);
     }
 
     /**

@@ -1743,6 +1743,10 @@ function _maybeInvalidate(tabloAdi){
   }
 }
 
+// Son API hata mesaji — toplu islemler (or. yayinlama) ozet mesajinda
+// sebebi gosterebilsin diye saklanir.
+let _lastApiError = null;
+
 // Backend'in gercek hata mesajini kullaniciya goster
 // (cagiran yerlerin genel "Kayit hatasi!" toast'ina ek olarak sebep belirtir)
 function _showApiError(e) {
@@ -1794,6 +1798,7 @@ async function genelVeriEkle(tabloAdi, veri) {
     return rows;
   } catch(e) {
     console.error('POST hatası', tabloAdi, e.message);
+    _lastApiError = e.message;
     _showApiError(e);
     return [];
   }
@@ -2419,6 +2424,8 @@ async function addPart(){
   const deptId = document.getElementById('f-dept').value;
   if(!name||!code){ toast('Parça adı ve kodu zorunlu!','error'); return; }
   if(!project){ toast('Proje zorunlu!','error'); return; }
+  const dup = parts.find(p=>p.project===project && (p.code||'').toLowerCase()===code.toLowerCase());
+  if(dup){ toast(`Bu projede "${dup.code}" kodlu bir parça zaten var: ${dup.name}`,'error'); return; }
   const dept = depts.find(d=>d.id===deptId);
   const btn = document.getElementById('add-btn');
   btn.disabled=true; btn.textContent='Kaydediliyor...';
@@ -2628,6 +2635,16 @@ function showQR(id,name,code,drawing){
   document.getElementById('qr-modal').classList.add('open');
 }
 function closeQR(){ document.getElementById('qr-modal').classList.remove('open'); }
+// QR'i PNG data-URL olarak uret (yazdirma ciktilarinda <img> icin;
+// yazdirma penceresi CDN'e erisemese de calisir)
+function qrDataUrl(text, size){
+  try {
+    const tmp=document.createElement('div');
+    new QRCode(tmp,{text,width:size||90,height:size||90,colorDark:'#000',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M});
+    const canvas=tmp.querySelector('canvas');
+    return canvas ? canvas.toDataURL('image/png') : '';
+  } catch(e){ console.error('QR üretilemedi:', e.message); return ''; }
+}
 
 // ═══ SCAN ═══
 async function renderScan(id){
@@ -3993,7 +4010,7 @@ async function saveWorkOrder() {
   // ONEMLI: backend'in dondurdugu GERCEK id kullanilir (genId degil!)
   const partInserts = await Promise.all(selected.map(p => dbInsert('work_order_parts',{
     work_order_id: woData[0].id,
-    part_id: p.id, part_name: p.name, part_code: p.code,
+    part_id: p.id,
     qty: parseInt(p.qty)||1
   })));
 
@@ -4002,13 +4019,15 @@ async function saveWorkOrder() {
   workOrders.unshift(woData[0]);
 
   btn.disabled = false; btn.textContent = '💾 İş Emri Kaydet';
-  toast('İş emri oluşturuldu!', 'success');
+  toast('İş emri oluşturuldu! Aynı listeden yeni seçim yapabilirsiniz.', 'success');
 
-  // Formu sıfırla
+  // Secimi temizle ama proje/bolum ve parca listesi ekranda kalsin —
+  // kullanici ayni listeden pes pese is emri olusturabilmeli
+  // (arkadas notu: "parça seçim ekranı gitmesin, istediğimiz zaman kapatalım").
   _woSelectedParts.clear();
-  document.getElementById('wo-project').value = '';
-  document.getElementById('wo-dept').innerHTML = '<option value="">— Önce proje seçin —</option>';
-  document.getElementById('wo-step2').style.display = 'none';
+  document.querySelectorAll('#wo-parts-grid .wo-part-item.selected').forEach(el=>el.classList.remove('selected'));
+  const cntEl = document.getElementById('wo-selected-count');
+  if (cntEl) cntEl.textContent = '';
   document.getElementById('wo-step3').style.display = 'none';
 
   // Taze veri çek ve render et
@@ -4323,14 +4342,18 @@ function printWorkOrders() {
         ? wParts.map(p => {
             const pd = parts.find(x => x.id === p.part_id);
             const statusTrP = pd ? (pd.status==='done'?'Yapıldı':pd.status==='reject'?'Reddedildi':'Bekliyor') : '—';
+            const done = pd ? (pd.qty_done||0) : 0;
+            const total = pd ? (pd.qty||p.qty||0) : (p.qty||0);
+            const qrImg = pd ? qrDataUrl(getScanURL(pd.id), 90) : '';
             return `<tr>
-              <td>${p.part_name}</td>
-              <td>${p.part_code}</td>
+              <td>${pd?.name || '(silinmiş parça)'}</td>
+              <td>${pd?.code || '—'}</td>
               <td style="text-align:center">${p.qty}</td>
-              <td>${statusTrP}</td>
+              <td>${statusTrP} (${done}/${total})</td>
+              <td style="text-align:center">${qrImg?`<img src="${qrImg}" style="width:62px;height:62px;display:block;margin:0 auto">`:'—'}</td>
             </tr>`;
           }).join('')
-        : `<tr><td colspan="4" style="text-align:center;color:#999">Parça kaydı yok</td></tr>`;
+        : `<tr><td colspan="5" style="text-align:center;color:#999">Parça kaydı yok</td></tr>`;
 
       return `<div class="wo-print-card">
         <div class="wo-print-header">
@@ -4353,7 +4376,7 @@ function printWorkOrders() {
         </table>
         <div class="wo-print-parts-title">PARÇA LİSTESİ (${wParts.length} kalem)</div>
         <table class="wo-print-parts">
-          <thead><tr><th>Parça Adı</th><th>Kod</th><th>Adet</th><th>Durum</th></tr></thead>
+          <thead><tr><th>Parça Adı</th><th>Kod</th><th>Adet</th><th>Durum</th><th style="width:70px;text-align:center">QR</th></tr></thead>
           <tbody>${partsRows}</tbody>
         </table>
         <div class="wo-print-sign">
@@ -6064,6 +6087,8 @@ async function addBomPart() {
   const name = document.getElementById('bom-part-name').value.trim();
   const code = document.getElementById('bom-part-code').value.trim();
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
+  const dup = bomParts.find(p=>p.product_id===_activeBomProduct.id && (p.code||'').toLowerCase()===code.toLowerCase());
+  if(dup){ toast(`Bu ürün ağacında "${dup.code}" kodlu bir parça zaten var: ${dup.name}`,'error'); return; }
   const parentId = document.getElementById('bom-part-parent').value||null;
   const parentPart = parentId ? bomParts.find(p=>p.id===parentId) : null;
   const level = parentPart ? (parentPart.level||0)+1 : 0;
@@ -6126,7 +6151,7 @@ async function addBomOperation() {
   const qty       = parseFloat(part.quantity) || 1;
   const totalTime = duration * qty;
 
-  if(bomParts.find(p=>p.code===newCode && p.product_id===_activeBomProduct.id)){
+  if(bomParts.find(p=>(p.code||'').toLowerCase()===newCode.toLowerCase() && p.product_id===_activeBomProduct.id)){
     toast(`"${newCode}" kodu zaten mevcut!`,'error'); return;
   }
 
@@ -6200,6 +6225,7 @@ function renderBomList() {
         ${opsHTML}
       </div>
       <div style="display:flex;gap:4px;align-items:center">
+        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="editBomPart('${part.id}')" title="Ad / kod / malzeme düzenle">✏️ Düzenle</button>
         <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="editBomQty('${part.id}')" title="Miktarı düzenle">✏️ Miktar</button>
         <button class="icon-btn" title="Sil" onclick="deleteBomPart('${part.id}')">🗑️</button>
       </div>
@@ -6351,6 +6377,61 @@ async function saveBomQty(partId) {
   document.getElementById('bom-qty-overlay')?.remove();
   renderBomContent();
   toast(`Miktar güncellendi: ${qIn} ${unit}`,'success');
+}
+
+// ─── Ad / Kod / Malzeme Düzenle ───
+function editBomPart(partId) {
+  const part = bomParts.find(p=>p.id===partId);
+  if(!part) return;
+
+  const inStyle = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none';
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'bom-edit-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:420px;text-align:left">
+    <h3 style="margin-bottom:4px">✏️ Parça Düzenle</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:18px">${part.code} — ${part.name}</p>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Parça Adı</label>
+      <input type="text" id="bom-edit-name" value="${(part.name||'').replace(/"/g,'&quot;')}" style="${inStyle}">
+    </div>
+    <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:18px">
+      <div class="form-group">
+        <label>Kod</label>
+        <input type="text" id="bom-edit-code" value="${(part.code||'').replace(/"/g,'&quot;')}" style="${inStyle}"
+          onkeydown="if(event.key==='Enter')saveBomPartEdit('${partId}')">
+      </div>
+      <div class="form-group">
+        <label>Malzeme</label>
+        <input type="text" id="bom-edit-material" value="${(part.material||'').replace(/"/g,'&quot;')}" style="${inStyle}"
+          onkeydown="if(event.key==='Enter')saveBomPartEdit('${partId}')">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('bom-edit-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" onclick="saveBomPartEdit('${partId}')">💾 Kaydet</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(()=>{ const el=document.getElementById('bom-edit-name'); if(el){el.focus();el.select();} },100);
+}
+
+async function saveBomPartEdit(partId) {
+  const part = bomParts.find(p=>p.id===partId);
+  if(!part) return;
+  const name     = document.getElementById('bom-edit-name').value.trim();
+  const code     = document.getElementById('bom-edit-code').value.trim();
+  const material = document.getElementById('bom-edit-material').value.trim();
+  if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
+  const dup = bomParts.find(p=>p.id!==partId && p.product_id===part.product_id && (p.code||'').toLowerCase()===code.toLowerCase());
+  if(dup){ toast(`Bu ürün ağacında "${dup.code}" kodlu bir parça zaten var: ${dup.name}`,'error'); return; }
+  // PARTIAL update'te null "dokunma" demek — malzemeyi temizlemek icin bos string gonderilir
+  const ok = await dbUpdate('bom_parts', partId, { name, code, material });
+  if(!ok) return;
+  part.name=name; part.code=code; part.material=material;
+  document.getElementById('bom-edit-overlay')?.remove();
+  renderBomContent();
+  toast('Parça güncellendi.','success');
 }
 
 // ─── Parça Sil ───
@@ -6681,6 +6762,8 @@ async function pbomeAddPart() {
   const name   = document.getElementById('pbome-part-name').value.trim();
   const code   = document.getElementById('pbome-part-code').value.trim();
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
+  const dup = _pbomeParts.find(p=>(p.custom_code||'').toLowerCase()===code.toLowerCase());
+  if(dup){ toast(`Bu ağaçta "${dup.custom_code}" kodlu bir parça zaten var: ${dup.custom_name}`,'error'); return; }
   const parentId = document.getElementById('pbome-part-parent').value||null;
   const parent   = parentId ? _pbomeParts.find(p=>p.id===parentId) : null;
   const level    = parent ? (parent.level||0)+1 : 0;
@@ -6727,7 +6810,7 @@ async function pbomeAddOp() {
   const qty     = parseFloat(part.custom_qty)||1;
   const ops     = [{name:opName,code:opCode,desc,duration_per_unit:dur||null,total_duration:dur?dur*qty:null}];
 
-  if(_pbomeParts.find(p=>p.custom_code===newCode)){
+  if(_pbomeParts.find(p=>(p.custom_code||'').toLowerCase()===newCode.toLowerCase())){
     toast(`"${newCode}" kodu zaten mevcut!`,'error'); return;
   }
 
@@ -6805,6 +6888,7 @@ function pbomeRenderList() {
               <option value="">— Bölüm —</option>
               ${depts.map(d=>`<option value="${d.id}"${d.id===p.dept_id?' selected':''}>${d.name}</option>`).join('')}
             </select>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditPart('${p.id}')" title="Ad / kod / malzeme düzenle">📝</button>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditQty('${p.id}')" title="Miktar düzenle">✏️</button>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px;color:var(--red)" onclick="pbomeDeletePart('${p.id}')" title="Sil">🗑️</button>
           </div>
@@ -6861,6 +6945,56 @@ async function pbomeSaveQty(partId) {
   document.getElementById('pbome-qty-overlay')?.remove();
   pbomeRenderList();
   toast('Miktar güncellendi!','success');
+}
+
+// Ad / kod / malzeme düzenle
+function pbomeEditPart(partId) {
+  const p=_pbomeParts.find(x=>x.id===partId);
+  if(!p) return;
+  const inStyle='width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none';
+  const overlay=document.createElement('div'); overlay.className='modal-overlay open'; overlay.id='pbome-edit-overlay';
+  overlay.innerHTML=`<div class="modal" style="width:420px;text-align:left">
+    <h3 style="margin-bottom:4px">📝 Parça Düzenle</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:18px">${p.custom_code} — ${p.custom_name}</p>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Parça Adı</label>
+      <input type="text" id="pbome-edit-name" value="${(p.custom_name||'').replace(/"/g,'&quot;')}" style="${inStyle}">
+    </div>
+    <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:18px">
+      <div class="form-group"><label>Kod</label>
+        <input type="text" id="pbome-edit-code" value="${(p.custom_code||'').replace(/"/g,'&quot;')}" style="${inStyle}"
+          onkeydown="if(event.key==='Enter')pbomeSavePartEdit('${partId}')">
+      </div>
+      <div class="form-group"><label>Malzeme</label>
+        <input type="text" id="pbome-edit-material" value="${(p.custom_material||'').replace(/"/g,'&quot;')}" style="${inStyle}"
+          onkeydown="if(event.key==='Enter')pbomeSavePartEdit('${partId}')">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('pbome-edit-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" onclick="pbomeSavePartEdit('${partId}')">💾 Kaydet</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(()=>{const el=document.getElementById('pbome-edit-name');if(el){el.focus();el.select();}},100);
+}
+
+async function pbomeSavePartEdit(partId) {
+  const p=_pbomeParts.find(x=>x.id===partId);
+  if(!p) return;
+  const name=document.getElementById('pbome-edit-name').value.trim();
+  const code=document.getElementById('pbome-edit-code').value.trim();
+  const material=document.getElementById('pbome-edit-material').value.trim();
+  if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
+  const dup=_pbomeParts.find(x=>x.id!==partId && (x.custom_code||'').toLowerCase()===code.toLowerCase());
+  if(dup){ toast(`Bu ağaçta "${dup.custom_code}" kodlu bir parça zaten var: ${dup.custom_name}`,'error'); return; }
+  // PARTIAL update'te null "dokunma" demek — malzemeyi temizlemek icin bos string gonderilir
+  const ok=await dbUpdate('project_bom_parts',partId,{custom_name:name,custom_code:code,custom_material:material});
+  if(!ok) return;
+  p.custom_name=name; p.custom_code=code; p.custom_material=material;
+  document.getElementById('pbome-edit-overlay')?.remove();
+  pbomeRenderContent();
+  toast('Parça güncellendi.','success');
 }
 
 // İşlem kaldır
@@ -6951,9 +7085,10 @@ async function openAndPublishPbom(pbomId) {
   console.log('Yayınlanacak parça sayısı:', allPbParts.length);
 
   let added=0, skipped=0, errors=0;
+  _lastApiError = null;
   for(const p of allPbParts) {
     if(p.is_excluded || !p.custom_name || !p.custom_code) continue;
-    const exists = parts.find(x=>x.project===pb.project_name && x.code===p.custom_code);
+    const exists = parts.find(x=>x.project===pb.project_name && (x.code||'').toLowerCase()===p.custom_code.toLowerCase());
     if(exists){ skipped++; continue; }
     const ops = Array.isArray(p.operations)?p.operations:(typeof p.operations==='string'?JSON.parse(p.operations||'[]'):[]);
     const newPart = await dbInsert('parts',{
@@ -6973,8 +7108,13 @@ async function openAndPublishPbom(pbomId) {
   renderProjectBomList();
   let msg=`✅ Yayınlandı! ${added} parça üretime çıkarıldı`;
   if(skipped>0) msg+=`, ${skipped} zaten mevcuttu`;
-  if(errors>0) msg+=`, ${errors} hata`;
-  toast(msg,'success');
+  if(errors>0){
+    msg+=`, ${errors} hata`;
+    if(_lastApiError) msg+=` (${_lastApiError})`;
+    toast(msg,'error');
+  } else {
+    toast(msg,'success');
+  }
   console.log('Tamamlandı — eklenen:',added,'atlanan:',skipped,'hata:',errors);
 }
 
@@ -6991,16 +7131,18 @@ async function pbomePublish() {
   console.log('Yayınlanacak parça sayısı:', allPbParts.length);
 
   let added=0, skipped=0, errors=0;
+  _lastApiError = null;
   for(const p of allPbParts) {
     if(p.is_excluded || !p.custom_name || !p.custom_code) continue;
-    const exists = parts.find(x=>x.project===pb.project_name && x.code===p.custom_code);
+    const exists = parts.find(x=>x.project===pb.project_name && (x.code||'').toLowerCase()===p.custom_code.toLowerCase());
     if(exists){ skipped++; continue; }
+    const ops = Array.isArray(p.operations)?p.operations:(typeof p.operations==='string'?JSON.parse(p.operations||'[]'):[]);
     const newPart = await dbInsert('parts',{
       id:genId(), name:p.custom_name, code:p.custom_code,
       project:pb.project_name, department_id:p.dept_id||null,
       qty:p.custom_qty||1, qty_done:0, qty_pending:0, qty_reject:0,
       status:'pending', material:p.custom_material||null,
-      notes: p.operations?.length ? p.operations.map(o=>o.name).join(', ') : null
+      notes: ops.length ? ops.map(o=>o.name).join(', ') : null
     });
     if(Array.isArray(newPart)&&newPart[0]){ parts.push(newPart[0]); added++; }
     else { errors++; console.error('Parça eklenemedi:', p.custom_code, p.custom_name); }
@@ -7015,8 +7157,13 @@ async function pbomePublish() {
   
   let msg = `✅ Yayınlandı! ${added} parça üretime çıkarıldı`;
   if(skipped>0) msg += `, ${skipped} zaten mevcuttu`;
-  if(errors>0) msg += `, ${errors} hata oluştu`;
-  toast(msg,'success');
+  if(errors>0){
+    msg += `, ${errors} hata oluştu`;
+    if(_lastApiError) msg += ` (${_lastApiError})`;
+    toast(msg,'error');
+  } else {
+    toast(msg,'success');
+  }
   console.log('Yayınlama tamamlandı — eklenen:', added, 'atlanan:', skipped, 'hata:', errors);
 }
 
@@ -7031,6 +7178,9 @@ async function addPbomCustomPart(pbomId) {
   const deptId   = document.getElementById('pbom-custom-dept').value||null;
   const parentId = document.getElementById('pbom-custom-parent')?.value||null;
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
+
+  const dupCheck = projectBomParts.find(p=>p.project_bom_id===pbomId && (p.custom_code||'').toLowerCase()===code.toLowerCase());
+  if(dupCheck){ toast(`Bu ağaçta "${dupCheck.custom_code}" kodlu bir parça zaten var: ${dupCheck.custom_name}`,'error'); return; }
 
   const existing = projectBomParts.filter(p=>p.project_bom_id===pbomId&&!p.bom_part_id);
   const parent   = existing.find(p=>p.id===parentId);
@@ -7387,7 +7537,8 @@ async function publishProjectBom(pbomId) {
   const customParts = pbParts.filter(p=>!p.bom_part_id);
 
   // parts tablosuna ekle
-  let added=0, skipped=0;
+  let added=0, skipped=0, errors=0;
+  _lastApiError = null;
   for(const p of includedParts) {
     const ov      = pbParts.find(x=>x.bom_part_id===p.id);
     const qty     = ov?.custom_qty||p.quantity||1;
@@ -7396,7 +7547,7 @@ async function publishProjectBom(pbomId) {
     const ops     = Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
 
     // Zaten bu projede bu kod ile parça var mı?
-    const exists = parts.find(x=>x.project===pb.project_name&&x.code===p.code);
+    const exists = parts.find(x=>x.project===pb.project_name&&(x.code||'').toLowerCase()===(p.code||'').toLowerCase());
     if(exists){ skipped++; continue; }
 
     const newPart = await dbInsert('parts',{
@@ -7416,7 +7567,7 @@ async function publishProjectBom(pbomId) {
     if(Array.isArray(newPart)&&newPart[0]){
       parts.push(newPart[0]);
       added++;
-    }
+    } else { errors++; console.error('Eklenemedi:', p.code); }
   }
 
   // Yayınlandı olarak işaretle
@@ -7425,7 +7576,7 @@ async function publishProjectBom(pbomId) {
   // Projeye özel parçaları da ekle
   for(const p of customParts) {
     if(!p.custom_name||!p.custom_code) continue;
-    const exists = parts.find(x=>x.project===pb.project_name&&x.code===p.custom_code);
+    const exists = parts.find(x=>x.project===pb.project_name&&(x.code||'').toLowerCase()===p.custom_code.toLowerCase());
     if(exists){ skipped++; continue; }
     const dept = p.dept_id ? depts.find(d=>d.id===p.dept_id) : null;
     const newPart = await dbInsert('parts',{
@@ -7435,12 +7586,20 @@ async function publishProjectBom(pbomId) {
       status:'pending', material:null, weight:null, drawing:null, notes:'⭐ Projeye özel'
     });
     if(Array.isArray(newPart)&&newPart[0]){ parts.push(newPart[0]); added++; }
+    else { errors++; console.error('Eklenemedi:', p.custom_code); }
   }
 
   pb.status='published'; pb.published_at=new Date().toISOString();
 
   renderProjectBomList();
-  toast(`✅ Yayınlandı! ${added} parça üretime çıkarıldı${skipped>0?', '+skipped+' parça zaten mevcuttu':''}.`,'success');
+  let msg=`✅ Yayınlandı! ${added} parça üretime çıkarıldı${skipped>0?', '+skipped+' parça zaten mevcuttu':''}`;
+  if(errors>0){
+    msg+=`, ${errors} hata`;
+    if(_lastApiError) msg+=` (${_lastApiError})`;
+    toast(msg,'error');
+  } else {
+    toast(msg+'.','success');
+  }
 }
 
 // ─── Yayınlanmış Ağacı Görüntüle ───

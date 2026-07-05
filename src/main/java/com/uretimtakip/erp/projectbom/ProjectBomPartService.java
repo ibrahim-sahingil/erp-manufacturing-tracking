@@ -162,6 +162,17 @@ public class ProjectBomPartService {
                     "Department", "id", request.getDeptId());
         }
 
+        // Ayni proje agacinda ayni kod (harf duyarsiz) iki kez olamaz
+        if (request.getCustomCode() != null && !request.getCustomCode().isBlank()
+                && projectBomPartRepository.existsByProjectBomIdAndCustomCodeIgnoreCase(
+                        request.getProjectBomId(), request.getCustomCode())) {
+            throw new BusinessException(
+                    "Bu proje agacinda bu kodda bir parca zaten var: "
+                            + request.getCustomCode(),
+                    "PBOM_PART_CODE_EXISTS"
+            );
+        }
+
         ProjectBomPart pbp = ProjectBomPart.builder()
                 .projectBomId(request.getProjectBomId())
                 .bomPartId(request.getBomPartId())
@@ -210,6 +221,17 @@ public class ProjectBomPartService {
             pbp.setCustomName(request.getCustomName());
         }
         if (request.getCustomCode() != null && !request.getCustomCode().isBlank()) {
+            if (!request.getCustomCode().equalsIgnoreCase(pbp.getCustomCode())
+                    && projectBomPartRepository
+                            .existsByProjectBomIdAndCustomCodeIgnoreCaseAndIdNot(
+                                    pbp.getProjectBomId(), request.getCustomCode(),
+                                    pbp.getId())) {
+                throw new BusinessException(
+                        "Bu proje agacinda bu kodda bir parca zaten var: "
+                                + request.getCustomCode(),
+                        "PBOM_PART_CODE_EXISTS"
+                );
+            }
             pbp.setCustomCode(request.getCustomCode());
         }
         if (request.getCustomQty() != null) {

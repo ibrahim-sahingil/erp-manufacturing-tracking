@@ -43,6 +43,11 @@ public interface BomPartRepository extends JpaRepository<BomPart, UUID> {
 
     boolean existsByParentId(UUID parentId);
 
+    /** Ayni urun agacinda harf duyarsiz kod kontrolu. */
+    boolean existsByProductIdAndCodeIgnoreCase(UUID productId, String code);
+
+    boolean existsByProductIdAndCodeIgnoreCaseAndIdNot(UUID productId, String code, UUID id);
+
     long countByProductId(UUID productId);
 
     long countByParentId(UUID parentId);

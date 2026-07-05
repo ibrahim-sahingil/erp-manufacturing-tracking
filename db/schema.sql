@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict oJRL8beOgn45yjuTSox2hvCBb16D2UDkH8IoCIVo4c4ybWi7qm6aTetiDsNVdSe
+\restrict wxedzWRCO1CB53Gu9KftrfVcWMUZBIK4u4laOJEpQcK2F6v1hpuXCIHmvzwid55
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -449,14 +449,6 @@ ALTER TABLE ONLY public.part_logs
 
 
 --
--- Name: parts parts_code_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.parts
-    ADD CONSTRAINT parts_code_key UNIQUE (code);
-
-
---
 -- Name: parts parts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -753,6 +745,13 @@ CREATE INDEX idx_work_orders_workspace_id ON public.work_orders USING btree (wor
 
 
 --
+-- Name: parts_order_code_ci_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX parts_order_code_ci_key ON public.parts USING btree (order_id, lower((code)::text));
+
+
+--
 -- Name: bom_parts bom_parts_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -988,5 +987,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict oJRL8beOgn45yjuTSox2hvCBb16D2UDkH8IoCIVo4c4ybWi7qm6aTetiDsNVdSe
+\unrestrict wxedzWRCO1CB53Gu9KftrfVcWMUZBIK4u4laOJEpQcK2F6v1hpuXCIHmvzwid55
 

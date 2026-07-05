@@ -76,6 +76,16 @@ public class BomPartService {
                     "BomProduct", "id", request.getProductId());
         }
 
+        // Ayni urun agacinda ayni kod (harf duyarsiz) iki kez olamaz
+        if (request.getCode() != null && !request.getCode().isBlank()
+                && bomPartRepository.existsByProductIdAndCodeIgnoreCase(
+                        request.getProductId(), request.getCode())) {
+            throw new BusinessException(
+                    "Bu urun agacinda bu kodda bir parca zaten var: " + request.getCode(),
+                    "BOM_PART_CODE_EXISTS"
+            );
+        }
+
         int level = 0;
         if (request.getParentId() != null) {
             BomPart parent = bomPartRepository.findById(request.getParentId())
@@ -128,6 +138,14 @@ public class BomPartService {
             part.setName(request.getName());
         }
         if (request.getCode() != null && !request.getCode().isBlank()) {
+            if (!request.getCode().equalsIgnoreCase(part.getCode())
+                    && bomPartRepository.existsByProductIdAndCodeIgnoreCaseAndIdNot(
+                            part.getProductId(), request.getCode(), part.getId())) {
+                throw new BusinessException(
+                        "Bu urun agacinda bu kodda bir parca zaten var: " + request.getCode(),
+                        "BOM_PART_CODE_EXISTS"
+                );
+            }
             part.setCode(request.getCode());
         }
         if (request.getQuantity() != null) {

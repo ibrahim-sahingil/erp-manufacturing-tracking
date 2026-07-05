@@ -28,6 +28,12 @@ public interface ProjectBomPartRepository extends JpaRepository<ProjectBomPart, 
 
     boolean existsByParentCustomId(UUID parentCustomId);
 
+    /** Ayni proje agacinda harf duyarsiz kod kontrolu. */
+    boolean existsByProjectBomIdAndCustomCodeIgnoreCase(UUID projectBomId, String customCode);
+
+    boolean existsByProjectBomIdAndCustomCodeIgnoreCaseAndIdNot(
+            UUID projectBomId, String customCode, UUID id);
+
     long countByParentCustomId(UUID parentCustomId);
 
     long countByBomPartId(UUID bomPartId);

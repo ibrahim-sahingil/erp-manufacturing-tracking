@@ -4,18 +4,23 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface PartRepository extends JpaRepository<Part, UUID> {
 
     /**
-     * Kod ile bul (UNIQUE).
+     * Kod benzersizligi PROJE (order) kapsaminda ve buyuk/kucuk harf
+     * duyarsizdir: ayni kod farkli projelerde serbest, ayni projede yasak.
+     * DB tarafinda parts_order_code_ci_key unique index'i ile eslesir.
      */
-    Optional<Part> findByCode(String code);
+    boolean existsByOrderIdAndCodeIgnoreCase(UUID orderId, String code);
 
-    boolean existsByCode(String code);
+    boolean existsByOrderIdAndCodeIgnoreCaseAndIdNot(UUID orderId, String code, UUID id);
+
+    boolean existsByOrderIdIsNullAndCodeIgnoreCase(String code);
+
+    boolean existsByOrderIdIsNullAndCodeIgnoreCaseAndIdNot(String code, UUID id);
 
     /**
      * Belirli siparise ait parcalar.
