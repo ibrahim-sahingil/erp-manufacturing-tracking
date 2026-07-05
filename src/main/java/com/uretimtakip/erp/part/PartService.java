@@ -4,6 +4,7 @@ import com.uretimtakip.erp.common.exception.BusinessException;
 import com.uretimtakip.erp.common.exception.ResourceNotFoundException;
 import com.uretimtakip.erp.part.dto.PartRequest;
 import com.uretimtakip.erp.part.dto.PartResponse;
+import com.uretimtakip.erp.part.dto.PartUpdateRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -87,26 +88,31 @@ public class PartService {
     }
 
     @Transactional
-    public PartResponse update(UUID id, PartRequest request) {
+    public PartResponse update(UUID id, PartUpdateRequest request) {
         Part part = findEntityById(id);
 
-        if (!part.getCode().equals(request.getCode())
-                && partRepository.existsByCode(request.getCode())) {
-            throw new BusinessException(
-                    "Bu kodda bir parca zaten var: " + request.getCode(),
-                    "PART_CODE_EXISTS"
-            );
+        // PARTIAL update: sadece gonderilen (non-null) alanlar islenir.
+        // QR/ilerleme kaydi yalnizca {status, qty_*} yollar.
+        if (request.getCode() != null && !request.getCode().isBlank()
+                && !part.getCode().equals(request.getCode())) {
+            if (partRepository.existsByCode(request.getCode())) {
+                throw new BusinessException(
+                        "Bu kodda bir parca zaten var: " + request.getCode(),
+                        "PART_CODE_EXISTS"
+                );
+            }
+            part.setCode(request.getCode());
         }
-
-        part.setName(request.getName());
-        part.setCode(request.getCode());
-        part.setDrawingNo(request.getDrawingNo());
-        part.setMaterial(request.getMaterial());
-        part.setOrderId(request.getOrderId());
-        part.setDepartmentId(request.getDepartmentId());
+        if (request.getName() != null && !request.getName().isBlank()) {
+            part.setName(request.getName());
+        }
+        if (request.getDrawingNo() != null) part.setDrawingNo(request.getDrawingNo());
+        if (request.getMaterial() != null) part.setMaterial(request.getMaterial());
+        if (request.getOrderId() != null) part.setOrderId(request.getOrderId());
+        if (request.getDepartmentId() != null) part.setDepartmentId(request.getDepartmentId());
         if (request.getTotalQty() != null) part.setTotalQty(request.getTotalQty());
         if (request.getStatus() != null) part.setStatus(request.getStatus());
-        part.setDescription(request.getDescription());
+        if (request.getDescription() != null) part.setDescription(request.getDescription());
         if (request.getQtyDone() != null) part.setQtyDone(request.getQtyDone());
         if (request.getQtyPending() != null) part.setQtyPending(request.getQtyPending());
         if (request.getQtyReject() != null) part.setQtyReject(request.getQtyReject());

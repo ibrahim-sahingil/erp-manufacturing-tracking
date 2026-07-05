@@ -3,6 +3,7 @@ package com.uretimtakip.erp.part;
 import com.uretimtakip.erp.common.ApiResponse;
 import com.uretimtakip.erp.part.dto.PartRequest;
 import com.uretimtakip.erp.part.dto.PartResponse;
+import com.uretimtakip.erp.part.dto.PartUpdateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -76,7 +77,7 @@ public class PartController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<PartResponse>> update(
             @PathVariable UUID id,
-            @Valid @RequestBody PartRequest request) {
+            @Valid @RequestBody PartUpdateRequest request) {
 
         PartResponse updated = partService.update(id, request);
         return ResponseEntity.ok(ApiResponse.success("Parca guncellendi", updated));
