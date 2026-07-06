@@ -5847,7 +5847,7 @@ function renderPurchaseOrders(){
         <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
           <span style="font-family:var(--font-mono);font-size:12px">
             🏢 <b>${q.supplier_name}</b>
-            ${isWinner?'<span style="color:#27ae60;font-size:10px"> ✔ KAZANAN</span>':''}
+            ${isWinner?'<span style="color:#27ae60;font-size:10px"> ✔ ONAYLANAN</span>':''}
           </span>
           <span style="display:flex;gap:6px;align-items:center">
             <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${meta}</span>
@@ -5991,7 +5991,7 @@ function poApprove(orderId){
   overlay.id = 'po-approve-overlay';
   overlay.innerHTML = `<div class="modal" style="width:560px;max-height:85vh;overflow:auto;text-align:left">
     <h3 style="margin-bottom:4px">✔ Sipariş Onayı</h3>
-    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">📦 ${o.name} — kazanan firmayı seçin; elenen her firma için gerekçe yazın.</p>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">📦 ${o.name} — onaylanacak firmayı seçin; elenen her firma için gerekçe yazın.</p>
     <div style="display:grid;gap:8px;margin-bottom:14px">
       ${quotes.map(q=>{
         const meta = [
@@ -6032,7 +6032,7 @@ function poApproveRadioChange(){
 
 async function poDoApprove(orderId){
   const sel = document.querySelector('input[name="po-app-quote"]:checked')?.value;
-  if(!sel){ toast('Kazanan teklifi seçin!','error'); return; }
+  if(!sel){ toast('Onaylanacak teklifi seçin!','error'); return; }
   const note = document.getElementById('po-app-note').value.trim();
   if(!note){ toast('Onay açıklaması zorunlu!','error'); return; }
   const losers = poQuotes.filter(q=>q.purchase_order_id===orderId && q.id!==sel);
