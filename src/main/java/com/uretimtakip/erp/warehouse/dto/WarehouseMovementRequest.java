@@ -37,6 +37,8 @@ public class WarehouseMovementRequest {
 
     private UUID purchaseItemId;
 
+    private UUID deliveryNoteId;
+
     @NotBlank(message = "Malzeme adi bos olamaz")
     @Size(max = 200, message = "Malzeme adi en fazla 200 karakter olabilir")
     private String itemName;

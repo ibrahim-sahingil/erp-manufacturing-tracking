@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict nQhiXN6umbtMHeAgjNTuRBHjSaaqg2VyVHdSy9KDFB0YsT0WfzWWnMhq7XTp4sK
+\restrict cEtev3CKCaaOON8iIP2vUgQLUs8LbegNJkYMXdyszgAvKYIFo510yVC5VlBpBV9
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -86,6 +86,51 @@ CREATE TABLE public.bom_products (
     unit character varying(20) DEFAULT 'adet'::character varying,
     description text,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: delivery_note_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.delivery_note_items (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    delivery_note_id uuid NOT NULL,
+    warehouse_id uuid,
+    item_name character varying(200) NOT NULL,
+    item_code character varying(100),
+    quantity numeric(15,4) DEFAULT 1 NOT NULL,
+    unit character varying(20) DEFAULT 'adet'::character varying,
+    notes character varying(300),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT delivery_note_items_qty_check CHECK ((quantity > (0)::numeric))
+);
+
+
+--
+-- Name: delivery_notes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.delivery_notes (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    note_no character varying(30) NOT NULL,
+    order_id uuid,
+    recipient_name character varying(200) NOT NULL,
+    tax_number character varying(20),
+    tax_office character varying(100),
+    address text,
+    city character varying(50),
+    district character varying(50),
+    scenario character varying(30) DEFAULT 'TEMEL'::character varying,
+    note_type character varying(30) DEFAULT 'SEVK'::character varying,
+    carrier character varying(150),
+    status character varying(20) DEFAULT 'DRAFT'::character varying NOT NULL,
+    ship_date date,
+    notes text,
+    created_by character varying(100),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    shipped_at timestamp without time zone,
+    CONSTRAINT delivery_notes_status_check CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'SHIPPED'::character varying, 'CANCELLED'::character varying])::text[])))
 );
 
 
@@ -364,8 +409,9 @@ CREATE TABLE public.warehouse_movements (
     performed_by character varying(150),
     notes text,
     created_at timestamp without time zone DEFAULT now(),
+    delivery_note_id uuid,
     CONSTRAINT warehouse_movements_quantity_check CHECK ((quantity > (0)::numeric)),
-    CONSTRAINT warehouse_movements_source_check CHECK (((source_type)::text = ANY ((ARRAY['MANUAL'::character varying, 'PURCHASE_TRANSFER'::character varying, 'GOODS_RECEIPT'::character varying])::text[]))),
+    CONSTRAINT warehouse_movements_source_check CHECK (((source_type)::text = ANY ((ARRAY['MANUAL'::character varying, 'PURCHASE_TRANSFER'::character varying, 'GOODS_RECEIPT'::character varying, 'DELIVERY'::character varying])::text[]))),
     CONSTRAINT warehouse_movements_type_check CHECK (((movement_type)::text = ANY ((ARRAY['IN'::character varying, 'OUT'::character varying])::text[])))
 );
 
@@ -488,6 +534,30 @@ ALTER TABLE ONLY public.bom_parts
 
 ALTER TABLE ONLY public.bom_products
     ADD CONSTRAINT bom_products_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: delivery_note_items delivery_note_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.delivery_note_items
+    ADD CONSTRAINT delivery_note_items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: delivery_notes delivery_notes_note_no_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.delivery_notes
+    ADD CONSTRAINT delivery_notes_note_no_key UNIQUE (note_no);
+
+
+--
+-- Name: delivery_notes delivery_notes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.delivery_notes
+    ADD CONSTRAINT delivery_notes_pkey PRIMARY KEY (id);
 
 
 --
@@ -713,6 +783,13 @@ CREATE INDEX idx_bom_parts_product_id ON public.bom_parts USING btree (product_i
 
 
 --
+-- Name: idx_dni_note; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_dni_note ON public.delivery_note_items USING btree (delivery_note_id);
+
+
+--
 -- Name: idx_orders_created_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -925,6 +1002,30 @@ ALTER TABLE ONLY public.bom_parts
 
 
 --
+-- Name: delivery_note_items delivery_note_items_delivery_note_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.delivery_note_items
+    ADD CONSTRAINT delivery_note_items_delivery_note_id_fkey FOREIGN KEY (delivery_note_id) REFERENCES public.delivery_notes(id) ON DELETE CASCADE;
+
+
+--
+-- Name: delivery_note_items delivery_note_items_warehouse_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.delivery_note_items
+    ADD CONSTRAINT delivery_note_items_warehouse_id_fkey FOREIGN KEY (warehouse_id) REFERENCES public.warehouses(id) ON DELETE SET NULL;
+
+
+--
+-- Name: delivery_notes delivery_notes_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.delivery_notes
+    ADD CONSTRAINT delivery_notes_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE SET NULL;
+
+
+--
 -- Name: departments departments_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1093,6 +1194,14 @@ ALTER TABLE ONLY public.user_pins
 
 
 --
+-- Name: warehouse_movements warehouse_movements_delivery_note_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.warehouse_movements
+    ADD CONSTRAINT warehouse_movements_delivery_note_id_fkey FOREIGN KEY (delivery_note_id) REFERENCES public.delivery_notes(id) ON DELETE SET NULL;
+
+
+--
 -- Name: warehouse_movements warehouse_movements_purchase_item_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1200,5 +1309,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict nQhiXN6umbtMHeAgjNTuRBHjSaaqg2VyVHdSy9KDFB0YsT0WfzWWnMhq7XTp4sK
+\unrestrict cEtev3CKCaaOON8iIP2vUgQLUs8LbegNJkYMXdyszgAvKYIFo510yVC5VlBpBV9
 

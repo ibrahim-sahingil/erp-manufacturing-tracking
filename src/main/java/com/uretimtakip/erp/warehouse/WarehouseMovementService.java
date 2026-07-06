@@ -31,7 +31,7 @@ public class WarehouseMovementService {
 
     /** DB'deki warehouse_movements_source_check ile ayni liste. */
     private static final Set<String> VALID_SOURCES = Set.of(
-            "MANUAL", "PURCHASE_TRANSFER", "GOODS_RECEIPT");
+            "MANUAL", "PURCHASE_TRANSFER", "GOODS_RECEIPT", "DELIVERY");
 
     private final WarehouseMovementRepository warehouseMovementRepository;
     private final WarehouseRepository warehouseRepository;
@@ -75,6 +75,7 @@ public class WarehouseMovementService {
         WarehouseMovement movement = WarehouseMovement.builder()
                 .warehouseId(request.getWarehouseId())
                 .purchaseItemId(request.getPurchaseItemId())
+                .deliveryNoteId(request.getDeliveryNoteId())
                 .itemName(request.getItemName())
                 .itemCode(request.getItemCode())
                 .movementType(request.getMovementType())

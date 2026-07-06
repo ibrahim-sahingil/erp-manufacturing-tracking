@@ -501,6 +501,7 @@
     <button class="nav-tab" data-tab="orders" onclick="switchTab('orders')">📋 Siparişler</button>
     <button class="nav-tab" data-tab="purchasing" onclick="switchTab('purchasing')">🛒 Satın Alma</button>
     <button class="nav-tab" data-tab="warehouse" onclick="switchTab('warehouse')">🏭 Depo</button>
+    <button class="nav-tab" data-tab="delivery" onclick="switchTab('delivery')">🚚 İrsaliye</button>
     <button class="nav-tab" data-tab="planning" onclick="switchTab('planning')">📅 Planlama</button>
     <button class="nav-tab" data-tab="bom" onclick="switchTab('bom')">🌳 Ürün Ağacı</button>
   </div>
@@ -1151,6 +1152,7 @@
       <div class="perm-item" data-perm="orders_edit" onclick="togglePerm(this)"><div class="perm-check"></div>📋 Siparişler (Düzenle)</div>
       <div class="perm-item" data-perm="purchasing" onclick="togglePerm(this)"><div class="perm-check"></div>🛒 Satın Alma</div>
       <div class="perm-item" data-perm="warehouse" onclick="togglePerm(this)"><div class="perm-check"></div>🏭 Depo</div>
+      <div class="perm-item" data-perm="delivery" onclick="togglePerm(this)"><div class="perm-check"></div>🚚 İrsaliye</div>
       <div class="perm-item" data-perm="planning" onclick="togglePerm(this)"><div class="perm-check"></div>📅 Planlama</div>
       <div class="perm-item" data-perm="scan" onclick="togglePerm(this)"><div class="perm-check"></div>📷 QR Okutma</div>
     </div>
@@ -1161,6 +1163,56 @@
   </div>
 
   <div id="appusers-list"></div>
+</div>
+
+<!-- İRSALİYE -->
+<div class="view" id="view-delivery">
+  <div class="section-title">İRSALİYELER</div>
+  <div class="section-sub">Sevk irsaliyesi oluştur · Kalemleri depodan seç · Sevk et · PDF yazdır</div>
+
+  <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-primary" onclick="dnToggleForm()">➕ Yeni İrsaliye</button>
+    <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">Not: Bu modül dahili sevk irsaliyesidir; resmî e-İrsaliye yerine geçmez.</span>
+  </div>
+
+  <!-- Yeni irsaliye formu (Alıcı Bilgileri — e-irsaliye formuyla uyumlu alanlar) -->
+  <div class="form-card" id="dn-form" style="display:none">
+    <div style="font-family:var(--font-display);font-size:16px;letter-spacing:2px;color:var(--accent);margin-bottom:14px">ALICI BİLGİLERİ</div>
+    <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+      <div class="form-group"><label>Alıcı *</label><input type="text" id="dn-recipient" placeholder="Firma / kişi adı"></div>
+      <div class="form-group"><label>TCKN/VKN</label><input type="text" id="dn-taxno" placeholder="Vergi/TC no"></div>
+      <div class="form-group"><label>Vergi Dairesi</label><input type="text" id="dn-taxoffice" placeholder="Vergi dairesi"></div>
+    </div>
+    <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+      <div class="form-group"><label>Adres</label><input type="text" id="dn-address" placeholder="Açık adres"></div>
+      <div class="form-group"><label>Şehir</label><input type="text" id="dn-city" placeholder="Şehir"></div>
+      <div class="form-group"><label>İlçe</label><input type="text" id="dn-district" placeholder="İlçe"></div>
+    </div>
+    <div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr">
+      <div class="form-group"><label>İrsaliye Senaryosu</label>
+        <select id="dn-scenario"><option value="TEMEL">Temel</option></select>
+      </div>
+      <div class="form-group"><label>İrsaliye Türü</label>
+        <select id="dn-type"><option value="SEVK">Sevk</option><option value="MATBUDAN">Matbudan</option></select>
+      </div>
+      <div class="form-group"><label>Proje (opsiyonel)</label>
+        <select id="dn-order"><option value="">— Proje yok —</option></select>
+      </div>
+      <div class="form-group"><label>Sevk Tarihi</label><input type="date" id="dn-shipdate"></div>
+      <div class="form-group"><label>Taşıyıcı / Plaka</label><input type="text" id="dn-carrier" placeholder="Opsiyonel"></div>
+    </div>
+    <div class="form-group"><label>Not</label><input type="text" id="dn-notes" placeholder="Opsiyonel açıklama"></div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-primary" onclick="dnCreate()">💾 İrsaliye Oluştur</button>
+      <button class="btn btn-ghost" onclick="dnToggleForm()">Vazgeç</button>
+    </div>
+  </div>
+
+  <!-- Aktif irsaliye detayı (kalem ekleme burada) -->
+  <div id="dn-detail"></div>
+
+  <!-- İrsaliye listesi -->
+  <div id="dn-list"></div>
 </div>
 
 <!-- BOM -->
@@ -1490,7 +1542,9 @@ const TABLE_ENDPOINTS = {
   warehouses: 'warehouses',
   warehouse_movements: 'warehouse-movements',
   purchase_orders: 'purchase-orders',
-  purchase_order_quotes: 'purchase-order-quotes'
+  purchase_order_quotes: 'purchase-order-quotes',
+  delivery_notes: 'delivery-notes',
+  delivery_note_items: 'delivery-note-items'
 };
 
 // ─── Ortak fetch: JWT header + ApiResponse unwrap + 401 yönetimi ───
@@ -5313,6 +5367,7 @@ async function switchTab(tab) {
   if(tab==='orders')    renderOrders();
   if(tab==='purchasing') renderPurchasing();
   if(tab==='warehouse') renderWarehouse();
+  if(tab==='delivery')  renderDelivery();
   if(tab==='planning')  renderPlanning();
   if(tab==='bom')       initBom();
   if(tab==='appusers')  renderAppUsers();
@@ -6257,6 +6312,385 @@ async function whUndo(id){
   renderPurchaseList();
 }
 
+// ═══ İRSALİYE (dahili sevk irsaliyesi + PDF — resmî e-İrsaliye DEĞİL) ═══
+// Akış: DRAFT oluştur → kalem ekle (depodan seç veya serbest) → Sevk Et
+// (depo bağlı kalemler için OUT hareketi, source_type=DELIVERY) → PDF.
+// Geri Al: durum DRAFT'a döner, bu irsaliyenin OUT hareketleri silinir.
+let deliveryNotes = [];
+let deliveryItems = [];
+let _dnActive = null;
+
+const DN_STATUS = {
+  DRAFT:     {label:'Taslak',       icon:'📝', color:'#f5a623'},
+  SHIPPED:   {label:'Sevk Edildi',  icon:'🚚', color:'#2ecc71'},
+  CANCELLED: {label:'İptal',        icon:'✖',  color:'#e74c3c'}
+};
+
+async function renderDelivery(){
+  const [dn, di, ws] = await Promise.all([
+    dbGet('delivery_notes'),
+    dbGet('delivery_note_items','order=created_at.asc'),
+    dbGet('warehouses')
+  ]);
+  deliveryNotes = Array.isArray(dn) ? dn : [];
+  deliveryItems = Array.isArray(di) ? di : [];
+  warehouses    = Array.isArray(ws) ? ws : warehouses;
+  // Proje dropdown'u
+  const sel = document.getElementById('dn-order');
+  if(sel){
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Proje yok —</option>' +
+      orders.map(o=>`<option value="${o.id}">${o.project_name}</option>`).join('');
+    sel.value = cur;
+  }
+  renderDnDetail();
+  renderDnList();
+}
+
+function dnToggleForm(){
+  const f = document.getElementById('dn-form');
+  if(f) f.style.display = f.style.display==='none' ? '' : 'none';
+}
+
+async function dnCreate(){
+  const recipient = document.getElementById('dn-recipient').value.trim();
+  if(!recipient){ toast('Alıcı adı zorunlu!','error'); return; }
+  const body = {
+    recipient_name: recipient,
+    tax_number:  document.getElementById('dn-taxno').value.trim() || null,
+    tax_office:  document.getElementById('dn-taxoffice').value.trim() || null,
+    address:     document.getElementById('dn-address').value.trim() || null,
+    city:        document.getElementById('dn-city').value.trim() || null,
+    district:    document.getElementById('dn-district').value.trim() || null,
+    scenario:    document.getElementById('dn-scenario').value,
+    note_type:   document.getElementById('dn-type').value,
+    order_id:    document.getElementById('dn-order').value || null,
+    ship_date:   document.getElementById('dn-shipdate').value || null,
+    carrier:     document.getElementById('dn-carrier').value.trim() || null,
+    notes:       document.getElementById('dn-notes').value.trim() || null,
+    created_by:  currentUser?.display_name || currentUser?.username || null
+  };
+  const data = await dbInsert('delivery_notes', body);
+  if(!Array.isArray(data)||!data[0]){ toast('İrsaliye oluşturulamadı!','error'); return; }
+  deliveryNotes.unshift(data[0]);
+  ['dn-recipient','dn-taxno','dn-taxoffice','dn-address','dn-city','dn-district','dn-shipdate','dn-carrier','dn-notes']
+    .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  dnToggleForm();
+  _dnActive = data[0].id;
+  toast('📦 '+data[0].note_no+' oluşturuldu — şimdi kalemleri ekleyin','success');
+  renderDnDetail(); renderDnList();
+}
+
+function dnOpen(id){ _dnActive = _dnActive===id ? null : id; renderDnDetail(); renderDnList();
+  if(_dnActive) document.getElementById('dn-detail')?.scrollIntoView({behavior:'smooth'}); }
+
+function renderDnList(){
+  const el = document.getElementById('dn-list');
+  if(!el) return;
+  if(!deliveryNotes.length){
+    el.innerHTML = `<div class="empty-state"><span class="emoji">🚚</span>Henüz irsaliye yok<br><span style="font-size:12px;color:var(--muted)">"➕ Yeni İrsaliye" ile başlayın</span></div>`;
+    return;
+  }
+  el.innerHTML = deliveryNotes.map(n=>{
+    const m = DN_STATUS[n.status] || DN_STATUS.DRAFT;
+    const items = deliveryItems.filter(i=>i.delivery_note_id===n.id);
+    const proj = n.order_id ? (orders.find(o=>o.id===n.order_id)||{}).project_name : null;
+    const meta = [
+      items.length+' kalem',
+      proj ? '📁 '+proj : '',
+      n.city ? '📍 '+[n.district,n.city].filter(Boolean).join('/') : '',
+      n.ship_date ? '📆 '+new Date(n.ship_date).toLocaleDateString('tr-TR') : '',
+      n.created_by ? '👤 '+n.created_by : '',
+      '🕓 '+new Date(n.created_at).toLocaleDateString('tr-TR')
+    ].filter(Boolean).join(' · ');
+    let actions = `<button class="btn btn-ghost btn-sm" onclick="dnOpen('${n.id}')">${_dnActive===n.id?'▴ Kapat':'✏️ Aç'}</button>
+      <button class="btn btn-ghost btn-sm" onclick="dnPrint('${n.id}')">🖨 PDF</button>`;
+    if(n.status==='DRAFT'){
+      actions += `<button class="btn btn-primary btn-sm" onclick="dnShip('${n.id}')">🚚 Sevk Et</button>
+        <button class="btn btn-ghost btn-sm" onclick="dnSetStatus('${n.id}','CANCELLED')">✖ İptal</button>
+        <button class="btn btn-ghost btn-sm" onclick="dnDelete('${n.id}')" style="color:var(--red)">🗑</button>`;
+    } else if(n.status==='SHIPPED'){
+      actions += `<button class="btn btn-ghost btn-sm" onclick="dnUnship('${n.id}')">↩ Sevki Geri Al</button>`;
+    } else {
+      actions += `<button class="btn btn-ghost btn-sm" onclick="dnSetStatus('${n.id}','DRAFT')">↩ Yeniden Aç</button>
+        <button class="btn btn-ghost btn-sm" onclick="dnDelete('${n.id}')" style="color:var(--red)">🗑</button>`;
+    }
+    return `<div class="pbom-card" style="border-left:3px solid ${m.color};margin-bottom:12px">
+      <div class="pbom-card-header">
+        <div style="min-width:0">
+          <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            🚚 <span style="font-family:var(--font-mono);color:var(--accent)">${n.note_no}</span> — ${n.recipient_name}
+            <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${m.color}44;color:${m.color};background:${m.color}11">${m.icon} ${m.label}</span>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">${meta}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${actions}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderDnDetail(){
+  const el = document.getElementById('dn-detail');
+  if(!el) return;
+  const n = deliveryNotes.find(x=>x.id===_dnActive);
+  if(!n){ el.innerHTML=''; return; }
+  const isDraft = n.status==='DRAFT';
+  const items = deliveryItems.filter(i=>i.delivery_note_id===n.id);
+  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;outline:none';
+
+  const itemRows = items.length ? items.map((i,idx)=>`
+    <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--border)">
+      <span style="font-family:var(--font-mono);font-size:12px;min-width:0">
+        <span style="color:var(--muted)">${String(idx+1).padStart(2,'0')}</span>
+        ${i.item_code?`<span style="color:var(--accent)"> ${i.item_code}</span> —`:''} ${i.item_name}
+        <span style="color:var(--muted)"> · ${Number(i.quantity)} ${i.unit||'adet'}${i.warehouse_id?' · 🗄️ '+(whName(i.warehouse_id)||'depo'):''}${i.notes?' · 🗒 '+i.notes:''}</span>
+      </span>
+      ${isDraft?`<button class="btn btn-ghost btn-sm" onclick="dnDeleteItem('${i.id}')" title="Kalemi sil">🗑</button>`:''}
+    </div>`).join('')
+    : `<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:6px 0">Henüz kalem yok${isDraft?' — aşağıdan ekleyin':''}</div>`;
+
+  const addRow = isDraft ? `
+    <div style="display:grid;grid-template-columns:2fr 1fr 80px 90px auto auto;gap:8px;margin-top:12px;align-items:center">
+      <input type="text" id="dni-name" placeholder="Kalem adı *" style="${inp}">
+      <input type="text" id="dni-code" placeholder="Kod" style="${inp}">
+      <input type="number" id="dni-qty" placeholder="Miktar" min="0.001" step="any" value="1" style="${inp}">
+      <input type="text" id="dni-unit" placeholder="adet" style="${inp}">
+      <button class="btn btn-ghost btn-sm" onclick="dnAddItem('${n.id}')">➕ Ekle</button>
+      <button class="btn btn-ghost btn-sm" onclick="dnPickFromStock('${n.id}')" title="Depodaki malzemeden seç — sevkte stoktan düşer">🗄️ Depodan Seç</button>
+    </div>
+    <input type="hidden" id="dni-warehouse" value="">
+    <div id="dni-stock-hint" style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:4px"></div>` : '';
+
+  el.innerHTML = `<div class="form-card" style="border-left:3px solid ${DN_STATUS[n.status].color}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-family:var(--font-display);font-size:17px;letter-spacing:2px;color:var(--accent)">${n.note_no} — ${n.recipient_name}</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:4px">
+          ${[n.tax_number?'VKN: '+n.tax_number:'',n.tax_office,n.address,[n.district,n.city].filter(Boolean).join('/')].filter(Boolean).join(' · ')||'Alıcı detayı girilmedi'}
+        </div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:2px">
+          ${n.note_type==='MATBUDAN'?'Matbudan':'Sevk'} · ${n.scenario||'TEMEL'}${n.carrier?' · 🚛 '+n.carrier:''}${n.ship_date?' · 📆 '+new Date(n.ship_date).toLocaleDateString('tr-TR'):''}
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="dnOpen('${n.id}')">▴ Kapat</button>
+    </div>
+    ${isDraft?'':'<div style="font-family:var(--font-mono);font-size:10px;color:var(--yellow);margin-top:8px">🔒 Sevk edilmiş irsaliye düzenlenemez — değişiklik için önce sevki geri alın.</div>'}
+    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin:14px 0 6px">📦 Kalemler (${items.length})</div>
+    ${itemRows}
+    ${addRow}
+  </div>`;
+}
+
+async function dnAddItem(noteId){
+  const name = document.getElementById('dni-name').value.trim();
+  if(!name){ toast('Kalem adı zorunlu!','error'); return; }
+  const qty = parseFloat(document.getElementById('dni-qty').value);
+  const body = {
+    delivery_note_id: noteId,
+    warehouse_id: document.getElementById('dni-warehouse').value || null,
+    item_name: name,
+    item_code: document.getElementById('dni-code').value.trim() || null,
+    quantity: (isFinite(qty)&&qty>0) ? qty : 1,
+    unit: document.getElementById('dni-unit').value.trim() || 'adet'
+  };
+  const data = await dbInsert('delivery_note_items', body);
+  if(!Array.isArray(data)||!data[0]) return;
+  deliveryItems.push(data[0]);
+  renderDnDetail(); renderDnList();
+}
+
+async function dnDeleteItem(itemId){
+  const ok = await dbDelete('delivery_note_items', itemId);
+  if(!ok) return;
+  deliveryItems = deliveryItems.filter(i=>i.id!==itemId);
+  renderDnDetail(); renderDnList();
+}
+
+// Depo stoğundan kalem seçimi (stok = hareketlerden SUM(IN)−SUM(OUT))
+async function dnPickFromStock(noteId){
+  const mv = await dbGet('warehouse_movements');
+  const list = Array.isArray(mv)?mv:[];
+  const map = new Map();
+  for(const m of list){
+    const key = m.warehouse_id+'|'+(m.item_code||m.item_name||'').trim().toLowerCase()+'|'+(m.unit||'adet');
+    const e = map.get(key) || { name:m.item_name, code:m.item_code, unit:m.unit||'adet', wh:m.warehouse_id, net:0 };
+    e.net += (m.movement_type==='IN'?1:-1)*Number(m.quantity||0);
+    map.set(key,e);
+  }
+  const rows = [...map.values()].filter(r=>r.net>1e-9)
+    .sort((a,b)=>(whName(a.wh)||'').localeCompare(whName(b.wh)||'','tr') || a.name.localeCompare(b.name,'tr'));
+  if(!rows.length){ toast('Depolarda stok görünmüyor — kalemi serbest satır olarak ekleyin.','error'); return; }
+  document.getElementById('dn-stock-overlay')?.remove();
+  const ov=document.createElement('div'); ov.className='modal-overlay open'; ov.id='dn-stock-overlay';
+  ov.innerHTML=`<div class="modal" style="width:560px;max-width:95vw;text-align:left">
+    <h3 style="margin-bottom:4px">🗄️ Depodan Kalem Seç</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px">Seçilen kalem sevk edildiğinde stoktan düşer</p>
+    <div style="max-height:45vh;overflow:auto">
+      ${rows.map((r,i)=>`<div onclick="dnStockPicked(${i})" style="display:flex;justify-content:space-between;gap:10px;padding:9px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+        <span style="font-family:var(--font-mono);font-size:12px;min-width:0">${r.code?`<span style="color:var(--accent)">${r.code}</span> — `:''}${r.name}<span style="color:var(--muted)"> · 🗄️ ${whName(r.wh)||'—'}</span></span>
+        <span style="font-family:var(--font-mono);font-size:12px;color:var(--green);white-space:nowrap">${Number(r.net.toFixed(4))} ${r.unit}</span>
+      </div>`).join('')}
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-ghost" onclick="document.getElementById('dn-stock-overlay').remove()">Vazgeç</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  window._dnStockRows = rows;
+}
+
+function dnStockPicked(idx){
+  const r = window._dnStockRows?.[idx];
+  document.getElementById('dn-stock-overlay')?.remove();
+  if(!r) return;
+  document.getElementById('dni-name').value = r.name||'';
+  document.getElementById('dni-code').value = r.code||'';
+  document.getElementById('dni-qty').value  = Number(r.net.toFixed(4));
+  document.getElementById('dni-unit').value = r.unit||'adet';
+  document.getElementById('dni-warehouse').value = r.wh||'';
+  const hint=document.getElementById('dni-stock-hint');
+  if(hint) hint.textContent = '🗄️ '+(whName(r.wh)||'Depo')+' stoğundan — mevcut: '+Number(r.net.toFixed(4))+' '+r.unit+' (miktarı düzenleyebilirsiniz)';
+}
+
+async function dnShip(id){
+  const items = deliveryItems.filter(i=>i.delivery_note_id===id);
+  if(!items.length){ toast('Önce kalem ekleyin!','error'); return; }
+  const whItems = items.filter(i=>i.warehouse_id);
+  if(!confirm(`İrsaliye sevk edilsin mi?\n${items.length} kalem${whItems.length?` (${whItems.length} tanesi depodan düşülecek)`:''}`)) return;
+  const ok = await dbUpdate('delivery_notes', id, {status:'SHIPPED'});
+  if(!ok) return;
+  // Depo bağlı kalemler için OUT hareketi (geri almada delivery_note_id ile silinir)
+  const n = deliveryNotes.find(x=>x.id===id);
+  for(const i of whItems){
+    await dbInsert('warehouse_movements',{
+      warehouse_id: i.warehouse_id,
+      delivery_note_id: id,
+      item_name: i.item_name,
+      item_code: i.item_code||null,
+      movement_type: 'OUT',
+      quantity: Number(i.quantity)>0?Number(i.quantity):1,
+      unit: i.unit||'adet',
+      source_type: 'DELIVERY',
+      performed_by: currentUser?.display_name||currentUser?.username||null,
+      notes: 'İrsaliye sevki: '+(n?.note_no||'')
+    });
+  }
+  toast('🚚 Sevk edildi!','success');
+  renderDelivery();
+}
+
+async function dnUnship(id){
+  if(!confirm('Sevk geri alınsın mı? Bu irsaliyenin depo çıkışları silinecek.')) return;
+  const ok = await dbUpdate('delivery_notes', id, {status:'DRAFT'});
+  if(!ok) return;
+  const mv = await dbGet('warehouse_movements');
+  const mine = (Array.isArray(mv)?mv:[]).filter(m=>m.delivery_note_id===id);
+  for(const m of mine){ await dbDelete('warehouse_movements', m.id); }
+  toast('↩ Sevk geri alındı, depo çıkışları silindi.','success');
+  renderDelivery();
+}
+
+async function dnSetStatus(id, status){
+  const ok = await dbUpdate('delivery_notes', id, {status});
+  if(!ok) return;
+  toast(status==='CANCELLED'?'✖ İptal edildi':'↩ Yeniden açıldı','success');
+  renderDelivery();
+}
+
+async function dnDelete(id){
+  if(!confirm('Bu irsaliye silinsin mi? (Kalemleri de silinir)')) return;
+  const ok = await dbDelete('delivery_notes', id);
+  if(!ok) return;
+  if(_dnActive===id) _dnActive=null;
+  deliveryNotes = deliveryNotes.filter(n=>n.id!==id);
+  deliveryItems = deliveryItems.filter(i=>i.delivery_note_id!==id);
+  toast('İrsaliye silindi.','success');
+  renderDnDetail(); renderDnList();
+}
+
+function dnPrint(id){
+  const n = deliveryNotes.find(x=>x.id===id);
+  if(!n) return;
+  const items = deliveryItems.filter(i=>i.delivery_note_id===id);
+  const proj = n.order_id ? (orders.find(o=>o.id===n.order_id)||{}).project_name : null;
+  const printDate = new Date().toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const fmtD = v => v ? new Date(v).toLocaleDateString('tr-TR') : '—';
+  const rows = items.length ? items.map((i,idx)=>`<tr>
+      <td style="text-align:center">${idx+1}</td>
+      <td>${i.item_code||'—'}</td>
+      <td>${i.item_name}</td>
+      <td style="text-align:right">${Number(i.quantity)}</td>
+      <td>${i.unit||'adet'}</td>
+      <td>${i.notes||''}</td>
+    </tr>`).join('')
+    : `<tr><td colspan="6" style="text-align:center;color:#999">Kalem yok</td></tr>`;
+  const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
+<title>${n.note_no} — Sevk İrsaliyesi</title>
+<style>
+  @page { size: A4; margin: 15mm 12mm; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size:11px; color:#1a1a1a; }
+  .hd { border-bottom:3px solid #f5a623; padding-bottom:10px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:flex-end; }
+  .logo { font-size:22px; font-weight:900; letter-spacing:2px; color:#f5a623; }
+  .doc-title { font-size:16px; font-weight:800; letter-spacing:3px; text-align:right; }
+  .doc-no { font-family:monospace; font-size:12px; color:#666; text-align:right; margin-top:2px; }
+  .blocks { display:flex; gap:14px; margin-bottom:14px; }
+  .block { flex:1; border:1.5px solid #ddd; border-radius:6px; padding:10px 12px; }
+  .block-title { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#f5a623; margin-bottom:6px; }
+  .block table { width:100%; border-collapse:collapse; }
+  .block td { padding:3px 4px; font-size:10px; vertical-align:top; }
+  .block td b { color:#555; font-size:9px; text-transform:uppercase; white-space:nowrap; }
+  .items { width:100%; border-collapse:collapse; margin-bottom:14px; }
+  .items th { background:#f5f5f5; padding:6px 8px; font-size:9px; text-transform:uppercase; color:#555; border:1px solid #ddd; text-align:left; }
+  .items td { padding:6px 8px; font-size:10px; border:1px solid #eee; }
+  .items tr:nth-child(even) td { background:#fafafa; }
+  .sign { display:flex; gap:14px; margin-top:24px; }
+  .sign-box { flex:1; border-top:1px solid #999; padding-top:6px; font-size:10px; color:#555; text-align:center; min-height:52px; }
+  .foot { margin-top:18px; padding-top:8px; border-top:1px solid #ddd; font-size:8px; color:#999; text-align:center; }
+  @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+</style></head><body>
+  <div class="hd">
+    <div><div class="logo">ÜretimTakip</div><div style="font-size:10px;color:#666;margin-top:4px">Düzenleme: ${printDate}</div></div>
+    <div><div class="doc-title">SEVK İRSALİYESİ</div><div class="doc-no">${n.note_no} · ${n.note_type==='MATBUDAN'?'Matbudan':'Sevk'} / ${n.scenario||'TEMEL'}</div></div>
+  </div>
+  <div class="blocks">
+    <div class="block">
+      <div class="block-title">Alıcı</div>
+      <table>
+        <tr><td><b>Ünvan</b></td><td>${n.recipient_name}</td></tr>
+        <tr><td><b>TCKN/VKN</b></td><td>${n.tax_number||'—'}</td></tr>
+        <tr><td><b>Vergi D.</b></td><td>${n.tax_office||'—'}</td></tr>
+        <tr><td><b>Adres</b></td><td>${[n.address,[n.district,n.city].filter(Boolean).join('/')].filter(Boolean).join(' — ')||'—'}</td></tr>
+      </table>
+    </div>
+    <div class="block">
+      <div class="block-title">Sevk Bilgileri</div>
+      <table>
+        <tr><td><b>Sevk Tarihi</b></td><td>${fmtD(n.ship_date)}</td></tr>
+        <tr><td><b>Taşıyıcı</b></td><td>${n.carrier||'—'}</td></tr>
+        <tr><td><b>Proje</b></td><td>${proj||'—'}</td></tr>
+        <tr><td><b>Durum</b></td><td>${(DN_STATUS[n.status]||{}).label||n.status}${n.shipped_at?' · '+new Date(n.shipped_at).toLocaleString('tr-TR'):''}</td></tr>
+        ${n.notes?`<tr><td><b>Not</b></td><td>${n.notes}</td></tr>`:''}
+      </table>
+    </div>
+  </div>
+  <table class="items">
+    <thead><tr><th style="width:28px">#</th><th style="width:110px">Kod</th><th>Malzeme / Ürün</th><th style="width:60px;text-align:right">Miktar</th><th style="width:50px">Birim</th><th style="width:120px">Açıklama</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="sign">
+    <div class="sign-box">Teslim Eden<br><br></div>
+    <div class="sign-box">Taşıyan<br><br></div>
+    <div class="sign-box">Teslim Alan<br><br></div>
+  </div>
+  <div class="foot">Bu belge ÜretimTakip ile düzenlenmiş dahili sevk irsaliyesidir · ${n.note_no} · ${printDate}</div>
+</body></html>`;
+  const w = window.open('','_blank','width=900,height=700');
+  w.document.write(html); w.document.close(); w.focus();
+  setTimeout(()=>{ w.print(); },600);
+}
+
 // ═══ QR MAL KABUL (arkadaş notu #4: sipariş verilen her kaleme QR'lı PDF,
 // depocu QR'ı okutup malı depoya alır) ═══
 function purReceiveURL(id){ return location.origin+location.pathname+'?receive='+id; }
@@ -6401,7 +6835,7 @@ function printGoodsReceiptPDF(itemIds){
 }
 
 // ─── Depo Yönetimi alt sekmesi ───
-const WH_SOURCE_LABELS = { MANUAL:'Manuel', PURCHASE_TRANSFER:'Satın Alma', GOODS_RECEIPT:'QR Mal Kabul' };
+const WH_SOURCE_LABELS = { MANUAL:'Manuel', PURCHASE_TRANSFER:'Satın Alma', GOODS_RECEIPT:'QR Mal Kabul', DELIVERY:'İrsaliye' };
 
 async function renderWarehouseManage(){
   const us = await getRef('users');
@@ -6797,7 +7231,7 @@ function editAppUserPerms(id) {
   if (!u) return;
   const perms = Array.isArray(u.permissions) ? u.permissions : JSON.parse(u.permissions||'[]');
   const allPerms = ['dashboard','parts','users','stats','orders_view','orders_edit','purchasing','warehouse','planning','scan'];
-  const labels = {dashboard:'📊 Dashboard',parts:'🔧 Parçalar',users:'👷 Personel',stats:'📈 İstatistik',orders_view:'📋 Siparişler (Görüntüle)',orders_edit:'📋 Siparişler (Düzenle)',purchasing:'🛒 Satın Alma',warehouse:'🏭 Depo',planning:'📅 Planlama',scan:'📷 QR Okutma'};
+  const labels = {dashboard:'📊 Dashboard',parts:'🔧 Parçalar',users:'👷 Personel',stats:'📈 İstatistik',orders_view:'📋 Siparişler (Görüntüle)',orders_edit:'📋 Siparişler (Düzenle)',purchasing:'🛒 Satın Alma',warehouse:'🏭 Depo',delivery:'🚚 İrsaliye',planning:'📅 Planlama',scan:'📷 QR Okutma'};
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';

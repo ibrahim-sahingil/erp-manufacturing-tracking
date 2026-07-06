@@ -24,7 +24,9 @@ import java.util.UUID;
  *   MANUAL            - depo yonetimi ekranindan elle giris/cikis
  *   PURCHASE_TRANSFER - satin alma kaleminin "Depoya Aktar" adimi
  *                       (purchase_item_id dolu; geri alinirsa OUT yazilir)
- *   GOODS_RECEIPT     - QR mal kabul (GELECEK MODUL icin rezerve, henuz kullanilmiyor)
+ *   GOODS_RECEIPT     - QR mal kabul (?receive= sayfasi; purchase_item_id dolu)
+ *   DELIVERY          - irsaliye sevki (delivery_note_id dolu; irsaliye geri
+ *                       alinirsa bu hareketler SILINIR - sil+yeniden gir deseni)
  *
  * item_name/item_code SNAPSHOT'tir: kaynak satin alma kalemi silinse de
  * (purchase_item_id SET NULL olur) hareket gecmisi anlamli kalir.
@@ -58,6 +60,9 @@ public class WarehouseMovement extends BaseEntity {
 
     @Column(name = "purchase_item_id")
     private UUID purchaseItemId;
+
+    @Column(name = "delivery_note_id")
+    private UUID deliveryNoteId;
 
     @Column(name = "item_name", nullable = false, length = 200)
     private String itemName;
