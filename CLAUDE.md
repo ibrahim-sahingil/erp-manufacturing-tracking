@@ -27,6 +27,20 @@ ikinci kişi fikir/test notu sağlar, geliştirme yapmaz.
 - **`server.forwarded-headers-strategy=framework`** — kaldırılırsa tünel/proxy
   arkasından login 403 verir.
 
+## Yedekleme (2026-07-06'da eklendi — bir daha veri kaybı yaşanmasın)
+
+- Günlük otomatik yedek: Görev Zamanlayıcı görevi **`ERP-DB-Yedek`** her gün 21:00'de
+  `C:\erp-backup\erp-backup.cmd` çalıştırır → `%USERPROFILE%\erp-backups\uretim_takip_<tarih>.dump`
+  (pg_dump -Fc, 14 gün saklanır). Parola script içinde DEĞİL, `secrets.properties`ten okunur.
+- Elle yedek: `cmd /c C:\erp-backup\erp-backup.cmd`. Geri yükleme:
+  `pg_restore -U postgres -d uretim_takip --clean --if-exists <dump>`.
+- NOT: Task Scheduler'a `powershell -File` verme — kullanıcı profilindeki Türkçe "İ"
+  harfi argümanda bozuluyor ve görev sessizce çalışmıyor; bu yüzden özel-karaktersiz
+  `C:\erp-backup\` yolunda **.cmd** kullanılıyor. Görev değişikliğinde `Set-ScheduledTask`
+  yerine `Unregister`+`Register` ile temiz kur.
+- DBeaver'da toplu DELETE/TRUNCATE öncesi mutlaka yedek al (WAL wal_level=replica,
+  arşiv yok — kurtarma zor).
+
 ## Mimari
 
 - **Backend**: Spring Boot 3.4, Java 21. Her modül aynı desen:
