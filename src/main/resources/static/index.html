@@ -1177,6 +1177,7 @@
       </select>
     </div>
     <button class="btn btn-ghost" onclick="openAddProduct()">+ Yeni Ürün</button>
+    <button class="btn btn-ghost" onclick="xlsImportOpen('bom')" title="Basamaklı Excel'den (1, 1.1, 1.1.2...) toplu parça aktar">📥 Excel'den İçe Aktar</button>
     <button class="btn btn-ghost btn-sm" onclick="deleteCurrentProduct()" style="color:var(--red);border-color:rgba(231,76,60,.3)" id="bom-delete-product-btn" style="display:none">🗑️ Ürünü Sil</button>
   </div>
 
@@ -1408,6 +1409,7 @@
         <span style="color:var(--accent)">←</span> Sol = Aynı seviye &nbsp;|&nbsp;
         <span style="color:#2980b9">→</span> Sağ = Alt parça yap
       </span>
+      <button class="btn btn-ghost btn-sm" onclick="xlsImportOpen('pbome')" title="Basamaklı Excel'den (1, 1.1, 1.1.2...) toplu parça aktar">📥 Excel'den İçe Aktar</button>
       <button class="btn btn-primary btn-sm" onclick="pbomeShowTree()">🌳 Ağacı Görüntüle</button>
       <button class="btn btn-primary" id="pbome-publish-btn" onclick="pbomePublish()">🚀 Yayınla → Üretime Çıkar</button>
     </div>
@@ -8023,6 +8025,137 @@ function pbomeDragOver(e,row){ e.preventDefault(); if(!_pbomeDragSrc||row===_pbo
 function pbomeDragLeave(row){ row.classList.remove('drag-over','drag-over-child'); }
 async function pbomeDrop(e,row){ e.preventDefault(); const isChild=row.classList.contains('drag-over-child'); row.classList.remove('drag-over','drag-over-child'); if(!_pbomeDragSrc||_pbomeDragSrc===row) return; const srcId=_pbomeDragSrc.dataset.id,tgtId=row.dataset.id; const src=_pbomeParts.find(p=>p.id===srcId),tgt=_pbomeParts.find(p=>p.id===tgtId); if(!src||!tgt) return; if(isChild){src.parent_custom_id=tgtId;src.level=(tgt.level||0)+1;await dbUpdate('project_bom_parts',srcId,{parent_custom_id:tgtId,level:src.level});toast(`"${src.custom_name}" → "${tgt.custom_name}" altına taşındı`,'success');}else{src.parent_custom_id=tgt.parent_custom_id||null;src.level=tgt.level||0;await dbUpdate('project_bom_parts',srcId,{parent_custom_id:src.parent_custom_id,level:src.level});toast(`"${src.custom_name}" taşındı`,'success');} _pbomeDragSrc=null; pbomeRenderContent(); }
 function pbomeDragEnd(){ document.querySelectorAll('.bom-part-row').forEach(r=>r.classList.remove('dragging','drag-over','drag-over-child')); _pbomeDragSrc=null; }
+
+// ═══ EXCEL'DEN ÜRÜN AĞACI İÇE AKTARMA (arkadaş sesli not: hızlı toplu giriş) ═══
+// Akış: dosya seç → POST /bom-import/parse (dosya saklanmaz) → önizleme modalı
+// (basamak hiyerarşisi girintili, hatalı satırlar seçilemez) → seçilenler
+// mevcut create endpoint'leriyle sırayla eklenir (üstler önce, id eşlenir).
+let _xlsImport = null; // {target:'bom'|'pbome', rows:[], checked:Set(level_no)}
+
+function xlsImportOpen(target){
+  if(target==='bom' && !_activeBomProduct){ toast('Önce ana ürün seçin!','error'); return; }
+  if(target==='pbome' && !_activePbomId){ toast('Düzenleyici aktif değil!','error'); return; }
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='.xlsx,.xlsm';
+  inp.onchange=()=>{ if(inp.files[0]) xlsImportParse(target, inp.files[0]); };
+  inp.click();
+}
+
+async function xlsImportTemplate(){
+  try{
+    const r=await fetch(API_BASE_URL+'/bom-import/template',{headers:{Authorization:'Bearer '+authToken}});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const blob=await r.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download='urun-agaci-sablon.xlsx'; a.click();
+    URL.revokeObjectURL(url);
+  }catch(e){ toast('Şablon indirilemedi: '+e.message,'error'); }
+}
+
+async function xlsImportParse(target, file){
+  let body=null;
+  try{
+    const fd=new FormData(); fd.append('file',file);
+    // apiFetch kullanılamaz: Content-Type'ı tarayıcı boundary ile kendisi koymalı
+    const r=await fetch(API_BASE_URL+'/bom-import/parse',{method:'POST',headers:authToken?{Authorization:'Bearer '+authToken}:{},body:fd});
+    if(r.status===401||r.status===403){ if(authToken) handleUnauthorized(); return; }
+    body=await r.json().catch(()=>null);
+    if(!r.ok||(body&&body.success===false)){ toast((body&&body.message)||('HTTP '+r.status),'error'); return; }
+  }catch(e){ toast('Dosya gönderilemedi: '+e.message,'error'); return; }
+  const data=(body&&body.data)||{};
+  const rows=data.rows||[];
+  if(!rows.length){ toast((data.file_errors&&data.file_errors.join(' '))||'Dosyada veri satırı bulunamadı.','error'); return; }
+  _xlsImport={ target, rows, checked:new Set(rows.filter(x=>!x.error).map(x=>x.level_no)) };
+  xlsImportRenderModal(data);
+}
+
+function xlsImportRenderModal(data){
+  document.getElementById('xls-import-overlay')?.remove();
+  const ov=document.createElement('div'); ov.className='modal-overlay open'; ov.id='xls-import-overlay';
+  ov.innerHTML=`<div class="modal" style="width:760px;max-width:95vw;text-align:left">
+    <h3 style="margin-bottom:4px">📥 Excel'den İçe Aktar — Önizleme</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px">
+      ${data.ok_count} satır hazır${data.error_count?` · <span style="color:var(--red)">${data.error_count} satır hatalı (aktarılamaz)</span>`:''} — aktarmak istemediklerinizin işaretini kaldırın
+    </p>
+    <div id="xls-import-list" style="max-height:50vh;overflow:auto;border:1px solid var(--border);border-radius:6px;padding:8px"></div>
+    <div style="display:flex;gap:10px;justify-content:space-between;margin-top:14px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="xlsImportTemplate()">📄 Boş şablon indir</button>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" onclick="document.getElementById('xls-import-overlay').remove();_xlsImport=null">İptal</button>
+        <button class="btn btn-primary" id="xls-import-apply-btn" onclick="xlsImportApply()">➕ Seçilenleri Ekle</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  xlsImportRenderList();
+}
+
+function xlsImportRenderList(){
+  const el=document.getElementById('xls-import-list'); if(!el||!_xlsImport) return;
+  el.innerHTML=_xlsImport.rows.map(r=>{
+    const dims=dimLabel(r.width_mm,r.height_mm,r.thickness_mm);
+    const checked=_xlsImport.checked.has(r.level_no);
+    return `<div style="display:flex;gap:8px;align-items:center;padding:5px 6px;margin-left:${(r.level||0)*22}px;border-left:2px solid ${r.error?'var(--red)':'var(--border)'};${r.error?'opacity:.8':''}">
+      <input type="checkbox" ${checked?'checked':''} ${r.error?'disabled':''} onchange="xlsImportToggle('${r.level_no}',this.checked)">
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);min-width:44px">${r.level_no}</span>
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">${r.code||'—'}</span>
+      <span style="font-size:12px">${r.name||'—'}</span>
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${r.quantity||1} adet${r.material?' · 🔩'+r.material:''}${dims?' · 📐'+dims:''}</span>
+      ${r.error?`<span style="font-family:var(--font-mono);font-size:10px;color:var(--red)">⚠ ${r.error}</span>`:''}
+    </div>`;
+  }).join('');
+  const btn=document.getElementById('xls-import-apply-btn');
+  if(btn) btn.textContent=`➕ Seçilenleri Ekle (${_xlsImport.checked.size})`;
+}
+
+function xlsImportToggle(levelNo, on){
+  if(!_xlsImport) return;
+  if(on){
+    _xlsImport.checked.add(levelNo);
+    // Ataları da işaretle — kopuk hiyerarşi oluşmasın
+    let ln=levelNo;
+    while(ln.includes('.')){
+      ln=ln.slice(0,ln.lastIndexOf('.'));
+      const anc=_xlsImport.rows.find(r=>r.level_no===ln);
+      if(anc&&!anc.error) _xlsImport.checked.add(ln);
+    }
+  }else{
+    _xlsImport.checked.delete(levelNo);
+    // Alt dallar da kalksın
+    _xlsImport.rows.forEach(r=>{ if(r.level_no.startsWith(levelNo+'.')) _xlsImport.checked.delete(r.level_no); });
+  }
+  xlsImportRenderList();
+}
+
+async function xlsImportApply(){
+  if(!_xlsImport||!_xlsImport.checked.size){ toast('En az bir satır seçin!','error'); return; }
+  const {target, rows, checked}=_xlsImport;
+  const btn=document.getElementById('xls-import-apply-btn');
+  btn.disabled=true;
+  const idMap={}; // level_no → oluşturulan kayıt id'si
+  let ok=0, fail=0, done=0;
+  for(const r of rows){
+    if(r.error||!checked.has(r.level_no)) continue;
+    btn.textContent=`Ekleniyor... (${++done}/${checked.size})`;
+    const parentId=r.parent_level_no?(idMap[r.parent_level_no]||null):null;
+    if(r.parent_level_no&&!parentId){ fail++; continue; } // üstü eklenemeyen dal atlanır
+    let created=null;
+    if(target==='bom'){
+      const d=await dbInsert('bom_parts',{product_id:_activeBomProduct.id,parent_id:parentId,name:r.name,code:r.code,quantity:r.quantity||1,material:r.material||null,width_mm:r.width_mm||null,height_mm:r.height_mm||null,thickness_mm:r.thickness_mm||null});
+      created=Array.isArray(d)?d[0]:null;
+    }else{
+      const d=await dbInsert('project_bom_parts',{id:genId(),project_bom_id:_activePbomId,bom_part_id:null,is_excluded:false,parent_custom_id:parentId,custom_name:r.name,custom_code:r.code,custom_qty:r.quantity||1,custom_unit:'adet',custom_material:r.material||null,custom_width_mm:r.width_mm||null,custom_height_mm:r.height_mm||null,custom_thickness_mm:r.thickness_mm||null,operations:[]});
+      created=Array.isArray(d)?d[0]:null;
+      if(created) projectBomParts.push(created);
+    }
+    if(created){ idMap[r.level_no]=created.id; ok++; } else fail++;
+  }
+  document.getElementById('xls-import-overlay')?.remove();
+  _xlsImport=null;
+  if(target==='bom'){ await loadBomParts(); renderBomContent(); }
+  else { _pbomeParts=projectBomParts.filter(p=>p.project_bom_id===_activePbomId); pbomeRenderContent(); }
+  toast(`✅ ${ok} parça eklendi${fail?` · ${fail} satır eklenemedi (üstü eksik ya da kod çakıştı)`:''}`, fail?'error':'success');
+}
 
 // Ağaç görüntüle
 function pbomeShowTree() {
