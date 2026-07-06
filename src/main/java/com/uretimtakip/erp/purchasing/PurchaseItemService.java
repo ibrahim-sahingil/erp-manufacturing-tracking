@@ -5,6 +5,7 @@ import com.uretimtakip.erp.common.exception.ResourceNotFoundException;
 import com.uretimtakip.erp.purchasing.dto.PurchaseItemRequest;
 import com.uretimtakip.erp.purchasing.dto.PurchaseItemResponse;
 import com.uretimtakip.erp.purchasing.dto.PurchaseItemUpdateRequest;
+import com.uretimtakip.erp.warehouse.WarehouseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,7 @@ public class PurchaseItemService {
             "PLANNED", "ORDERED", "RECEIVED", "IN_WAREHOUSE", "IN_STOCK", "CANCELLED");
 
     private final PurchaseItemRepository purchaseItemRepository;
+    private final WarehouseRepository warehouseRepository;
 
     @Transactional(readOnly = true)
     public List<PurchaseItemResponse> listAll() {
@@ -135,6 +137,15 @@ public class PurchaseItemService {
         }
         if (request.isNotesPresent()) {
             item.setNotes(request.getNotes());
+        }
+        if (request.isWarehouseIdPresent()) {
+            if (request.getWarehouseId() != null
+                    && !warehouseRepository.existsById(request.getWarehouseId())) {
+                throw new BusinessException(
+                        "Secilen depo bulunamadi.",
+                        "PURCHASE_ITEM_WAREHOUSE_NOT_FOUND");
+            }
+            item.setWarehouseId(request.getWarehouseId());
         }
 
         if (request.getStatus() != null && !request.getStatus().isBlank()

@@ -1019,29 +1019,85 @@
 <!-- ÜRETİM DEPOSU -->
 <div class="view" id="view-warehouse">
   <div class="section-title">ÜRETİM DEPOSU</div>
-  <div class="section-sub">Depoya giren malzemeler · Beklenen girişler · Proje bazında takip</div>
+  <div class="section-sub">Depoya giren malzemeler · Beklenen girişler · Depo yönetimi</div>
 
-  <div class="form-card" style="margin-bottom:16px">
-    <div class="form-row">
-      <div class="form-group" style="flex:1"><label>Proje</label>
-        <select id="wh-project-sel" onchange="renderWarehouseList()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
-          <option value="">— Tüm projeler —</option>
-        </select>
+  <!-- Alt sekmeler (planning-tab deseni; switchWarehouseTab #view-warehouse'a scope'ludur) -->
+  <div class="planning-tabs" id="warehouse-tabs">
+    <button class="planning-tab active" onclick="switchWarehouseTab('view')">📦 Depo Görünümü</button>
+    <button class="planning-tab" onclick="switchWarehouseTab('manage')">🗄️ Depo Yönetimi</button>
+  </div>
+
+  <!-- Depo Görünümü -->
+  <div class="planning-section active" id="wh-tab-view">
+    <div class="form-card" style="margin-bottom:16px">
+      <div class="form-row">
+        <div class="form-group" style="flex:1"><label>Proje</label>
+          <select id="wh-project-sel" onchange="renderWarehouseList()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+            <option value="">— Tüm projeler —</option>
+          </select>
+        </div>
       </div>
+      <div id="wh-summary" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>
     </div>
-    <div id="wh-summary" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>
+
+    <!-- Beklenen girişler -->
+    <div id="wh-pending-wrap" style="margin-bottom:20px">
+      <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">📦 Beklenen Girişler</div>
+      <div id="wh-pending"></div>
+    </div>
+
+    <!-- Depodakiler -->
+    <div>
+      <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">🏭 Depoda</div>
+      <div id="wh-list"></div>
+    </div>
   </div>
 
-  <!-- Beklenen girişler -->
-  <div id="wh-pending-wrap" style="margin-bottom:20px">
-    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">📦 Beklenen Girişler</div>
-    <div id="wh-pending"></div>
-  </div>
+  <!-- Depo Yönetimi -->
+  <div class="planning-section" id="wh-tab-manage">
+    <div class="form-card" style="margin-bottom:16px">
+      <div style="font-family:var(--font-display);font-size:18px;letter-spacing:2px;color:var(--accent);margin-bottom:16px">+ YENİ DEPO</div>
+      <div class="form-row">
+        <div class="form-group"><label>Depo Adı *</label><input type="text" id="whm-name" placeholder="Örn: Ana Depo"></div>
+        <div class="form-group"><label>Konum</label><input type="text" id="whm-location" placeholder="Örn: Fabrika zemin kat"></div>
+        <div class="form-group"><label>Sorumlu</label><select id="whm-resp"><option value="">— Sorumlu yok —</option></select></div>
+      </div>
+      <button class="btn btn-primary" onclick="whmAddWarehouse()">🗄️ Depo Ekle</button>
+    </div>
 
-  <!-- Depodakiler -->
-  <div>
-    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">🏭 Depoda</div>
-    <div id="wh-list"></div>
+    <!-- Depo kartları -->
+    <div id="whm-list" style="margin-bottom:24px"></div>
+
+    <!-- Manuel hareket -->
+    <div class="form-card" style="margin-bottom:16px">
+      <div style="font-family:var(--font-display);font-size:18px;letter-spacing:2px;color:var(--accent);margin-bottom:16px">± MANUEL HAREKET</div>
+      <div class="form-row">
+        <div class="form-group"><label>Depo *</label><select id="whm-mv-wh"></select></div>
+        <div class="form-group"><label>Malzeme Adı *</label><input type="text" id="whm-mv-name" placeholder="Örn: M12 civata"></div>
+        <div class="form-group"><label>Malzeme Kodu</label><input type="text" id="whm-mv-code" placeholder="Opsiyonel"></div>
+      </div>
+      <div class="form-row" style="grid-template-columns:1fr 1fr 1fr 2fr">
+        <div class="form-group"><label>Hareket</label>
+          <select id="whm-mv-type">
+            <option value="IN">⬇ Giriş (IN)</option>
+            <option value="OUT">⬆ Çıkış (OUT)</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Miktar *</label><input type="number" id="whm-mv-qty" min="0.0001" step="0.0001" value="1"></div>
+        <div class="form-group"><label>Birim</label><input type="text" id="whm-mv-unit" value="adet"></div>
+        <div class="form-group"><label>Not</label><input type="text" id="whm-mv-notes" placeholder="Opsiyonel"></div>
+      </div>
+      <button class="btn btn-primary" onclick="whmAddMovement()">💾 Hareketi Kaydet</button>
+    </div>
+
+    <!-- Hareket geçmişi -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px">📜 Hareket Geçmişi</div>
+      <select id="whm-mv-filter" onchange="renderWhMovements()" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:6px 10px;outline:none">
+        <option value="">— Tüm depolar —</option>
+      </select>
+    </div>
+    <div id="whm-mv-list"></div>
   </div>
 </div>
 
@@ -1399,7 +1455,9 @@ const TABLE_ENDPOINTS = {
   bom_parts: 'bom-parts',
   project_bom: 'project-bom',
   project_bom_parts: 'project-bom-parts',
-  purchase_items: 'purchase-items'
+  purchase_items: 'purchase-items',
+  warehouses: 'warehouses',
+  warehouse_movements: 'warehouse-movements'
 };
 
 // ─── Ortak fetch: JWT header + ApiResponse unwrap + 401 yönetimi ───
@@ -1719,6 +1777,18 @@ const FIELD_XLATE = {
       const o = { ...b };
       if (o.user_name && !o.user_id) o.user_id = await userKeyToId(o.user_name);
       delete o.user_name;
+      return o;
+    }
+  },
+  warehouses: {
+    async fromApi(r) {
+      const o = { ...r };
+      o.responsible_user_name = await userIdToName(r.responsible_user_id);
+      return o;
+    },
+    async toApi(b) {
+      const o = { ...b };
+      delete o.responsible_user_name;
       return o;
     }
   }
@@ -3331,8 +3401,9 @@ function renderPlanning() {
 }
 
 function switchPlanningTab(tab) {
-  document.querySelectorAll('.planning-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.planning-section').forEach(s => s.classList.remove('active'));
+  // #view-planning'e scope'lu: ayni CSS sinifini Depo sekmesi de kullaniyor
+  document.querySelectorAll('#view-planning .planning-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#view-planning .planning-section').forEach(s => s.classList.remove('active'));
   event.currentTarget.classList.add('active');
   document.getElementById('plan-' + tab).classList.add('active');
   if(tab === 'project-dates') { renderPdForm(); loadAndRenderPd(); }
@@ -5247,6 +5318,11 @@ async function addPurchaseItem(){
 }
 
 async function purSetStatus(id, status){
+  // Depo entegrasyonu: depoya giris/cikis her zaman whTransfer/whUndo uzerinden
+  // yapilir ki hedef depo secilsin ve hareket defterine yazilsin.
+  const cur = purchaseItems.find(x=>x.id===id);
+  if(status === 'IN_WAREHOUSE') return whTransfer(id);
+  if(cur && cur.status === 'IN_WAREHOUSE' && status !== 'IN_WAREHOUSE') return whUndo(id);
   const ok = await dbUpdate('purchase_items', id, {status});
   if(!ok){ toast('Durum güncellenemedi!','error'); return; }
   // Damgalar backend'de atılır — listeyi tazele
@@ -5393,9 +5469,32 @@ async function purImportSelected(proj){
 }
 
 // ═══ ÜRETİM DEPOSU ═══
+let warehouses = [];   // depo tanımları cache'i (rozetler + hedef depo seçimi)
+let whMovements = [];  // hareket defteri cache'i (yönetim sekmesi)
+
+function whName(id){
+  const w = warehouses.find(x=>x.id===id);
+  return w ? w.name : null;
+}
+
+// Alt sekme geçişi (#view-warehouse'a scope'lu — planlama sekmesiyle CSS ortak)
+function _whActivateTab(tab){
+  document.querySelectorAll('#view-warehouse .planning-tab').forEach(t=>
+    t.classList.toggle('active', (t.getAttribute('onclick')||'').includes("'"+tab+"'")));
+  document.querySelectorAll('#view-warehouse .planning-section').forEach(s=>
+    s.classList.toggle('active', s.id==='wh-tab-'+tab));
+  if(tab==='manage') renderWarehouseManage();
+  if(tab==='view') renderWarehouseList();
+}
+function switchWarehouseTab(tab){ _whActivateTab(tab); }
+
 async function renderWarehouse(){
-  const pi = await dbGet('purchase_items','order=created_at.asc');
+  const [pi, ws] = await Promise.all([
+    dbGet('purchase_items','order=created_at.asc'),
+    dbGet('warehouses')
+  ]);
   purchaseItems = Array.isArray(pi) ? pi : purchaseItems;
+  warehouses = Array.isArray(ws) ? ws : warehouses;
 
   const sel = document.getElementById('wh-project-sel');
   if(sel){
@@ -5406,6 +5505,7 @@ async function renderWarehouse(){
     if(projNames.includes(cur)) sel.value = cur;
   }
   renderWarehouseList();
+  if(document.getElementById('wh-tab-manage')?.classList.contains('active')) renderWarehouseManage();
 }
 
 function whRow(i, actionsHTML){
@@ -5427,6 +5527,7 @@ function whRow(i, actionsHTML){
           ${i.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${i.code}</span>`:''}
           ${i.name}
           <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${m.color}44;color:${m.color};background:${m.color}11">${m.icon} ${m.label}</span>
+          ${i.status==='IN_WAREHOUSE' && whName(i.warehouse_id) ? `<span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--muted)">🗄️ ${whName(i.warehouse_id)}</span>` : ''}
         </div>
         <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">📁 ${i.project_name} · ${meta}</div>
       </div>
@@ -5474,13 +5575,72 @@ function renderWarehouseList(){
     : `<div class="empty-state" style="padding:18px"><span class="emoji">🏭</span>${proj?'Bu projede depoya girmiş malzeme yok':'Depoda malzeme yok'}</div>`;
 }
 
+// Depoya aktarım: hedef depo seçtirir (0 depo → yönetime yönlendir,
+// 1 depo → otomatik, 2+ → modal). purSetStatus da buraya yönlendirir.
 async function whTransfer(id){
-  const ok = await dbUpdate('purchase_items', id, {status:'IN_WAREHOUSE'});
+  const ws = await dbGet('warehouses');
+  warehouses = Array.isArray(ws) ? ws : warehouses;
+  const act = warehouses.filter(w=>w.is_active!==false);
+  if(!act.length){
+    toast('Önce Depo Yönetimi sekmesinden bir depo tanımlayın!','error');
+    await switchTab('warehouse');
+    _whActivateTab('manage');
+    return;
+  }
+  if(act.length===1) return whDoTransfer(id, act[0].id);
+
+  const i = purchaseItems.find(x=>x.id===id);
+  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none';
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'wh-target-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:380px;text-align:left">
+    <h3 style="margin-bottom:4px">🏭 Depoya Aktar</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:18px">${i?(i.code?i.code+' — ':'')+i.name:''}</p>
+    <div class="form-group" style="margin-bottom:18px">
+      <label>Hedef Depo</label>
+      <select id="wh-target-sel" style="${inp}">
+        ${act.map(w=>`<option value="${w.id}">${w.name}${w.location?' — '+w.location:''}</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('wh-target-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" onclick="whConfirmTransfer('${id}')">🏭 Aktar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+function whConfirmTransfer(id){
+  const whId = document.getElementById('wh-target-sel')?.value;
+  document.getElementById('wh-target-overlay')?.remove();
+  if(whId) whDoTransfer(id, whId);
+}
+
+async function whDoTransfer(id, warehouseId){
+  const ok = await dbUpdate('purchase_items', id, {status:'IN_WAREHOUSE', warehouse_id: warehouseId});
   if(!ok){ toast('Aktarılamadı!','error'); return; }
   const i = purchaseItems.find(x=>x.id===id);
-  if(i) i.status = 'IN_WAREHOUSE';
-  toast('🏭 Üretim deposuna aktarıldı!','success');
+  if(i){
+    i.status = 'IN_WAREHOUSE';
+    i.warehouse_id = warehouseId;
+    const q = Number(i.quantity);
+    await dbInsert('warehouse_movements', {
+      warehouse_id: warehouseId,
+      purchase_item_id: id,
+      item_name: i.name,
+      item_code: i.code || null,
+      movement_type: 'IN',
+      quantity: q > 0 ? q : 1,
+      unit: i.unit || 'adet',
+      source_type: 'PURCHASE_TRANSFER',
+      performed_by: currentUser?.display_name || currentUser?.username || null,
+      notes: 'Satın almadan depoya aktarım'
+    });
+  }
+  toast('🏭 '+(whName(warehouseId)||'Depo')+' deposuna aktarıldı!','success');
   renderWarehouseList();
+  renderPurchaseList();
 }
 
 async function whUndo(id){
@@ -5488,11 +5648,269 @@ async function whUndo(id){
   if(!i) return;
   // Teslim alınmışsa RECEIVED'a, stok kalemiyse IN_STOCK'a geri döner
   const back = i.received_at ? 'RECEIVED' : 'IN_STOCK';
-  const ok = await dbUpdate('purchase_items', id, {status:back});
+  const oldWh = i.warehouse_id || null;
+  const ok = await dbUpdate('purchase_items', id, {status:back, warehouse_id:null});
   if(!ok){ toast('Geri alınamadı!','error'); return; }
   i.status = back;
+  i.warehouse_id = null;
+  if(oldWh){
+    const q = Number(i.quantity);
+    await dbInsert('warehouse_movements', {
+      warehouse_id: oldWh,
+      purchase_item_id: id,
+      item_name: i.name,
+      item_code: i.code || null,
+      movement_type: 'OUT',
+      quantity: q > 0 ? q : 1,
+      unit: i.unit || 'adet',
+      source_type: 'PURCHASE_TRANSFER',
+      performed_by: currentUser?.display_name || currentUser?.username || null,
+      notes: 'Depodan geri alındı'
+    });
+  }
   toast('↩ Depodan geri alındı','success');
   renderWarehouseList();
+  renderPurchaseList();
+}
+
+// ─── Depo Yönetimi alt sekmesi ───
+const WH_SOURCE_LABELS = { MANUAL:'Manuel', PURCHASE_TRANSFER:'Satın Alma', GOODS_RECEIPT:'QR Mal Kabul' };
+
+async function renderWarehouseManage(){
+  const us = await getRef('users');
+  const respSel = document.getElementById('whm-resp');
+  if(respSel){
+    const cur = respSel.value;
+    respSel.innerHTML = '<option value="">— Sorumlu yok —</option>' +
+      us.map(u=>`<option value="${u.id}">${u.full_name||u.username}</option>`).join('');
+    respSel.value = cur;
+  }
+
+  const [ws, mv] = await Promise.all([
+    dbGet('warehouses'),
+    dbGet('warehouse_movements')
+  ]);
+  warehouses  = Array.isArray(ws) ? ws : warehouses;
+  whMovements = Array.isArray(mv) ? mv : whMovements;
+
+  renderWhmList();
+
+  const act = warehouses.filter(w=>w.is_active!==false);
+  const mvSel = document.getElementById('whm-mv-wh');
+  if(mvSel){
+    mvSel.innerHTML = act.length
+      ? act.map(w=>`<option value="${w.id}">${w.name}</option>`).join('')
+      : '<option value="">— Önce depo tanımlayın —</option>';
+  }
+  const fSel = document.getElementById('whm-mv-filter');
+  if(fSel){
+    const cur = fSel.value;
+    fSel.innerHTML = '<option value="">— Tüm depolar —</option>' +
+      warehouses.map(w=>`<option value="${w.id}">${w.name}</option>`).join('');
+    if(warehouses.some(w=>w.id===cur)) fSel.value = cur;
+  }
+  renderWhMovements();
+}
+
+function renderWhmList(){
+  const el = document.getElementById('whm-list');
+  if(!el) return;
+  if(!warehouses.length){
+    el.innerHTML = `<div class="empty-state" style="padding:18px"><span class="emoji">🗄️</span>Henüz depo tanımlanmadı</div>`;
+    return;
+  }
+  el.innerHTML = warehouses.map(w=>{
+    const active = w.is_active !== false;
+    const c = active ? '#2ecc71' : '#7f8c8d';
+    const itemCount = purchaseItems.filter(i=>i.warehouse_id===w.id && i.status==='IN_WAREHOUSE').length;
+    const mvCount = whMovements.filter(m=>m.warehouse_id===w.id).length;
+    const meta = [
+      w.location ? '📍 '+w.location : '',
+      w.responsible_user_name ? '👤 '+w.responsible_user_name : '👤 Sorumlu yok',
+      '📦 Depoda '+itemCount+' kalem',
+      '📜 '+mvCount+' hareket'
+    ].filter(Boolean).join(' · ');
+    return `<div class="pbom-card" style="border-left:3px solid ${c}">
+      <div class="pbom-card-header">
+        <div style="min-width:0">
+          <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            🗄️ ${w.name}
+            <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${c}44;color:${c};background:${c}11">${active?'AKTİF':'PASİF'}</span>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">${meta}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="whmEditWarehouse('${w.id}')">✏️ Düzenle</button>
+          <button class="btn btn-ghost btn-sm" onclick="whmToggleActive('${w.id}')">${active?'⏸ Pasife Al':'▶ Aktifleştir'}</button>
+          <button class="btn btn-ghost btn-sm" onclick="whmDeleteWarehouse('${w.id}')" style="color:#e74c3c" title="Sil">🗑</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function whmAddWarehouse(){
+  const name = document.getElementById('whm-name').value.trim();
+  if(!name){ toast('Depo adı girin!','error'); return; }
+  const body = {
+    name,
+    location: document.getElementById('whm-location').value.trim() || null,
+    responsible_user_id: document.getElementById('whm-resp').value || null
+  };
+  const data = await dbInsert('warehouses', body);
+  if(!Array.isArray(data)||!data[0]){ toast('Depo eklenemedi!','error'); return; }
+  document.getElementById('whm-name').value = '';
+  document.getElementById('whm-location').value = '';
+  document.getElementById('whm-resp').value = '';
+  toast('🗄️ Depo eklendi!','success');
+  renderWarehouseManage();
+}
+
+function whmEditWarehouse(id){
+  const w = warehouses.find(x=>x.id===id);
+  if(!w) return;
+  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 11px;outline:none';
+  getRef('users').then(us=>{
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay open';
+    overlay.id = 'whm-edit-overlay';
+    overlay.innerHTML = `<div class="modal" style="width:420px;text-align:left">
+      <h3 style="margin-bottom:4px">✏️ Depoyu Düzenle</h3>
+      <p style="margin-bottom:14px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">🗄️ ${w.name}</p>
+      <div style="display:grid;gap:10px">
+        <div><label style="font-size:11px;color:var(--muted)">Depo Adı</label><input type="text" id="whm-e-name" value="${w.name.replace(/"/g,'&quot;')}" style="${inp}"></div>
+        <div><label style="font-size:11px;color:var(--muted)">Konum</label><input type="text" id="whm-e-location" value="${(w.location||'').replace(/"/g,'&quot;')}" style="${inp}"></div>
+        <div><label style="font-size:11px;color:var(--muted)">Sorumlu</label>
+          <select id="whm-e-resp" style="${inp}">
+            <option value="">— Sorumlu yok —</option>
+            ${us.map(u=>`<option value="${u.id}" ${w.responsible_user_id===u.id?'selected':''}>${u.full_name||u.username}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+        <button class="btn btn-ghost" onclick="document.getElementById('whm-edit-overlay').remove()">İptal</button>
+        <button class="btn btn-primary" onclick="whmSaveEdit('${id}')">💾 Kaydet</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+  });
+}
+
+async function whmSaveEdit(id){
+  const name = document.getElementById('whm-e-name').value.trim();
+  if(!name){ toast('Depo adı boş olamaz!','error'); return; }
+  const body = {
+    name,
+    location: document.getElementById('whm-e-location').value.trim() || null,
+    responsible_user_id: document.getElementById('whm-e-resp').value || null
+  };
+  const ok = await dbUpdate('warehouses', id, body);
+  if(!ok){ toast('Güncellenemedi!','error'); return; }
+  document.getElementById('whm-edit-overlay')?.remove();
+  toast('Depo güncellendi','success');
+  renderWarehouseManage();
+}
+
+async function whmToggleActive(id){
+  const w = warehouses.find(x=>x.id===id);
+  if(!w) return;
+  const target = !(w.is_active !== false);
+  const ok = await dbUpdate('warehouses', id, {is_active: target});
+  if(!ok){ toast('Güncellenemedi!','error'); return; }
+  w.is_active = target;
+  toast(target ? '▶ Depo aktifleştirildi' : '⏸ Depo pasife alındı','success');
+  renderWarehouseManage();
+}
+
+async function whmDeleteWarehouse(id){
+  const w = warehouses.find(x=>x.id===id);
+  if(!w) return;
+  if(!confirm(`"${w.name}" deposu silinsin mi?\n(Hareketi veya bağlı kalemi olan depo silinemez — onun yerine pasife alın.)`)) return;
+  const ok = await dbDelete('warehouses', id);
+  if(!ok){ toast('Silinemedi!','error'); return; }
+  toast('Depo silindi','success');
+  renderWarehouseManage();
+}
+
+async function whmAddMovement(){
+  const whId = document.getElementById('whm-mv-wh').value;
+  const name = document.getElementById('whm-mv-name').value.trim();
+  const qty  = parseFloat(document.getElementById('whm-mv-qty').value);
+  if(!whId){ toast('Depo seçin!','error'); return; }
+  if(!name){ toast('Malzeme adı girin!','error'); return; }
+  if(!qty || qty<=0){ toast('Geçerli bir miktar girin!','error'); return; }
+  const body = {
+    warehouse_id: whId,
+    item_name: name,
+    item_code: document.getElementById('whm-mv-code').value.trim() || null,
+    movement_type: document.getElementById('whm-mv-type').value,
+    quantity: qty,
+    unit: document.getElementById('whm-mv-unit').value.trim() || 'adet',
+    source_type: 'MANUAL',
+    performed_by: currentUser?.display_name || currentUser?.username || null,
+    notes: document.getElementById('whm-mv-notes').value.trim() || null
+  };
+  const data = await dbInsert('warehouse_movements', body);
+  if(!Array.isArray(data)||!data[0]){ toast('Hareket kaydedilemedi!','error'); return; }
+  whMovements.unshift(data[0]);
+  document.getElementById('whm-mv-name').value = '';
+  document.getElementById('whm-mv-code').value = '';
+  document.getElementById('whm-mv-notes').value = '';
+  document.getElementById('whm-mv-qty').value = '1';
+  toast('💾 Hareket kaydedildi!','success');
+  renderWhmList();
+  renderWhMovements();
+}
+
+function renderWhMovements(){
+  const el = document.getElementById('whm-mv-list');
+  if(!el) return;
+  const f = document.getElementById('whm-mv-filter')?.value || '';
+  const list = f ? whMovements.filter(m=>m.warehouse_id===f) : whMovements;
+  if(!list.length){
+    el.innerHTML = `<div class="empty-state" style="padding:18px"><span class="emoji">📜</span>Hareket kaydı yok</div>`;
+    return;
+  }
+  el.innerHTML = list.map(m=>{
+    const isIn = m.movement_type==='IN';
+    const c = isIn ? '#2ecc71' : '#e74c3c';
+    const src = WH_SOURCE_LABELS[m.source_type] || m.source_type;
+    const meta = [
+      '🗄️ '+(whName(m.warehouse_id)||'—'),
+      Number(m.quantity)+' '+(m.unit||'adet'),
+      m.performed_by ? '👤 '+m.performed_by : '',
+      '🕓 '+new Date(m.created_at).toLocaleString('tr-TR'),
+      m.notes ? '📝 '+m.notes : ''
+    ].filter(Boolean).join(' · ');
+    return `<div class="pbom-card" style="border-left:3px solid ${c}">
+      <div class="pbom-card-header">
+        <div style="min-width:0">
+          <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span style="color:${c};font-family:var(--font-mono);font-size:12px">${isIn?'⬇ GİRİŞ':'⬆ ÇIKIŞ'}</span>
+            ${m.item_code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${m.item_code}</span>`:''}
+            ${m.item_name}
+            <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--muted)">${src}</span>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">${meta}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn btn-ghost btn-sm" onclick="whmDeleteMovement('${m.id}')" style="color:#e74c3c" title="Yanlış kaydı sil">🗑</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function whmDeleteMovement(id){
+  const m = whMovements.find(x=>x.id===id);
+  if(!m) return;
+  if(!confirm(`"${m.item_name}" ${m.movement_type==='IN'?'giriş':'çıkış'} kaydı silinsin mi?\n(Hareket defteri düzeltilmez — yanlış kayıt silinip yeniden girilir.)`)) return;
+  const ok = await dbDelete('warehouse_movements', id);
+  if(!ok){ toast('Silinemedi!','error'); return; }
+  whMovements = whMovements.filter(x=>x.id!==id);
+  toast('Hareket silindi','success');
+  renderWhmList();
+  renderWhMovements();
 }
 
 // ═══ KULLANICI YÖNETİMİ ═══

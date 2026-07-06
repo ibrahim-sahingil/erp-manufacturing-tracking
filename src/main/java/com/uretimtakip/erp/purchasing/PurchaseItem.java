@@ -46,6 +46,8 @@ import java.util.UUID;
  *   currency            varchar(10)   DEFAULT 'TRY'
  *   expected_date       date          NULL (termin)
  *   status              varchar(20)   DEFAULT 'PLANNED' (CHECK)
+ *   warehouse_id        uuid          NULL (FK -> warehouses, ON DELETE SET NULL;
+ *                                     IN_WAREHOUSE durumunda hangi depoda oldugu)
  *   notes               text          NULL
  *   ordered_at          timestamp     NULL
  *   received_at         timestamp     NULL
@@ -100,6 +102,9 @@ public class PurchaseItem extends BaseEntity {
     @Column(name = "status", length = 20)
     @Builder.Default
     private String status = "PLANNED";
+
+    @Column(name = "warehouse_id")
+    private UUID warehouseId;
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict wxedzWRCO1CB53Gu9KftrfVcWMUZBIK4u4laOJEpQcK2F6v1hpuXCIHmvzwid55
+\restrict o9r7V3s9F3HJcTeg12pQDpcfcF8CNH1UD4kg4afAgZo8sisOxnPwqhAKLUynNd1
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -267,6 +267,7 @@ CREATE TABLE public.purchase_items (
     received_at timestamp without time zone,
     created_by character varying(150),
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    warehouse_id uuid,
     CONSTRAINT purchase_items_status_check CHECK (((status)::text = ANY ((ARRAY['PLANNED'::character varying, 'ORDERED'::character varying, 'RECEIVED'::character varying, 'IN_WAREHOUSE'::character varying, 'IN_STOCK'::character varying, 'CANCELLED'::character varying])::text[])))
 );
 
@@ -299,6 +300,43 @@ CREATE TABLE public.users (
     password_hash character varying(255),
     pin_code character varying,
     permissions jsonb DEFAULT '[]'::jsonb
+);
+
+
+--
+-- Name: warehouse_movements; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.warehouse_movements (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    warehouse_id uuid NOT NULL,
+    purchase_item_id uuid,
+    item_name character varying(200) NOT NULL,
+    item_code character varying(100),
+    movement_type character varying(10) NOT NULL,
+    quantity numeric(15,4) NOT NULL,
+    unit character varying(20) DEFAULT 'adet'::character varying,
+    source_type character varying(30) DEFAULT 'MANUAL'::character varying NOT NULL,
+    performed_by character varying(150),
+    notes text,
+    created_at timestamp without time zone DEFAULT now(),
+    CONSTRAINT warehouse_movements_quantity_check CHECK ((quantity > (0)::numeric)),
+    CONSTRAINT warehouse_movements_source_check CHECK (((source_type)::text = ANY ((ARRAY['MANUAL'::character varying, 'PURCHASE_TRANSFER'::character varying, 'GOODS_RECEIPT'::character varying])::text[]))),
+    CONSTRAINT warehouse_movements_type_check CHECK (((movement_type)::text = ANY ((ARRAY['IN'::character varying, 'OUT'::character varying])::text[])))
+);
+
+
+--
+-- Name: warehouses; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.warehouses (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying(150) NOT NULL,
+    location character varying(200),
+    responsible_user_id uuid,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp without time zone DEFAULT now()
 );
 
 
@@ -537,6 +575,30 @@ ALTER TABLE ONLY public.users
 
 
 --
+-- Name: warehouse_movements warehouse_movements_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.warehouse_movements
+    ADD CONSTRAINT warehouse_movements_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: warehouses warehouses_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.warehouses
+    ADD CONSTRAINT warehouses_name_key UNIQUE (name);
+
+
+--
+-- Name: warehouses warehouses_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.warehouses
+    ADD CONSTRAINT warehouses_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: work_order_parts work_order_parts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -696,6 +758,13 @@ CREATE INDEX idx_purchase_items_status ON public.purchase_items USING btree (sta
 
 
 --
+-- Name: idx_purchase_items_warehouse; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_purchase_items_warehouse ON public.purchase_items USING btree (warehouse_id);
+
+
+--
 -- Name: idx_user_pins_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -714,6 +783,20 @@ CREATE INDEX idx_users_is_active ON public.users USING btree (is_active);
 --
 
 CREATE INDEX idx_users_username ON public.users USING btree (username);
+
+
+--
+-- Name: idx_warehouse_movements_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_warehouse_movements_created ON public.warehouse_movements USING btree (created_at DESC);
+
+
+--
+-- Name: idx_warehouse_movements_warehouse; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_warehouse_movements_warehouse ON public.warehouse_movements USING btree (warehouse_id);
 
 
 --
@@ -896,11 +979,43 @@ ALTER TABLE ONLY public.purchase_items
 
 
 --
+-- Name: purchase_items purchase_items_warehouse_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.purchase_items
+    ADD CONSTRAINT purchase_items_warehouse_fkey FOREIGN KEY (warehouse_id) REFERENCES public.warehouses(id) ON DELETE SET NULL;
+
+
+--
 -- Name: user_pins user_pins_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.user_pins
     ADD CONSTRAINT user_pins_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: warehouse_movements warehouse_movements_purchase_item_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.warehouse_movements
+    ADD CONSTRAINT warehouse_movements_purchase_item_fkey FOREIGN KEY (purchase_item_id) REFERENCES public.purchase_items(id) ON DELETE SET NULL;
+
+
+--
+-- Name: warehouse_movements warehouse_movements_warehouse_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.warehouse_movements
+    ADD CONSTRAINT warehouse_movements_warehouse_fkey FOREIGN KEY (warehouse_id) REFERENCES public.warehouses(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: warehouses warehouses_responsible_user_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.warehouses
+    ADD CONSTRAINT warehouses_responsible_user_fkey FOREIGN KEY (responsible_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --
@@ -987,5 +1102,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wxedzWRCO1CB53Gu9KftrfVcWMUZBIK4u4laOJEpQcK2F6v1hpuXCIHmvzwid55
+\unrestrict o9r7V3s9F3HJcTeg12pQDpcfcF8CNH1UD4kg4afAgZo8sisOxnPwqhAKLUynNd1
 

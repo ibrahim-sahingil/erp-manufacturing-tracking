@@ -8,6 +8,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 
 /**
  * PurchaseItem PARTIAL update icin request DTO.
@@ -20,7 +21,8 @@ import java.time.LocalDate;
  *   {"expected_date": "2026-08-01"}          - termin guncelleme
  *
  * PRESENCE TAKIPLI ALANLAR (explicit null = temizle):
- *   expected_date, supplier, unit_price, notes
+ *   expected_date, supplier, unit_price, notes, warehouse_id
+ *   (warehouse_id: whUndo depodan geri alirken explicit null gonderir)
  *
  * projectName ve projectBomPartId IMMUTABLE - gelse de service ignore eder.
  * Durum gecis damgalari (ordered_at/received_at) service'te atilir.
@@ -85,6 +87,17 @@ public class PurchaseItemUpdateRequest {
 
     @Size(max = 20, message = "Durum en fazla 20 karakter olabilir")
     private String status;
+
+    @Setter(lombok.AccessLevel.NONE)
+    private UUID warehouseId;
+
+    @Setter(lombok.AccessLevel.NONE)
+    private boolean warehouseIdPresent;
+
+    public void setWarehouseId(UUID warehouseId) {
+        this.warehouseId = warehouseId;
+        this.warehouseIdPresent = true;
+    }
 
     @Setter(lombok.AccessLevel.NONE)
     private String notes;

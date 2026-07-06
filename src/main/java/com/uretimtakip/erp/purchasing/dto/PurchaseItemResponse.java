@@ -36,6 +36,7 @@ public class PurchaseItemResponse {
     private String currency;
     private LocalDate expectedDate;
     private String status;
+    private UUID warehouseId;
     private String notes;
     private LocalDateTime orderedAt;
     private LocalDateTime receivedAt;
@@ -57,6 +58,7 @@ public class PurchaseItemResponse {
                 .currency(e.getCurrency())
                 .expectedDate(e.getExpectedDate())
                 .status(e.getStatus())
+                .warehouseId(e.getWarehouseId())
                 .notes(e.getNotes())
                 .orderedAt(e.getOrderedAt())
                 .receivedAt(e.getReceivedAt())
