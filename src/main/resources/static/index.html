@@ -2149,14 +2149,16 @@ async function loadLogs(partId){
 // ═══ DASHBOARD — 3 katman ═══
 async function renderDashboard(){
   // Taze veri çek (iş emirleri de dashboard'da gösterilir — akış adım 6)
-  const [freshParts, freshWo, freshWop] = await Promise.all([
+  const [freshParts, freshWo, freshWop, freshPi] = await Promise.all([
     dbGet('parts','order=created_at.asc'),
     dbGet('work_orders','order=start_datetime.asc'),
-    dbGet('work_order_parts','order=created_at.asc')
+    dbGet('work_order_parts','order=created_at.asc'),
+    dbGet('purchase_items') // planlama bekleyen şeridinde malzeme durumu için (#9)
   ]);
   if(Array.isArray(freshParts)) parts = freshParts;
   if(Array.isArray(freshWo))    workOrders = freshWo;
   if(Array.isArray(freshWop))   workOrderParts = freshWop;
+  if(Array.isArray(freshPi))    purchaseItems = freshPi;
   _activeProject=null; _activeDept=null;
   showLayer('projects');
   renderStats();
@@ -2314,14 +2316,36 @@ function isPartAwaitingPlanning(p){
   if ((parseInt(p.qty_done)||0) > 0 || (parseInt(p.qty_reject)||0) > 0) return false;
   return !p.status || p.status === 'pending';
 }
-function awaitingPlanningStripHTML(count, style){
-  if(!count) return '';
-  return `<div style="background:rgba(245,166,35,.07);border:1px dashed rgba(245,166,35,.35);border-radius:8px;padding:12px 16px;font-family:var(--font-mono);font-size:12px;color:var(--yellow);${style||''}">⏳ ${count} parça · Satın alma veya üretim planlaması bekleniyor</div>`;
+// (#9 arkadaş isteği) Planlama bekleyenler ikiye ayrılır: kodu bir satın alma
+// kalemiyle eşleşip malzemesi siparişte/hazır olanlar (ORDERED/RECEIVED/
+// IN_WAREHOUSE/IN_STOCK) ayrı şeritte gösterilir; satın alma bağı olmayanlar
+// eski metinle kalır. Eşleşme: aynı proje + aynı kod (BOM'dan satın almaya
+// aktarımda kod taşındığı için project_bom_part bağını da kapsar).
+const PUR_MAT_ONWAY = new Set(['ORDERED','RECEIVED','IN_WAREHOUSE','IN_STOCK']);
+function partHasMaterialOnWay(p){
+  const code=(p.code||'').trim().toLowerCase();
+  if(!code) return false;
+  return purchaseItems.some(i => PUR_MAT_ONWAY.has(i.status)
+    && (i.code||'').trim().toLowerCase()===code
+    && (i.project_name||'')===(p.project||''));
+}
+function awaitingPlanningStripHTML(waitingParts, style){
+  if(!waitingParts || !waitingParts.length) return '';
+  const mat  = waitingParts.filter(partHasMaterialOnWay).length;
+  const rest = waitingParts.length - mat;
+  const strip=(icon,txt,color,border,bg)=>
+    `<div style="background:${bg};border:1px dashed ${border};border-radius:8px;padding:12px 16px;font-family:var(--font-mono);font-size:12px;color:${color}">${icon} ${txt}</div>`;
+  return `<div style="display:grid;gap:8px;${style||''}">`
+    + (mat ? strip('🛒',`${mat} parça · Malzemesi hazır/siparişte — üretim planlaması bekleniyor`,'#2980b9','rgba(41,128,185,.35)','rgba(41,128,185,.07)') : '')
+    + (rest? strip('⏳',`${rest} parça · Satın alma veya üretim planlaması bekleniyor`,'var(--yellow)','rgba(245,166,35,.35)','rgba(245,166,35,.07)') : '')
+    + `</div>`;
 }
 
 function renderStats(){
   // Planlama bekleyen parçalar üst istatistiklere katılmaz (detaysız özet)
-  const waiting=parts.filter(isPartAwaitingPlanning).length;
+  const waitingParts=parts.filter(isPartAwaitingPlanning);
+  const waitMat=waitingParts.filter(partHasMaterialOnWay).length;
+  const waitRest=waitingParts.length-waitMat;
   const active=parts.filter(p=>!isPartAwaitingPlanning(p));
   const total=active.length;
   const done=active.filter(p=>p.status==='done').length;
@@ -2337,7 +2361,7 @@ function renderStats(){
   document.getElementById('stats-row').innerHTML=`
     <div class="stat-card" style="--c:var(--accent)">
       <div class="stat-label">Toplam Parça</div><div class="stat-value">${total}</div>
-      <div class="stat-sub">${qt} adet · Tüm projeler${waiting?` · ⏳ ${waiting} parça planlama bekliyor`:''}</div>
+      <div class="stat-sub">${qt} adet · Tüm projeler${waitMat?` · 🛒 ${waitMat} malzemesi hazır/siparişte`:''}${waitRest?` · ⏳ ${waitRest} parça planlama bekliyor`:''}</div>
       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
     </div>
     <div class="stat-card" style="--c:var(--green)">
@@ -2443,7 +2467,7 @@ function openProject(name){
   showLayer('depts');
 
   const projAll   = parts.filter(p=>(p.project||'(Proje Yok)')===name);
-  const waitingCnt = projAll.filter(isPartAwaitingPlanning).length;
+  const waitingParts = projAll.filter(isPartAwaitingPlanning);
   const projParts = projAll.filter(p=>!isPartAwaitingPlanning(p));
   const projDepts = depts.filter(d=>d.project===name);
 
@@ -2480,7 +2504,7 @@ function openProject(name){
         <div class="report-progress"><div class="report-progress-fill" style="width:${total?Math.round(rej/total*100):0}%"></div></div>
       </div>
     </div>
-    ${awaitingPlanningStripHTML(waitingCnt,'margin-bottom:24px')}
+    ${awaitingPlanningStripHTML(waitingParts,'margin-bottom:24px')}
     <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:12px">🏭 Bölümler</div>
     <div class="dept-cards">`;
 
@@ -2550,7 +2574,7 @@ function openDept(deptId, deptName){
   const bucket = deptId==='__unassigned__'
     ? projParts.filter(p=>!p.department_id)
     : projParts.filter(p=>p.department_id===deptId);
-  const waitingCnt = bucket.filter(isPartAwaitingPlanning).length;
+  const waitingParts = bucket.filter(isPartAwaitingPlanning);
   const deptParts = bucket.filter(p=>!isPartAwaitingPlanning(p));
   // İş emrine bağlı parçalar iş emri kartlarının içinde listelenir (arkadaş
   // notu #5); bağımsız listede yalnız iş emri dışı kalanlar gösterilir.
@@ -2595,7 +2619,7 @@ function openDept(deptId, deptName){
       </div>
     </div>
     ${deptWoStripHTML(deptId)}
-    ${awaitingPlanningStripHTML(waitingCnt,'margin-bottom:24px')}
+    ${awaitingPlanningStripHTML(waitingParts,'margin-bottom:24px')}
     ${looseParts.length?`
     <!-- İş emri dışı parçalar (ilerlemesi olan ama iş emrine bağlanmamış eski kayıtlar) -->
     <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">🔧 İş Emri Dışı Parçalar (${looseParts.length})</div>
@@ -2637,7 +2661,7 @@ function openDept(deptId, deptName){
     <div class="parts-grid" style="margin-bottom:24px">
       ${looseParts.map((p,i)=>partRowHTML(p,i,false)).join('')}
     </div>`:''}
-    ${!deptParts.length && !waitingCnt && !deptWoStripHTML(deptId) ? `<div class="empty-state"><span class="emoji">📦</span>Bu bölümde henüz parça yok</div>` : ''}`;
+    ${!deptParts.length && !waitingParts.length && !deptWoStripHTML(deptId) ? `<div class="empty-state"><span class="emoji">📦</span>Bu bölümde henüz parça yok</div>` : ''}`;
 
   document.getElementById('layer-parts').innerHTML = html;
 }
