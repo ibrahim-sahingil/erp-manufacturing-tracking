@@ -2151,11 +2151,54 @@ function deptWoStripHTML(deptId){
       fmtDt(w.start_datetime) ? '🕐 '+fmtDt(w.start_datetime)+(fmtDt(w.end_datetime)?' → '+fmtDt(w.end_datetime):'') : '',
       w.assigned_user ? '👷 '+w.assigned_user : '',
       w.workspace_name ? '📍 '+w.workspace_name : '',
-      wops.length ? '🔧 '+wops.length+' parça' : '',
       w.notes ? '🗒 '+w.notes : ''
     ].filter(Boolean).join(' · ');
     const btns = (ACTIONS[w.status]||[]).map(([s,txt])=>
       `<button class="btn btn-ghost btn-sm" onclick="dashWoSetStatus('${w.id}','${s}')">${txt}</button>`).join('');
+
+    // İş emrinin parçaları (arkadaş notu #5: iş emrine girilir, içindeki
+    // parçalar QR'larıyla listelenir, bitip bitmediği oradan takip edilir)
+    const isOpen = _dashWoOpen.has(w.id);
+    const partsTable = wops.length ? `<div id="dwop-${w.id}" style="display:${isOpen?'block':'none'};margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
+      <div class="report-table">
+        <div class="report-table-header">
+          <div>Parça</div>
+          <div style="text-align:center">✅</div>
+          <div style="text-align:center" class="rtc-hide">⏳</div>
+          <div style="text-align:center" class="rtc-hide">❌</div>
+          <div style="text-align:center">Durum</div>
+          <div>İlerleme / QR</div>
+        </div>
+        ${wops.map(wp=>{
+          const pd = parts.find(x=>x.id===wp.part_id);
+          if(!pd) return `<div class="report-table-row"><div style="color:var(--muted)">(silinmiş parça)</div><div></div><div class="rtc-hide"></div><div class="rtc-hide"></div><div></div><div></div></div>`;
+          const qd=parseInt(pd.qty_done)||0, qr2=parseInt(pd.qty_reject)||0;
+          const qt2=parseInt(pd.qty)||0;
+          const qp2=Math.max(0,qt2-qd-qr2);
+          const bd=qt2?Math.round(qd/qt2*100):0, br=qt2?Math.round(qr2/qt2*100):0;
+          const bp=qt2?100-bd-br:0;
+          return `<div class="report-table-row">
+            <div><div style="font-size:13px;font-weight:600">${pd.name}</div><div style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${pd.code}</div></div>
+            <div class="report-num" style="color:var(--green)">${qd}</div>
+            <div class="report-num rtc-hide" style="color:var(--yellow)">${qp2}</div>
+            <div class="report-num rtc-hide" style="color:var(--red)">${qr2}</div>
+            <div style="text-align:center">${statusBadge(pd.status)}</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div style="flex:1">
+                <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);text-align:right;margin-bottom:3px">${qd+qr2}/${qt2||'?'}</div>
+                <div class="report-bar">
+                  <div style="flex:${bd};background:var(--green)"></div>
+                  <div style="flex:${bp};background:var(--yellow)"></div>
+                  <div style="flex:${br};background:var(--red)"></div>
+                </div>
+              </div>
+              <button class="icon-btn" title="QR göster" onclick="showQR('${pd.id}','${ea(pd.name)}','${ea(pd.code)}','${ea(pd.drawing||'')}')">📷</button>
+              <button class="icon-btn" title="Geçmiş" onclick="showLog('${pd.id}','${ea(pd.name)}')">📋</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : '';
 
     return `<div class="pbom-card" style="border-left:3px solid ${color}">
       <div class="pbom-card-header">
@@ -2167,8 +2210,12 @@ function deptWoStripHTML(deptId){
           </div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">${meta}</div>
         </div>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${btns}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          ${wops.length?`<button class="btn btn-ghost btn-sm" id="dwob-${w.id}" onclick="dashWoToggleParts('${w.id}')">🔧 Parçalar (${wops.length}) ${isOpen?'▴':'▾'}</button>`:''}
+          ${btns}
+        </div>
       </div>
+      ${partsTable}
     </div>`;
   }).join('');
 
@@ -2176,6 +2223,17 @@ function deptWoStripHTML(deptId){
     <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">📋 İş Emirleri (${deptWos.length})</div>
     ${rows}
   </div>`;
+}
+
+// İş emri parça listesi aç/kapa durumu (bölüm görünümü yeniden çizilse de korunur)
+const _dashWoOpen = new Set();
+function dashWoToggleParts(woId){
+  const el = document.getElementById('dwop-'+woId);
+  const btn = document.getElementById('dwob-'+woId);
+  const open = _dashWoOpen.has(woId);
+  if(open) _dashWoOpen.delete(woId); else _dashWoOpen.add(woId);
+  if(el) el.style.display = open ? 'none' : 'block';
+  if(btn) btn.innerHTML = btn.innerHTML.replace(open?'▴':'▾', open?'▾':'▴');
 }
 
 async function dashWoSetStatus(id, status){
@@ -2440,6 +2498,10 @@ function openDept(deptId, deptName){
     : projParts.filter(p=>p.department_id===deptId);
   const waitingCnt = bucket.filter(isPartAwaitingPlanning).length;
   const deptParts = bucket.filter(p=>!isPartAwaitingPlanning(p));
+  // İş emrine bağlı parçalar iş emri kartlarının içinde listelenir (arkadaş
+  // notu #5); bağımsız listede yalnız iş emri dışı kalanlar gösterilir.
+  const woPartIds = new Set(workOrderParts.map(wp=>wp.part_id));
+  const looseParts = deptParts.filter(p=>!woPartIds.has(p.id));
 
   const total=deptParts.length;
   const done=deptParts.filter(p=>p.status==='done').length;
@@ -2480,7 +2542,9 @@ function openDept(deptId, deptName){
     </div>
     ${deptWoStripHTML(deptId)}
     ${awaitingPlanningStripHTML(waitingCnt,'margin-bottom:24px')}
-    <!-- Rapor tablosu -->
+    ${looseParts.length?`
+    <!-- İş emri dışı parçalar (ilerlemesi olan ama iş emrine bağlanmamış eski kayıtlar) -->
+    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">🔧 İş Emri Dışı Parçalar (${looseParts.length})</div>
     <div class="report-table" style="margin-bottom:24px">
       <div class="report-table-header">
         <div>Parça</div>
@@ -2490,7 +2554,7 @@ function openDept(deptId, deptName){
         <div style="text-align:center">Durum</div>
         <div>İlerleme</div>
       </div>
-      ${deptParts.map(p=>{
+      ${looseParts.map(p=>{
         const qd=parseInt(p.qty_done)||0,qr=parseInt(p.qty_reject)||0;
         const qt_parça=parseInt(p.qty)||0;
         const qp=Math.max(0,qt_parça-qd-qr);
@@ -2516,11 +2580,10 @@ function openDept(deptId, deptName){
         </div>`;
       }).join('')}
     </div>
-    <!-- Parça kartları -->
-    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:12px">🔧 Parça Listesi</div>
-    <div class="parts-grid">
-      ${deptParts.length ? deptParts.map((p,i)=>partRowHTML(p,i,false)).join('') : `<div class="empty-state"><span class="emoji">📦</span>Bu bölümde henüz parça yok</div>`}
-    </div>`;
+    <div class="parts-grid" style="margin-bottom:24px">
+      ${looseParts.map((p,i)=>partRowHTML(p,i,false)).join('')}
+    </div>`:''}
+    ${!deptParts.length && !waitingCnt && !deptWoStripHTML(deptId) ? `<div class="empty-state"><span class="emoji">📦</span>Bu bölümde henüz parça yok</div>` : ''}`;
 
   document.getElementById('layer-parts').innerHTML = html;
 }
