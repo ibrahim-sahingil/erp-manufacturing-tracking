@@ -966,7 +966,16 @@
 <!-- SATIN ALMA PLANLAMASI -->
 <div class="view" id="view-purchasing">
   <div class="section-title">SATIN ALMA PLANLAMASI</div>
-  <div class="section-sub">Proje seç · Ürün ağacından aktar veya elle kalem ekle · Sipariş ve teslim durumunu takip et</div>
+  <div class="section-sub">Proje seç · Ürün ağacından aktar veya elle kalem ekle · Toplu sipariş, teklif ve onay</div>
+
+  <!-- Alt sekmeler (planning-tab deseni; switchPurchasingTab #view-purchasing'e scope'ludur) -->
+  <div class="planning-tabs" id="purchasing-tabs">
+    <button class="planning-tab active" onclick="switchPurchasingTab('items')">📝 Kalemler</button>
+    <button class="planning-tab" onclick="switchPurchasingTab('orders')">📦 Toplu Sipariş &amp; Teklif</button>
+  </div>
+
+  <!-- Kalemler -->
+  <div class="planning-section active" id="pur-tab-items">
 
   <!-- Proje seçimi + aksiyonlar -->
   <div class="form-card" style="margin-bottom:16px">
@@ -1012,8 +1021,25 @@
     </div>
   </div>
 
+  <!-- Toplu seçim çubuğu (seçim yokken gizli) -->
+  <div class="form-card" id="pur-select-bar" style="display:none;margin-bottom:16px;padding:12px 16px">
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <span id="pur-select-count" style="font-family:var(--font-mono);font-size:12px;color:var(--accent)"></span>
+      <button class="btn btn-primary btn-sm" onclick="poCreateFromSelection()">📦 Toplu Sipariş Oluştur</button>
+      <button class="btn btn-ghost btn-sm" onclick="purClearSelection()">✖ Seçimi Temizle</button>
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">Sadece 📝 Planlandı durumundaki, grupta olmayan kalemler seçilebilir</span>
+    </div>
+  </div>
+
   <!-- Kalem listesi -->
   <div id="pur-list"></div>
+
+  </div><!-- /pur-tab-items -->
+
+  <!-- Toplu Sipariş & Teklif -->
+  <div class="planning-section" id="pur-tab-orders">
+    <div id="po-list"></div>
+  </div>
 </div>
 
 <!-- ÜRETİM DEPOSU -->
@@ -1460,7 +1486,9 @@ const TABLE_ENDPOINTS = {
   project_bom_parts: 'project-bom-parts',
   purchase_items: 'purchase-items',
   warehouses: 'warehouses',
-  warehouse_movements: 'warehouse-movements'
+  warehouse_movements: 'warehouse-movements',
+  purchase_orders: 'purchase-orders',
+  purchase_order_quotes: 'purchase-order-quotes'
 };
 
 // ─── Ortak fetch: JWT header + ApiResponse unwrap + 401 yönetimi ───
@@ -5168,6 +5196,9 @@ async function switchTab(tab) {
 
 // ═══ SATIN ALMA PLANLAMASI ═══
 let purchaseItems = [];
+let purchaseOrders = [];        // toplu sipariş grupları
+let poQuotes = [];              // firma teklifleri
+const purSelected = new Set();  // kalemler sekmesindeki toplu seçim
 
 const PUR_STATUS = {
   PLANNED:      {label:'Planlandı',        icon:'📝', color:'#f5a623'},
@@ -5188,12 +5219,16 @@ const PUR_ACTIONS = {
 };
 
 async function renderPurchasing(){
-  // Satın alma kalemleri + aktarma için proje BOM verileri
-  const [pi] = await Promise.all([
+  // Satın alma kalemleri + toplu sipariş grupları + teklifler + proje BOM verileri
+  const [pi, po, pq] = await Promise.all([
     dbGet('purchase_items','order=created_at.asc'),
+    dbGet('purchase_orders'),
+    dbGet('purchase_order_quotes'),
     loadProjectBoms()
   ]);
-  purchaseItems = Array.isArray(pi) ? pi : [];
+  purchaseItems  = Array.isArray(pi) ? pi : [];
+  purchaseOrders = Array.isArray(po) ? po : [];
+  poQuotes       = Array.isArray(pq) ? pq : [];
 
   // Proje dropdown'u: siparişlerdeki + mevcut kalemlerdeki proje adları
   const sel = document.getElementById('pur-project-sel');
@@ -5208,7 +5243,19 @@ async function renderPurchasing(){
     if(projNames.includes(cur)) sel.value = cur;
   }
   renderPurchaseList();
+  if(document.getElementById('pur-tab-orders')?.classList.contains('active')) renderPurchaseOrders();
 }
+
+// Alt sekme geçişi (#view-purchasing'e scope'lu — depo/planlama ile CSS ortak)
+function _purActivateTab(tab){
+  document.querySelectorAll('#view-purchasing .planning-tab').forEach(t=>
+    t.classList.toggle('active', (t.getAttribute('onclick')||'').includes("'"+tab+"'")));
+  document.querySelectorAll('#view-purchasing .planning-section').forEach(s=>
+    s.classList.toggle('active', s.id==='pur-tab-'+tab));
+  if(tab==='orders') renderPurchaseOrders();
+  if(tab==='items') renderPurchaseList();
+}
+function switchPurchasingTab(tab){ _purActivateTab(tab); }
 
 function purFmtMoney(v){ return Number(v).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
@@ -5244,11 +5291,26 @@ function renderPurchaseList(){
     return;
   }
 
+  // Seçim setini ayıkla: artık seçilemez kalemler düşsün
+  [...purSelected].forEach(id=>{
+    const it = purchaseItems.find(x=>x.id===id);
+    if(!it || it.status!=='PLANNED' || it.purchase_order_id) purSelected.delete(id);
+  });
+  updatePurSelectBar();
+
   const today = new Date(); today.setHours(0,0,0,0);
   listEl.innerHTML = items.map(i=>{
     const m = PUR_STATUS[i.status] || PUR_STATUS.PLANNED;
-    const actions = (PUR_ACTIONS[i.status]||[]).map(([st,txt])=>
+    const group = i.purchase_order_id ? purchaseOrders.find(o=>o.id===i.purchase_order_id) : null;
+    const selectable = i.status==='PLANNED' && !i.purchase_order_id;
+    let actions = (PUR_ACTIONS[i.status]||[]).map(([st,txt])=>
       `<button class="btn btn-ghost btn-sm" onclick="purSetStatus('${i.id}','${st}')">${txt}</button>`).join('');
+    // Gruptaki PLANNED kalemin siparişi grup üzerinden yönetilir
+    if(group && i.status==='PLANNED'){
+      actions = `<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">sipariş grup üzerinden</span>
+        <button class="btn btn-ghost btn-sm" onclick="poGoto('${group.id}')">↗ Grup</button>` +
+        (group.status==='DRAFT' ? `<button class="btn btn-ghost btn-sm" onclick="poRemoveItem('${i.id}')">➖ Gruptan Çıkar</button>` : '');
+    }
     const overdue = i.expected_date && !['RECEIVED','IN_WAREHOUSE','CANCELLED'].includes(i.status)
       && new Date(i.expected_date) < today;
     const dateTxt = i.expected_date
@@ -5265,14 +5327,18 @@ function renderPurchaseList(){
 
     return `<div class="pbom-card" style="border-left:3px solid ${m.color}">
       <div class="pbom-card-header">
-        <div style="min-width:0">
+        <div style="min-width:0;display:flex;gap:10px;align-items:flex-start">
+          ${selectable?`<input type="checkbox" ${purSelected.has(i.id)?'checked':''} onchange="purToggleSel('${i.id}',this.checked)" title="Toplu sipariş için seç" style="width:16px;height:16px;margin-top:3px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">`:''}
+          <div style="min-width:0">
           <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             ${i.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${i.code}</span>`:''}
             ${i.name}
             <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${m.color}44;color:${m.color};background:${m.color}11">${m.icon} ${m.label}</span>
+            ${group?`<span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--muted)">📦 ${group.name}</span>`:''}
           </div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
             📁 ${i.project_name} · ${meta}
+          </div>
           </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -5469,6 +5535,395 @@ async function purImportSelected(proj){
   document.getElementById('pur-import-overlay')?.remove();
   toast(okCount+' parça satın alma listesine aktarıldı!','success');
   renderPurchaseList();
+}
+
+// ═══ TOPLU SİPARİŞ & TEKLİF/ONAY ═══
+const PO_STATUS = {
+  DRAFT:     {label:'Taslak / Teklif Toplama', icon:'📝', color:'#f5a623'},
+  APPROVED:  {label:'Onaylandı',               icon:'✔',  color:'#27ae60'},
+  ORDERED:   {label:'Sipariş Verildi',         icon:'📦', color:'#2980b9'},
+  CANCELLED: {label:'İptal',                   icon:'✖',  color:'#e74c3c'}
+};
+
+function purToggleSel(id, on){
+  if(on) purSelected.add(id); else purSelected.delete(id);
+  updatePurSelectBar();
+}
+
+function purClearSelection(){
+  purSelected.clear();
+  renderPurchaseList();
+}
+
+function updatePurSelectBar(){
+  const bar = document.getElementById('pur-select-bar');
+  const cnt = document.getElementById('pur-select-count');
+  if(!bar) return;
+  bar.style.display = purSelected.size ? '' : 'none';
+  if(cnt) cnt.textContent = purSelected.size + ' kalem seçili';
+}
+
+// Seçilen kalemlerden grup oluşturma modalı
+function poCreateFromSelection(){
+  if(!purSelected.size){ toast('Önce kalem seçin!','error'); return; }
+  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none';
+  const defName = 'Toplu Sipariş ' + new Date().toLocaleDateString('tr-TR');
+  const selItems = purchaseItems.filter(i=>purSelected.has(i.id));
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'po-create-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:460px;text-align:left">
+    <h3 style="margin-bottom:4px">📦 Toplu Sipariş Oluştur</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">${selItems.length} kalem gruplanacak; teklifler bu grup üzerinden toplanır.</p>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Grup Adı</label>
+      <input type="text" id="po-create-name" value="${defName}" style="${inp}">
+    </div>
+    <div style="max-height:180px;overflow:auto;font-family:var(--font-mono);font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-bottom:16px">
+      ${selItems.map(i=>`<div>• ${i.code?i.code+' — ':''}${i.name} <span style="opacity:.7">(${Number(i.quantity||1)} ${i.unit||'adet'} · ${i.project_name})</span></div>`).join('')}
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('po-create-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" onclick="poDoCreate()">📦 Oluştur</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(()=>{ const el=document.getElementById('po-create-name'); if(el){el.focus();el.select();} },100);
+}
+
+async function poDoCreate(){
+  const name = document.getElementById('po-create-name').value.trim();
+  if(!name){ toast('Grup adı girin!','error'); return; }
+  const data = await dbInsert('purchase_orders', {
+    name,
+    item_ids: [...purSelected],
+    created_by: currentUser?.display_name || currentUser?.username || null
+  });
+  if(!Array.isArray(data)||!data[0]){ toast('Grup oluşturulamadı!','error'); return; }
+  document.getElementById('po-create-overlay')?.remove();
+  purSelected.clear();
+  toast('📦 Toplu sipariş grubu oluşturuldu!','success');
+  await renderPurchasing();
+  _purActivateTab('orders');
+}
+
+function poGoto(orderId){
+  _purActivateTab('orders');
+  setTimeout(()=>{
+    const el = document.getElementById('po-card-'+orderId);
+    if(el){ el.scrollIntoView({behavior:'smooth', block:'start'}); }
+  }, 100);
+}
+
+async function poReload(){
+  const [pi, po, pq] = await Promise.all([
+    dbGet('purchase_items','order=created_at.asc'),
+    dbGet('purchase_orders'),
+    dbGet('purchase_order_quotes')
+  ]);
+  purchaseItems  = Array.isArray(pi) ? pi : purchaseItems;
+  purchaseOrders = Array.isArray(po) ? po : purchaseOrders;
+  poQuotes       = Array.isArray(pq) ? pq : poQuotes;
+  renderPurchaseOrders();
+  renderPurchaseList();
+}
+
+function renderPurchaseOrders(){
+  const el = document.getElementById('po-list');
+  if(!el) return;
+  if(!purchaseOrders.length){
+    el.innerHTML = `<div class="empty-state"><span class="emoji">📦</span>Henüz toplu sipariş grubu yok<br><span style="font-size:12px;color:var(--muted)">Kalemler sekmesinde 📝 Planlandı kalemleri işaretleyip "Toplu Sipariş Oluştur" deyin</span></div>`;
+    return;
+  }
+  const inp = 'background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;outline:none;width:100%';
+  el.innerHTML = purchaseOrders.map(o=>{
+    const m = PO_STATUS[o.status] || PO_STATUS.DRAFT;
+    const items  = purchaseItems.filter(i=>i.purchase_order_id===o.id);
+    const quotes = poQuotes.filter(q=>q.purchase_order_id===o.id);
+    const isDraft = o.status==='DRAFT';
+
+    // Üye kalemler
+    const itemRows = items.length ? items.map(i=>
+      `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--border)">
+        <span style="font-family:var(--font-mono);font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${i.code?`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
+          <span style="color:var(--muted)"> · ${Number(i.quantity||1)} ${i.unit||'adet'} · 📁 ${i.project_name}</span>
+        </span>
+        ${isDraft?`<button class="btn btn-ghost btn-sm" onclick="poRemoveItem('${i.id}')" title="Gruptan çıkar">➖</button>`:''}
+      </div>`).join('')
+      : `<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:4px 0">Grupta kalem kalmadı</div>`;
+
+    // Teklifler
+    const quoteRows = quotes.length ? quotes.map(q=>{
+      const isWinner = o.selected_quote_id===q.id;
+      const c = isWinner ? '#27ae60' : (q.rejection_reason ? '#e74c3c' : 'var(--border)');
+      const meta = [
+        q.total_price!=null ? '💰 '+purFmtMoney(q.total_price)+' '+(q.currency||'TRY') : '',
+        q.delivery_date ? '📆 '+new Date(q.delivery_date).toLocaleDateString('tr-TR') : '',
+        q.contact_info ? '☎ '+q.contact_info : '',
+        q.notes ? '🗒 '+q.notes : ''
+      ].filter(Boolean).join(' · ');
+      return `<div style="border:1px solid ${c};border-radius:6px;padding:8px 12px;margin-bottom:6px;${isWinner?'background:#27ae6011':''}">
+        <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+          <span style="font-family:var(--font-mono);font-size:12px">
+            🏢 <b>${q.supplier_name}</b>
+            ${isWinner?'<span style="color:#27ae60;font-size:10px"> ✔ KAZANAN</span>':''}
+          </span>
+          <span style="display:flex;gap:6px;align-items:center">
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${meta}</span>
+            ${isDraft?`<button class="btn btn-ghost btn-sm" onclick="poDeleteQuote('${q.id}')" title="Teklifi sil">🗑</button>`:''}
+          </span>
+        </div>
+        ${!isWinner && q.rejection_reason ? `<div style="font-family:var(--font-mono);font-size:10px;color:#e74c3c;margin-top:4px">✖ Elenme gerekçesi: ${q.rejection_reason}</div>`:''}
+      </div>`;
+    }).join('') : `<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">Henüz teklif girilmedi</div>`;
+
+    // Teklif ekleme formu (sadece DRAFT)
+    const quoteForm = isDraft ? `
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-top:10px">
+        <input type="text" id="poq-sup-${o.id}" placeholder="Firma adı *" style="${inp}">
+        <input type="number" id="poq-price-${o.id}" placeholder="Toplam fiyat" min="0" step="0.01" style="${inp}">
+        <select id="poq-cur-${o.id}" style="${inp}"><option>TRY</option><option>EUR</option><option>USD</option></select>
+        <input type="date" id="poq-date-${o.id}" title="Taahhüt edilen teslim" style="${inp}">
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 2fr auto;gap:8px;margin-top:8px">
+        <input type="text" id="poq-contact-${o.id}" placeholder="İletişim (opsiyonel)" style="${inp}">
+        <input type="text" id="poq-notes-${o.id}" placeholder="Not (opsiyonel)" style="${inp}">
+        <button class="btn btn-ghost btn-sm" onclick="poAddQuote('${o.id}')">➕ Teklif Ekle</button>
+      </div>` : '';
+
+    // Onay bilgisi
+    const approvalInfo = (o.status==='APPROVED'||o.status==='ORDERED') && o.approval_note
+      ? `<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:8px;border-left:2px solid #27ae60;padding-left:10px">
+          ✔ Onay: ${o.approval_note}${o.approved_by?` — <b>${o.approved_by}</b>`:''}${o.approved_at?' · '+new Date(o.approved_at).toLocaleString('tr-TR'):''}
+        </div>` : '';
+
+    // Duruma göre aksiyonlar
+    let actions = '';
+    if(o.status==='DRAFT'){
+      actions = `<button class="btn btn-primary btn-sm" onclick="poApprove('${o.id}')">✔ Onayla</button>
+        <button class="btn btn-ghost btn-sm" onclick="poRename('${o.id}')">✏️</button>
+        <button class="btn btn-ghost btn-sm" onclick="poCancel('${o.id}')">✖ İptal</button>
+        <button class="btn btn-ghost btn-sm" onclick="poDelete('${o.id}')" style="color:#e74c3c">🗑</button>`;
+    } else if(o.status==='APPROVED'){
+      actions = `<button class="btn btn-primary btn-sm" onclick="poOrder('${o.id}')">📦 Sipariş Ver</button>
+        <button class="btn btn-ghost btn-sm" onclick="poUndoApprove('${o.id}')">↩ Onayı Geri Al</button>
+        <button class="btn btn-ghost btn-sm" onclick="poCancel('${o.id}')">✖ İptal</button>`;
+    } else if(o.status==='ORDERED'){
+      actions = `<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">📦 ${o.ordered_at?new Date(o.ordered_at).toLocaleString('tr-TR'):''}</span>
+        <button class="btn btn-ghost btn-sm" onclick="poUndoOrder('${o.id}')">↩ Siparişi Geri Al</button>`;
+    } else {
+      actions = `<button class="btn btn-ghost btn-sm" onclick="poDelete('${o.id}')" style="color:#e74c3c">🗑 Sil</button>`;
+    }
+
+    return `<div class="pbom-card" id="po-card-${o.id}" style="border-left:3px solid ${m.color};margin-bottom:14px">
+      <div class="pbom-card-header">
+        <div style="min-width:0">
+          <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            📦 ${o.name}
+            <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${m.color}44;color:${m.color};background:${m.color}11">${m.icon} ${m.label}</span>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
+            ${items.length} kalem · ${quotes.length} teklif${o.created_by?' · 👤 '+o.created_by:''} · 🕓 ${new Date(o.created_at).toLocaleDateString('tr-TR')}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${actions}</div>
+      </div>
+      <div style="margin-top:10px">
+        <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:4px">Kalemler</div>
+        ${itemRows}
+      </div>
+      <div style="margin-top:12px">
+        <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:6px">Teklifler</div>
+        ${quoteRows}
+        ${quoteForm}
+      </div>
+      ${approvalInfo}
+    </div>`;
+  }).join('');
+}
+
+async function poAddQuote(orderId){
+  const sup = document.getElementById('poq-sup-'+orderId).value.trim();
+  if(!sup){ toast('Firma adı girin!','error'); return; }
+  const price = parseFloat(document.getElementById('poq-price-'+orderId).value);
+  const data = await dbInsert('purchase_order_quotes', {
+    purchase_order_id: orderId,
+    supplier_name: sup,
+    total_price: isNaN(price) ? null : price,
+    currency: document.getElementById('poq-cur-'+orderId).value || 'TRY',
+    delivery_date: document.getElementById('poq-date-'+orderId).value || null,
+    contact_info: document.getElementById('poq-contact-'+orderId).value.trim() || null,
+    notes: document.getElementById('poq-notes-'+orderId).value.trim() || null
+  });
+  if(!Array.isArray(data)||!data[0]){ toast('Teklif kaydedilemedi!','error'); return; }
+  poQuotes.push(data[0]);
+  toast('➕ Teklif eklendi!','success');
+  renderPurchaseOrders();
+}
+
+async function poDeleteQuote(id){
+  const q = poQuotes.find(x=>x.id===id);
+  if(!q) return;
+  if(!confirm(`"${q.supplier_name}" teklifi silinsin mi?`)) return;
+  const ok = await dbDelete('purchase_order_quotes', id);
+  if(!ok){ toast('Silinemedi!','error'); return; }
+  poQuotes = poQuotes.filter(x=>x.id!==id);
+  toast('Teklif silindi','success');
+  renderPurchaseOrders();
+}
+
+async function poRemoveItem(itemId){
+  const ok = await dbUpdate('purchase_items', itemId, {purchase_order_id: null});
+  if(!ok){ toast('Çıkarılamadı!','error'); return; }
+  const i = purchaseItems.find(x=>x.id===itemId);
+  if(i) i.purchase_order_id = null;
+  toast('➖ Kalem gruptan çıkarıldı','success');
+  renderPurchaseOrders();
+  renderPurchaseList();
+}
+
+function poRename(orderId){
+  const o = purchaseOrders.find(x=>x.id===orderId);
+  if(!o) return;
+  const name = prompt('Grup adı:', o.name);
+  if(!name || !name.trim() || name.trim()===o.name) return;
+  dbUpdate('purchase_orders', orderId, {name: name.trim()}).then(ok=>{
+    if(!ok){ toast('Güncellenemedi!','error'); return; }
+    o.name = name.trim();
+    toast('Grup adı güncellendi','success');
+    renderPurchaseOrders();
+    renderPurchaseList();
+  });
+}
+
+// Onay modalı: kazanan teklif + onay açıklaması + elenenler için gerekçe (hepsi zorunlu)
+function poApprove(orderId){
+  const o = purchaseOrders.find(x=>x.id===orderId);
+  if(!o) return;
+  const quotes = poQuotes.filter(q=>q.purchase_order_id===orderId);
+  if(!quotes.length){ toast('Onay için önce en az bir teklif girin!','error'); return; }
+  if(quotes.length===1) toast('Tek teklifle onaylıyorsunuz — karşılaştırma için birden fazla teklif önerilir','');
+  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;outline:none';
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'po-approve-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:560px;max-height:85vh;overflow:auto;text-align:left">
+    <h3 style="margin-bottom:4px">✔ Sipariş Onayı</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">📦 ${o.name} — kazanan firmayı seçin; elenen her firma için gerekçe yazın.</p>
+    <div style="display:grid;gap:8px;margin-bottom:14px">
+      ${quotes.map(q=>{
+        const meta = [
+          q.total_price!=null ? purFmtMoney(q.total_price)+' '+(q.currency||'TRY') : 'fiyat girilmedi',
+          q.delivery_date ? '📆 '+new Date(q.delivery_date).toLocaleDateString('tr-TR') : ''
+        ].filter(Boolean).join(' · ');
+        return `<div style="border:1px solid var(--border);border-radius:6px;padding:10px 12px">
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-family:var(--font-mono);font-size:12px">
+            <input type="radio" name="po-app-quote" value="${q.id}" onchange="poApproveRadioChange()" style="accent-color:var(--accent)">
+            <b>${q.supplier_name}</b><span style="color:var(--muted)">${meta}</span>
+          </label>
+          <input type="text" id="po-rej-${q.id}" placeholder="Neden tercih edilmedi? *" style="${inp};margin-top:8px">
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="form-group" style="margin-bottom:16px">
+      <label>Onay Açıklaması * <span style="color:var(--muted);text-transform:none">(bu firma neden seçildi?)</span></label>
+      <textarea id="po-app-note" rows="2" style="${inp};resize:vertical"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('po-approve-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" onclick="poDoApprove('${orderId}')">✔ Onayla</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+// Seçilen (kazanan) teklifin gerekçe alanını kapat
+function poApproveRadioChange(){
+  const sel = document.querySelector('input[name="po-app-quote"]:checked')?.value;
+  document.querySelectorAll('[id^="po-rej-"]').forEach(el=>{
+    const isWinner = el.id === 'po-rej-'+sel;
+    el.disabled = isWinner;
+    el.style.opacity = isWinner ? '.35' : '1';
+    if(isWinner) el.value = '';
+  });
+}
+
+async function poDoApprove(orderId){
+  const sel = document.querySelector('input[name="po-app-quote"]:checked')?.value;
+  if(!sel){ toast('Kazanan teklifi seçin!','error'); return; }
+  const note = document.getElementById('po-app-note').value.trim();
+  if(!note){ toast('Onay açıklaması zorunlu!','error'); return; }
+  const losers = poQuotes.filter(q=>q.purchase_order_id===orderId && q.id!==sel);
+  const reasons = {};
+  for(const q of losers){
+    const r = document.getElementById('po-rej-'+q.id).value.trim();
+    if(!r){ toast(`"${q.supplier_name}" için elenme gerekçesi zorunlu!`,'error'); return; }
+    reasons[q.id] = r;
+  }
+  const ok = await dbUpdate('purchase_orders', orderId, {
+    status: 'APPROVED',
+    selected_quote_id: sel,
+    approval_note: note,
+    approved_by: currentUser?.display_name || currentUser?.username || null
+  });
+  if(!ok){ toast('Onaylanamadı!','error'); return; }
+  // Elenme gerekçeleri + kazananın eski gerekçesini temizle
+  for(const q of losers) await dbUpdate('purchase_order_quotes', q.id, {rejection_reason: reasons[q.id]});
+  await dbUpdate('purchase_order_quotes', sel, {rejection_reason: null});
+  document.getElementById('po-approve-overlay')?.remove();
+  toast('✔ Sipariş onaylandı!','success');
+  poReload();
+}
+
+async function poOrder(orderId){
+  const o = purchaseOrders.find(x=>x.id===orderId);
+  if(!o) return;
+  const win = poQuotes.find(q=>q.id===o.selected_quote_id);
+  if(!confirm(`"${o.name}" grubu ${win?win.supplier_name+' firmasına':''} sipariş verilecek; gruptaki kalemler "Sipariş Verildi" olur. Devam?`)) return;
+  const ok = await dbUpdate('purchase_orders', orderId, {status:'ORDERED'});
+  if(!ok){ toast('Sipariş verilemedi!','error'); return; }
+  toast('📦 Sipariş verildi!','success');
+  poReload();
+}
+
+async function poUndoOrder(orderId){
+  if(!confirm('Sipariş geri alınacak; gruptaki kalemler "Planlandı" durumuna döner. Devam?')) return;
+  const ok = await dbUpdate('purchase_orders', orderId, {status:'APPROVED'});
+  if(!ok){ toast('Geri alınamadı!','error'); return; }
+  toast('↩ Sipariş geri alındı','success');
+  poReload();
+}
+
+async function poUndoApprove(orderId){
+  const ok = await dbUpdate('purchase_orders', orderId, {status:'DRAFT'});
+  if(!ok){ toast('Geri alınamadı!','error'); return; }
+  // Gerekçeler yeni onayda yeniden yazılacak — eskileri temizle
+  for(const q of poQuotes.filter(x=>x.purchase_order_id===orderId && x.rejection_reason)){
+    await dbUpdate('purchase_order_quotes', q.id, {rejection_reason: null});
+  }
+  toast('↩ Onay geri alındı','success');
+  poReload();
+}
+
+async function poCancel(orderId){
+  const o = purchaseOrders.find(x=>x.id===orderId);
+  if(!o) return;
+  if(!confirm(`"${o.name}" grubu iptal edilsin mi? Kalemler serbest kalır (Planlandı olarak).`)) return;
+  const ok = await dbUpdate('purchase_orders', orderId, {status:'CANCELLED'});
+  if(!ok){ toast('İptal edilemedi!','error'); return; }
+  toast('✖ Grup iptal edildi','success');
+  poReload();
+}
+
+async function poDelete(orderId){
+  const o = purchaseOrders.find(x=>x.id===orderId);
+  if(!o) return;
+  if(!confirm(`"${o.name}" grubu silinsin mi? Kalemler ve teklif geçmişi grupla birlikte kaldırılır (kalemler serbest kalır).`)) return;
+  const ok = await dbDelete('purchase_orders', orderId);
+  if(!ok){ toast('Silinemedi!','error'); return; }
+  toast('Grup silindi','success');
+  poReload();
 }
 
 // ═══ ÜRETİM DEPOSU ═══

@@ -21,8 +21,9 @@ import java.util.UUID;
  *   {"expected_date": "2026-08-01"}          - termin guncelleme
  *
  * PRESENCE TAKIPLI ALANLAR (explicit null = temizle):
- *   expected_date, supplier, unit_price, notes, warehouse_id
- *   (warehouse_id: whUndo depodan geri alirken explicit null gonderir)
+ *   expected_date, supplier, unit_price, notes, warehouse_id, purchase_order_id
+ *   (warehouse_id: whUndo depodan geri alirken explicit null gonderir;
+ *    purchase_order_id: gruptan cikarma explicit null - sadece DRAFT grupta)
  *
  * projectName ve projectBomPartId IMMUTABLE - gelse de service ignore eder.
  * Durum gecis damgalari (ordered_at/received_at) service'te atilir.
@@ -97,6 +98,17 @@ public class PurchaseItemUpdateRequest {
     public void setWarehouseId(UUID warehouseId) {
         this.warehouseId = warehouseId;
         this.warehouseIdPresent = true;
+    }
+
+    @Setter(lombok.AccessLevel.NONE)
+    private UUID purchaseOrderId;
+
+    @Setter(lombok.AccessLevel.NONE)
+    private boolean purchaseOrderIdPresent;
+
+    public void setPurchaseOrderId(UUID purchaseOrderId) {
+        this.purchaseOrderId = purchaseOrderId;
+        this.purchaseOrderIdPresent = true;
     }
 
     @Setter(lombok.AccessLevel.NONE)

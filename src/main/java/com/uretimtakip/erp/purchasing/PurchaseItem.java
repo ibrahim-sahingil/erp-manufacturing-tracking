@@ -48,6 +48,8 @@ import java.util.UUID;
  *   status              varchar(20)   DEFAULT 'PLANNED' (CHECK)
  *   warehouse_id        uuid          NULL (FK -> warehouses, ON DELETE SET NULL;
  *                                     IN_WAREHOUSE durumunda hangi depoda oldugu)
+ *   purchase_order_id   uuid          NULL (FK -> purchase_orders, ON DELETE SET NULL;
+ *                                     kalemin bagli oldugu toplu siparis grubu)
  *   notes               text          NULL
  *   ordered_at          timestamp     NULL
  *   received_at         timestamp     NULL
@@ -105,6 +107,9 @@ public class PurchaseItem extends BaseEntity {
 
     @Column(name = "warehouse_id")
     private UUID warehouseId;
+
+    @Column(name = "purchase_order_id")
+    private UUID purchaseOrderId;
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;

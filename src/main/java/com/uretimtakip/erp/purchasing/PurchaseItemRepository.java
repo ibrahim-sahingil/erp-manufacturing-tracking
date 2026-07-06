@@ -14,4 +14,6 @@ public interface PurchaseItemRepository extends JpaRepository<PurchaseItem, UUID
     boolean existsByProjectBomPartId(UUID projectBomPartId);
 
     boolean existsByWarehouseId(UUID warehouseId);
+
+    List<PurchaseItem> findByPurchaseOrderId(UUID purchaseOrderId);
 }

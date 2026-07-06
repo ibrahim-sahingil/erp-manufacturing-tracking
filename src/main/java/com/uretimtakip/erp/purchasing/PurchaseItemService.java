@@ -39,6 +39,7 @@ public class PurchaseItemService {
 
     private final PurchaseItemRepository purchaseItemRepository;
     private final WarehouseRepository warehouseRepository;
+    private final PurchaseOrderRepository purchaseOrderRepository;
 
     @Transactional(readOnly = true)
     public List<PurchaseItemResponse> listAll() {
@@ -147,6 +148,25 @@ public class PurchaseItemService {
             }
             item.setWarehouseId(request.getWarehouseId());
         }
+        if (request.isPurchaseOrderIdPresent()
+                && !java.util.Objects.equals(request.getPurchaseOrderId(), item.getPurchaseOrderId())) {
+            // Gruptan cikarma: mevcut grup DRAFT olmali (siparis grup uzerinden yonetiliyor)
+            if (item.getPurchaseOrderId() != null) {
+                assertOrderDraft(item.getPurchaseOrderId(),
+                        "Kalem sadece taslak (DRAFT) gruptan cikarilabilir.");
+            }
+            // Gruba ekleme: hedef grup DRAFT + kalem PLANNED olmali
+            if (request.getPurchaseOrderId() != null) {
+                assertOrderDraft(request.getPurchaseOrderId(),
+                        "Kalem sadece taslak (DRAFT) gruba eklenebilir.");
+                if (!"PLANNED".equals(item.getStatus())) {
+                    throw new BusinessException(
+                            "Sadece PLANNED durumundaki kalem gruba eklenebilir.",
+                            "PURCHASE_ORDER_ITEM_INVALID");
+                }
+            }
+            item.setPurchaseOrderId(request.getPurchaseOrderId());
+        }
 
         if (request.getStatus() != null && !request.getStatus().isBlank()
                 && !request.getStatus().equals(item.getStatus())) {
@@ -171,6 +191,14 @@ public class PurchaseItemService {
         PurchaseItem item = findEntityById(id);
         purchaseItemRepository.delete(item);
         log.info("PurchaseItem deleted: id={}, name={}", id, item.getName());
+    }
+
+    private void assertOrderDraft(java.util.UUID orderId, String message) {
+        PurchaseOrder order = purchaseOrderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("PurchaseOrder", "id", orderId));
+        if (!"DRAFT".equals(order.getStatus())) {
+            throw new BusinessException(message, "PURCHASE_ORDER_LOCKED");
+        }
     }
 
     private void validateStatus(String status) {

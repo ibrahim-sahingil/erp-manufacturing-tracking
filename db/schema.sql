@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict o9r7V3s9F3HJcTeg12pQDpcfcF8CNH1UD4kg4afAgZo8sisOxnPwqhAKLUynNd1
+\restrict SpddN7adusZDUfdxhz4Nd1uMRYMC7f65L112rMMbifxbr8MbW11ybKelkwhW6QT
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -268,7 +268,45 @@ CREATE TABLE public.purchase_items (
     created_by character varying(150),
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     warehouse_id uuid,
+    purchase_order_id uuid,
     CONSTRAINT purchase_items_status_check CHECK (((status)::text = ANY ((ARRAY['PLANNED'::character varying, 'ORDERED'::character varying, 'RECEIVED'::character varying, 'IN_WAREHOUSE'::character varying, 'IN_STOCK'::character varying, 'CANCELLED'::character varying])::text[])))
+);
+
+
+--
+-- Name: purchase_order_quotes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.purchase_order_quotes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    purchase_order_id uuid NOT NULL,
+    supplier_name character varying(150) NOT NULL,
+    contact_info character varying(200),
+    total_price numeric(15,2),
+    currency character varying(10) DEFAULT 'TRY'::character varying,
+    delivery_date date,
+    notes text,
+    rejection_reason text,
+    created_at timestamp without time zone DEFAULT now()
+);
+
+
+--
+-- Name: purchase_orders; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.purchase_orders (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying(200) NOT NULL,
+    status character varying(20) DEFAULT 'DRAFT'::character varying NOT NULL,
+    selected_quote_id uuid,
+    approval_note text,
+    approved_by character varying(150),
+    approved_at timestamp without time zone,
+    ordered_at timestamp without time zone,
+    created_by character varying(150),
+    created_at timestamp without time zone DEFAULT now(),
+    CONSTRAINT purchase_orders_status_check CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'APPROVED'::character varying, 'ORDERED'::character varying, 'CANCELLED'::character varying])::text[])))
 );
 
 
@@ -543,6 +581,22 @@ ALTER TABLE ONLY public.purchase_items
 
 
 --
+-- Name: purchase_order_quotes purchase_order_quotes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.purchase_order_quotes
+    ADD CONSTRAINT purchase_order_quotes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: purchase_orders purchase_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.purchase_orders
+    ADD CONSTRAINT purchase_orders_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: user_pins user_pins_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -709,6 +763,13 @@ CREATE INDEX idx_parts_status ON public.parts USING btree (status);
 
 
 --
+-- Name: idx_po_quotes_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_po_quotes_order ON public.purchase_order_quotes USING btree (purchase_order_id);
+
+
+--
 -- Name: idx_project_bom_parts_bom_part; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -741,6 +802,13 @@ CREATE INDEX idx_project_bom_product_id ON public.project_bom USING btree (bom_p
 --
 
 CREATE INDEX idx_project_bom_project_name ON public.project_bom USING btree (project_name);
+
+
+--
+-- Name: idx_purchase_items_po; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_purchase_items_po ON public.purchase_items USING btree (purchase_order_id);
 
 
 --
@@ -979,11 +1047,35 @@ ALTER TABLE ONLY public.purchase_items
 
 
 --
+-- Name: purchase_items purchase_items_po_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.purchase_items
+    ADD CONSTRAINT purchase_items_po_fkey FOREIGN KEY (purchase_order_id) REFERENCES public.purchase_orders(id) ON DELETE SET NULL;
+
+
+--
 -- Name: purchase_items purchase_items_warehouse_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.purchase_items
     ADD CONSTRAINT purchase_items_warehouse_fkey FOREIGN KEY (warehouse_id) REFERENCES public.warehouses(id) ON DELETE SET NULL;
+
+
+--
+-- Name: purchase_order_quotes purchase_order_quotes_po_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.purchase_order_quotes
+    ADD CONSTRAINT purchase_order_quotes_po_fkey FOREIGN KEY (purchase_order_id) REFERENCES public.purchase_orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: purchase_orders purchase_orders_selected_quote_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.purchase_orders
+    ADD CONSTRAINT purchase_orders_selected_quote_fkey FOREIGN KEY (selected_quote_id) REFERENCES public.purchase_order_quotes(id) ON DELETE SET NULL;
 
 
 --
@@ -1102,5 +1194,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict o9r7V3s9F3HJcTeg12pQDpcfcF8CNH1UD4kg4afAgZo8sisOxnPwqhAKLUynNd1
+\unrestrict SpddN7adusZDUfdxhz4Nd1uMRYMC7f65L112rMMbifxbr8MbW11ybKelkwhW6QT
 
