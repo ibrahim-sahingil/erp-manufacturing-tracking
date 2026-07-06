@@ -77,6 +77,17 @@ Sıra, bağımlılık ve risk gözetilerek kuruldu. Her adım: derleme + Playwri
   dashboard'da "X'in A ve B parçaları bekleniyor"; iş emri çıktısında alt parçalar yazsın.
 - Kapsamlı iş — F/G bittikten sonra ayrıca planlanmalı.
 
+## SONRADAN EKLENEN MADDELER (1.txt 02:18 güncellemesi)
+- **(#11) "Mal kabul fişi kalemler kısmında tek tek verilenlerde yok"**: BÜYÜK OLASILIKLA
+  ESKİ SAYFA — kalem bazlı "📄 Mal Kabul Fişi" butonu ORDERED/RECEIVED kalemlerde 894f62a'da
+  eklendi. Yeni oturumda ÖNCE canlıda doğrula (Ctrl+F5); gerçekten eksik senaryo varsa
+  (örn. PLANNED'dan doğrudan RECEIVED?) PAKET A'ya al.
+- **(#12) Tedarikçi listesi (kartotek)**: `suppliers` tablosu (ad, iletişim, vergi bilgileri,
+  not) + backend CRUD + Satın Alma'da kalem tedarikçisi ve teklif firması alanları listeden
+  seçilsin ("listede yoksa ekle" seçeneğiyle — combobox deseni). İrsaliye alıcısı için de
+  aynı listeden seçim düşünülebilir (Cari Rehber görselindeki gibi). → **PAKET B'ye dahil et**
+  (satın alma maliyetleriyle aynı bölgede çalışılıyor).
+
 ## Önerilen sıra
 A (hızlı) → B → C → D → E → F → G → H. Arkadaş onayı gelince ayrıca: Parçalar sekmesi kaldırma
 (görev #4, bekliyor).
