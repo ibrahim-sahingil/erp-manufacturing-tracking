@@ -12,6 +12,7 @@ import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -62,9 +63,9 @@ public class BomImportService {
         }
         String fname = file.getOriginalFilename() != null
                 ? file.getOriginalFilename().toLowerCase() : "";
-        if (!fname.endsWith(".xlsx") && !fname.endsWith(".xlsm")) {
+        if (!fname.endsWith(".xlsx") && !fname.endsWith(".xlsm") && !fname.endsWith(".xls")) {
             throw new BusinessException(
-                    "Sadece .xlsx uzantili Excel dosyasi destekleniyor.",
+                    "Sadece .xlsx / .xlsm / .xls uzantili Excel dosyasi destekleniyor.",
                     "BOM_IMPORT_BAD_TYPE");
         }
 
@@ -72,8 +73,9 @@ public class BomImportService {
         List<String> fileErrors = new ArrayList<>();
         DataFormatter fmt = new DataFormatter();
 
+        // WorkbookFactory icerigi koklayarak hem .xls (HSSF) hem .xlsx (XSSF) acar
         try (InputStream in = file.getInputStream();
-             Workbook wb = new XSSFWorkbook(in)) {
+             Workbook wb = WorkbookFactory.create(in)) {
 
             Sheet sheet = wb.getSheetAt(0);
             if (sheet == null || sheet.getLastRowNum() < 0) {
