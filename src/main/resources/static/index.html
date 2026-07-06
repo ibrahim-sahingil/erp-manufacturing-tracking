@@ -1090,13 +1090,16 @@
       <button class="btn btn-primary" onclick="whmAddMovement()">💾 Hareketi Kaydet</button>
     </div>
 
-    <!-- Hareket geçmişi -->
+    <!-- Stok özeti + hareket geçmişi (ortak depo filtresi) -->
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-      <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px">📜 Hareket Geçmişi</div>
+      <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px">📊 Stok Özeti <span style="text-transform:none;letter-spacing:0">(hareketlerden hesaplanır)</span></div>
       <select id="whm-mv-filter" onchange="renderWhMovements()" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:6px 10px;outline:none">
         <option value="">— Tüm depolar —</option>
       </select>
     </div>
+    <div id="whm-stock" style="margin-bottom:20px"></div>
+
+    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">📜 Hareket Geçmişi</div>
     <div id="whm-mv-list"></div>
   </div>
 </div>
@@ -5839,11 +5842,18 @@ async function whmAddMovement(){
   if(!whId){ toast('Depo seçin!','error'); return; }
   if(!name){ toast('Malzeme adı girin!','error'); return; }
   if(!qty || qty<=0){ toast('Geçerli bir miktar girin!','error'); return; }
+  const code = document.getElementById('whm-mv-code').value.trim() || null;
+  const mvType = document.getElementById('whm-mv-type').value;
+  // Eksi stok uyarısı (engel değil: kayıt dışı giriş olabilir, kullanıcı karar verir)
+  if(mvType === 'OUT'){
+    const cur = _whItemStock(whId, name, code);
+    if(qty > cur && !confirm(`Bu depoda "${name}" için mevcut stok ${Number(cur.toFixed(4))} görünüyor; ${qty} çıkış eksi stok oluşturur.\nYine de kaydedilsin mi?`)) return;
+  }
   const body = {
     warehouse_id: whId,
     item_name: name,
-    item_code: document.getElementById('whm-mv-code').value.trim() || null,
-    movement_type: document.getElementById('whm-mv-type').value,
+    item_code: code,
+    movement_type: mvType,
     quantity: qty,
     unit: document.getElementById('whm-mv-unit').value.trim() || 'adet',
     source_type: 'MANUAL',
@@ -5862,7 +5872,55 @@ async function whmAddMovement(){
   renderWhMovements();
 }
 
+// Bir depodaki tek malzemenin net stoğu (kod varsa kodla, yoksa adla eşleşir)
+function _whItemStock(warehouseId, itemName, itemCode){
+  const key = (itemCode || itemName || '').trim().toLowerCase();
+  let net = 0;
+  for(const m of whMovements){
+    if(m.warehouse_id !== warehouseId) continue;
+    const mk = (m.item_code || m.item_name || '').trim().toLowerCase();
+    if(mk !== key) continue;
+    net += (m.movement_type==='IN' ? 1 : -1) * Number(m.quantity || 0);
+  }
+  return net;
+}
+
+// Stok özeti: hareketlerden SUM(IN)−SUM(OUT); ayrı stok tablosu yok
+function renderWhStock(){
+  const el = document.getElementById('whm-stock');
+  if(!el) return;
+  const f = document.getElementById('whm-mv-filter')?.value || '';
+  const list = f ? whMovements.filter(m=>m.warehouse_id===f) : whMovements;
+  const map = new Map();
+  for(const m of list){
+    const key = m.warehouse_id + '|' + (m.item_code || m.item_name || '').trim().toLowerCase() + '|' + (m.unit||'adet');
+    const e = map.get(key) || { name:m.item_name, code:m.item_code, unit:m.unit||'adet', wh:m.warehouse_id, net:0 };
+    e.net += (m.movement_type==='IN' ? 1 : -1) * Number(m.quantity || 0);
+    map.set(key, e);
+  }
+  const rows = [...map.values()].filter(r=>Math.abs(r.net)>1e-9)
+    .sort((a,b)=>(whName(a.wh)||'').localeCompare(whName(b.wh)||'','tr') || a.name.localeCompare(b.name,'tr'));
+  if(!rows.length){
+    el.innerHTML = `<div class="empty-state" style="padding:14px"><span class="emoji">📊</span>Depoda malzeme yok</div>`;
+    return;
+  }
+  el.innerHTML = rows.map(r=>{
+    const c = r.net > 0 ? '#2ecc71' : '#e74c3c';
+    return `<div class="pbom-card" style="border-left:3px solid ${c};padding:8px 14px">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0">
+          ${r.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${r.code}</span>`:''}
+          <span>${r.name}</span>
+          ${!f?`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">🗄️ ${whName(r.wh)||'—'}</span>`:''}
+        </div>
+        <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${r.unit}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function renderWhMovements(){
+  renderWhStock();
   const el = document.getElementById('whm-mv-list');
   if(!el) return;
   const f = document.getElementById('whm-mv-filter')?.value || '';
