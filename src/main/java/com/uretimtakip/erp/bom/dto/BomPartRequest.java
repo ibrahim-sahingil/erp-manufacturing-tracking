@@ -74,6 +74,15 @@ public class BomPartRequest {
     @Size(max = 150, message = "Materyal en fazla 150 karakter olabilir")
     private String material;
 
+    @PositiveOrZero(message = "En 0 veya pozitif olmali")
+    private BigDecimal widthMm;
+
+    @PositiveOrZero(message = "Boy 0 veya pozitif olmali")
+    private BigDecimal heightMm;
+
+    @PositiveOrZero(message = "Kalinlik 0 veya pozitif olmali")
+    private BigDecimal thicknessMm;
+
     /**
      * Esnek jsonb yapisi. Her item icindeki anahtarlar serbest.
      * Tipik: operationId (UUID), code (String), duration (Number), notes (String).

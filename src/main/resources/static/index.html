@@ -1956,6 +1956,15 @@ const STANDARD_DEPTS = ['Kaynak','Montaj','Elektrikhane','Talaşlı İmalat','Ka
 function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function ea(s){ return (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 
+// ─── Ölçü yardımcıları (sac/profil mm ölçüleri; 0 veya boş = ölçü yok) ───
+function dimVal(v){ const n=parseFloat(v); return (isFinite(n)&&n>0)?n:''; }
+function dimNum(id){ const el=document.getElementById(id); const n=parseFloat(el?el.value:''); return (isFinite(n)&&n>0)?n:0; }
+function dimLabel(w,h,t){
+  const f=v=>{ const n=parseFloat(v); return (isFinite(n)&&n>0)?(+n.toFixed(2)):null; };
+  const arr=[f(w),f(h),f(t)].filter(v=>v!=null);
+  return arr.length?arr.join('×')+' mm':'';
+}
+
 // ═══ INIT ═══
 async function init(){
   // Beni hatırla — kayıtlı bilgileri yükle
@@ -7178,6 +7187,7 @@ function renderBomList() {
           <span id="bom-qty-display-${part.id}" style="cursor:pointer;border-bottom:1px dashed var(--muted)" onclick="editBomQty('${part.id}')" title="Miktarı düzenle">${part.quantity} ${part.unit}</span>
           ${part.weight_kg?`<span>⚖ ${part.weight_kg} kg</span>`:''}
           ${part.material?`<span>🔩 ${part.material}</span>`:''}
+          ${dimLabel(part.width_mm,part.height_mm,part.thickness_mm)?`<span>📐 ${dimLabel(part.width_mm,part.height_mm,part.thickness_mm)}</span>`:''}
         </div>
         ${opsHTML}
       </div>
@@ -7352,7 +7362,7 @@ function editBomPart(partId) {
       <label>Parça Adı</label>
       <input type="text" id="bom-edit-name" value="${(part.name||'').replace(/"/g,'&quot;')}" style="${inStyle}">
     </div>
-    <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:18px">
+    <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
       <div class="form-group">
         <label>Kod</label>
         <input type="text" id="bom-edit-code" value="${(part.code||'').replace(/"/g,'&quot;')}" style="${inStyle}"
@@ -7362,6 +7372,14 @@ function editBomPart(partId) {
         <label>Malzeme</label>
         <input type="text" id="bom-edit-material" value="${(part.material||'').replace(/"/g,'&quot;')}" style="${inStyle}"
           onkeydown="if(event.key==='Enter')saveBomPartEdit('${partId}')">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:18px">
+      <label>Ölçü (mm) — opsiyonel, sac/profil için</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <input type="number" id="bom-edit-width" min="0" step="any" placeholder="En" value="${dimVal(part.width_mm)}" style="${inStyle}">
+        <input type="number" id="bom-edit-height" min="0" step="any" placeholder="Boy" value="${dimVal(part.height_mm)}" style="${inStyle}">
+        <input type="number" id="bom-edit-thickness" min="0" step="any" placeholder="Kalınlık" value="${dimVal(part.thickness_mm)}" style="${inStyle}">
       </div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
@@ -7382,10 +7400,14 @@ async function saveBomPartEdit(partId) {
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
   const dup = bomParts.find(p=>p.id!==partId && p.product_id===part.product_id && (p.code||'').toLowerCase()===code.toLowerCase());
   if(dup){ toast(`Bu ürün ağacında "${dup.code}" kodlu bir parça zaten var: ${dup.name}`,'error'); return; }
+  // Olcu: bos birakmak = 0 gonderilir (backend'de null "dokunma" demek oldugu icin
+  // temizleme 0 ile yapilir; 0 ekranda "olcu yok" sayilir)
+  const width_mm = dimNum('bom-edit-width'), height_mm = dimNum('bom-edit-height'), thickness_mm = dimNum('bom-edit-thickness');
   // PARTIAL update'te null "dokunma" demek — malzemeyi temizlemek icin bos string gonderilir
-  const ok = await dbUpdate('bom_parts', partId, { name, code, material });
+  const ok = await dbUpdate('bom_parts', partId, { name, code, material, width_mm, height_mm, thickness_mm });
   if(!ok) return;
   part.name=name; part.code=code; part.material=material;
+  part.width_mm=width_mm; part.height_mm=height_mm; part.thickness_mm=thickness_mm;
   document.getElementById('bom-edit-overlay')?.remove();
   renderBomContent();
   toast('Parça güncellendi.','success');
@@ -7444,6 +7466,7 @@ function renderBomTreeSvg() {
           <span style="color:var(--muted);font-size:10px">${p.quantity} ${p.unit}</span>
           ${p.weight_kg?`<span style="color:var(--muted);font-size:10px">⚖${p.weight_kg}kg</span>`:''}
           ${p.material?`<span style="color:var(--muted);font-size:10px">🔩${p.material}</span>`:''}
+          ${dimLabel(p.width_mm,p.height_mm,p.thickness_mm)?`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.width_mm,p.height_mm,p.thickness_mm)}</span>`:''}
           ${opBadges}
         </div>
         ${childrenHtml?`<div class="bom-tree-children">${childrenHtml}</div>`:''}
@@ -7835,6 +7858,7 @@ function pbomeRenderList() {
               <span>${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
               ${p.custom_weight?`<span>⚖${p.custom_weight}kg</span>`:''}
               ${p.custom_material?`<span>🔩${p.custom_material}</span>`:''}
+              ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?`<span>📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
               ${dept?`<span style="color:#2980b9">🏭${dept.name}</span>`:''}
             </div>
             ${opsHTML}
@@ -7917,7 +7941,7 @@ function pbomeEditPart(partId) {
       <label>Parça Adı</label>
       <input type="text" id="pbome-edit-name" value="${(p.custom_name||'').replace(/"/g,'&quot;')}" style="${inStyle}">
     </div>
-    <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:18px">
+    <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
       <div class="form-group"><label>Kod</label>
         <input type="text" id="pbome-edit-code" value="${(p.custom_code||'').replace(/"/g,'&quot;')}" style="${inStyle}"
           onkeydown="if(event.key==='Enter')pbomeSavePartEdit('${partId}')">
@@ -7925,6 +7949,14 @@ function pbomeEditPart(partId) {
       <div class="form-group"><label>Malzeme</label>
         <input type="text" id="pbome-edit-material" value="${(p.custom_material||'').replace(/"/g,'&quot;')}" style="${inStyle}"
           onkeydown="if(event.key==='Enter')pbomeSavePartEdit('${partId}')">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:18px">
+      <label>Ölçü (mm) — opsiyonel, sac/profil için</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <input type="number" id="pbome-edit-width" min="0" step="any" placeholder="En" value="${dimVal(p.custom_width_mm ?? p.resolved_width_mm)}" style="${inStyle}">
+        <input type="number" id="pbome-edit-height" min="0" step="any" placeholder="Boy" value="${dimVal(p.custom_height_mm ?? p.resolved_height_mm)}" style="${inStyle}">
+        <input type="number" id="pbome-edit-thickness" min="0" step="any" placeholder="Kalınlık" value="${dimVal(p.custom_thickness_mm ?? p.resolved_thickness_mm)}" style="${inStyle}">
       </div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
@@ -7945,10 +7977,13 @@ async function pbomeSavePartEdit(partId) {
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
   const dup=_pbomeParts.find(x=>x.id!==partId && (x.custom_code||'').toLowerCase()===code.toLowerCase());
   if(dup){ toast(`Bu ağaçta "${dup.custom_code}" kodlu bir parça zaten var: ${dup.custom_name}`,'error'); return; }
+  const custom_width_mm=dimNum('pbome-edit-width'), custom_height_mm=dimNum('pbome-edit-height'), custom_thickness_mm=dimNum('pbome-edit-thickness');
   // PARTIAL update'te null "dokunma" demek — malzemeyi temizlemek icin bos string gonderilir
-  const ok=await dbUpdate('project_bom_parts',partId,{custom_name:name,custom_code:code,custom_material:material});
+  const ok=await dbUpdate('project_bom_parts',partId,{custom_name:name,custom_code:code,custom_material:material,custom_width_mm,custom_height_mm,custom_thickness_mm});
   if(!ok) return;
   p.custom_name=name; p.custom_code=code; p.custom_material=material;
+  p.custom_width_mm=custom_width_mm; p.custom_height_mm=custom_height_mm; p.custom_thickness_mm=custom_thickness_mm;
+  p.resolved_width_mm=custom_width_mm; p.resolved_height_mm=custom_height_mm; p.resolved_thickness_mm=custom_thickness_mm;
   document.getElementById('pbome-edit-overlay')?.remove();
   pbomeRenderContent();
   toast('Parça güncellendi.','success');
@@ -8009,6 +8044,7 @@ function pbomeShowTree() {
             <span>${p.custom_name}${isCustom?' ⭐':''}</span>
             <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
             ${p.custom_weight?`<span style="color:var(--muted);font-size:10px">⚖${p.custom_weight}kg</span>`:''}
+            ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
             ${dept?`<span style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;font-size:10px;color:#2980b9">🏭${dept.name}</span>`:''}
             ${ops.map(o=>`<span style="background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.2);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${o.name}(${o.code})</span>`).join('')}
           </div>
@@ -8586,6 +8622,7 @@ async function viewPublishedBom(pbomId) {
             <span>${p.custom_name}${isCustom?' ⭐':''}</span>
             <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
             ${p.custom_weight?`<span style="color:var(--muted);font-size:10px">⚖${p.custom_weight}kg</span>`:''}
+            ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
             ${dept?`<span style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;font-size:10px;color:#2980b9">🏭${dept.name}</span>`:''}
             ${ops.map(o=>`<span style="background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.2);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${o.name}(${o.code})</span>`).join('')}
             ${partStatus}

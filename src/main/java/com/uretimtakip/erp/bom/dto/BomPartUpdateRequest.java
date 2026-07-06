@@ -67,6 +67,15 @@ public class BomPartUpdateRequest {
     @Size(max = 150, message = "Materyal en fazla 150 karakter olabilir")
     private String material;
 
+    @PositiveOrZero(message = "En 0 veya pozitif olmali")
+    private BigDecimal widthMm;
+
+    @PositiveOrZero(message = "Boy 0 veya pozitif olmali")
+    private BigDecimal heightMm;
+
+    @PositiveOrZero(message = "Kalinlik 0 veya pozitif olmali")
+    private BigDecimal thicknessMm;
+
     /** Esnek jsonb yapisi - BomPartRequest.operations ile ayni format. */
     private List<Map<String, Object>> operations;
 

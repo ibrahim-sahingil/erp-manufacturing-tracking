@@ -78,6 +78,15 @@ public class ProjectBomPartRequest {
     @Size(max = 150, message = "Materyal en fazla 150 karakter olabilir")
     private String customMaterial;
 
+    @PositiveOrZero(message = "En 0 veya pozitif olmali")
+    private BigDecimal customWidthMm;
+
+    @PositiveOrZero(message = "Boy 0 veya pozitif olmali")
+    private BigDecimal customHeightMm;
+
+    @PositiveOrZero(message = "Kalinlik 0 veya pozitif olmali")
+    private BigDecimal customThicknessMm;
+
     /**
      * Bu parcayi hangi departman uretecek.
      * Department FK - service'te varlik kontrolu yapilir.

@@ -46,6 +46,9 @@ public class ProjectBomPartResponse {
     private String customUnit;
     private BigDecimal customWeight;
     private String customMaterial;
+    private BigDecimal customWidthMm;
+    private BigDecimal customHeightMm;
+    private BigDecimal customThicknessMm;
 
     private UUID deptId;
     private UUID parentCustomId;
@@ -61,6 +64,9 @@ public class ProjectBomPartResponse {
     private String resolvedUnit;
     private BigDecimal resolvedWeight;
     private String resolvedMaterial;
+    private BigDecimal resolvedWidthMm;
+    private BigDecimal resolvedHeightMm;
+    private BigDecimal resolvedThicknessMm;
 
     /**
      * BomPart referansi YOK - sadece custom_X'lerden olusturulur.
@@ -88,6 +94,9 @@ public class ProjectBomPartResponse {
                 .customUnit(e.getCustomUnit())
                 .customWeight(e.getCustomWeight())
                 .customMaterial(e.getCustomMaterial())
+                .customWidthMm(e.getCustomWidthMm())
+                .customHeightMm(e.getCustomHeightMm())
+                .customThicknessMm(e.getCustomThicknessMm())
                 .deptId(e.getDeptId())
                 .parentCustomId(e.getParentCustomId())
                 .operations(e.getOperations())
@@ -109,6 +118,12 @@ public class ProjectBomPartResponse {
                 bomPart != null ? bomPart.getWeightKg() : null));
         r.setResolvedMaterial(coalesceString(e.getCustomMaterial(),
                 bomPart != null ? bomPart.getMaterial() : null));
+        r.setResolvedWidthMm(coalesceBigDecimal(e.getCustomWidthMm(),
+                bomPart != null ? bomPart.getWidthMm() : null));
+        r.setResolvedHeightMm(coalesceBigDecimal(e.getCustomHeightMm(),
+                bomPart != null ? bomPart.getHeightMm() : null));
+        r.setResolvedThicknessMm(coalesceBigDecimal(e.getCustomThicknessMm(),
+                bomPart != null ? bomPart.getThicknessMm() : null));
 
         return r;
     }

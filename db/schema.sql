@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict SpddN7adusZDUfdxhz4Nd1uMRYMC7f65L112rMMbifxbr8MbW11ybKelkwhW6QT
+\restrict nQhiXN6umbtMHeAgjNTuRBHjSaaqg2VyVHdSy9KDFB0YsT0WfzWWnMhq7XTp4sK
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -68,7 +68,10 @@ CREATE TABLE public.bom_parts (
     operations jsonb DEFAULT '[]'::jsonb,
     level integer DEFAULT 0,
     sort_order integer DEFAULT 0,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    width_mm numeric(15,4),
+    height_mm numeric(15,4),
+    thickness_mm numeric(15,4)
 );
 
 
@@ -210,7 +213,10 @@ CREATE TABLE public.project_bom_parts (
     operations jsonb DEFAULT '[]'::jsonb,
     level integer DEFAULT 0,
     sort_order integer DEFAULT 0,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    custom_width_mm numeric(15,4),
+    custom_height_mm numeric(15,4),
+    custom_thickness_mm numeric(15,4)
 );
 
 
@@ -1194,5 +1200,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SpddN7adusZDUfdxhz4Nd1uMRYMC7f65L112rMMbifxbr8MbW11ybKelkwhW6QT
+\unrestrict nQhiXN6umbtMHeAgjNTuRBHjSaaqg2VyVHdSy9KDFB0YsT0WfzWWnMhq7XTp4sK
 

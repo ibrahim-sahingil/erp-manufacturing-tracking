@@ -33,6 +33,9 @@ public class BomPartResponse {
     private String unit;
     private BigDecimal weightKg;
     private String material;
+    private BigDecimal widthMm;
+    private BigDecimal heightMm;
+    private BigDecimal thicknessMm;
     private List<Map<String, Object>> operations;
     private Integer level;
     private Integer sortOrder;
@@ -49,6 +52,9 @@ public class BomPartResponse {
                 .unit(e.getUnit())
                 .weightKg(e.getWeightKg())
                 .material(e.getMaterial())
+                .widthMm(e.getWidthMm())
+                .heightMm(e.getHeightMm())
+                .thicknessMm(e.getThicknessMm())
                 .operations(e.getOperations())
                 .level(e.getLevel())
                 .sortOrder(e.getSortOrder())

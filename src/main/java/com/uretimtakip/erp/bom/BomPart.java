@@ -45,6 +45,9 @@ import java.util.UUID;
  *   unit        varchar(20)   DEFAULT 'adet'
  *   weight_kg   numeric(15,4) NULL
  *   material    varchar(150)  NULL
+ *   width_mm     numeric(15,4) NULL (sac/profil olcusu - opsiyonel)
+ *   height_mm    numeric(15,4) NULL
+ *   thickness_mm numeric(15,4) NULL
  *   operations  jsonb         DEFAULT '[]'
  *   level       int4          DEFAULT 0
  *   sort_order  int4          DEFAULT 0
@@ -84,6 +87,16 @@ public class BomPart extends BaseEntity {
 
     @Column(name = "material", length = 150)
     private String material;
+
+    /** Sac/profil olculeri (mm) - nesting/plaka hesabi icin, hepsi opsiyonel. */
+    @Column(name = "width_mm", precision = 15, scale = 4)
+    private BigDecimal widthMm;
+
+    @Column(name = "height_mm", precision = 15, scale = 4)
+    private BigDecimal heightMm;
+
+    @Column(name = "thickness_mm", precision = 15, scale = 4)
+    private BigDecimal thicknessMm;
 
     /**
      * Operasyonlar listesi (PostgreSQL jsonb -> Java List<Map<String, Object>>).

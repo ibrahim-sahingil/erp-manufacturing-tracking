@@ -184,6 +184,9 @@ public class ProjectBomPartService {
                 .customUnit(request.getCustomUnit())
                 .customWeight(request.getCustomWeight())
                 .customMaterial(request.getCustomMaterial())
+                .customWidthMm(request.getCustomWidthMm())
+                .customHeightMm(request.getCustomHeightMm())
+                .customThicknessMm(request.getCustomThicknessMm())
                 .deptId(request.getDeptId())
                 .parentCustomId(request.getParentCustomId())
                 .operations(request.getOperations() != null
@@ -245,6 +248,15 @@ public class ProjectBomPartService {
         }
         if (request.getCustomMaterial() != null) {
             pbp.setCustomMaterial(request.getCustomMaterial());
+        }
+        if (request.getCustomWidthMm() != null) {
+            pbp.setCustomWidthMm(request.getCustomWidthMm());
+        }
+        if (request.getCustomHeightMm() != null) {
+            pbp.setCustomHeightMm(request.getCustomHeightMm());
+        }
+        if (request.getCustomThicknessMm() != null) {
+            pbp.setCustomThicknessMm(request.getCustomThicknessMm());
         }
         if (request.getOperations() != null) {
             pbp.setOperations(request.getOperations());

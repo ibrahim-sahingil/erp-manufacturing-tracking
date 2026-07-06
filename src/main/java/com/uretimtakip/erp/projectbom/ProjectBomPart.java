@@ -96,6 +96,16 @@ public class ProjectBomPart extends BaseEntity {
     @Column(name = "custom_material", length = 150)
     private String customMaterial;
 
+    /** Sac/profil olcu override'lari (mm) - null ise sablondaki olcu gecerli. */
+    @Column(name = "custom_width_mm", precision = 15, scale = 4)
+    private BigDecimal customWidthMm;
+
+    @Column(name = "custom_height_mm", precision = 15, scale = 4)
+    private BigDecimal customHeightMm;
+
+    @Column(name = "custom_thickness_mm", precision = 15, scale = 4)
+    private BigDecimal customThicknessMm;
+
     @Column(name = "dept_id")
     private UUID deptId;
 

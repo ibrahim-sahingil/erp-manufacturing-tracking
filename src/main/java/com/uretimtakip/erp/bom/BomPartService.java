@@ -114,6 +114,9 @@ public class BomPartService {
                         ? request.getUnit() : "adet")
                 .weightKg(request.getWeightKg())
                 .material(request.getMaterial())
+                .widthMm(request.getWidthMm())
+                .heightMm(request.getHeightMm())
+                .thicknessMm(request.getThicknessMm())
                 .operations(request.getOperations() != null
                         ? request.getOperations() : new ArrayList<>())
                 .level(level)
@@ -159,6 +162,15 @@ public class BomPartService {
         }
         if (request.getMaterial() != null) {
             part.setMaterial(request.getMaterial());
+        }
+        if (request.getWidthMm() != null) {
+            part.setWidthMm(request.getWidthMm());
+        }
+        if (request.getHeightMm() != null) {
+            part.setHeightMm(request.getHeightMm());
+        }
+        if (request.getThicknessMm() != null) {
+            part.setThicknessMm(request.getThicknessMm());
         }
         if (request.getOperations() != null) {
             part.setOperations(request.getOperations());
