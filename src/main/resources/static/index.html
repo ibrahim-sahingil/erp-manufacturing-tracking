@@ -2164,14 +2164,31 @@ function showLayer(layer){
   });
 }
 
+// Arkadaş notu (2026-07-06): BOM yayınlanan parçalar planlama yapılmadan
+// dashboard'a detaylarıyla düşmesin. Bir iş emrine bağlanana ya da üretim
+// ilerlemesi kaydedilene kadar parça "planlama bekliyor" sayılır ve
+// detaysız tek bir şeritte özetlenir.
+function isPartAwaitingPlanning(p){
+  if (workOrderParts.some(wp => wp.part_id === p.id)) return false;
+  if ((parseInt(p.qty_done)||0) > 0 || (parseInt(p.qty_reject)||0) > 0) return false;
+  return !p.status || p.status === 'pending';
+}
+function awaitingPlanningStripHTML(count, style){
+  if(!count) return '';
+  return `<div style="background:rgba(245,166,35,.07);border:1px dashed rgba(245,166,35,.35);border-radius:8px;padding:12px 16px;font-family:var(--font-mono);font-size:12px;color:var(--yellow);${style||''}">⏳ ${count} parça · Satın alma veya üretim planlaması bekleniyor</div>`;
+}
+
 function renderStats(){
-  const total=parts.length;
-  const done=parts.filter(p=>p.status==='done').length;
-  const pend=parts.filter(p=>p.status==='pending').length;
-  const rej=parts.filter(p=>p.status==='reject').length;
-  const qd=parts.reduce((s,p)=>s+(parseInt(p.qty_done)||0),0);
-  const qr=parts.reduce((s,p)=>s+(parseInt(p.qty_reject)||0),0);
-  const qt=parts.reduce((s,p)=>s+(parseInt(p.qty)||0),0);
+  // Planlama bekleyen parçalar üst istatistiklere katılmaz (detaysız özet)
+  const waiting=parts.filter(isPartAwaitingPlanning).length;
+  const active=parts.filter(p=>!isPartAwaitingPlanning(p));
+  const total=active.length;
+  const done=active.filter(p=>p.status==='done').length;
+  const pend=active.filter(p=>p.status==='pending').length;
+  const rej=active.filter(p=>p.status==='reject').length;
+  const qd=active.reduce((s,p)=>s+(parseInt(p.qty_done)||0),0);
+  const qr=active.reduce((s,p)=>s+(parseInt(p.qty_reject)||0),0);
+  const qt=active.reduce((s,p)=>s+(parseInt(p.qty)||0),0);
   // Bekliyor = toplam sipariş adeti - yapılan - reddedilen
   const qp = Math.max(0, qt - qd - qr);
   // Adet bazlı yüzde
@@ -2179,7 +2196,7 @@ function renderStats(){
   document.getElementById('stats-row').innerHTML=`
     <div class="stat-card" style="--c:var(--accent)">
       <div class="stat-label">Toplam Parça</div><div class="stat-value">${total}</div>
-      <div class="stat-sub">${qt} adet · Tüm projeler</div>
+      <div class="stat-sub">${qt} adet · Tüm projeler${waiting?` · ⏳ ${waiting} parça planlama bekliyor`:''}</div>
       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
     </div>
     <div class="stat-card" style="--c:var(--green)">
@@ -2231,17 +2248,19 @@ function renderProjectCards(){
 
   el.innerHTML = (pinnedCount>0 ? `<div class="pinned-label">📌 Sabitlenmiş Projeler</div>` : '') +
     `<div class="project-cards">`+entries.map(([name,plist])=>{
-    const d=plist.filter(x=>x.status==='done').length;
-    const r=plist.filter(x=>x.status==='reject').length;
-    const pe=plist.filter(x=>x.status==='pending').length;
-    const t=plist.length;
-    const qd=plist.reduce((s,p)=>s+(parseInt(p.qty_done)||0),0);
-    const qr=plist.reduce((s,p)=>s+(parseInt(p.qty_reject)||0),0);
-    const qt=plist.reduce((s,p)=>s+(parseInt(p.qty)||0),0);
+    const waitCnt = plist.filter(isPartAwaitingPlanning).length;
+    const act = plist.filter(p=>!isPartAwaitingPlanning(p));
+    const d=act.filter(x=>x.status==='done').length;
+    const r=act.filter(x=>x.status==='reject').length;
+    const pe=act.filter(x=>x.status==='pending').length;
+    const t=act.length;
+    const qd=act.reduce((s,p)=>s+(parseInt(p.qty_done)||0),0);
+    const qr=act.reduce((s,p)=>s+(parseInt(p.qty_reject)||0),0);
+    const qt=act.reduce((s,p)=>s+(parseInt(p.qty)||0),0);
     const qp = Math.max(0, qt - qd - qr);
     const qdp = qt ? Math.round(qd/qt*100) : 0;
     const qrp = qt ? Math.round(qr/qt*100) : 0;
-    const qpp = 100 - qdp - qrp;
+    const qpp = qt ? 100 - qdp - qrp : 0;
     const dp=t?Math.round(d/t*100):0;
     const pinned = isPinned('project', name);
     const firstDate = plist
@@ -2253,8 +2272,9 @@ function renderProjectCards(){
     return `<div class="project-card${pinned?' pinned':''}" onclick="openProject('${ea(name)}')">
       <button class="pin-btn${pinned?' active':''}" onclick="togglePin('project','${ea(name)}',event)" title="${pinned?'Sabitlemeyi kaldır':'Sabitle'}">📌</button>
       <div class="project-card-name">${name}</div>
-      <div class="project-card-count">${t} parça &middot; %${qdp} tamamlandı <span style="font-size:10px;opacity:.6">(adet bazlı)</span></div>
+      <div class="project-card-count">${t?`${t} parça &middot; %${qdp} tamamlandı <span style="font-size:10px;opacity:.6">(adet bazlı)</span>`:`Üretimde parça yok`}</div>
       ${woLine?`<div style="font-family:var(--font-mono);font-size:10px;margin-top:2px">📋 ${woLine}</div>`:''}
+      ${waitCnt?`<div style="font-family:var(--font-mono);font-size:10px;color:var(--yellow);margin-top:2px">⏳ ${waitCnt} parça · satın alma / üretim planlaması bekliyor</div>`:''}
       <div class="project-mini-bars">
         <div class="pmb-done" style="flex:${qdp}"></div>
         <div class="pmb-pending" style="flex:${qpp}"></div>
@@ -2281,7 +2301,9 @@ function openProject(name){
   renderBreadcrumb();
   showLayer('depts');
 
-  const projParts = parts.filter(p=>(p.project||'(Proje Yok)')===name);
+  const projAll   = parts.filter(p=>(p.project||'(Proje Yok)')===name);
+  const waitingCnt = projAll.filter(isPartAwaitingPlanning).length;
+  const projParts = projAll.filter(p=>!isPartAwaitingPlanning(p));
   const projDepts = depts.filter(d=>d.project===name);
 
   // Bölümsüz parçalar da var mı?
@@ -2317,6 +2339,7 @@ function openProject(name){
         <div class="report-progress"><div class="report-progress-fill" style="width:${total?Math.round(rej/total*100):0}%"></div></div>
       </div>
     </div>
+    ${awaitingPlanningStripHTML(waitingCnt,'margin-bottom:24px')}
     <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:12px">🏭 Bölümler</div>
     <div class="dept-cards">`;
 
@@ -2383,9 +2406,11 @@ function openDept(deptId, deptName){
   showLayer('parts');
 
   const projParts = parts.filter(p=>(p.project||'(Proje Yok)')===_activeProject);
-  const deptParts = deptId==='__unassigned__'
+  const bucket = deptId==='__unassigned__'
     ? projParts.filter(p=>!p.department_id)
     : projParts.filter(p=>p.department_id===deptId);
+  const waitingCnt = bucket.filter(isPartAwaitingPlanning).length;
+  const deptParts = bucket.filter(p=>!isPartAwaitingPlanning(p));
 
   const total=deptParts.length;
   const done=deptParts.filter(p=>p.status==='done').length;
@@ -2425,6 +2450,7 @@ function openDept(deptId, deptName){
       </div>
     </div>
     ${deptWoStripHTML(deptId)}
+    ${awaitingPlanningStripHTML(waitingCnt,'margin-bottom:24px')}
     <!-- Rapor tablosu -->
     <div class="report-table" style="margin-bottom:24px">
       <div class="report-table-header">
