@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cEtev3CKCaaOON8iIP2vUgQLUs8LbegNJkYMXdyszgAvKYIFo510yVC5VlBpBV9
+\restrict U9mHpMXccAKXlAHehkJGfqz0w3AdQXCNxQopXdtiVvp8gWYChj2YBd5DcSYTKGh
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -362,6 +362,25 @@ CREATE TABLE public.purchase_orders (
 
 
 --
+-- Name: suppliers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.suppliers (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying(150) NOT NULL,
+    contact_person character varying(150),
+    phone character varying(50),
+    email character varying(150),
+    address character varying(300),
+    tax_office character varying(100),
+    tax_number character varying(50),
+    notes text,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp without time zone DEFAULT now()
+);
+
+
+--
 -- Name: user_pins; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -670,6 +689,14 @@ ALTER TABLE ONLY public.purchase_order_quotes
 
 ALTER TABLE ONLY public.purchase_orders
     ADD CONSTRAINT purchase_orders_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: suppliers suppliers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.suppliers
+    ADD CONSTRAINT suppliers_pkey PRIMARY KEY (id);
 
 
 --
@@ -983,6 +1010,13 @@ CREATE INDEX idx_work_orders_workspace_id ON public.work_orders USING btree (wor
 --
 
 CREATE UNIQUE INDEX parts_order_code_ci_key ON public.parts USING btree (order_id, lower((code)::text));
+
+
+--
+-- Name: suppliers_name_lower_uq; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX suppliers_name_lower_uq ON public.suppliers USING btree (lower((name)::text));
 
 
 --
@@ -1309,5 +1343,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cEtev3CKCaaOON8iIP2vUgQLUs8LbegNJkYMXdyszgAvKYIFo510yVC5VlBpBV9
+\unrestrict U9mHpMXccAKXlAHehkJGfqz0w3AdQXCNxQopXdtiVvp8gWYChj2YBd5DcSYTKGh
 

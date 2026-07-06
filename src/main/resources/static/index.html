@@ -989,6 +989,7 @@
       <div class="form-group" style="display:flex;align-items:flex-end;gap:8px">
         <button class="btn btn-primary" onclick="openPurImport()">🌳 Ürün Ağacından Aktar</button>
         <button class="btn btn-ghost" onclick="togglePurForm()">+ Elle Kalem Ekle</button>
+        <button class="btn btn-ghost" onclick="openSuppliersModal()">🏢 Tedarikçiler</button>
       </div>
     </div>
     <div id="pur-summary" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>
@@ -1005,7 +1006,7 @@
     </div>
     <div class="form-row">
       <div class="form-group"><label>Malzeme</label><input type="text" id="pur-material" placeholder="Örn: St-37"></div>
-      <div class="form-group"><label>Tedarikçi</label><input type="text" id="pur-supplier" placeholder="Örn: X Metal A.Ş."></div>
+      <div class="form-group"><label>Tedarikçi</label><input type="text" id="pur-supplier" list="sup-datalist" placeholder="Örn: X Metal A.Ş."></div>
       <div class="form-group"><label>Birim Fiyat</label><input type="number" id="pur-price" placeholder="0.00" min="0" step="0.01"></div>
       <div class="form-group"><label>Para Birimi</label>
         <select id="pur-currency" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
@@ -1179,7 +1180,7 @@
   <div class="form-card" id="dn-form" style="display:none">
     <div style="font-family:var(--font-display);font-size:16px;letter-spacing:2px;color:var(--accent);margin-bottom:14px">ALICI BİLGİLERİ</div>
     <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-      <div class="form-group"><label>Alıcı *</label><input type="text" id="dn-recipient" placeholder="Firma / kişi adı"></div>
+      <div class="form-group"><label>Alıcı *</label><input type="text" id="dn-recipient" list="sup-datalist" onchange="dnRecipientAutofill()" placeholder="Firma / kişi adı"></div>
       <div class="form-group"><label>TCKN/VKN</label><input type="text" id="dn-taxno" placeholder="Vergi/TC no"></div>
       <div class="form-group"><label>Vergi Dairesi</label><input type="text" id="dn-taxoffice" placeholder="Vergi dairesi"></div>
     </div>
@@ -1544,7 +1545,8 @@ const TABLE_ENDPOINTS = {
   purchase_orders: 'purchase-orders',
   purchase_order_quotes: 'purchase-order-quotes',
   delivery_notes: 'delivery-notes',
-  delivery_note_items: 'delivery-note-items'
+  delivery_note_items: 'delivery-note-items',
+  suppliers: 'suppliers'
 };
 
 // ─── Ortak fetch: JWT header + ApiResponse unwrap + 401 yönetimi ───
@@ -5397,6 +5399,165 @@ async function switchTab(tab) {
   if(tab==='appusers')  renderAppUsers();
 }
 
+// ═══ TEDARİKÇİ KARTOTEKİ (#12 arkadaş isteği: cari rehber) ═══
+// Kalem tedarikçisi, teklif firması ve irsaliye alıcısı bu listeden seçilir
+// (datalist = combobox: serbest yazım + öneri). Kayıtta ad listede yoksa
+// kartoteğe otomatik eklenir ("listede yoksa ekle" deseni).
+let suppliers = [];
+
+async function loadSuppliers(){
+  const s = await dbGet('suppliers','order=name.asc');
+  if(Array.isArray(s)) suppliers = s;
+  refreshSupplierDatalist();
+}
+
+function refreshSupplierDatalist(){
+  let dl = document.getElementById('sup-datalist');
+  if(!dl){ dl = document.createElement('datalist'); dl.id = 'sup-datalist'; document.body.appendChild(dl); }
+  dl.innerHTML = suppliers.filter(s=>s.is_active!==false)
+    .map(s=>`<option value="${(s.name||'').replace(/"/g,'&quot;')}">`).join('');
+}
+
+// Yazılan ad kartotekte yoksa oluşturur (kayıt akışlarını bloklamasın diye
+// hata durumunda sessizce geçer — kalem/teklif kaydı tedarikçiye bağlı değil).
+async function ensureSupplier(name){
+  const n = (name||'').trim();
+  if(!n) return;
+  if(suppliers.some(s=>(s.name||'').trim().toLowerCase()===n.toLowerCase())) return;
+  try{
+    const data = await dbInsert('suppliers', {name:n});
+    if(Array.isArray(data)&&data[0]){
+      suppliers.push(data[0]);
+      refreshSupplierDatalist();
+      toast(`🏢 "${n}" tedarikçi kartoteğine eklendi`,'success');
+    }
+  }catch(e){ /* kartotek eklenemese de asıl kayıt devam etsin */ }
+}
+
+// ─── Kartotek yönetim modalı (liste + ekle + düzenle + sil/pasif) ───
+function openSuppliersModal(){
+  document.getElementById('sup-modal-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'sup-modal-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:760px;max-height:85vh;display:flex;flex-direction:column;text-align:left">
+    <h3 style="margin-bottom:4px">🏢 Tedarikçi Kartoteki</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px">Kalem tedarikçisi, teklif firması ve irsaliye alıcısı bu listeden önerilir.</p>
+    <div id="sup-modal-list" style="overflow-y:auto;flex:1;border:1px solid var(--border);border-radius:6px;padding:6px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-primary" onclick="supEdit(null)">➕ Yeni Tedarikçi</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('sup-modal-overlay').remove()">Kapat</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  loadSuppliers().then(renderSuppliersModalList);
+  renderSuppliersModalList();
+}
+
+function renderSuppliersModalList(){
+  const el = document.getElementById('sup-modal-list');
+  if(!el) return;
+  if(!suppliers.length){
+    el.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:16px;text-align:center">Henüz tedarikçi yok — kayıtlarda yazılan adlar otomatik buraya düşer.</div>`;
+    return;
+  }
+  el.innerHTML = suppliers.map(s=>{
+    const passive = s.is_active===false;
+    const meta = [
+      s.contact_person ? '👤 '+s.contact_person : '',
+      s.phone ? '☎ '+s.phone : '',
+      s.email ? '✉ '+s.email : '',
+      s.tax_number ? 'VKN: '+s.tax_number+(s.tax_office?' / '+s.tax_office:'') : (s.tax_office||''),
+      s.notes ? '🗒 '+s.notes : ''
+    ].filter(Boolean).join(' · ');
+    return `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px dashed var(--border);${passive?'opacity:.45':''}">
+      <div style="min-width:0">
+        <div style="font-family:var(--font-mono);font-size:12px"><b>${s.name}</b>${passive?' <span style="font-size:10px;color:var(--muted)">(pasif)</span>':''}</div>
+        ${meta?`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">${meta}</div>`:''}
+      </div>
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        <button class="btn btn-ghost btn-sm" onclick="supEdit('${s.id}')">✏️</button>
+        <button class="btn btn-ghost btn-sm" onclick="supToggleActive('${s.id}')" title="${passive?'Aktifleştir':'Pasife al'}">${passive?'▶':'⏸'}</button>
+        <button class="btn btn-ghost btn-sm" onclick="supDelete('${s.id}')" style="color:var(--red,#e74c3c)">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function supEdit(id){
+  const s = id ? suppliers.find(x=>x.id===id) : {};
+  if(id && !s) return;
+  document.getElementById('sup-edit-overlay')?.remove();
+  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 11px;outline:none';
+  const esc = v => (v||'').replace(/"/g,'&quot;');
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'sup-edit-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:520px;text-align:left">
+    <h3 style="margin-bottom:14px">${id?'✏️ Tedarikçiyi Düzenle':'➕ Yeni Tedarikçi'}</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="grid-column:1/-1"><label style="font-size:11px;color:var(--muted)">Ad *</label><input type="text" id="se-name" value="${esc(s.name)}" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Yetkili</label><input type="text" id="se-contact" value="${esc(s.contact_person)}" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Telefon</label><input type="text" id="se-phone" value="${esc(s.phone)}" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">E-posta</label><input type="text" id="se-email" value="${esc(s.email)}" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Vergi Dairesi</label><input type="text" id="se-taxoffice" value="${esc(s.tax_office)}" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Vergi No / TCKN</label><input type="text" id="se-taxno" value="${esc(s.tax_number)}" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Adres</label><input type="text" id="se-address" value="${esc(s.address)}" style="${inp}"></div>
+      <div style="grid-column:1/-1"><label style="font-size:11px;color:var(--muted)">Not</label><input type="text" id="se-notes" value="${esc(s.notes)}" style="${inp}"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="document.getElementById('sup-edit-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" onclick="supSave(${id?`'${id}'`:'null'})">💾 Kaydet</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(()=>document.getElementById('se-name')?.focus(),100);
+}
+
+async function supSave(id){
+  const name = document.getElementById('se-name').value.trim();
+  if(!name){ toast('Tedarikçi adı zorunlu!','error'); return; }
+  const body = {
+    name,
+    contact_person: document.getElementById('se-contact').value.trim() || null,
+    phone:      document.getElementById('se-phone').value.trim() || null,
+    email:      document.getElementById('se-email').value.trim() || null,
+    tax_office: document.getElementById('se-taxoffice').value.trim() || null,
+    tax_number: document.getElementById('se-taxno').value.trim() || null,
+    address:    document.getElementById('se-address').value.trim() || null,
+    notes:      document.getElementById('se-notes').value.trim() || null
+  };
+  const ok = id ? await dbUpdate('suppliers', id, body)
+                : await dbInsert('suppliers', body);
+  if(!ok || (Array.isArray(ok)&&!ok[0])){ toast('Kaydedilemedi!','error'); return; }
+  document.getElementById('sup-edit-overlay')?.remove();
+  toast(id?'Tedarikçi güncellendi':'Tedarikçi eklendi','success');
+  await loadSuppliers();
+  renderSuppliersModalList();
+}
+
+async function supToggleActive(id){
+  const s = suppliers.find(x=>x.id===id);
+  if(!s) return;
+  const ok = await dbUpdate('suppliers', id, {is_active: s.is_active===false});
+  if(!ok){ toast('Güncellenemedi!','error'); return; }
+  s.is_active = s.is_active===false;
+  refreshSupplierDatalist();
+  renderSuppliersModalList();
+}
+
+async function supDelete(id){
+  const s = suppliers.find(x=>x.id===id);
+  if(!s) return;
+  if(!confirm(`"${s.name}" kartotekten silinsin mi?\n(Eski kayıtlardaki adlar etkilenmez.)`)) return;
+  const ok = await dbDelete('suppliers', id);
+  if(!ok){ toast('Silinemedi!','error'); return; }
+  suppliers = suppliers.filter(x=>x.id!==id);
+  refreshSupplierDatalist();
+  renderSuppliersModalList();
+  toast('Tedarikçi silindi','success');
+}
+
 // ═══ SATIN ALMA PLANLAMASI ═══
 let purchaseItems = [];
 let purchaseOrders = [];        // toplu sipariş grupları
@@ -5427,7 +5588,8 @@ async function renderPurchasing(){
     dbGet('purchase_items','order=created_at.asc'),
     dbGet('purchase_orders'),
     dbGet('purchase_order_quotes'),
-    loadProjectBoms()
+    loadProjectBoms(),
+    loadSuppliers() // tedarikçi combobox önerileri (#12)
   ]);
   purchaseItems  = Array.isArray(pi) ? pi : [];
   purchaseOrders = Array.isArray(po) ? po : [];
@@ -5584,6 +5746,7 @@ async function addPurchaseItem(){
   const data = await dbInsert('purchase_items', body);
   if(!Array.isArray(data)||!data[0]){ toast('Kayıt hatası!','error'); return; }
   purchaseItems.push(data[0]);
+  ensureSupplier(body.supplier);
   ['pur-name','pur-code','pur-qty','pur-unit','pur-material','pur-supplier','pur-price','pur-date','pur-notes']
     .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   toast('Kalem eklendi!','success');
@@ -5630,7 +5793,7 @@ function editPurchaseItem(id){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><label style="font-size:11px;color:var(--muted)">Miktar</label><input type="number" id="pe-qty" value="${i.quantity!=null?Number(i.quantity):1}" min="0" step="0.01" style="${inp}"></div>
       <div><label style="font-size:11px;color:var(--muted)">Birim</label><input type="text" id="pe-unit" value="${i.unit||'adet'}" style="${inp}"></div>
-      <div><label style="font-size:11px;color:var(--muted)">Tedarikçi</label><input type="text" id="pe-supplier" value="${(i.supplier||'').replace(/"/g,'&quot;')}" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Tedarikçi</label><input type="text" id="pe-supplier" list="sup-datalist" value="${(i.supplier||'').replace(/"/g,'&quot;')}" style="${inp}"></div>
       <div><label style="font-size:11px;color:var(--muted)">Termin</label><input type="date" id="pe-date" value="${i.expected_date||''}" style="${inp}"></div>
       <div><label style="font-size:11px;color:var(--muted)">Birim Fiyat</label><input type="number" id="pe-price" value="${i.unit_price!=null?Number(i.unit_price):''}" min="0" step="0.01" style="${inp}"></div>
       <div><label style="font-size:11px;color:var(--muted)">Para Birimi</label>
@@ -5662,6 +5825,7 @@ async function savePurchaseEdit(id){
   };
   const ok = await dbUpdate('purchase_items', id, body);
   if(!ok){ toast('Kaydedilemedi!','error'); return; }
+  ensureSupplier(body.supplier);
   document.getElementById('pur-edit-overlay')?.remove();
   const fresh = await dbGet('purchase_items','order=created_at.asc');
   purchaseItems = Array.isArray(fresh) ? fresh : purchaseItems;
@@ -5885,7 +6049,7 @@ function renderPurchaseOrders(){
     // Teklif ekleme formu (sadece DRAFT)
     const quoteForm = isDraft ? `
       <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-top:10px">
-        <input type="text" id="poq-sup-${o.id}" placeholder="Firma adı *" style="${inp}">
+        <input type="text" id="poq-sup-${o.id}" list="sup-datalist" placeholder="Firma adı *" style="${inp}">
         <input type="number" id="poq-price-${o.id}" placeholder="Toplam fiyat" min="0" step="0.01" style="${inp}">
         <select id="poq-cur-${o.id}" style="${inp}"><option>TRY</option><option>EUR</option><option>USD</option></select>
         <input type="date" id="poq-date-${o.id}" title="Taahhüt edilen teslim" style="${inp}">
@@ -5963,6 +6127,7 @@ async function poAddQuote(orderId){
   });
   if(!Array.isArray(data)||!data[0]){ toast('Teklif kaydedilemedi!','error'); return; }
   poQuotes.push(data[0]);
+  ensureSupplier(sup);
   toast('➕ Teklif eklendi!','success');
   renderPurchaseOrders();
 }
@@ -6374,6 +6539,18 @@ async function renderDelivery(){
 function dnToggleForm(){
   const f = document.getElementById('dn-form');
   if(f) f.style.display = f.style.display==='none' ? '' : 'none';
+  if(f && f.style.display!=='none' && !suppliers.length) loadSuppliers(); // alıcı önerileri (#12)
+}
+
+// Alıcı kartotekten seçildiyse boş vergi/adres alanlarını kartotekten doldur
+function dnRecipientAutofill(){
+  const n = document.getElementById('dn-recipient').value.trim().toLowerCase();
+  const s = suppliers.find(x=>(x.name||'').trim().toLowerCase()===n);
+  if(!s) return;
+  const fill = (id,val)=>{ const el=document.getElementById(id); if(el && !el.value.trim() && val) el.value=val; };
+  fill('dn-taxno', s.tax_number);
+  fill('dn-taxoffice', s.tax_office);
+  fill('dn-address', s.address);
 }
 
 async function dnCreate(){
@@ -6397,6 +6574,7 @@ async function dnCreate(){
   const data = await dbInsert('delivery_notes', body);
   if(!Array.isArray(data)||!data[0]){ toast('İrsaliye oluşturulamadı!','error'); return; }
   deliveryNotes.unshift(data[0]);
+  ensureSupplier(recipient);
   ['dn-recipient','dn-taxno','dn-taxoffice','dn-address','dn-city','dn-district','dn-shipdate','dn-carrier','dn-notes']
     .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   dnToggleForm();
