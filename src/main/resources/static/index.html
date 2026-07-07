@@ -1368,21 +1368,20 @@
     <!-- Yeni bağlantı formu -->
     <div class="form-card" style="margin-bottom:20px">
       <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:14px">+ Yeni Proje Bağlantısı</div>
-      <div class="form-row">
-        <div class="form-group"><label>Ürün Ağaçları * <span style="text-transform:none;color:var(--muted)">(birden fazla seçilebilir)</span></label>
-          <div id="pbom-product-multi" style="max-height:132px;overflow-y:auto;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:6px 10px;font-family:var(--font-mono);font-size:12px">
-            <span style="color:var(--muted)">— Ürün ağacı yok —</span>
-          </div>
-        </div>
-        <div class="form-group"><label>Proje *</label>
-          <select id="pbom-project-sel" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+      <!-- Akış (arkadaş isteği): 1) proje seç → 2) listeden makine ekle →
+           "+ Makine Ekle" ile 2., 3. makine satırları → Bağlantı Oluştur -->
+      <div class="form-row" style="grid-template-columns:1fr 2fr">
+        <div class="form-group"><label>1️⃣ Proje *</label>
+          <select id="pbom-project-sel" onchange="pbomProjOnChange()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
             <option value="">— Proje seçin —</option>
           </select>
         </div>
-        <div class="form-group" style="display:flex;align-items:flex-end">
-          <button class="btn btn-primary" style="width:100%" onclick="createProjectBom()">+ Bağlantı Oluştur</button>
+        <div class="form-group"><label>2️⃣ Projeye Dahil Olacak Makineler *</label>
+          <div id="pbom-machine-rows"></div>
+          <button class="btn btn-ghost btn-sm" id="pbom-add-machine-btn" onclick="pbomAddMachineRow()" style="display:none;margin-top:2px">+ Makine Ekle</button>
         </div>
       </div>
+      <button class="btn btn-primary" onclick="createProjectBom()">+ Bağlantı Oluştur</button>
     </div>
 
     <!-- Mevcut bağlantılar -->
@@ -9778,32 +9777,88 @@ async function loadProjectBoms() {
 }
 
 function renderPbomDropdowns() {
-  // Ürün ağacı çoklu seçim listesi (#1 arkadaş isteği: aynı projeye birden
-  // fazla ürün tek seferde bağlanabilsin — görsel 100)
-  const pMulti = document.getElementById('pbom-product-multi');
-  if(pMulti){
-    const checked = new Set([...pMulti.querySelectorAll('.pbom-prod-chk:checked')].map(c=>c.value));
-    pMulti.innerHTML = bomProducts.length
-      ? bomProducts.map(p=>`<label style="display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer">
-          <input type="checkbox" class="pbom-prod-chk" value="${p.id}" ${checked.has(p.id)?'checked':''} style="accent-color:var(--accent)">
-          <span>${p.name}${p.code?' <span style="color:var(--muted)">('+p.code+')</span>':''}</span>
-        </label>`).join('')
-      : '<span style="color:var(--muted)">— Ürün ağacı yok —</span>';
-  }
-  // Proje dropdown
+  // Proje dropdown (seçim korunur — makine satırları projeye bağlı)
   const prSel = document.getElementById('pbom-project-sel');
   if(prSel) {
+    const cur = prSel.value;
     const projNames = [...new Set(orders.map(o=>o.project_name).filter(Boolean))].sort();
     prSel.innerHTML = '<option value="">— Proje seçin —</option>' +
       projNames.map(n=>`<option value="${n}">${n}</option>`).join('');
+    if(projNames.includes(cur)) prSel.value = cur;
   }
+  pbomRenderMachineRows();
+}
+
+// ─── Makine ekleme akışı (arkadaş isteği, 07.07 görsel): önce proje seçilir,
+// sonra listeden makine eklenir; "+ Makine Ekle" ile 2., 3. satır açılır ───
+let _pbomMachineSel = ['']; // satır başına seçilen bom_product_id ('' = boş)
+
+function pbomProjOnChange(){
+  _pbomMachineSel = [''];
+  pbomRenderMachineRows();
+}
+
+function pbomRenderMachineRows(){
+  const wrap = document.getElementById('pbom-machine-rows');
+  const addBtn = document.getElementById('pbom-add-machine-btn');
+  if(!wrap) return;
+  const projName = document.getElementById('pbom-project-sel')?.value || '';
+  if(!projName){
+    wrap.innerHTML = '<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:10px 2px">— Önce proje seçin —</div>';
+    if(addBtn) addBtn.style.display = 'none';
+    return;
+  }
+  if(!_pbomMachineSel.length) _pbomMachineSel = [''];
+  // Bu projeye zaten bağlı makineler listede sunulmaz
+  const linked = new Set(projectBoms.filter(pb=>pb.project_name===projName).map(pb=>pb.bom_product_id));
+  const inp = 'flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none';
+  const avail = bomProducts.filter(p=>!linked.has(p.id));
+  if(!avail.length){
+    wrap.innerHTML = '<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:10px 2px">Bu projeye bağlanabilecek makine kalmadı (hepsi bağlı ya da ürün ağacı yok).</div>';
+    if(addBtn) addBtn.style.display = 'none';
+    return;
+  }
+  wrap.innerHTML = _pbomMachineSel.map((val,idx)=>{
+    const taken = new Set(_pbomMachineSel.filter((v,i)=>i!==idx && v));
+    const opts = avail.filter(p=>!taken.has(p.id));
+    return `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted);width:18px;flex-shrink:0">${idx+1}.</span>
+      <select style="${inp}" onchange="pbomMachineChange(${idx},this.value)">
+        <option value="">— Makine seçin —</option>
+        ${opts.map(p=>`<option value="${p.id}" ${p.id===val?'selected':''}>${p.name}${p.code?' ('+p.code+')':''}</option>`).join('')}
+      </select>
+      ${_pbomMachineSel.length>1?`<button class="btn btn-ghost btn-sm" onclick="pbomRemoveMachineRow(${idx})" title="Satırı kaldır" style="color:var(--red);flex-shrink:0">✕</button>`:''}
+    </div>`;
+  }).join('');
+  if(addBtn) addBtn.style.display = '';
+}
+
+function pbomMachineChange(idx, val){
+  _pbomMachineSel[idx] = val;
+  pbomRenderMachineRows(); // diğer satırların listelerinden düşsün
+}
+
+function pbomAddMachineRow(){
+  if(_pbomMachineSel.some(v=>!v)){ toast('Önce boş makine satırında seçim yapın!','error'); return; }
+  const projName = document.getElementById('pbom-project-sel')?.value || '';
+  const linked = new Set(projectBoms.filter(pb=>pb.project_name===projName).map(pb=>pb.bom_product_id));
+  const remaining = bomProducts.filter(p=>!linked.has(p.id) && !_pbomMachineSel.includes(p.id)).length;
+  if(!remaining){ toast('Eklenebilecek başka makine kalmadı!','error'); return; }
+  _pbomMachineSel.push('');
+  pbomRenderMachineRows();
+}
+
+function pbomRemoveMachineRow(idx){
+  _pbomMachineSel.splice(idx,1);
+  pbomRenderMachineRows();
 }
 
 async function createProjectBom() {
-  // Çoklu seçim: işaretli her ürün için ayrı project_bom satırı (#1)
-  const prodIds  = [...document.querySelectorAll('.pbom-prod-chk:checked')].map(c=>c.value);
+  // Seçilen her makine için ayrı project_bom satırı
   const projName = document.getElementById('pbom-project-sel').value;
-  if(!prodIds.length||!projName){ toast('En az bir ürün ve proje seçin!','error'); return; }
+  const prodIds  = _pbomMachineSel.filter(Boolean);
+  if(!projName){ toast('Önce proje seçin!','error'); return; }
+  if(!prodIds.length){ toast('Listeden en az bir makine ekleyin!','error'); return; }
   let ok = 0, skipped = 0;
   for(const bomProdId of prodIds){
     if(projectBoms.find(pb=>pb.bom_product_id===bomProdId&&pb.project_name===projName)){ skipped++; continue; }
@@ -9818,7 +9873,7 @@ async function createProjectBom() {
     return;
   }
   toast(`${ok} bağlantı oluşturuldu${skipped?` (${skipped} zaten bağlıydı)`:''}! Parçaları düzenleyip yayınlayın.`,'success');
-  document.querySelectorAll('.pbom-prod-chk:checked').forEach(c=>c.checked=false);
+  _pbomMachineSel = [''];
   renderProjectBomList();
 }
 
