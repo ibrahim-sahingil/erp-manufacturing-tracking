@@ -55,12 +55,18 @@ ağacın farklı dallarında tekrar kullanılabilsin; bir kopyasına da izin ver
   "🛒 <ad> — <durum>" olarak gösterilir; ata çözülemezse ağaç altında
   "🛒 Satın alma malzemeleri" bölümü.
 
-## Sıra ve durum
+## Sıra ve durum (2026-07-07 tamamlandı)
 1 → 2 → 3 → 4.
-- [ ] PAKET 1 (backend gevşetme + yayınla toplama + dal kopyala)
-- [ ] PAKET 2 (depolar arası aktarım)
-- [ ] PAKET 3 (toplu mal kabul + hesap/adet)
-- [ ] PAKET 4 (planlama ağacı)
+- [x] PAKET 1 (f688fc6) — backend gevşetme + yayınla toplama + dal kopyala.
+      BONUS BUGFIX: openPbomEditor şablon kopyalamasında parent_custom_id
+      genId ile gidiyordu (backend 500 → bağlar kopuk); dönen id kullanıldı.
+- [x] PAKET 2 (33c61d5) — depolar arası aktarım (tam taşıma / kısmi bölme /
+      münferit); WAREHOUSE_TRANSFER kısıtı DB'de uygulandı.
+- [x] PAKET 3 (05cc068) — toplu mal kabul + received_by/received_qty/
+      returned_qty (DB'de uygulandı + gelen kayıtlar backfill edildi).
+- [x] PAKET 4 (8b68927) — iş emri parça seçimi ağaç + malzeme durumu çipleri.
+- E2E smoke: farklı dalda aynı kod OK / aynı dalda RED; WAREHOUSE_TRANSFER
+  hareketi kabul; yeni alanlar API cevabında. Yedek: uretim_takip_2026-07-07_1219.dump
 
 ## Kararlar (arkadaşa not)
 - Yayınlamada aynı kodlu parçalar üretimde TEK satırda toplanır (adet toplamı) —
