@@ -3,6 +3,15 @@
 Kod tabanı tarandı (backend servisleri + FK kuralları + frontend akışları).
 HİÇBİR DÜZELTME YAPILMADI — önce karar bekleniyor. Önem sırasına göre:
 
+> **DURUM GÜNCELLEMESİ (2026-07-07, veri güvenliği turu):** K1, K2, K3
+> `veri-guvenligi-k1-k3` dalında düzeltildi (K1 8373e36 · K2 a7916be ·
+> K3 0aa3c87) ve E2E'ye K senaryoları eklendi (tümü geçiyor). Dal,
+> /code-review ultra sonrası master'a alınacak. O7 zaten B1 kapsamında
+> düzeltilmişti (4565438: qty_done+qty_reject > hedef → güncelleme yok).
+> U6 da B7 ile büyük ölçüde kapandı (c5cf927: termin+ordered_at taşınıyor,
+> grup detayı kod eşleşmeli gösteriyor; purchase_order_id bilinçli boş).
+> U8 = B8'de düzeltildi (47eb5d4). Sırada: O1-O5 silme/tutarlılık turu.
+
 ## 🔴 KRİTİK
 
 ### K1. Sipariş (proje) silme — tek onayla tüm proje verisi gidiyor
