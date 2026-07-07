@@ -39,6 +39,8 @@ public class PurchaseItemResponse {
     private UUID warehouseId;
     private UUID purchaseOrderId;
     private String notes;
+    private Boolean needsPlanning;
+    private UUID stockPlanId;
     private LocalDateTime orderedAt;
     private LocalDateTime receivedAt;
     private String createdBy;
@@ -62,6 +64,8 @@ public class PurchaseItemResponse {
                 .warehouseId(e.getWarehouseId())
                 .purchaseOrderId(e.getPurchaseOrderId())
                 .notes(e.getNotes())
+                .needsPlanning(e.getNeedsPlanning())
+                .stockPlanId(e.getStockPlanId())
                 .orderedAt(e.getOrderedAt())
                 .receivedAt(e.getReceivedAt())
                 .createdBy(e.getCreatedBy())

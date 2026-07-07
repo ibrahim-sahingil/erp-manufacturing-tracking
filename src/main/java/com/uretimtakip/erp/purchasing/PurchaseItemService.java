@@ -139,6 +139,19 @@ public class PurchaseItemService {
         if (request.isNotesPresent()) {
             item.setNotes(request.getNotes());
         }
+        if (request.getNeedsPlanning() != null) {
+            item.setNeedsPlanning(request.getNeedsPlanning());
+        }
+        if (request.isStockPlanIdPresent()) {
+            // Plaka/profil bagi (#10 MRP): hedef kalem mevcut olmali
+            if (request.getStockPlanId() != null
+                    && !purchaseItemRepository.existsById(request.getStockPlanId())) {
+                throw new BusinessException(
+                        "Baglanacak plaka/profil kalemi bulunamadi.",
+                        "PURCHASE_STOCK_PLAN_NOT_FOUND");
+            }
+            item.setStockPlanId(request.getStockPlanId());
+        }
         if (request.isWarehouseIdPresent()) {
             if (request.getWarehouseId() != null
                     && !warehouseRepository.existsById(request.getWarehouseId())) {

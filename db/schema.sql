@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict NzLcuap7HJQsvjPR40kcjAWREronaH77QTMbj2e80FgWpcUSNYlBgcveJLjQgjT
+\restrict cqEFVA550ANwM7VjqXpor4OOrNnWFf45PdDTbkH7Vwk21Zi8XtlpUDMVz3mhhQP
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -324,6 +324,8 @@ CREATE TABLE public.purchase_items (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     warehouse_id uuid,
     purchase_order_id uuid,
+    needs_planning boolean DEFAULT false NOT NULL,
+    stock_plan_id uuid,
     CONSTRAINT purchase_items_status_check CHECK (((status)::text = ANY ((ARRAY['PLANNED'::character varying, 'ORDERED'::character varying, 'RECEIVED'::character varying, 'IN_WAREHOUSE'::character varying, 'IN_STOCK'::character varying, 'CANCELLED'::character varying])::text[])))
 );
 
@@ -362,6 +364,26 @@ CREATE TABLE public.purchase_orders (
     created_by character varying(150),
     created_at timestamp without time zone DEFAULT now(),
     CONSTRAINT purchase_orders_status_check CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'APPROVED'::character varying, 'ORDERED'::character varying, 'CANCELLED'::character varying])::text[])))
+);
+
+
+--
+-- Name: stock_sheets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stock_sheets (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    kind character varying(10) NOT NULL,
+    name character varying(150) NOT NULL,
+    material character varying(150),
+    width_mm numeric(15,4),
+    height_mm numeric(15,4),
+    thickness_mm numeric(15,4),
+    length_mm numeric(15,4),
+    notes text,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp without time zone DEFAULT now(),
+    CONSTRAINT stock_sheets_kind_chk CHECK (((kind)::text = ANY ((ARRAY['SAC'::character varying, 'PROFIL'::character varying])::text[])))
 );
 
 
@@ -693,6 +715,14 @@ ALTER TABLE ONLY public.purchase_order_quotes
 
 ALTER TABLE ONLY public.purchase_orders
     ADD CONSTRAINT purchase_orders_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: stock_sheets stock_sheets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stock_sheets
+    ADD CONSTRAINT stock_sheets_pkey PRIMARY KEY (id);
 
 
 --
@@ -1200,6 +1230,14 @@ ALTER TABLE ONLY public.purchase_items
 
 
 --
+-- Name: purchase_items purchase_items_stock_plan_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.purchase_items
+    ADD CONSTRAINT purchase_items_stock_plan_fk FOREIGN KEY (stock_plan_id) REFERENCES public.purchase_items(id) ON DELETE SET NULL;
+
+
+--
 -- Name: purchase_items purchase_items_warehouse_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1347,5 +1385,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict NzLcuap7HJQsvjPR40kcjAWREronaH77QTMbj2e80FgWpcUSNYlBgcveJLjQgjT
+\unrestrict cqEFVA550ANwM7VjqXpor4OOrNnWFf45PdDTbkH7Vwk21Zi8XtlpUDMVz3mhhQP
 

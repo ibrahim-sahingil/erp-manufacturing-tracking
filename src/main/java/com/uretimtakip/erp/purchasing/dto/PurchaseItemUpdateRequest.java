@@ -121,4 +121,19 @@ public class PurchaseItemUpdateRequest {
         this.notes = notes;
         this.notesPresent = true;
     }
+
+    /** Ihtiyac planlama havuzu isareti (#10 plaka MRP). */
+    private Boolean needsPlanning;
+
+    /** Kaynak kalemin baglandigi plaka/profil kalemi (explicit null = bagi coz). */
+    @Setter(lombok.AccessLevel.NONE)
+    private UUID stockPlanId;
+
+    @Setter(lombok.AccessLevel.NONE)
+    private boolean stockPlanIdPresent;
+
+    public void setStockPlanId(UUID stockPlanId) {
+        this.stockPlanId = stockPlanId;
+        this.stockPlanIdPresent = true;
+    }
 }

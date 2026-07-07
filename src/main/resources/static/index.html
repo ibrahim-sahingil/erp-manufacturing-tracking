@@ -974,6 +974,7 @@
     <button class="planning-tab active" onclick="switchPurchasingTab('items')">📝 Kalemler</button>
     <button class="planning-tab" onclick="switchPurchasingTab('orders')">📦 Toplu Sipariş &amp; Teklif</button>
     <button class="planning-tab" onclick="switchPurchasingTab('receiving')">📥 Mal Kabul</button>
+    <button class="planning-tab" onclick="switchPurchasingTab('mrp')">📐 İhtiyaç Planlama</button>
   </div>
 
   <!-- Kalemler -->
@@ -1048,6 +1049,20 @@
   <div class="planning-section" id="pur-tab-receiving">
     <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">Proje kartına tıklayın · ⏳ siparişte olanlar "✅ Geldi" ile depoya alınır · 📄 QR'lı mal kabul fişi buradan yazdırılır</div>
     <div id="rcv-list"></div>
+  </div>
+
+  <!-- İhtiyaç Planlama (#10 plaka MRP): havuz → SAC 2D / PROFİL 1D hesap → onay -->
+  <div class="planning-section" id="pur-tab-mrp">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">Kalemler sekmesinde 📐 ile havuza atın · havuzdan seçin · hesaplayın · onaylayın → plaka/profil satın alma kalemi oluşur</span>
+      <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="openStockSheetsModal()">⚙ Ölçü Kataloğu</button>
+    </div>
+    <div class="form-card" id="mrp-pool-card" style="margin-bottom:16px">
+      <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">📐 Planlama Havuzu <span style="text-transform:none">(tüm projeler)</span></div>
+      <div id="mrp-pool"></div>
+    </div>
+    <div class="form-card" id="mrp-params" style="margin-bottom:16px"></div>
+    <div id="mrp-result"></div>
   </div>
 </div>
 
@@ -1556,7 +1571,8 @@ const TABLE_ENDPOINTS = {
   purchase_order_quotes: 'purchase-order-quotes',
   delivery_notes: 'delivery-notes',
   delivery_note_items: 'delivery-note-items',
-  suppliers: 'suppliers'
+  suppliers: 'suppliers',
+  stock_sheets: 'stock-sheets'
 };
 
 // ─── Ortak fetch: JWT header + ApiResponse unwrap + 401 yönetimi ───
@@ -5645,6 +5661,7 @@ function _purActivateTab(tab){
   if(tab==='orders') renderPurchaseOrders();
   if(tab==='items') renderPurchaseList();
   if(tab==='receiving') renderReceiving();
+  if(tab==='mrp') renderMrp();
 }
 function switchPurchasingTab(tab){ _purActivateTab(tab); }
 
@@ -5713,6 +5730,538 @@ function rcvToggle(proj){
   renderReceiving();
 }
 
+// ═══ İHTİYAÇ PLANLAMA — PLAKA MRP (#10 arkadaş isteği) ═══
+// Arkadaşın plaka-mrp.html algoritmaları port edildi:
+// SAC: 2D guillotine (Best Short Side Fit + shuffle&retry) + canvas çizim
+// PROFİL: 1D konsolidasyon (büyükten küçüğe greedy bin packing)
+// Akış: kalemde 📐 → havuz → seçim → hesap → revize → ONAY →
+// plaka/profil satın alma kalemi (PLANNED) + kaynaklara stock_plan_id bağı.
+let stockSheets = [];
+let _mrpResult = null; // {type:'SAC'|'PROFIL', ...hesap çıktısı}
+
+const MRP_RENKLER = ['#f5a623','#2980b9','#2ecc71','#e74c3c','#9b59b6','#1abc9c','#e67e22','#34495e','#f1c40f','#7f8c8d'];
+const MRP_ACIK    = MRP_RENKLER.map(c=>c+'33');
+
+async function loadStockSheets(){
+  const s = await dbGet('stock_sheets');
+  if(Array.isArray(s)) stockSheets = s;
+}
+
+async function purTogglePlanning(id){
+  const i = purchaseItems.find(x=>x.id===id);
+  if(!i) return;
+  const val = !i.needs_planning;
+  const ok = await dbUpdate('purchase_items', id, {needs_planning: val});
+  if(!ok){ toast('Güncellenemedi!','error'); return; }
+  i.needs_planning = val;
+  toast(val?'📐 Kalem planlama havuzuna atıldı':'Kalem havuzdan çıkarıldı','success');
+  renderPurchaseList();
+}
+
+// Kalemin ölçüleri: BOM bağıysa resolved ölçüler, yoksa boş (elle girilir)
+function mrpItemDims(i){
+  const pbp = i.project_bom_part_id ? projectBomParts.find(p=>p.id===i.project_bom_part_id) : null;
+  return {
+    w: pbp ? parseFloat(pbp.resolved_width_mm)||0 : 0,
+    h: pbp ? parseFloat(pbp.resolved_height_mm)||0 : 0,
+    t: pbp ? parseFloat(pbp.resolved_thickness_mm)||0 : 0
+  };
+}
+
+async function renderMrp(){
+  const poolEl = document.getElementById('mrp-pool');
+  if(!poolEl) return;
+  const [pi] = await Promise.all([
+    dbGet('purchase_items','order=created_at.asc'),
+    loadProjectBoms(),
+    loadStockSheets()
+  ]);
+  if(Array.isArray(pi)) purchaseItems = pi;
+
+  const pool = purchaseItems.filter(i=>i.needs_planning && i.status==='PLANNED' && !i.stock_plan_id);
+  if(!pool.length){
+    poolEl.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:12px;text-align:center">Havuz boş — Kalemler sekmesinde 📝 Planlandı kalemlerde 📐 butonuna basın</div>`;
+  } else {
+    poolEl.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn btn-ghost btn-sm" onclick="document.querySelectorAll('.mrp-chk').forEach(c=>c.checked=true)">Tümünü Seç</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.querySelectorAll('.mrp-chk').forEach(c=>c.checked=false)">Tümünü Bırak</button>
+      </div>` +
+      pool.map(i=>{
+        const d = mrpItemDims(i);
+        const inp = 'width:76px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:4px 6px;outline:none';
+        return `<div style="display:flex;gap:10px;align-items:center;padding:6px 4px;border-bottom:1px dashed var(--border);flex-wrap:wrap">
+          <input type="checkbox" class="mrp-chk" value="${i.id}" checked style="accent-color:var(--accent)">
+          <span style="font-family:var(--font-mono);font-size:11px;min-width:0;flex:1">
+            ${i.code?`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
+            <span style="color:var(--muted)"> · ${Number(i.quantity||1)} ${i.unit||'adet'} · 📁 ${i.project_name}${i.material?' · 🔩'+i.material:''}</span>
+          </span>
+          <span style="display:flex;gap:4px;align-items:center;font-family:var(--font-mono);font-size:10px;color:var(--muted)">
+            En <input type="number" id="mrp-w-${i.id}" value="${d.w||''}" min="0" style="${inp}">
+            Boy <input type="number" id="mrp-h-${i.id}" value="${d.h||''}" min="0" style="${inp}">
+            <button class="btn btn-ghost btn-sm" onclick="purTogglePlanning('${i.id}').then(()=>renderMrp())" title="Havuzdan çıkar">➖</button>
+          </span>
+        </div>`;
+      }).join('');
+  }
+  renderMrpParams();
+  if(!pool.length){ document.getElementById('mrp-result').innerHTML=''; _mrpResult=null; }
+}
+
+function renderMrpParams(){
+  const el = document.getElementById('mrp-params');
+  if(!el) return;
+  const inp = 'background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none';
+  const sacs = stockSheets.filter(s=>s.kind==='SAC' && s.is_active!==false);
+  const profs = stockSheets.filter(s=>s.kind==='PROFIL' && s.is_active!==false);
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div>
+        <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:8px">📐 SAC (2D plaka yerleşimi)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div><label style="font-size:10px;color:var(--muted);display:block">Katalog</label>
+            <select id="mrp-sac-sel" style="${inp};min-width:170px" onchange="mrpSacSelChange()">
+              <option value="">— elle gir —</option>
+              ${sacs.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}
+            </select>
+          </div>
+          <div><label style="font-size:10px;color:var(--muted);display:block">Plaka En</label><input type="number" id="mrp-sac-w" value="1350" min="1" style="${inp};width:84px"></div>
+          <div><label style="font-size:10px;color:var(--muted);display:block">Plaka Boy</label><input type="number" id="mrp-sac-h" value="5000" min="1" style="${inp};width:84px"></div>
+          <div><label style="font-size:10px;color:var(--muted);display:block">Kalınlık</label><input type="number" id="mrp-sac-t" value="3" min="0" style="${inp};width:64px"></div>
+          <div><label style="font-size:10px;color:var(--muted);display:block">Kenar payı</label><input type="number" id="mrp-sac-edge" value="10" min="0" style="${inp};width:64px"></div>
+          <div><label style="font-size:10px;color:var(--muted);display:block">Parça aralığı</label><input type="number" id="mrp-sac-gap" value="5" min="0" style="${inp};width:64px"></div>
+          <button class="btn btn-primary btn-sm" onclick="mrpCalcSac()">📐 SAC Hesapla</button>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:8px">📏 PROFİL (1D boy kesim)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div><label style="font-size:10px;color:var(--muted);display:block">Katalog</label>
+            <select id="mrp-prf-sel" style="${inp};min-width:170px" onchange="mrpPrfSelChange()">
+              <option value="">— elle gir —</option>
+              ${profs.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}
+            </select>
+          </div>
+          <div><label style="font-size:10px;color:var(--muted);display:block">Profil boyu (mm)</label><input type="number" id="mrp-prf-len" value="6000" min="1" style="${inp};width:90px"></div>
+          <div><label style="font-size:10px;color:var(--muted);display:block">Kesiş payı</label><input type="number" id="mrp-prf-kerf" value="5" min="0" style="${inp};width:64px"></div>
+          <div><label style="font-size:10px;color:var(--muted);display:block">Fire %</label><input type="number" id="mrp-prf-fire" value="5" min="0" max="50" style="${inp};width:64px"></div>
+          <button class="btn btn-primary btn-sm" onclick="mrpCalcProfil()">📏 PROFİL Hesapla</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function mrpSacSelChange(){
+  const s = stockSheets.find(x=>x.id===document.getElementById('mrp-sac-sel').value);
+  if(!s) return;
+  if(s.width_mm) document.getElementById('mrp-sac-w').value = Number(s.width_mm);
+  if(s.height_mm) document.getElementById('mrp-sac-h').value = Number(s.height_mm);
+  if(s.thickness_mm) document.getElementById('mrp-sac-t').value = Number(s.thickness_mm);
+}
+function mrpPrfSelChange(){
+  const s = stockSheets.find(x=>x.id===document.getElementById('mrp-prf-sel').value);
+  if(!s) return;
+  if(s.length_mm) document.getElementById('mrp-prf-len').value = Number(s.length_mm);
+}
+
+// Seçili havuz kalemlerini oku (ölçüler satırdaki inputlardan)
+function mrpSelectedItems(){
+  const ids = [...document.querySelectorAll('.mrp-chk:checked')].map(c=>c.value);
+  return ids.map(id=>{
+    const i = purchaseItems.find(x=>x.id===id);
+    if(!i) return null;
+    return {
+      item: i,
+      w: parseFloat(document.getElementById('mrp-w-'+id)?.value)||0,
+      h: parseFloat(document.getElementById('mrp-h-'+id)?.value)||0,
+      qty: Math.max(1, Math.round(Number(i.quantity)||1))
+    };
+  }).filter(Boolean);
+}
+
+// ── 2D Guillotine (arkadaşın algoritması: Best Short Side Fit + rastgele restart) ──
+function mrpShuffle(a){
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+function mrpRunGuillotine(items, W, H, gap){
+  let free = [{x:0, y:0, w:W, h:H}];
+  let placed = [];
+  for(let item of items){
+    let best = null, bestScore = Infinity, bestRi = -1;
+    for(let ri=0; ri<free.length; ri++){
+      const r = free[ri];
+      const opts = [
+        {w:item.w+gap, h:item.h+gap, rot:false},
+        {w:item.h+gap, h:item.w+gap, rot:true}
+      ];
+      for(let o of opts){
+        if(o.w <= r.w && o.h <= r.h){
+          const score = Math.min(r.w - o.w, r.h - o.h);
+          if(score < bestScore){
+            bestScore = score;
+            best = {x:r.x, y:r.y, w:o.w-gap, h:o.h-gap, rot:o.rot};
+            bestRi = ri;
+          }
+        }
+      }
+    }
+    if(!best) continue;
+    placed.push({
+      x:best.x, y:best.y,
+      w:best.rot ? item.h : item.w,
+      h:best.rot ? item.w : item.h,
+      kod:item.kod, cid:item.cid, ci:item.ci, _idx:item._idx
+    });
+    const r = free[bestRi];
+    const pw = best.w + gap, ph = best.h + gap;
+    free.splice(bestRi, 1);
+    if(r.w - pw > 0) free.push({x:r.x+pw, y:r.y,   w:r.w-pw, h:ph});
+    if(r.h - ph > 0) free.push({x:r.x,   y:r.y+ph, w:r.w,    h:r.h-ph});
+    free = free.filter(f=>f.w>=1 && f.h>=1);
+  }
+  return placed;
+}
+function mrpPackBest(items, W, H, gap, passes){
+  let best = [];
+  for(let i=0;i<passes;i++){
+    const shuffled = mrpShuffle([...items].map((it,idx)=>({...it,_idx:idx})));
+    const result = mrpRunGuillotine(shuffled, W, H, gap);
+    if(result.length > best.length) best = result;
+  }
+  return best;
+}
+
+function mrpCalcSac(){
+  const sel = mrpSelectedItems();
+  if(!sel.length){ toast('Havuzdan kalem seçin!','error'); return; }
+  const noDim = sel.filter(s=>!(s.w>0 && s.h>0));
+  if(noDim.length){
+    toast('Ölçüsü eksik kalemler var (En×Boy girin): '+noDim.map(s=>s.item.code||s.item.name).join(', '),'error');
+    return;
+  }
+  const W = parseFloat(document.getElementById('mrp-sac-w').value)||0;
+  const H = parseFloat(document.getElementById('mrp-sac-h').value)||0;
+  const T = parseFloat(document.getElementById('mrp-sac-t').value)||0;
+  const edge = parseFloat(document.getElementById('mrp-sac-edge').value)||0;
+  const gap = parseFloat(document.getElementById('mrp-sac-gap').value)||0;
+  if(!(W>0&&H>0)){ toast('Plaka ölçüsü girin!','error'); return; }
+  const netW = W - 2*edge, netH = H - 2*edge;
+  const tooBig = sel.filter(s=>!((s.w<=netW&&s.h<=netH)||(s.h<=netW&&s.w<=netH)));
+  if(tooBig.length){
+    toast('Plakaya sığmayan parçalar var: '+tooBig.map(s=>s.item.code||s.item.name).join(', '),'error');
+    return;
+  }
+
+  // Parça instansları
+  let all = [];
+  sel.forEach((s,ci)=>{
+    for(let i=0;i<s.qty;i++)
+      all.push({w:s.w, h:s.h, kod:s.item.code||s.item.name.slice(0,10), cid:s.item.id, ci:ci%MRP_RENKLER.length});
+  });
+
+  // Plakaları doldur (shuffle & retry 40 pas)
+  const plates = [];
+  let kalan = [...all];
+  while(kalan.length > 0){
+    const result = mrpPackBest(kalan, netW, netH, gap, 40);
+    if(result.length === 0) break;
+    plates.push({placed: result});
+    const placedIdx = new Set(result.map(p=>p._idx));
+    kalan = kalan.filter((_,i)=>!placedIdx.has(i));
+  }
+
+  const netAlan = netW*netH;
+  const ortVerim = plates.length
+    ? plates.reduce((s,pl)=>s + pl.placed.reduce((a,p)=>a+p.w*p.h,0)/netAlan*100, 0)/plates.length : 0;
+
+  const selSheet = stockSheets.find(x=>x.id===document.getElementById('mrp-sac-sel').value);
+  _mrpResult = {
+    type:'SAC', plates, W, H, T, edge, gap, netW, netH, ortVerim,
+    sheetName: selSheet ? selSheet.name : `SAC ${W}×${H}${T?'×'+T:''}`,
+    material: selSheet?.material || null,
+    sourceIds: sel.map(s=>s.item.id),
+    legend: sel.map((s,ci)=>({kod:s.item.code||s.item.name, ad:s.item.name, qty:s.qty, ci:ci%MRP_RENKLER.length}))
+  };
+  mrpRenderSacResult();
+}
+
+function mrpRenderSacResult(){
+  const el = document.getElementById('mrp-result');
+  const r = _mrpResult;
+  if(!el||!r||r.type!=='SAC') return;
+  const canvasIds = r.plates.map((_,i)=>'mrp-cv-'+i);
+  el.innerHTML = `<div class="form-card">
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <span style="font-family:var(--font-display);font-size:18px;letter-spacing:2px;color:var(--accent)">📐 ${r.sheetName}</span>
+      <span style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">Gereken plaka: <b style="color:var(--accent)">${r.plates.length}</b> · Ort. verim: <b style="color:${r.ortVerim>70?'var(--green)':r.ortVerim>50?'var(--yellow)':'var(--red)'}">%${r.ortVerim.toFixed(1)}</b> · kenar ${r.edge}mm · aralık ${r.gap}mm</span>
+      <span style="margin-left:auto;display:flex;gap:8px;align-items:center;font-family:var(--font-mono);font-size:12px">
+        Sipariş adedi: <input type="number" id="mrp-approve-qty" value="${r.plates.length}" min="1" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:6px 8px;outline:none">
+        <button class="btn btn-primary btn-sm" onclick="mrpApprove()">✅ Onayla → Kalem Oluştur</button>
+      </span>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:8px">
+      ${r.legend.map(l=>`<span style="display:inline-flex;gap:4px;align-items:center;margin-right:12px"><span style="width:10px;height:10px;border-radius:2px;background:${MRP_RENKLER[l.ci]};display:inline-block"></span>${l.kod} × ${l.qty}</span>`).join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+      ${r.plates.map((pl,i)=>{
+        const alan = pl.placed.reduce((s,p)=>s+p.w*p.h,0);
+        const fire = r.netW*r.netH>0 ? (1-alan/(r.netW*r.netH))*100 : 0;
+        return `<div>
+          <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:4px">
+            <span>Plaka ${i+1}</span><span style="color:${fire<20?'var(--green)':fire<40?'var(--yellow)':'var(--red)'}">%${fire.toFixed(1)} fire · ${pl.placed.length} parça</span>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden"><canvas id="${canvasIds[i]}" style="width:100%;display:block"></canvas></div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+  requestAnimationFrame(()=>{
+    r.plates.forEach((pl,i)=>mrpDrawPlate(canvasIds[i], r, pl.placed));
+  });
+}
+
+function mrpDrawPlate(canvasId, r, placed){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  const DISPLAY_W = Math.round(canvas.parentElement.getBoundingClientRect().width) || 300;
+  const scale = DISPLAY_W / r.W;
+  const DISPLAY_H = Math.round(r.H * scale);
+  canvas.width = DISPLAY_W; canvas.height = DISPLAY_H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0d0e10'; ctx.fillRect(0,0,DISPLAY_W,DISPLAY_H);
+  ctx.strokeStyle = '#4a4c5e'; ctx.lineWidth = 1.5;
+  ctx.strokeRect(0.75,0.75,DISPLAY_W-1.5,DISPLAY_H-1.5);
+  // Kenar payı çerçevesi
+  ctx.strokeStyle = '#3a3b46'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+  ctx.strokeRect(r.edge*scale, r.edge*scale, r.netW*scale, r.netH*scale);
+  ctx.setLineDash([]);
+  placed.forEach(p=>{
+    const px=(p.x+r.edge)*scale, py=(p.y+r.edge)*scale, pw=p.w*scale, ph=p.h*scale;
+    ctx.fillStyle = MRP_ACIK[p.ci]; ctx.fillRect(px,py,pw-0.5,ph-0.5);
+    ctx.strokeStyle = MRP_RENKLER[p.ci]; ctx.lineWidth=1; ctx.strokeRect(px,py,pw-0.5,ph-0.5);
+    if(pw>18 && ph>12){
+      ctx.fillStyle = MRP_RENKLER[p.ci];
+      const fs = Math.max(7, Math.min(10, Math.min(pw,ph)/6));
+      ctx.font = `500 ${fs}px monospace`; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(p.kod, px+pw/2, py+ph/2);
+    }
+  });
+  ctx.font='10px monospace'; ctx.fillStyle='#7a7c8e'; ctx.textAlign='right'; ctx.textBaseline='top';
+  ctx.fillText(`${r.W}×${r.H} mm`, DISPLAY_W-6, 4);
+}
+
+// ── 1D Profil konsolidasyonu (arkadaşın algoritması: greedy bin packing) ──
+function mrpKonsolideProfil(lengths, profilBoyu, firePct){
+  const efektifProfil = profilBoyu*(1-firePct/100);
+  const sorted = [...lengths].sort((a,b)=>b-a);
+  let profiller=[], mevcutKalan=0;
+  sorted.forEach(boy=>{
+    if(boy>mevcutKalan){
+      mevcutKalan = efektifProfil;
+      profiller.push({kalan:mevcutKalan, parcalar:[]});
+    }
+    mevcutKalan -= boy;
+    profiller[profiller.length-1].kalan = mevcutKalan;
+    profiller[profiller.length-1].parcalar.push(boy);
+  });
+  return {toplamProfil:profiller.length, profiller, profilBoyu};
+}
+
+function mrpCalcProfil(){
+  const sel = mrpSelectedItems();
+  if(!sel.length){ toast('Havuzdan kalem seçin!','error'); return; }
+  // Profilde kesim boyu = satırdaki "Boy" alanı
+  const noDim = sel.filter(s=>!(s.h>0));
+  if(noDim.length){
+    toast('Kesim boyu (Boy) eksik kalemler var: '+noDim.map(s=>s.item.code||s.item.name).join(', '),'error');
+    return;
+  }
+  const L = parseFloat(document.getElementById('mrp-prf-len').value)||0;
+  const kerf = parseFloat(document.getElementById('mrp-prf-kerf').value)||0;
+  const fire = parseFloat(document.getElementById('mrp-prf-fire').value)||0;
+  if(!(L>0)){ toast('Profil boyu girin!','error'); return; }
+  const tooLong = sel.filter(s=>s.h+kerf > L*(1-fire/100));
+  if(tooLong.length){
+    toast('Profile sığmayan parçalar var: '+tooLong.map(s=>s.item.code||s.item.name).join(', '),'error');
+    return;
+  }
+  let lengths=[];
+  sel.forEach(s=>{ for(let i=0;i<s.qty;i++) lengths.push(s.h+kerf); });
+  const kons = mrpKonsolideProfil(lengths, L, fire);
+  const selSheet = stockSheets.find(x=>x.id===document.getElementById('mrp-prf-sel').value);
+  _mrpResult = {
+    type:'PROFIL', kons, L, kerf, fire,
+    sheetName: selSheet ? selSheet.name : `PROFİL ${L} mm`,
+    material: selSheet?.material || null,
+    sourceIds: sel.map(s=>s.item.id),
+    legend: sel.map(s=>({kod:s.item.code||s.item.name, boy:s.h, qty:s.qty}))
+  };
+  mrpRenderProfilResult();
+}
+
+function mrpRenderProfilResult(){
+  const el = document.getElementById('mrp-result');
+  const r = _mrpResult;
+  if(!el||!r||r.type!=='PROFIL') return;
+  const show = Math.min(r.kons.profiller.length, 12);
+  const bars = r.kons.profiller.slice(0,show).map((p,i)=>{
+    const doluluk = (r.L-p.kalan)/r.L*100;
+    return `<div style="margin-bottom:6px;display:flex;align-items:center;gap:8px">
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);width:34px;flex-shrink:0">#${i+1}</span>
+      <div style="flex:1;background:var(--surface2);border-radius:3px;height:18px;overflow:hidden;position:relative">
+        <div style="width:${doluluk.toFixed(1)}%;height:100%;background:#2980b9;opacity:.7;border-radius:3px"></div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;padding:0 6px;overflow:hidden">
+          ${p.parcalar.map(b=>`<span style="font-size:9px;color:#fff;margin-right:4px;white-space:nowrap">${Number(b.toFixed(0))}</span>`).join('')}
+        </div>
+      </div>
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);width:110px;flex-shrink:0;text-align:right">%${doluluk.toFixed(0)} · fire ${p.kalan.toFixed(0)}mm</span>
+    </div>`;
+  }).join('') + (r.kons.profiller.length>show?`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">+ ${r.kons.profiller.length-show} profil daha...</div>`:'');
+  el.innerHTML = `<div class="form-card">
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <span style="font-family:var(--font-display);font-size:18px;letter-spacing:2px;color:var(--accent)">📏 ${r.sheetName}</span>
+      <span style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">Gereken profil: <b style="color:var(--accent)">${r.kons.toplamProfil}</b> · kesiş payı ${r.kerf}mm · fire %${r.fire}</span>
+      <span style="margin-left:auto;display:flex;gap:8px;align-items:center;font-family:var(--font-mono);font-size:12px">
+        Sipariş adedi: <input type="number" id="mrp-approve-qty" value="${r.kons.toplamProfil}" min="1" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:6px 8px;outline:none">
+        <button class="btn btn-primary btn-sm" onclick="mrpApprove()">✅ Onayla → Kalem Oluştur</button>
+      </span>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:8px">
+      ${r.legend.map(l=>`<span style="margin-right:12px">${l.kod}: ${Number(l.boy)}mm × ${l.qty}</span>`).join('')}
+    </div>
+    ${bars}
+  </div>`;
+}
+
+// ── ONAY: plaka/profil satın alma kalemi + kaynak bağlama ──
+async function mrpApprove(){
+  const r = _mrpResult;
+  if(!r){ toast('Önce hesap yapın!','error'); return; }
+  const qty = parseInt(document.getElementById('mrp-approve-qty')?.value)||0;
+  if(qty<1){ toast('Sipariş adedi girin!','error'); return; }
+  const sources = r.sourceIds.map(id=>purchaseItems.find(x=>x.id===id)).filter(Boolean);
+  // Proje: kaynakların hepsi aynı projedense o; değilse ortak havuz etiketi
+  const projs = [...new Set(sources.map(s=>s.project_name))];
+  const projName = projs.length===1 ? projs[0] : 'ORTAK (MRP)';
+  const calcTxt = r.type==='SAC'
+    ? `hesap: ${r.plates.length} plaka, ort. verim %${r.ortVerim.toFixed(1)}`
+    : `hesap: ${r.kons.toplamProfil} profil (${r.L}mm, fire %${r.fire})`;
+  if(!confirm(`"${r.sheetName}" için ${qty} adet satın alma kalemi (PLANNED) oluşturulacak;\n${sources.length} kaynak kalem bu plana bağlanacak (havuzdan düşer). Devam?`)) return;
+
+  const d = await dbInsert('purchase_items',{
+    project_name: projName,
+    name: r.sheetName,
+    code: null,
+    quantity: qty, unit: 'adet',
+    material: r.material || null,
+    notes: `📐 MRP planı — ${sources.length} kalem: ${sources.map(s=>s.code||s.name).join(', ')} · ${calcTxt}`,
+    created_by: currentUser?.display_name || currentUser?.username || null
+  });
+  if(!Array.isArray(d)||!d[0]){ toast('Plan kalemi oluşturulamadı!','error'); return; }
+  const planItem = d[0];
+  purchaseItems.push(planItem);
+  let linked = 0;
+  for(const s of sources){
+    const ok = await dbUpdate('purchase_items', s.id, {stock_plan_id: planItem.id, needs_planning: false});
+    if(ok){ s.stock_plan_id = planItem.id; s.needs_planning = false; linked++; }
+  }
+  _mrpResult = null;
+  document.getElementById('mrp-result').innerHTML = '';
+  toast(`✅ "${r.sheetName}" × ${qty} kalemi oluşturuldu, ${linked} kaynak kalem bağlandı`,'success');
+  renderMrp();
+}
+
+// ── Ölçü kataloğu yönetimi (stock_sheets) ──
+function openStockSheetsModal(){
+  document.getElementById('ss-modal-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'ss-modal-overlay';
+  const inp = 'background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none';
+  overlay.innerHTML = `<div class="modal" style="width:720px;max-height:85vh;display:flex;flex-direction:column;text-align:left">
+    <h3 style="margin-bottom:4px">⚙ Plaka / Profil Ölçü Kataloğu</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px">İhtiyaç planlamada seçilecek standart ölçüler (örn. 1350×5000×3 sac, 6000mm profil).</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+      <select id="ss-kind" style="${inp}" onchange="document.getElementById('ss-dims-sac').style.display=this.value==='SAC'?'':'none';document.getElementById('ss-dims-prf').style.display=this.value==='PROFIL'?'':'none'">
+        <option value="SAC">SAC</option><option value="PROFIL">PROFİL</option>
+      </select>
+      <input type="text" id="ss-name" placeholder="Ad (örn. DKP 1350×5000×3)" style="${inp};flex:1;min-width:150px">
+      <input type="text" id="ss-material" placeholder="Malzeme" style="${inp};width:100px">
+      <span id="ss-dims-sac" style="display:flex;gap:6px">
+        <input type="number" id="ss-w" placeholder="En" min="0" style="${inp};width:74px">
+        <input type="number" id="ss-h" placeholder="Boy" min="0" style="${inp};width:74px">
+        <input type="number" id="ss-t" placeholder="Kal." min="0" style="${inp};width:64px">
+      </span>
+      <span id="ss-dims-prf" style="display:none">
+        <input type="number" id="ss-l" placeholder="Boy (mm)" min="0" style="${inp};width:90px">
+      </span>
+      <button class="btn btn-primary btn-sm" onclick="ssAdd()">➕ Ekle</button>
+    </div>
+    <div id="ss-list" style="overflow-y:auto;flex:1;border:1px solid var(--border);border-radius:6px;padding:6px"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-ghost" onclick="document.getElementById('ss-modal-overlay').remove();renderMrpParams()">Kapat</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  loadStockSheets().then(ssRenderList);
+}
+
+function ssRenderList(){
+  const el = document.getElementById('ss-list');
+  if(!el) return;
+  if(!stockSheets.length){
+    el.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:14px;text-align:center">Henüz ölçü tanımlanmadı</div>`;
+    return;
+  }
+  el.innerHTML = stockSheets.map(s=>{
+    const dims = s.kind==='SAC'
+      ? [s.width_mm,s.height_mm,s.thickness_mm].filter(v=>v!=null).map(Number).join('×')+' mm'
+      : (s.length_mm!=null?Number(s.length_mm)+' mm':'');
+    return `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px dashed var(--border);${s.is_active===false?'opacity:.45':''}">
+      <span style="font-family:var(--font-mono);font-size:12px">
+        <span style="font-size:10px;padding:1px 6px;border-radius:8px;border:1px solid var(--border);color:var(--muted)">${s.kind}</span>
+        <b> ${s.name}</b>
+        <span style="color:var(--muted)"> · ${dims}${s.material?' · '+s.material:''}</span>
+      </span>
+      <button class="btn btn-ghost btn-sm" onclick="ssDelete('${s.id}')" style="color:var(--red,#e74c3c)">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+async function ssAdd(){
+  const kind = document.getElementById('ss-kind').value;
+  const name = document.getElementById('ss-name').value.trim();
+  if(!name){ toast('Ad zorunlu!','error'); return; }
+  const num = id => { const v=parseFloat(document.getElementById(id).value); return isFinite(v)&&v>0?v:null; };
+  const body = {
+    kind, name,
+    material: document.getElementById('ss-material').value.trim()||null,
+    width_mm: kind==='SAC'?num('ss-w'):null,
+    height_mm: kind==='SAC'?num('ss-h'):null,
+    thickness_mm: kind==='SAC'?num('ss-t'):null,
+    length_mm: kind==='PROFIL'?num('ss-l'):null
+  };
+  const d = await dbInsert('stock_sheets', body);
+  if(!Array.isArray(d)||!d[0]){ toast('Kaydedilemedi!','error'); return; }
+  stockSheets.push(d[0]);
+  ['ss-name','ss-material','ss-w','ss-h','ss-t','ss-l'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ssRenderList();
+  toast('Ölçü eklendi','success');
+}
+
+async function ssDelete(id){
+  const s = stockSheets.find(x=>x.id===id);
+  if(!s) return;
+  if(!confirm(`"${s.name}" katalogdan silinsin mi?`)) return;
+  const ok = await dbDelete('stock_sheets', id);
+  if(!ok){ toast('Silinemedi!','error'); return; }
+  stockSheets = stockSheets.filter(x=>x.id!==id);
+  ssRenderList();
+}
+
 function purFmtMoney(v){ return Number(v).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
 function renderPurchaseList(){
@@ -5772,12 +6321,17 @@ function renderPurchaseList(){
     const dateTxt = i.expected_date
       ? `<span style="color:${overdue?'var(--red,#e74c3c)':'var(--muted)'}">${overdue?'⚠ ':''}📆 ${new Date(i.expected_date).toLocaleDateString('tr-TR')}</span>` : '';
     const priceTxt = i.unit_price!=null ? `💰 ${purFmtMoney(i.unit_price)} ${i.currency||'TRY'}` : '';
+    const planParent = i.stock_plan_id ? purchaseItems.find(x=>x.id===i.stock_plan_id) : null;
+    const isPlanItem = purchaseItems.some(x=>x.stock_plan_id===i.id);
     const meta = [
       `${Number(i.quantity||1)} ${i.unit||'adet'}`,
       i.material ? '🔩 '+i.material : '',
       i.supplier ? '🏢 '+i.supplier : '',
       priceTxt, dateTxt,
       i.project_bom_part_id ? '🌳 ağaçtan' : '',
+      i.needs_planning ? '📐 planlama havuzunda' : '',
+      planParent ? '📐 → '+planParent.name : '',
+      isPlanItem ? '📐 MRP planı' : '',
       i.notes ? '🗒 '+i.notes : ''
     ].filter(Boolean).join(' · ');
 
@@ -5800,6 +6354,7 @@ function renderPurchaseList(){
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           ${actions}
           ${['ORDERED','RECEIVED'].includes(i.status)?`<button class="btn btn-ghost btn-sm" onclick="printGoodsReceiptPDF(['${i.id}'])" title="QR'lı mal kabul fişi yazdır">📄 Mal Kabul Fişi</button>`:''}
+          ${i.status==='PLANNED' && !i.stock_plan_id ? `<button class="btn btn-ghost btn-sm" onclick="purTogglePlanning('${i.id}')" title="${i.needs_planning?'Planlama havuzundan çıkar':'İhtiyaç planlama havuzuna at'}" ${i.needs_planning?'style="color:var(--accent);border-color:rgba(245,166,35,.4)"':''}>📐</button>`:''}
           <button class="btn btn-ghost btn-sm" onclick="purQuickPrice('${i.id}')" title="Hızlı fiyat gir">💰</button>
           <button class="btn btn-ghost btn-sm" onclick="editPurchaseItem('${i.id}')">✏️</button>
           <button class="btn btn-ghost btn-sm" onclick="deletePurchaseItem('${i.id}')" style="color:var(--red,#e74c3c);border-color:rgba(231,76,60,.3)">🗑️</button>
@@ -7295,6 +7850,13 @@ function printGoodsReceiptPDF(itemIds){
   const cards=list.map(i=>{
     const group=i.purchase_order_id?purchaseOrders.find(o=>o.id===i.purchase_order_id):null;
     const qr=qrDataUrl(purReceiveURL(i.id),110);
+    // (#10 MRP) Bu plakadan/profilden çıkacak kaynak kalemler
+    const planKids = purchaseItems.filter(x=>x.stock_plan_id===i.id);
+    const kidsHTML = planKids.length ? `
+      <div style="margin-top:8px;padding:6px 8px;background:#eef4fb;border:1px dashed #2980b9;border-radius:4px;font-size:9px;color:#1a4a6e">
+        <b>📐 Bu plakadan/profilden çıkacak parçalar (${planKids.length}):</b><br>
+        ${planKids.map(k=>`• ${k.code?k.code+' — ':''}${k.name} (${Number(k.quantity||1)} ${k.unit||'adet'} · ${k.project_name})`).join('<br>')}
+      </div>` : '';
     const rows=[
       ['Proje',i.project_name||'—'],['Kod',i.code||'—'],
       ['Miktar',`${Number(i.quantity||1)} ${i.unit||'adet'}`],
@@ -7314,6 +7876,7 @@ function printGoodsReceiptPDF(itemIds){
         </div>
       </div>
       <table class="gr-info">${rows}</table>
+      ${kidsHTML}
       <div class="gr-note">📦 Malzeme geldiğinde bu QR'ı telefonla okutun → depo seçin → mal kabul tamamlanır. (Elle kabul: Satın Alma sekmesi → Depoya Aktar)</div>
     </div>`;
   }).join('');

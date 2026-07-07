@@ -51,6 +51,9 @@ import java.util.UUID;
  *   purchase_order_id   uuid          NULL (FK -> purchase_orders, ON DELETE SET NULL;
  *                                     kalemin bagli oldugu toplu siparis grubu)
  *   notes               text          NULL
+ *   needs_planning      boolean       DEFAULT false NOT NULL (#10 MRP havuzu isareti)
+ *   stock_plan_id       uuid          NULL (FK -> purchase_items self, ON DELETE SET NULL;
+ *                                     kaynak kalemin baglandigi plaka/profil kalemi)
  *   ordered_at          timestamp     NULL
  *   received_at         timestamp     NULL
  *   created_by          varchar(150)  NULL
@@ -113,6 +116,15 @@ public class PurchaseItem extends BaseEntity {
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
+
+    /** Ihtiyac planlama havuzunda mi (#10 plaka MRP). */
+    @Column(name = "needs_planning", nullable = false)
+    @Builder.Default
+    private Boolean needsPlanning = false;
+
+    /** Bu kalemin malzemesinin cikacagi plaka/profil kalemi (self-referans). */
+    @Column(name = "stock_plan_id")
+    private UUID stockPlanId;
 
     @Column(name = "ordered_at")
     private LocalDateTime orderedAt;
