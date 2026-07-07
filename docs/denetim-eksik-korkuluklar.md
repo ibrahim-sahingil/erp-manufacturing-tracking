@@ -5,12 +5,22 @@ HİÇBİR DÜZELTME YAPILMADI — önce karar bekleniyor. Önem sırasına göre
 
 > **DURUM GÜNCELLEMESİ (2026-07-07, veri güvenliği turu):** K1, K2, K3
 > `veri-guvenligi-k1-k3` dalında düzeltildi (K1 8373e36 · K2 a7916be ·
-> K3 0aa3c87) ve E2E'ye K senaryoları eklendi (tümü geçiyor). Dal,
-> /code-review ultra sonrası master'a alınacak. O7 zaten B1 kapsamında
+> K3 0aa3c87), E2E'ye K senaryoları eklendi (tümü geçiyor) ve dal
+> /code-review ultra'dan SIFIR bulguyla çıktı. O7 zaten B1 kapsamında
 > düzeltilmişti (4565438: qty_done+qty_reject > hedef → güncelleme yok).
 > U6 da B7 ile büyük ölçüde kapandı (c5cf927: termin+ordered_at taşınıyor,
 > grup detayı kod eşleşmeli gösteriyor; purchase_order_id bilinçli boş).
-> U8 = B8'de düzeltildi (47eb5d4). Sırada: O1-O5 silme/tutarlılık turu.
+> U8 = B8'de düzeltildi (47eb5d4).
+>
+> **O1-O5 silme/tutarlılık turu (aynı gün, `silme-tutarlilik-o1-o5` dalı):**
+> O1 803b0ce (parça silme: iş emri bağı/ilerleme/alt parça guard'ları) ·
+> O2 d82d453 (iş emri oluşturmada #8 engeli) · O3 4ec0064 (depodaki
+> kalemde miktar kilidi — backend guard bilinçli yok: bölme akışları
+> quantity günceller) · O4 f601c4f (depodaki/gruptaki kalem silinemez) ·
+> O5 66b8dd1 (defterden bağlı hareket silinemez; MANUAL ve
+> WAREHOUSE_TRANSFER serbest, DELIVERY yalnız DRAFT irsaliyede).
+> E2E'ye O1/O4/O5 senaryoları eklendi, tümü geçiyor.
+> Sırada: O6 (irsaliye sevkinde stok kontrolü) → E1 XSS → U'lar.
 
 ## 🔴 KRİTİK
 
