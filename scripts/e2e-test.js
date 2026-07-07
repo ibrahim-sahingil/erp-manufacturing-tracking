@@ -1,6 +1,9 @@
-// ═══ E2E TESTİ — 3. tur özellikleri, GERÇEK frontend fonksiyonlarıyla ═══
-// index.html'den pbomPublishParts / woWaitingChildren vb. çıkarılır ve canlı
-// backend'e karşı izole bir test projesinde koşulur; sonunda tam temizlik.
+// ═══ E2E TESTİ — 3. + 4. tur özellikleri, GERÇEK frontend fonksiyonlarıyla ═══
+// index.html'den pbomPublishParts / woWaitingChildren / rcvDoReceive vb.
+// çıkarılır ve canlı backend'e karşı izole bir test projesinde koşulur;
+// sonunda tam temizlik. 4. tur kapsamı: aynı kod farklı dallarda (aynalama),
+// yayınlamada adet toplama + yeniden yayınlamada adet güncelleme, kısmi mal
+// kabul (gelen/iade/bölme), depolar arası aktarım kaynak tipi.
 // Kullanım: node scripts/e2e-test.js <token>  (sunucu localhost:8080 çalışırken)
 const fs = require('fs');
 const TOK = process.argv[2];
@@ -33,6 +36,7 @@ function grab(name){
 (0,eval)(grab('partWaitingChildren'));
 (0,eval)(grab('woWaitingChildren'));
 (0,eval)(grab('woStartBlockMsg'));
+(0,eval)(grab('rcvDoReceive'));   // 4. tur: kısmi mal kabul çekirdeği
 
 // ── Shims (frontend adapter'ın minimal karşılığı) ──
 globalThis.currentUser = {display_name:'E2E Test'};
@@ -94,55 +98,89 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const prod = await api('POST','/bom-products',{name:'E2E Ürün', code:'E2E-PRD-'+Date.now().toString(36)});
     check('bom ürünü oluştu', !!prod);
 
-    // Ağaç: GVD(MAMUL) → PLT(türsüz), CVT(TEDARIK); PLT → SAC(HAMMADDE)
+    // Ağaç (4. tur aynalama senaryosu — sol/sağ direk):
+    //   GVD(MAMUL) ─┬─ PLT (türsüz)  ─┬─ SAC (HAMMADDE, aynı kod her iki dalda)
+    //               │                 └─ BRK (türsüz, aynı kod her iki dalda)
+    //               ├─ PLT2 (türsüz) ─┬─ SAC (kopya dal)
+    //               │                 └─ BRK (kopya dal)
+    //               └─ CVT (TEDARIK, adet 8)
     const mkBp = (name,code,kind,parent,extra)=>api('POST','/bom-parts',{
       product_id:prod.id, parent_id:parent||null, name, code,
       quantity:1, material_kind:kind, ...(extra||{})});
-    const gvd = await mkBp('E2E Gövde','E2E-GVD','MAMUL',null);
-    const plt = await mkBp('E2E Platin','E2E-PLT',null,gvd.id);
-    const sac = await mkBp('E2E Sac','E2E-SAC','HAMMADDE',plt.id,{width_mm:300,height_mm:500,thickness_mm:3});
+    const gvd  = await mkBp('E2E Gövde','E2E-GVD','MAMUL',null);
+    const plt  = await mkBp('E2E Platin Sol','E2E-PLT',null,gvd.id);
+    const plt2 = await mkBp('E2E Platin Sağ','E2E-PLT2',null,gvd.id);
+    const sac  = await mkBp('E2E Sac','E2E-SAC','HAMMADDE',plt.id,{width_mm:300,height_mm:500,thickness_mm:3});
+    const sac2 = await mkBp('E2E Sac','E2E-SAC','HAMMADDE',plt2.id,{width_mm:300,height_mm:500,thickness_mm:3});
+    const brk  = await mkBp('E2E Braket','E2E-BRK',null,plt.id);
+    const brk2 = await mkBp('E2E Braket','E2E-BRK',null,plt2.id);
+    check('7 bom parçası oluştu (aynalama dallar dahil)', gvd&&plt&&plt2&&sac&&sac2&&brk&&brk2, _lastApiError||'');
     const cvt = await mkBp('E2E Civata','E2E-CVT','TEDARIK',gvd.id,{quantity:8});
-    check('4 bom parçası oluştu', gvd&&plt&&sac&&cvt);
+    check('CVT oluştu', !!cvt);
+
+    console.log('═══ 4.TUR #1: KOD BENZERSİZLİĞİ KARDEŞ KAPSAMINDA ═══');
+    const dupFail = await mkBp('E2E Sac Mükerrer','E2E-SAC',null,plt.id);
+    check('aynı dalda aynı kod REDDEDİLDİ', dupFail===null && /ust parca/i.test(_lastApiError||''), _lastApiError);
+    const dupOk = await mkBp('E2E Sac Serbest','E2E-SAC',null,cvt.id);
+    check('farklı dalda aynı kod KABUL', !!dupOk);
+    if(dupOk) await dbDelete('bom_parts', dupOk.id); // ağacı bozmadan geri al
 
     const pbm = await api('POST','/project-bom',{project_name:PROJ, bom_product_id:prod.id, status:'draft', created_by:'E2E'});
     check('project_bom bağlantısı oluştu', !!pbm);
 
     // pbp'ler: project_bom CREATE sirasinda backend sablondan OTOMATIK kopyalar
-    // (autoPopulateBomParts) — elle kopya YAPILMAZ (UI'daki hasCopied kontrolü gibi)
     const codeOf = p => p.custom_code || p.resolved_code;
     const pbps = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm.id);
-    check('4 pbp otomatik kopyalandı', pbps.length===4,
+    check('8 pbp otomatik kopyalandı', pbps.length===8,
       pbps.length + ' → ' + pbps.map(codeOf).join(','));
-    check('pbp resolved_material_kind şablondan geliyor',
-      pbps.find(p=>codeOf(p)==='E2E-SAC')?.resolved_material_kind==='HAMMADDE');
+    // Hiyerarşi bağları backend 2. pass'te kurulmuş olmalı (parent_custom_id)
+    const pbpSacs = pbps.filter(p=>codeOf(p)==='E2E-SAC');
+    check('aynı kodlu 2 SAC pbp FARKLI parent altında',
+      pbpSacs.length===2 && pbpSacs[0].parent_custom_id!==pbpSacs[1].parent_custom_id && pbpSacs.every(p=>!!p.parent_custom_id));
 
-    console.log('═══ F+H: YAYINLA (gerçek pbomPublishParts) ═══');
+    console.log('═══ F+H + 4.TUR: YAYINLA (adet toplama + hiyerarşi) ═══');
     globalThis.parts = await dbGet('parts');
     const tpl = (await dbGet('bom_parts')).filter(b=>b.product_id===prod.id);
     const r1 = await pbomPublishParts({project_name:PROJ}, pbps, tpl);
     console.log('  sonuç:', JSON.stringify(r1), '→', pbomPublishMsg(r1));
-    check('2 parça üretime (GVD, PLT)', r1.added===2, r1.added);
-    check('2 kalem satın almaya (SAC, CVT)', r1.purAdded===2, r1.purAdded);
-    check('1 hiyerarşi bağı (PLT→GVD)', r1.linked===1, r1.linked);
+    check('4 parça üretime (GVD, PLT, PLT2, BRK-tek satır)', r1.added===4, r1.added);
+    check('2 kalem satın almaya (SAC-tek satır, CVT)', r1.purAdded===2, r1.purAdded);
+    check('3 hiyerarşi bağı (PLT→GVD, PLT2→GVD, BRK→PLT)', r1.linked===3, r1.linked);
 
-    const partGvd = parts.find(p=>p.project===PROJ && p.code==='E2E-GVD');
-    const partPlt = parts.find(p=>p.project===PROJ && p.code==='E2E-PLT');
-    created.parts.push(partGvd?.id, partPlt?.id);
-    check('PLT.parent_part_id === GVD', partPlt?.parent_part_id===partGvd?.id);
+    const partGvd  = parts.find(p=>p.project===PROJ && p.code==='E2E-GVD');
+    const partPlt  = parts.find(p=>p.project===PROJ && p.code==='E2E-PLT');
+    const partPlt2 = parts.find(p=>p.project===PROJ && p.code==='E2E-PLT2');
+    const partBrk  = parts.find(p=>p.project===PROJ && p.code==='E2E-BRK');
+    check('PLT.parent === GVD', partPlt?.parent_part_id===partGvd?.id);
+    check('PLT2.parent === GVD', partPlt2?.parent_part_id===partGvd?.id);
+    check('BRK tek satır, adet TOPLAMI 2, parent İLK dal (PLT)',
+      Number(partBrk?.qty)===2 && partBrk?.parent_part_id===partPlt?.id,
+      `qty=${partBrk?.qty}`);
     const piSac = purchaseItems.find(i=>i.project_name===PROJ && i.code==='E2E-SAC');
     const piCvt = purchaseItems.find(i=>i.project_name===PROJ && i.code==='E2E-CVT');
-    created.pi.push(piSac?.id, piCvt?.id);
-    check('SAC kalemi pbp bağlı + adet 1', !!piSac?.project_bom_part_id && Number(piSac?.quantity)===1);
+    check('SAC satın almada TEK kalem, adet TOPLAMI 2', Number(piSac?.quantity)===2, piSac?.quantity);
     check('CVT kalemi adet 8', Number(piCvt?.quantity)===8, piCvt?.quantity);
     check('SAC/CVT parts\'a GİRMEDİ', !parts.some(p=>p.project===PROJ&&['E2E-SAC','E2E-CVT'].includes(p.code)));
 
     console.log('═══ İKİNCİ YAYINLAMA (idempotens) ═══');
     const r2 = await pbomPublishParts({project_name:PROJ}, pbps, tpl);
     check('hiçbir şey mükerrer oluşmadı',
-      r2.added===0 && r2.purAdded===0 && r2.linked===0 && r2.skipped===2 && r2.purSkipped===2,
+      r2.added===0 && r2.purAdded===0 && r2.linked===0 && r2.updated===0
+      && r2.skipped===4 && r2.purSkipped===2,
       JSON.stringify(r2));
 
-    console.log('═══ H: İŞ EMRİ BAŞLATMA ENGELİ (gerçek woWaitingChildren) ═══');
+    console.log('═══ 4.TUR: YENİDEN YAYINLAMADA ADET GÜNCELLEME ═══');
+    // BRK'nin bir dalındaki adet 1→2 yapılır → toplam 3 → parts güncellenmeli
+    const pbpBrk1 = pbps.find(p=>codeOf(p)==='E2E-BRK');
+    check('pbp adet değişti', await dbUpdate('project_bom_parts', pbpBrk1.id, {custom_qty:2}));
+    const pbpsFresh = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm.id);
+    const r3 = await pbomPublishParts({project_name:PROJ}, pbpsFresh, tpl);
+    globalThis.parts = await dbGet('parts');
+    const brkFresh = parts.find(p=>p.project===PROJ && p.code==='E2E-BRK');
+    check('adet güncellendi (updated=1, BRK qty 3)', r3.updated===1 && Number(brkFresh?.qty)===3,
+      `updated=${r3.updated}, qty=${brkFresh?.qty}`);
+
+    console.log('═══ H: İŞ EMRİ BAŞLATMA ENGELİ ═══');
     const wo = await api('POST','/work-orders',{order_id:orderId, status:'planned', notes:'E2E',
       start_datetime:new Date().toISOString().slice(0,19)});
     check('iş emri oluştu', !!wo, _lastApiError||'');
@@ -151,26 +189,49 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     created.wop.push(wop.id);
     globalThis.workOrderParts = [wop];
     let waiting = woWaitingChildren(wo.id);
-    check('GVD emri engelli (PLT bitmedi)', waiting.length===1, woStartBlockMsg(waiting));
-    // PLT'yi bitir → engel kalkmalı
+    check('GVD emri engelli (PLT+PLT2 bitmedi)', waiting.length===2, woStartBlockMsg(waiting));
     await dbUpdate('parts', partPlt.id, {status:'done', qty_done:1});
+    await dbUpdate('parts', partPlt2.id, {status:'done', qty_done:1});
     globalThis.parts = await dbGet('parts');
     waiting = woWaitingChildren(wo.id);
-    check('PLT bitince engel kalktı', waiting.length===0, waiting.length);
+    check('ikisi bitince engel kalktı', waiting.length===0, waiting.length);
 
-    console.log('═══ D: MAL KABUL AKIŞI (CVT kalemi) ═══');
+    console.log('═══ 4.TUR #3: KISMİ MAL KABUL (gerçek rcvDoReceive) ═══');
     let whs = await dbGet('warehouses');
     let wh = whs.find(w=>w.is_active!==false);
     if(!wh){ wh = (await dbInsert('warehouses',{name:'E2E Depo'}))[0]; created.wh.push(wh.id); }
     check('sipariş ver (ORDERED)', await dbUpdate('purchase_items', piCvt.id, {status:'ORDERED'}));
-    check('depoya al (IN_WAREHOUSE)', await dbUpdate('purchase_items', piCvt.id, {status:'IN_WAREHOUSE', warehouse_id:wh.id}));
-    const mv = (await dbInsert('warehouse_movements',{warehouse_id:wh.id, purchase_item_id:piCvt.id,
-      item_name:piCvt.name, item_code:piCvt.code, movement_type:'IN', quantity:8, unit:'adet',
-      source_type:'PURCHASE_TRANSFER', performed_by:'E2E', notes:'E2E test'}))[0];
-    created.mv.push(mv?.id);
-    check('depo hareketi yazıldı', !!mv);
-    const cvtFresh = (await dbGet('purchase_items')).find(i=>i.id===piCvt.id);
-    check('damga: received_at dolu', !!cvtFresh.received_at);
+    globalThis.purchaseItems = await dbGet('purchase_items');
+    // 8 beklenirken 5 geldi, 1'i iade → 4 depoya girer, 4 beklemede kalır (kalem bölünür)
+    const okPartial = await rcvDoReceive(piCvt.id, wh.id, 4, 1);
+    check('kısmi kabul çalıştı', okPartial===true);
+    const freshAll = await dbGet('purchase_items');
+    const cvtOrig  = freshAll.find(i=>i.id===piCvt.id);
+    const cvtSplit = freshAll.find(i=>i.project_name===PROJ && i.code==='E2E-CVT' && i.id!==piCvt.id);
+    check('orijinal: 4 beklemede, ORDERED, iade 1',
+      Number(cvtOrig?.quantity)===4 && cvtOrig?.status==='ORDERED' && Number(cvtOrig?.returned_qty)===1,
+      `q=${cvtOrig?.quantity} s=${cvtOrig?.status} iade=${cvtOrig?.returned_qty}`);
+    check('bölünen: 4 depoda, kabul 4, alan damgalı',
+      Number(cvtSplit?.quantity)===4 && cvtSplit?.status==='IN_WAREHOUSE'
+      && Number(cvtSplit?.received_qty)===4 && cvtSplit?.received_by==='E2E Test',
+      `q=${cvtSplit?.quantity} s=${cvtSplit?.status} alan=${cvtSplit?.received_by}`);
+    const mvIn = (await dbGet('warehouse_movements')).find(m=>m.purchase_item_id===cvtSplit?.id);
+    check('IN hareketi kabul adediyle (4, GOODS_RECEIPT)',
+      mvIn && Number(mvIn.quantity)===4 && mvIn.movement_type==='IN' && mvIn.source_type==='GOODS_RECEIPT');
+    // Kalan 4 tam kabul → orijinal kalem depoya geçer
+    globalThis.purchaseItems = await dbGet('purchase_items');
+    const okFull = await rcvDoReceive(piCvt.id, wh.id, 4, 0);
+    const cvtDone = (await dbGet('purchase_items')).find(i=>i.id===piCvt.id);
+    check('tam kabul: IN_WAREHOUSE + received_at damgalı + kabul 4',
+      okFull===true && cvtDone?.status==='IN_WAREHOUSE' && !!cvtDone?.received_at && Number(cvtDone?.received_qty)===4,
+      `s=${cvtDone?.status}`);
+
+    console.log('═══ 4.TUR #2: DEPOLAR ARASI AKTARIM KAYNAK TİPİ ═══');
+    const mvX = (await dbInsert('warehouse_movements',{warehouse_id:wh.id, purchase_item_id:null,
+      item_name:'E2E Aktarım Malzemesi', item_code:'E2E-XFR', movement_type:'IN', quantity:3,
+      unit:'adet', source_type:'WAREHOUSE_TRANSFER', performed_by:'E2E', notes:'E2E depolar arası'}))[0];
+    check('WAREHOUSE_TRANSFER hareketi kabul edildi', !!mvX, _lastApiError||'');
+    created.mv.push(mvX?.id);
 
     console.log('═══ G: MRP BAĞI (SAC kalemi) ═══');
     check('havuza at', await dbUpdate('purchase_items', piSac.id, {needs_planning:true}));
@@ -189,10 +250,11 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
   } finally {
     // temizlik: ters sırayla, hatalar yutulur
     const del = async (t,id)=>{ if(id) await dbDelete(t,id).catch(()=>{}); };
-    for(const id of created.mv)  await del('warehouse_movements', id);
+    // E2E hareketleri (rcvDoReceive'in yazdıkları dahil) kod önekiyle süpürülür
+    for(const m of (await dbGet('warehouse_movements')).filter(m=>(m.item_code||'').startsWith('E2E-')))
+      await del('warehouse_movements', m.id);
     for(const id of created.wop) await del('work_order_parts', id);
     for(const id of created.wo)  await del('work_orders', id);
-    // stock_plan bağı olan önce (FK SET NULL zaten var ama sıralı gidelim)
     const piAll = await dbGet('purchase_items');
     for(const i of piAll.filter(x=>x.project_name===PROJ && x.stock_plan_id)) await del('purchase_items', i.id);
     for(const i of (await dbGet('purchase_items')).filter(x=>x.project_name===PROJ)) await del('purchase_items', i.id);
@@ -206,7 +268,8 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
       (await dbGet('purchase_items')).filter(x=>x.project_name===PROJ).length +
       (await dbGet('parts')).filter(x=>x.project===PROJ).length +
       (await dbGet('project_bom')).filter(x=>x.project_name===PROJ).length +
-      (await dbGet('orders')).filter(x=>x.project_name===PROJ).length;
+      (await dbGet('orders')).filter(x=>x.project_name===PROJ).length +
+      (await dbGet('warehouse_movements')).filter(m=>(m.item_code||'').startsWith('E2E-')).length;
     check('temizlik tamam (0 artık kayıt)', leftovers===0, leftovers);
     console.log('\n═══ SONUÇ: ' + (failures? failures+' HATA ❌' : 'TÜM TESTLER GEÇTİ ✅') + ' ═══');
     process.exit(failures?1:0);
