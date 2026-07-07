@@ -6,8 +6,26 @@
 - H notu: hiyerarşi bağları YAYINLA sırasında kurulur; eski yayınlanmış
   projelerde bağlar için ilgili ağaç bir kez "🔄 Yeniden Yayınla" yapılmalı.
   Kural ENGEL olarak uygulandı (uyarı+devam değil).
-- ⏳ E'nin "depodaki ürünü projeye aktar" maddesi uygulanmadı — kullanıcıyla
-  netleşecek (movements'a project_name snapshot kolonu gerekebilir).
+- ✳ E'nin "depodaki ürünü projeye aktar" maddesi NETLEŞTİ (07.07, arkadaş cevabı):
+  STOK TAHSİSİ istiyor — depodaki serbest (münferit) malzemeden projenin parça
+  adedi kadarı projeye "markalanır"; malzeme fiziksel depoda kalır, serbest stok
+  o kadar azalır (örn. 50 M12'den 25'i projeye, 25'i serbest kalır).
+  UYGULAMA TASARIMI (şema değişikliği YOK, hareket defteriyle):
+  * Depo bazlı görünümde münferit satırına "📁 Projeye Tahsis Et" butonu →
+    modal: proje seç + adet (mevcut serbest netten fazla olamaz).
+  * Onayda: (1) ilgili projeye purchase_item oluşur (status IN_WAREHOUSE,
+    warehouse_id=o depo, quantity=adet, notes "depodan tahsis") →
+    (2) aynı depoya kalem bağlı IN hareketi (source_type=PROJECT_ALLOC) +
+    serbest stoktan aynı adet OUT hareketi (purchase_item_id NULL,
+    source_type=PROJECT_ALLOC, notes tahsis referansı).
+    Net etki: depo toplamı değişmez, münferit azalır, proje malzemesi artar;
+    proje bazlı görünümde ve malzeme bedelinde görünür (fiyat girilebilir).
+  * Geri alma: whUndo yerine tahsise özel geri al (kalem sil + iki hareketi sil)
+    ya da OUT/IN ters kayıtları — uygulamada karar ver.
+  * source_type için WH_SOURCE_LABELS'a 'PROJECT_ALLOC': 'Projeye Tahsis' ekle.
+    DİKKAT: DB'de `warehouse_movements_source_check` CHECK kısıtı VAR
+    (MANUAL/PURCHASE_TRANSFER/GOODS_RECEIPT/DELIVERY) — PROJECT_ALLOC için
+    kısıt DROP+ADD ile genişletilmeli, sonra schema.sql yeniden dump'lanmalı.
 - ⏳ #11 canlıda doğrulanacak (büyük olasılıkla eski sayfa — Ctrl+F5).
 - Verilen kararlar: D→alt-sekme; F→türsüz (NULL) parçalar eski davranışla
   parts'a; G→ölçü kataloğu (stock_sheets) + elle giriş İKİSİ birden; G onayda
