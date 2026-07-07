@@ -11,7 +11,8 @@ function grab(name){
   if(start<0) throw new Error(name+' bulunamadı');
   let i=html.indexOf('{',start),d=1;i++;
   while(d>0){const c=html[i];if(c==='{')d++;if(c==='}')d--;i++;}
-  return html.slice(start,i);
+  const asyncPrefix = html.slice(Math.max(0,start-6),start)==='async ' ? 'async ' : '';
+  return asyncPrefix + html.slice(start,i);
 }
 // h`` mekanizması — index.html'deki esc/raw/_hval/h ile AYNI olmalı
 global.esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -20,12 +21,14 @@ global._hval = v => (v==null||v===false||v===true)?'':(v&&v.__html)?v.toString()
 global.h = (strings,...vals)=>{ let out=strings[0]; for(let i=0;i<vals.length;i++) out+=_hval(vals[i])+strings[i+1]; return raw(out); };
 
 const store={};
-global.document={ getElementById:id=>({ set innerHTML(v){store[id]=String(v);}, get innerHTML(){return store[id]||'';}, value:'' }) };
+global.document={ getElementById:id=>({ set innerHTML(v){store[id]=String(v);}, get innerHTML(){return store[id]||'';}, value:'', addEventListener(){}, style:{} }) };
 global.parts=[];
 const EVIL='<img src=x onerror=alert(1)>';
 
 let fail=0;
 const chk=(n,c)=>{ console.log((c?'  ✅':'  ❌ FAIL')+' '+n); if(!c)fail++; };
+
+async function main(){
 
 // ── renderSuppliersModalList + renderDeptList ──
 global.suppliers=[{id:'s1', name:'Ac<b>me "X" & Co', contact_person:EVIL, phone:'5\'55', email:'a@b', notes:'not<script>', is_active:true},
@@ -45,5 +48,27 @@ chk('suppliers: notes <script> kaçırıldı', sup.includes('not&lt;script&gt;')
 chk('depts: proje/ad kaçırıldı', dep.includes('Proj&lt;X&gt;') && dep.includes('Kaynak&lt;img&gt;'));
 chk('depts: kart yapısı (raw HTML) korundu', dep.includes('<div style="background:var(--surface2)') && dep.includes('deleteDept('));
 
+// ── renderScan (QR tarama — herkese açık, en yüksek risk) ──
+global.dbGet = async (t)=> t==='parts'
+  ? [{id:'p1', name:'Parça'+EVIL, code:'C&<D>', drawing:'"Resim"', department:'Böl<b>', material:'Mat<i>', project:'Prj<script>alert(1)</script>', status:'pending', qty:5, created_at:'2026-01-01T10:00:00', description:'Açıklama '+EVIL}]
+  : t==='users' ? [{name:'Kişi<b>', dept:'D<i>'}] : [];
+global.loadLogs = async ()=> [{created_at:'2026-01-01T09:00:00', username:'Kayıtçı'+EVIL, qty_done:2, qty_reject:1, note:'not<script>x</script>'}];
+global.autoSelectScanUser = ()=>{};
+eval(grab('renderScan'));
+await renderScan('p1');
+const scan=store['scan-content']||'';
+console.log('\nrenderScan (QR ekranı):');
+chk('scan: parça adı onerror atağı kaçırıldı', !scan.includes('Parça'+EVIL) && scan.includes('Parça&lt;img'));
+chk('scan: proje <script> kaçırıldı', scan.includes('Prj&lt;script&gt;') && !scan.includes('Prj<script>'));
+chk('scan: açıklama onerror kaçırıldı', scan.includes('Açıklama &lt;img'));
+chk('scan: log kullanıcı adı atağı kaçırıldı', scan.includes('Kayıtçı&lt;img') && !scan.includes('Kayıtçı'+EVIL));
+chk('scan: log notu <script> kaçırıldı', scan.includes('not&lt;script&gt;'));
+chk('scan: kod & < > kaçırıldı', scan.includes('C&amp;&lt;D&gt;'));
+chk('scan: user option value kaçırıldı', scan.includes('<option value="Kişi&lt;b&gt;">'));
+chk('scan: kart/buton yapısı (raw) korundu', scan.includes('class="scan-card"') && scan.includes("submitScan('p1')"));
+chk('scan: log badge (raw) korundu', scan.includes('log-qty-badge log-qty-done') && scan.includes('✅ 2'));
+
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);
+}
+main();
