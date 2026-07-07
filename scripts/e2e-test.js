@@ -368,6 +368,17 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const sacFresh = (await dbGet('purchase_items')).find(i=>i.id===piSac.id);
     check('bağ + havuzdan düştü', sacFresh.stock_plan_id===plan.id && !sacFresh.needs_planning);
 
+    console.log('═══ E2: ONDALIK ADET ÜRETİMDE YUKARI YUVARLANIR ═══');
+    // parts.total_qty INTEGER — ondalık BOM adedi eskiden sessizce kesiliyordu.
+    // İzole: türsüz ondalık (2.5) parça yayınla → parts qty 3 + rounded uyarısı.
+    globalThis.projectBoms = [];
+    const e2fake = [{id:'e2-fake-ondalik', custom_code:'E2E-ONDALIK', custom_name:'E2E Ondalık Parça', custom_qty:2.5, material_kind:null}];
+    const rE2 = await pbomPublishParts({id:'yok', project_name:PROJ}, e2fake, []);
+    globalThis.parts = await dbGet('parts');
+    const ondalik = parts.find(p=>p.project===PROJ && p.code==='E2E-ONDALIK');
+    check('ondalık 2.5 → parts qty 3 (yukarı) + rounded=1',
+      rE2.rounded===1 && Number(ondalik?.qty)===3, JSON.stringify({rounded:rE2.rounded, qty:ondalik?.qty}));
+
     console.log('═══ O6: DEPO NET STOK HESABI (_whItemStock) ═══');
     // dnShip eksi-stok uyarısı bu hesaba dayanır: SUM(IN)−SUM(OUT), kod önce
     globalThis.whMovements = [

@@ -10742,7 +10742,7 @@ function pbomeShowTree() {
 async function pbomPublishParts(pb, allPbParts, templateParts){
   const freshPur = await dbGet('purchase_items');
   if(Array.isArray(freshPur)) purchaseItems = freshPur;
-  const res = { added:0, skipped:0, updated:0, qtyBlocked:0, purAdded:0, purSkipped:0, purUpdated:0, purManual:0, errors:0, linked:0 };
+  const res = { added:0, skipped:0, updated:0, qtyBlocked:0, rounded:0, purAdded:0, purSkipped:0, purUpdated:0, purManual:0, errors:0, linked:0 };
   _lastApiError = null;
   const partIdByPbp = {}; // (#8) pbp.id → parts.id (üretime gidenler)
   const pbpById = {};
@@ -10817,7 +10817,13 @@ async function pbomPublishParts(pb, allPbParts, templateParts){
 
   for(const g of prodGroups.values()){
     const p = g.rows[0], code = codeOf(p), name = nameOf(p);
-    const target = g.qty + (otherProdQty.get(code.toLowerCase())||0);
+    const rawTarget = g.qty + (otherProdQty.get(code.toLowerCase())||0);
+    // (E2) parts.total_qty INTEGER — ondalık BOM adedi (2.5 kg, 1.2 m vb.)
+    // yayınlamada sessizce AŞAĞI kesiliyordu (canlı doğrulanmış veri kaybı).
+    // Üretim tam sayı takip ettiğinden yukarı yuvarla (eksik üretim olmasın)
+    // ve kullanıcıyı uyar. (Satın alma tarafı numeric → dokunulmaz.)
+    const target = Math.ceil(rawTarget - 1e-9);
+    if(Math.abs(target - rawTarget) > 1e-9) res.rounded++;
     const exists = parts.find(x=>x.project===pb.project_name && (x.code||'').toLowerCase()===code.toLowerCase());
     if(exists){
       g.rows.forEach(r=>{ partIdByPbp[r.id] = exists.id; });
@@ -10889,6 +10895,7 @@ function pbomPublishMsg(r){
   if(r.linked) msg += `, 🔗 ${r.linked} hiyerarşi bağı kuruldu`;
   if(r.updated) msg += `, 🔢 ${r.updated} parçanın adedi güncellendi`;
   if(r.qtyBlocked) msg += `, ⚠️ ${r.qtyBlocked} parçada adet güncellenmedi (tamamlanan üretim yeni hedefin üstünde)`;
+  if(r.rounded) msg += `, ⚠️ ${r.rounded} parçada ondalık adet üretim için tam sayıya (yukarı) yuvarlandı`;
   if(r.purUpdated) msg += `, 🛒 ${r.purUpdated} satın alma kaleminin adedi güncellendi`;
   if(r.purManual) msg += `, ⚠️ ${r.purManual} kalemin siparişi verilmiş — adedi elle kontrol edin`;
   if(r.skipped || r.purSkipped) msg += `, ${r.skipped + r.purSkipped} zaten mevcuttu`;
