@@ -28,8 +28,8 @@ import java.util.UUID;
  *
  * projectName ve projectBomPartId IMMUTABLE - gelse de service ignore eder.
  * Durum gecis damgalari (ordered_at/received_at) service'te atilir;
- * received_at ayrica bolunen kalemlere damga tasimak icin dogrudan
- * gonderilebilir (4. tur B4).
+ * ikisi de ayrica bolunen kalemlere damga tasimak icin dogrudan
+ * gonderilebilir (4. tur B4/B7).
  */
 @Getter
 @Setter
@@ -154,6 +154,13 @@ public class PurchaseItemUpdateRequest {
      * yazilir (temizlenemez); frontend bolme yollari gonderir.
      */
     private LocalDateTime receivedAt;
+
+    /**
+     * Siparis damgasi (4. tur B7): bolunen kaleme orijinalin ordered_at'i
+     * tasinir ki termin/gecikme raporlarinda gorunmeye devam etsin.
+     * receivedAt ile ayni kural: yalniz non-null geldiginde yazilir.
+     */
+    private LocalDateTime orderedAt;
 
     @PositiveOrZero(message = "Iade adedi 0 veya pozitif olmali")
     private BigDecimal returnedQty;

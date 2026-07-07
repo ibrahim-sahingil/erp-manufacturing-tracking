@@ -151,9 +151,12 @@ public class PurchaseItemService {
         if (request.getReceivedQty() != null) {
             item.setReceivedQty(request.getReceivedQty());
         }
-        // Bolunen kalemlere mal kabul damgasi tasinir (4. tur B4)
+        // Bolunen kalemlere mal kabul/siparis damgasi tasinir (4. tur B4/B7)
         if (request.getReceivedAt() != null) {
             item.setReceivedAt(request.getReceivedAt());
+        }
+        if (request.getOrderedAt() != null) {
+            item.setOrderedAt(request.getOrderedAt());
         }
         if (request.getReturnedQty() != null) {
             item.setReturnedQty(request.getReturnedQty());

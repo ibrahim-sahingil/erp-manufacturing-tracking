@@ -5974,12 +5974,17 @@ async function rcvDoReceive(id, whId, accepted, returned){
     const ok = await dbUpdate('purchase_items', id, {quantity:remain, returned_qty:retTotal});
     if(!ok) return false;
     i.quantity = remain; i.returned_qty = retTotal;
+    // (B7) termin + grup referansı taşınır: purchase_order_id bölmede
+    // taşınamaz (sipariş kilidi), grup adı notes'a yazılır; grup detayı
+    // bölünmüş kalemleri kod eşleşmesiyle gösterir
+    const grp = i.purchase_order_id ? purchaseOrders.find(o=>o.id===i.purchase_order_id) : null;
     const d = await dbInsert('purchase_items',{
       project_name:i.project_name, name:i.name, code:i.code||null,
       quantity:accepted, unit:i.unit||'adet', material:i.material||null,
       supplier:i.supplier||null, unit_price:i.unit_price||null,
       currency:i.currency||'TRY', status:'IN_WAREHOUSE',
-      notes:'Kısmi mal kabul ('+accepted+'/'+total+')', created_by:by});
+      expected_date:i.expected_date||null,
+      notes:'Kısmi mal kabul ('+accepted+'/'+total+')'+(grp?' · 📦 '+grp.name:''), created_by:by});
     if(!Array.isArray(d)||!d[0]){
       await dbUpdate('purchase_items', id, {quantity:total});
       i.quantity = total;
@@ -5990,8 +5995,8 @@ async function rcvDoReceive(id, whId, accepted, returned){
     // whUndo onu IN_STOCK'a düşürüp mal kabul akışından koparıyordu.
     // Backend LocalDateTime beklediğinden yerel saat, dilimsiz gönderilir.
     const rcvAt = new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,19);
-    await dbUpdate('purchase_items', ni.id, {warehouse_id:whId, received_by:by, received_qty:accepted, received_at:rcvAt});
-    Object.assign(ni, {status:'IN_WAREHOUSE', warehouse_id:whId, received_by:by, received_qty:accepted, received_at:rcvAt});
+    await dbUpdate('purchase_items', ni.id, {warehouse_id:whId, received_by:by, received_qty:accepted, received_at:rcvAt, ordered_at:i.ordered_at||null});
+    Object.assign(ni, {status:'IN_WAREHOUSE', warehouse_id:whId, received_by:by, received_qty:accepted, received_at:rcvAt, ordered_at:i.ordered_at||null});
     purchaseItems.push(ni);
     mvItemId = ni.id;
   }
@@ -7046,6 +7051,18 @@ function renderPurchaseOrders(){
         </span>
       </div>`).join('')
       : `<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:4px 0">Grupta kalem kalmadı</div>`;
+    // (B7) Bölünen kalemler purchase_order_id bağını taşıyamaz (sipariş
+    // kilidi); grup teslimatı izlenebilsin diye kod eşleşmesiyle listelenir
+    const memberKey = new Set(items.map(i=>i.project_name+'|'+(i.code||'').toLowerCase()));
+    const splitRows = purchaseItems.filter(i=>!i.purchase_order_id && i.code
+      && ['RECEIVED','IN_WAREHOUSE'].includes(i.status)
+      && memberKey.has(i.project_name+'|'+i.code.toLowerCase()))
+      .map(i=>`<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px dashed var(--border)">
+        <span style="font-family:var(--font-mono);font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">
+          🔀 ${i.code?`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
+          <span style="color:var(--muted)"> · ${Number(i.quantity||1)} ${i.unit||'adet'} · ${i.status==='IN_WAREHOUSE'?'🏭 '+(whName(i.warehouse_id)||'Depoda'):'📥 Teslim alındı'}</span>
+        </span>
+      </div>`).join('');
     // Kalem fiyatları toplamı (girilenlerden; teklif toplamıyla kıyas için)
     const itemTotals = {};
     items.forEach(i=>{ if(i.unit_price!=null){ const c=i.currency||'TRY'; itemTotals[c]=(itemTotals[c]||0)+Number(i.unit_price)*Number(i.quantity||1); }});
@@ -7131,6 +7148,7 @@ function renderPurchaseOrders(){
       <div style="margin-top:10px">
         <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:4px">Kalemler</div>
         ${itemRows}
+        ${splitRows?`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:6px" title="Bölme sırasında grup bağı taşınamaz; kod eşleşmesiyle bulunur">🔀 Bölünmüş kalemler (kod eşleşmesi):</div>${splitRows}`:''}
         ${itemTotalStr?`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:6px 0 0;text-align:right">Kalem fiyatları toplamı: <b style="color:var(--accent)">${itemTotalStr}</b></div>`:''}
       </div>
       <div style="margin-top:12px">
@@ -7799,12 +7817,16 @@ async function whXferConfirm(){
       if(!ok){ toast('Aktarılamadı!','error'); _whXfer=null; return; }
       i.quantity = x.maxQ-qty;
       i.received_qty = x.maxQ-qty;
+      // (B7) termin + grup referansı taşınır (purchase_order_id kilit
+      // nedeniyle taşınamaz; grup detayı kod eşleşmesiyle gösterir)
+      const grp = i.purchase_order_id ? purchaseOrders.find(o=>o.id===i.purchase_order_id) : null;
       const d = await dbInsert('purchase_items',{
         project_name:i.project_name, name:i.name, code:i.code||null,
         quantity:qty, unit:i.unit||'adet', material:i.material||null,
         supplier:i.supplier||null, unit_price:i.unit_price||null,
         currency:i.currency||'TRY', status:'IN_WAREHOUSE',
-        notes:note, created_by:by});
+        expected_date:i.expected_date||null,
+        notes:note+(grp?' · 📦 '+grp.name:''), created_by:by});
       if(!Array.isArray(d)||!d[0]){
         // (B6) rollback: adetle birlikte bölünmüş kabul sayacı da geri yüklenir
         await dbUpdate('purchase_items', x.id, {quantity: x.maxQ, received_qty: x.maxQ});
@@ -7816,7 +7838,7 @@ async function whXferConfirm(){
       // (B4) received_at orijinalden kopyalanır: mal kabulden gelen kalemin
       // bölünmüş parçası da whUndo'da RECEIVED'a dönebilsin (stok kökenli
       // kalemde damga yok → null gönderilir, backend yok sayar → IN_STOCK).
-      const wok = await dbUpdate('purchase_items', ni.id, {warehouse_id: target, received_by: i.received_by||null, received_qty: qty, received_at: i.received_at||null});
+      const wok = await dbUpdate('purchase_items', ni.id, {warehouse_id: target, received_by: i.received_by||null, received_qty: qty, received_at: i.received_at||null, ordered_at: i.ordered_at||null});
       if(!wok){
         // (B6) yeni kalem depoya bağlanamadı — bölme tamamen geri alınır
         await dbDelete('purchase_items', ni.id);
@@ -7827,6 +7849,7 @@ async function whXferConfirm(){
       }
       ni.warehouse_id = target; ni.status='IN_WAREHOUSE';
       ni.received_by = i.received_by||null; ni.received_qty = qty; ni.received_at = i.received_at||null;
+      ni.ordered_at = i.ordered_at||null;
       purchaseItems.push(ni);
       await mv(x.src,'OUT',x.id,i.name,i.code||null,i.unit||'adet',qty);
       await mv(target,'IN',ni.id,i.name,i.code||null,i.unit||'adet',qty);

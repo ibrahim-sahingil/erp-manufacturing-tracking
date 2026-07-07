@@ -45,6 +45,7 @@ globalThis.parts = [];
 globalThis.purchaseItems = [];
 globalThis.workOrderParts = [];
 globalThis.projectBoms = []; // B1: pbomPublishParts kardeş pbom'ları buradan bulur
+globalThis.purchaseOrders = []; // B7: rcvDoReceive grup referansını buradan çözer
 let orderId = null, PROJ = 'E2E-TEST-'+Date.now().toString(36);
 
 async function api(method, path, body){
@@ -287,7 +288,7 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     let whs = await dbGet('warehouses');
     let wh = whs.find(w=>w.is_active!==false);
     if(!wh){ wh = (await dbInsert('warehouses',{name:'E2E Depo'}))[0]; created.wh.push(wh.id); }
-    check('sipariş ver (ORDERED)', await dbUpdate('purchase_items', piCvt.id, {status:'ORDERED'}));
+    check('sipariş ver (ORDERED + termin)', await dbUpdate('purchase_items', piCvt.id, {status:'ORDERED', expected_date:'2026-08-01'}));
     // (B2) sipariş verilmiş kalemin adedi republish'te EZİLMEZ, uyarı sayılır
     await dbUpdate('project_bom_parts', pbpCvt.id, {custom_qty:12});
     const pbpsB2c = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm.id);
@@ -313,6 +314,9 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
       `q=${cvtSplit?.quantity} s=${cvtSplit?.status} alan=${cvtSplit?.received_by}`);
     check('bölünen kalem received_at damgalı (B4 — whUndo RECEIVED\'a döndürebilir)',
       !!cvtSplit?.received_at, cvtSplit?.received_at);
+    check('bölünen kalem termin + sipariş damgası taşıdı (B7)',
+      cvtSplit?.expected_date==='2026-08-01' && !!cvtSplit?.ordered_at,
+      `termin=${cvtSplit?.expected_date} sipariş=${cvtSplit?.ordered_at}`);
     const mvIn = (await dbGet('warehouse_movements')).find(m=>m.purchase_item_id===cvtSplit?.id);
     check('IN hareketi kabul adediyle (4, GOODS_RECEIPT)',
       mvIn && Number(mvIn.quantity)===4 && mvIn.movement_type==='IN' && mvIn.source_type==='GOODS_RECEIPT');
