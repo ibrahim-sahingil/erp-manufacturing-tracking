@@ -187,6 +187,8 @@ public class ProjectBomPartService {
                 .customWidthMm(request.getCustomWidthMm())
                 .customHeightMm(request.getCustomHeightMm())
                 .customThicknessMm(request.getCustomThicknessMm())
+                .materialKind(request.getMaterialKind() != null && !request.getMaterialKind().isBlank()
+                        ? request.getMaterialKind() : null)
                 .deptId(request.getDeptId())
                 .parentCustomId(request.getParentCustomId())
                 .operations(request.getOperations() != null
@@ -257,6 +259,10 @@ public class ProjectBomPartService {
         }
         if (request.getCustomThicknessMm() != null) {
             pbp.setCustomThicknessMm(request.getCustomThicknessMm());
+        }
+        if (request.getMaterialKind() != null) {
+            // Bos string = override'i temizle (sablon turu gecerli olur)
+            pbp.setMaterialKind(request.getMaterialKind().isBlank() ? null : request.getMaterialKind());
         }
         if (request.getOperations() != null) {
             pbp.setOperations(request.getOperations());

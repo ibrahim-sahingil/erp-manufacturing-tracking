@@ -87,6 +87,11 @@ public class ProjectBomPartRequest {
     @PositiveOrZero(message = "Kalinlik 0 veya pozitif olmali")
     private BigDecimal customThicknessMm;
 
+    @jakarta.validation.constraints.Pattern(
+            regexp = "^(TEDARIK|HAMMADDE|YARI_MAMUL|MAMUL|SARF)?$",
+            message = "Malzeme turu TEDARIK/HAMMADDE/YARI_MAMUL/MAMUL/SARF olmali")
+    private String materialKind;
+
     /**
      * Bu parcayi hangi departman uretecek.
      * Department FK - service'te varlik kontrolu yapilir.

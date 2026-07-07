@@ -48,6 +48,7 @@ import java.util.UUID;
  *   width_mm     numeric(15,4) NULL (sac/profil olcusu - opsiyonel)
  *   height_mm    numeric(15,4) NULL
  *   thickness_mm numeric(15,4) NULL
+ *   material_kind varchar(20)  NULL (CHECK: TEDARIK/HAMMADDE/YARI_MAMUL/MAMUL/SARF)
  *   operations  jsonb         DEFAULT '[]'
  *   level       int4          DEFAULT 0
  *   sort_order  int4          DEFAULT 0
@@ -97,6 +98,14 @@ public class BomPart extends BaseEntity {
 
     @Column(name = "thickness_mm", precision = 15, scale = 4)
     private BigDecimal thicknessMm;
+
+    /**
+     * Malzeme turu (#7 arkadas istegi): TEDARIK / HAMMADDE / YARI_MAMUL /
+     * MAMUL / SARF. NULL = belirtilmedi (eski kayitlar). Yayinla/satin alma
+     * aktariminda yonlendirme icin kullanilir.
+     */
+    @Column(name = "material_kind", length = 20)
+    private String materialKind;
 
     /**
      * Operasyonlar listesi (PostgreSQL jsonb -> Java List<Map<String, Object>>).

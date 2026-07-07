@@ -88,6 +88,12 @@ public class ProjectBomPartUpdateRequest {
     @PositiveOrZero(message = "Kalinlik 0 veya pozitif olmali")
     private BigDecimal customThicknessMm;
 
+    /** Bos string ("") gonderilirse tur TEMIZLENIR (sablon degeri gecerli olur). */
+    @jakarta.validation.constraints.Pattern(
+            regexp = "^(TEDARIK|HAMMADDE|YARI_MAMUL|MAMUL|SARF)?$",
+            message = "Malzeme turu TEDARIK/HAMMADDE/YARI_MAMUL/MAMUL/SARF olmali")
+    private String materialKind;
+
     /** Esnek jsonb yapisi - ProjectBomPartRequest.operations ile ayni format. */
     private List<Map<String, Object>> operations;
 

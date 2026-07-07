@@ -49,6 +49,9 @@ public class BomImportRowResponse {
     private BigDecimal heightMm;
     private BigDecimal thicknessMm;
 
+    /** Malzeme turu (#7): TEDARIK/HAMMADDE/YARI_MAMUL/MAMUL/SARF (null = yok). */
+    private String materialKind;
+
     /** Satir hatasi (null = sorun yok). Ornek: "Ust basamak (1.2) dosyada yok" */
     private String error;
 }

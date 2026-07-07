@@ -41,6 +41,7 @@ import java.util.regex.Pattern;
  *   F: En (mm)        (opsiyonel sac/profil olcusu)
  *   G: Boy (mm)
  *   H: Kalinlik (mm)
+ *   I: Tur            (opsiyonel: Tedarik/Hammadde/Yari Mamul/Mamul/Sarf)
  *
  * Dosya KAYDEDILMEZ; sadece parse edilir. Olusturma islemini frontend,
  * onizlemede secilen satirlarla mevcut bom-parts / project-bom-parts
@@ -104,8 +105,14 @@ public class BomImportService {
                 BigDecimal widthMm   = readNumber(row.getCell(5), fmt);
                 BigDecimal heightMm  = readNumber(row.getCell(6), fmt);
                 BigDecimal thickMm   = readNumber(row.getCell(7), fmt);
+                String kindRaw       = fmt.formatCellValue(row.getCell(8)).trim();
+                String materialKind  = normalizeKind(kindRaw);
 
                 String error = null;
+                if (!kindRaw.isEmpty() && materialKind == null) {
+                    error = "Tur taninmadi: \"" + kindRaw
+                            + "\" (beklenen: Tedarik, Hammadde, Yari Mamul, Mamul, Sarf)";
+                }
                 String parentLevelNo = null;
                 int level = 0;
 
@@ -145,6 +152,7 @@ public class BomImportService {
                         .widthMm(widthMm)
                         .heightMm(heightMm)
                         .thicknessMm(thickMm)
+                        .materialKind(materialKind)
                         .error(error)
                         .build());
             }
@@ -181,10 +189,32 @@ public class BomImportService {
     }
 
     private boolean isRowBlank(Row row, DataFormatter fmt) {
-        for (int c = 0; c < 8; c++) {
+        for (int c = 0; c < 9; c++) {
             if (!fmt.formatCellValue(row.getCell(c)).trim().isEmpty()) return false;
         }
         return true;
+    }
+
+    /**
+     * Tur hucresini normalize eder (#7). Turkce harf/bosluk toleransli:
+     * "Tedarik", "TEDARİK", "Yarı Mamul", "yari_mamul", "Mamül" hepsi calisir.
+     * Bos -> null; taninmayan deger -> null (cagiran hata uretir).
+     */
+    private String normalizeKind(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String s = raw.trim()
+                .replace('ı', 'i').replace('İ', 'I')
+                .replace('ü', 'u').replace('Ü', 'U')
+                .toUpperCase(java.util.Locale.ROOT)
+                .replace(' ', '_').replace('-', '_');
+        switch (s) {
+            case "TEDARIK":               return "TEDARIK";
+            case "HAMMADDE", "HAM_MADDE": return "HAMMADDE";
+            case "YARI_MAMUL":            return "YARI_MAMUL";
+            case "MAMUL":                 return "MAMUL";
+            case "SARF":                  return "SARF";
+            default:                      return null;
+        }
     }
 
     /** Sayisal hucre okur; metin girilmisse virgullu Turkce degeri de tolere eder. */
@@ -212,7 +242,7 @@ public class BomImportService {
 
             Sheet sheet = wb.createSheet("Urun Agaci");
             String[] headers = {"Basamak", "Parça Adı", "Kod", "Malzeme",
-                    "Adet", "En (mm)", "Boy (mm)", "Kalınlık (mm)"};
+                    "Adet", "En (mm)", "Boy (mm)", "Kalınlık (mm)", "Tür"};
 
             CellStyle headStyle = wb.createCellStyle();
             Font bold = wb.createFont();
@@ -231,11 +261,11 @@ public class BomImportService {
             }
 
             String[][] examples = {
-                    {"1",     "Ana Gövde",             "GVD-001", "S235",  "1", "",     "",     ""},
-                    {"1.1",   "Yan Sac",               "YS-001",  "St-37", "2", "300",  "500",  "3"},
-                    {"1.1.1", "Yan Sac Destek Profili","YSD-001", "S235",  "4", "",     "1200", ""},
-                    {"1.2",   "Kapak Sacı",            "KPK-001", "St-37", "1", "250",  "250",  "2"},
-                    {"2",     "Şase",                  "SSE-001", "S355",  "1", "",     "",     ""}
+                    {"1",     "Ana Gövde",             "GVD-001", "S235",  "1", "",     "",     "",  "Mamul"},
+                    {"1.1",   "Yan Sac",               "YS-001",  "St-37", "2", "300",  "500",  "3", "Hammadde"},
+                    {"1.1.1", "Yan Sac Destek Profili","YSD-001", "S235",  "4", "",     "1200", "",  "Tedarik"},
+                    {"1.2",   "Kapak Sacı",            "KPK-001", "St-37", "1", "250",  "250",  "2", "Yarı Mamul"},
+                    {"2",     "Şase",                  "SSE-001", "S355",  "1", "",     "",     "",  ""}
             };
             for (int r = 0; r < examples.length; r++) {
                 Row row = sheet.createRow(r + 1);

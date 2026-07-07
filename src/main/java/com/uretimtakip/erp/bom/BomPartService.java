@@ -117,6 +117,8 @@ public class BomPartService {
                 .widthMm(request.getWidthMm())
                 .heightMm(request.getHeightMm())
                 .thicknessMm(request.getThicknessMm())
+                .materialKind(request.getMaterialKind() != null && !request.getMaterialKind().isBlank()
+                        ? request.getMaterialKind() : null)
                 .operations(request.getOperations() != null
                         ? request.getOperations() : new ArrayList<>())
                 .level(level)
@@ -171,6 +173,10 @@ public class BomPartService {
         }
         if (request.getThicknessMm() != null) {
             part.setThicknessMm(request.getThicknessMm());
+        }
+        if (request.getMaterialKind() != null) {
+            // Bos string = turu temizle (null'a dondur)
+            part.setMaterialKind(request.getMaterialKind().isBlank() ? null : request.getMaterialKind());
         }
         if (request.getOperations() != null) {
             part.setOperations(request.getOperations());

@@ -1250,8 +1250,15 @@
           </div>
           <div class="form-group"><label>Ağırlık (kg)</label><input type="number" id="bom-part-weight" placeholder="0.00" step="0.001"></div>
         </div>
-        <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:0">
+        <div class="form-row" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:0">
           <div class="form-group"><label>Malzeme</label><input type="text" id="bom-part-material" placeholder="Örn: ST37, Alüminyum"></div>
+          <div class="form-group"><label>Tür</label>
+            <select id="bom-part-kind" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+              <option value="">— Tür yok —</option>
+              <option value="TEDARIK">Tedarik</option><option value="HAMMADDE">Hammadde</option>
+              <option value="YARI_MAMUL">Yarı Mamul</option><option value="MAMUL">Mamul</option><option value="SARF">Sarf</option>
+            </select>
+          </div>
           <div class="form-group"><label>Üst Parça</label>
             <select id="bom-part-parent" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
               <option value="">— Ana ürün altına ekle —</option>
@@ -1396,8 +1403,15 @@
         </div>
         <div class="form-group"><label>Ağırlık (kg)</label><input type="number" id="pbome-part-weight" placeholder="0.00" step="0.001"></div>
       </div>
-      <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:0">
+      <div class="form-row" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:0">
         <div class="form-group"><label>Malzeme</label><input type="text" id="pbome-part-material" placeholder="ST37, Alüminyum..."></div>
+        <div class="form-group"><label>Tür</label>
+          <select id="pbome-part-kind" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+            <option value="">— Tür yok —</option>
+            <option value="TEDARIK">Tedarik</option><option value="HAMMADDE">Hammadde</option>
+            <option value="YARI_MAMUL">Yarı Mamul</option><option value="MAMUL">Mamul</option><option value="SARF">Sarf</option>
+          </select>
+        </div>
         <div class="form-group"><label>Üst Parça</label>
           <select id="pbome-part-parent" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
             <option value="">— Ana seviye —</option>
@@ -5977,13 +5991,18 @@ function openPurImport(){
       <button class="btn btn-ghost btn-sm" onclick="purImportToggleAll(false)">Tümünü Bırak</button>
     </div>
     <div id="pur-import-list" style="overflow-y:auto;flex:1;border:1px solid var(--border);border-radius:6px;padding:6px">
-      ${candidates.map(p=>`
+      ${candidates.map(p=>{
+        // (#7) Tür yönlendirmesi: satın alma türleri ve türsüzler işaretli
+        // başlar; YARI_MAMUL/MAMUL (üretim) işaretsiz başlar ama seçilebilir
+        const kind = p.material_kind || p.resolved_material_kind || null;
+        const preChecked = !kind || PURCHASE_KINDS.includes(kind);
+        return `
         <label style="display:flex;gap:10px;align-items:center;padding:7px 10px;border-radius:4px;cursor:pointer;font-family:var(--font-mono);font-size:12px" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-          <input type="checkbox" class="pur-import-chk" value="${p.id}" checked>
+          <input type="checkbox" class="pur-import-chk" value="${p.id}" ${preChecked?'checked':''}>
           <span style="color:var(--accent);min-width:120px">${p.custom_code||'—'}</span>
-          <span style="flex:1">${'&nbsp;'.repeat((p.level||0)*3)}${p.custom_name||'—'}</span>
+          <span style="flex:1">${'&nbsp;'.repeat((p.level||0)*3)}${p.custom_name||'—'} ${kindBadge(kind)}</span>
           <span style="color:var(--muted)">${Number(p.custom_qty||1)} ${p.custom_unit||'adet'}${p.custom_material?' · '+p.custom_material:''}</span>
-        </label>`).join('')}
+        </label>`;}).join('')}
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
       <button class="btn btn-ghost" onclick="document.getElementById('pur-import-overlay').remove()">İptal</button>
@@ -8211,6 +8230,22 @@ function renderOpPartSelect() {
     bomParts.map(p=>`<option value="${p.id}">${p.code} — ${p.name}</option>`).join('');
 }
 
+// ─── Malzeme türü (#7 arkadaş isteği) ───
+// Yayınlamada yönlendirme: TEDARIK/HAMMADDE/SARF → satın alma kalemi,
+// YARI_MAMUL/MAMUL → üretim (parts). NULL (belirtilmemiş) = eski davranış (parts).
+const MATERIAL_KINDS = { TEDARIK:'Tedarik', HAMMADDE:'Hammadde', YARI_MAMUL:'Yarı Mamul', MAMUL:'Mamul', SARF:'Sarf' };
+const PURCHASE_KINDS = ['TEDARIK','HAMMADDE','SARF'];
+function kindOptions(sel){
+  return '<option value="">— Tür yok —</option>' + Object.entries(MATERIAL_KINDS)
+    .map(([k,l])=>`<option value="${k}" ${sel===k?'selected':''}>${l}</option>`).join('');
+}
+function kindBadge(k){
+  if(!k||!MATERIAL_KINDS[k]) return '';
+  const purch = PURCHASE_KINDS.includes(k);
+  const c = purch ? '#2980b9' : '#8e44ad';
+  return `<span style="font-family:var(--font-mono);font-size:9px;padding:1px 6px;border-radius:8px;border:1px solid ${c}44;color:${c};background:${c}11;white-space:nowrap">${purch?'🛒':'🏭'} ${MATERIAL_KINDS[k]}</span>`;
+}
+
 // ─── Parça Ekle ───
 async function addBomPart() {
   const name = document.getElementById('bom-part-name').value.trim();
@@ -8230,6 +8265,7 @@ async function addBomPart() {
     unit: document.getElementById('bom-part-unit').value,
     weight_kg: parseFloat(document.getElementById('bom-part-weight').value)||null,
     material: document.getElementById('bom-part-material').value.trim()||null,
+    material_kind: document.getElementById('bom-part-kind').value||null,
     operations: [], level, sort_order: bomParts.length
   });
   btn.disabled=false; btn.textContent='+ Parça Ekle';
@@ -8241,7 +8277,7 @@ async function addBomPart() {
 }
 
 function clearBomPartForm() {
-  ['bom-part-name','bom-part-code','bom-part-material'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['bom-part-name','bom-part-code','bom-part-material','bom-part-kind'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const q=document.getElementById('bom-part-qty'); if(q) q.value='1';
   const u=document.getElementById('bom-part-unit'); if(u) u.value='adet';
   const w=document.getElementById('bom-part-weight'); if(w) w.value='';
@@ -8345,7 +8381,7 @@ function renderBomList() {
       ${level>0?`<span style="color:var(--muted);font-size:10px;margin-right:4px">${'└─'.repeat(1)}</span>`:''}
       <span class="bom-part-code">${part.code}</span>
       <div style="flex:1">
-        <div class="bom-part-name-cell">${part.name}</div>
+        <div class="bom-part-name-cell">${part.name} ${kindBadge(part.material_kind)}</div>
         <div class="bom-part-meta">
           <span id="bom-qty-display-${part.id}" style="cursor:pointer;border-bottom:1px dashed var(--muted)" onclick="editBomQty('${part.id}')" title="Miktarı düzenle">${part.quantity} ${part.unit}</span>
           ${part.weight_kg?`<span>⚖ ${part.weight_kg} kg</span>`:''}
@@ -8537,6 +8573,10 @@ function editBomPart(partId) {
           onkeydown="if(event.key==='Enter')saveBomPartEdit('${partId}')">
       </div>
     </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Tür</label>
+      <select id="bom-edit-kind" style="${inStyle}">${kindOptions(part.material_kind)}</select>
+    </div>
     <div class="form-group" style="margin-bottom:18px">
       <label>Ölçü (mm) — opsiyonel, sac/profil için</label>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
@@ -8566,10 +8606,12 @@ async function saveBomPartEdit(partId) {
   // Olcu: bos birakmak = 0 gonderilir (backend'de null "dokunma" demek oldugu icin
   // temizleme 0 ile yapilir; 0 ekranda "olcu yok" sayilir)
   const width_mm = dimNum('bom-edit-width'), height_mm = dimNum('bom-edit-height'), thickness_mm = dimNum('bom-edit-thickness');
+  const material_kind = document.getElementById('bom-edit-kind').value; // ''=türü temizle
   // PARTIAL update'te null "dokunma" demek — malzemeyi temizlemek icin bos string gonderilir
-  const ok = await dbUpdate('bom_parts', partId, { name, code, material, width_mm, height_mm, thickness_mm });
+  const ok = await dbUpdate('bom_parts', partId, { name, code, material, width_mm, height_mm, thickness_mm, material_kind });
   if(!ok) return;
   part.name=name; part.code=code; part.material=material;
+  part.material_kind=material_kind||null;
   part.width_mm=width_mm; part.height_mm=height_mm; part.thickness_mm=thickness_mm;
   document.getElementById('bom-edit-overlay')?.remove();
   renderBomContent();
@@ -8938,6 +8980,7 @@ async function pbomeAddPart() {
     custom_unit:document.getElementById('pbome-part-unit').value,
     custom_weight:parseFloat(document.getElementById('pbome-part-weight').value)||null,
     custom_material:document.getElementById('pbome-part-material').value.trim()||null,
+    material_kind:document.getElementById('pbome-part-kind').value||null,
     dept_id:null, parent_custom_id:parentId, operations:[], level, sort_order:_pbomeParts.length
   });
   if(!Array.isArray(data)||!data[0]){ toast('Kayıt hatası!','error'); return; }
@@ -8949,7 +8992,7 @@ async function pbomeAddPart() {
 }
 
 function pbomeClearPartForm() {
-  ['pbome-part-name','pbome-part-code','pbome-part-material','pbome-part-weight'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['pbome-part-name','pbome-part-code','pbome-part-material','pbome-part-weight','pbome-part-kind'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const q=document.getElementById('pbome-part-qty');if(q)q.value='1';
   const u=document.getElementById('pbome-part-unit');if(u)u.value='adet';
 }
@@ -9036,7 +9079,7 @@ function pbomeRenderList() {
           ${level>0?`<span style="color:var(--muted);font-size:10px;margin-right:2px">└─</span>`:''}
           <span class="bom-part-code" style="${isFromBom?'':'color:var(--green)'}">${p.custom_code}</span>
           <div style="flex:1">
-            <div class="bom-part-name-cell">${p.custom_name}${isFromBom?'':' ⭐'}</div>
+            <div class="bom-part-name-cell">${p.custom_name}${isFromBom?'':' ⭐'} ${kindBadge(p.material_kind||p.resolved_material_kind)}</div>
             <div class="bom-part-meta">
               <span>${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
               ${p.custom_weight?`<span>⚖${p.custom_weight}kg</span>`:''}
@@ -9134,6 +9177,10 @@ function pbomeEditPart(partId) {
           onkeydown="if(event.key==='Enter')pbomeSavePartEdit('${partId}')">
       </div>
     </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Tür ${p.resolved_material_kind&&!p.material_kind?`<span style="text-transform:none;color:var(--muted)">(şablondan: ${MATERIAL_KINDS[p.resolved_material_kind]||''})</span>`:''}</label>
+      <select id="pbome-edit-kind" style="${inStyle}">${kindOptions(p.material_kind)}</select>
+    </div>
     <div class="form-group" style="margin-bottom:18px">
       <label>Ölçü (mm) — opsiyonel, sac/profil için</label>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
@@ -9161,10 +9208,12 @@ async function pbomeSavePartEdit(partId) {
   const dup=_pbomeParts.find(x=>x.id!==partId && (x.custom_code||'').toLowerCase()===code.toLowerCase());
   if(dup){ toast(`Bu ağaçta "${dup.custom_code}" kodlu bir parça zaten var: ${dup.custom_name}`,'error'); return; }
   const custom_width_mm=dimNum('pbome-edit-width'), custom_height_mm=dimNum('pbome-edit-height'), custom_thickness_mm=dimNum('pbome-edit-thickness');
+  const material_kind=document.getElementById('pbome-edit-kind').value; // ''=override'i temizle
   // PARTIAL update'te null "dokunma" demek — malzemeyi temizlemek icin bos string gonderilir
-  const ok=await dbUpdate('project_bom_parts',partId,{custom_name:name,custom_code:code,custom_material:material,custom_width_mm,custom_height_mm,custom_thickness_mm});
+  const ok=await dbUpdate('project_bom_parts',partId,{custom_name:name,custom_code:code,custom_material:material,custom_width_mm,custom_height_mm,custom_thickness_mm,material_kind});
   if(!ok) return;
   p.custom_name=name; p.custom_code=code; p.custom_material=material;
+  p.material_kind=material_kind||null;
   p.custom_width_mm=custom_width_mm; p.custom_height_mm=custom_height_mm; p.custom_thickness_mm=custom_thickness_mm;
   p.resolved_width_mm=custom_width_mm; p.resolved_height_mm=custom_height_mm; p.resolved_thickness_mm=custom_thickness_mm;
   document.getElementById('pbome-edit-overlay')?.remove();
@@ -9282,6 +9331,7 @@ function xlsImportRenderList(){
       <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">${r.code||'—'}</span>
       <span style="font-size:12px">${r.name||'—'}</span>
       <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${r.quantity||1} adet${r.material?' · 🔩'+r.material:''}${dims?' · 📐'+dims:''}</span>
+      ${kindBadge(r.material_kind)}
       ${r.error?`<span style="font-family:var(--font-mono);font-size:10px;color:var(--red)">⚠ ${r.error}</span>`:''}
     </div>`;
   }).join('');
@@ -9322,10 +9372,10 @@ async function xlsImportApply(){
     if(r.parent_level_no&&!parentId){ fail++; continue; } // üstü eklenemeyen dal atlanır
     let created=null;
     if(target==='bom'){
-      const d=await dbInsert('bom_parts',{product_id:_activeBomProduct.id,parent_id:parentId,name:r.name,code:r.code,quantity:r.quantity||1,material:r.material||null,width_mm:r.width_mm||null,height_mm:r.height_mm||null,thickness_mm:r.thickness_mm||null});
+      const d=await dbInsert('bom_parts',{product_id:_activeBomProduct.id,parent_id:parentId,name:r.name,code:r.code,quantity:r.quantity||1,material:r.material||null,material_kind:r.material_kind||null,width_mm:r.width_mm||null,height_mm:r.height_mm||null,thickness_mm:r.thickness_mm||null});
       created=Array.isArray(d)?d[0]:null;
     }else{
-      const d=await dbInsert('project_bom_parts',{id:genId(),project_bom_id:_activePbomId,bom_part_id:null,is_excluded:false,parent_custom_id:parentId,custom_name:r.name,custom_code:r.code,custom_qty:r.quantity||1,custom_unit:'adet',custom_material:r.material||null,custom_width_mm:r.width_mm||null,custom_height_mm:r.height_mm||null,custom_thickness_mm:r.thickness_mm||null,operations:[]});
+      const d=await dbInsert('project_bom_parts',{id:genId(),project_bom_id:_activePbomId,bom_part_id:null,is_excluded:false,parent_custom_id:parentId,custom_name:r.name,custom_code:r.code,custom_qty:r.quantity||1,custom_unit:'adet',custom_material:r.material||null,material_kind:r.material_kind||null,custom_width_mm:r.width_mm||null,custom_height_mm:r.height_mm||null,custom_thickness_mm:r.thickness_mm||null,operations:[]});
       created=Array.isArray(d)?d[0]:null;
       if(created) projectBomParts.push(created);
     }
@@ -9377,6 +9427,56 @@ function pbomeShowTree() {
   </div>`;
 }
 
+// (#7) Yayınlama çekirdeği — türe göre yönlendirme:
+// TEDARIK/HAMMADDE/SARF → satın alma kalemi (parts'a GİRMEZ);
+// YARI_MAMUL/MAMUL/türsüz → üretim (parts, eski davranış).
+// Mükerrer kontrolü: parts proje+kod; purchase_items pbp bağı veya proje+kod.
+async function pbomPublishParts(pb, allPbParts){
+  const freshPur = await dbGet('purchase_items');
+  if(Array.isArray(freshPur)) purchaseItems = freshPur;
+  const res = { added:0, skipped:0, purAdded:0, purSkipped:0, errors:0 };
+  _lastApiError = null;
+  for(const p of allPbParts){
+    if(p.is_excluded || !p.custom_name || !p.custom_code) continue;
+    const kind = p.material_kind || p.resolved_material_kind || null;
+    if(PURCHASE_KINDS.includes(kind)){
+      const purExists = purchaseItems.find(x=>x.project_bom_part_id===p.id ||
+        (x.project_name===pb.project_name && (x.code||'').toLowerCase()===p.custom_code.toLowerCase()));
+      if(purExists){ res.purSkipped++; continue; }
+      const d = await dbInsert('purchase_items',{
+        project_name: pb.project_name, project_bom_part_id: p.id,
+        name: p.custom_name, code: p.custom_code,
+        quantity: p.custom_qty!=null?p.custom_qty:1, unit: p.custom_unit||'adet',
+        material: p.custom_material||p.resolved_material||null,
+        created_by: currentUser?.display_name||currentUser?.username||null
+      });
+      if(Array.isArray(d)&&d[0]){ purchaseItems.push(d[0]); res.purAdded++; }
+      else { res.errors++; console.error('Satın almaya eklenemedi:', p.custom_code); }
+      continue;
+    }
+    const exists = parts.find(x=>x.project===pb.project_name && (x.code||'').toLowerCase()===p.custom_code.toLowerCase());
+    if(exists){ res.skipped++; continue; }
+    const ops = Array.isArray(p.operations)?p.operations:(typeof p.operations==='string'?JSON.parse(p.operations||'[]'):[]);
+    const newPart = await dbInsert('parts',{
+      id:genId(), name:p.custom_name, code:p.custom_code,
+      project:pb.project_name, department_id:p.dept_id||null,
+      qty:p.custom_qty||1, qty_done:0, qty_pending:0, qty_reject:0,
+      status:'pending', material:p.custom_material||null,
+      notes: ops.length ? ops.map(o=>o.name).join(', ') : null
+    });
+    if(Array.isArray(newPart)&&newPart[0]){ parts.push(newPart[0]); res.added++; }
+    else { res.errors++; console.error('Eklenemedi:', p.custom_code); }
+  }
+  return res;
+}
+function pbomPublishMsg(r){
+  let msg = `✅ Yayınlandı! ${r.added} parça üretime çıkarıldı`;
+  if(r.purAdded) msg += `, 🛒 ${r.purAdded} kalem satın almaya aktarıldı`;
+  if(r.skipped || r.purSkipped) msg += `, ${r.skipped + r.purSkipped} zaten mevcuttu`;
+  if(r.errors){ msg += `, ${r.errors} hata`; if(_lastApiError) msg += ` (${_lastApiError})`; }
+  return msg;
+}
+
 // Yayınla
 async function openAndPublishPbom(pbomId) {
   const pb   = projectBoms.find(p=>p.id===pbomId);
@@ -9391,38 +9491,14 @@ async function openAndPublishPbom(pbomId) {
 
   console.log('Yayınlanacak parça sayısı:', allPbParts.length);
 
-  let added=0, skipped=0, errors=0;
-  _lastApiError = null;
-  for(const p of allPbParts) {
-    if(p.is_excluded || !p.custom_name || !p.custom_code) continue;
-    const exists = parts.find(x=>x.project===pb.project_name && (x.code||'').toLowerCase()===p.custom_code.toLowerCase());
-    if(exists){ skipped++; continue; }
-    const ops = Array.isArray(p.operations)?p.operations:(typeof p.operations==='string'?JSON.parse(p.operations||'[]'):[]);
-    const newPart = await dbInsert('parts',{
-      id:genId(), name:p.custom_name, code:p.custom_code,
-      project:pb.project_name, department_id:p.dept_id||null,
-      qty:p.custom_qty||1, qty_done:0, qty_pending:0, qty_reject:0,
-      status:'pending', material:p.custom_material||null,
-      notes: ops.length ? ops.map(o=>o.name).join(', ') : null
-    });
-    if(Array.isArray(newPart)&&newPart[0]){ parts.push(newPart[0]); added++; }
-    else { errors++; console.error('Eklenemedi:', p.custom_code); }
-  }
+  const r = await pbomPublishParts(pb, allPbParts);
 
   await dbUpdate('project_bom', pbomId, {status:'published', published_at:new Date().toISOString()});
   pb.status='published'; pb.published_at=new Date().toISOString();
 
   renderProjectBomList();
-  let msg=`✅ Yayınlandı! ${added} parça üretime çıkarıldı`;
-  if(skipped>0) msg+=`, ${skipped} zaten mevcuttu`;
-  if(errors>0){
-    msg+=`, ${errors} hata`;
-    if(_lastApiError) msg+=` (${_lastApiError})`;
-    toast(msg,'error');
-  } else {
-    toast(msg,'success');
-  }
-  console.log('Tamamlandı — eklenen:',added,'atlanan:',skipped,'hata:',errors);
+  toast(pbomPublishMsg(r), r.errors?'error':'success');
+  console.log('Tamamlandı —', r);
 }
 
 async function pbomePublish() {
@@ -9437,23 +9513,7 @@ async function pbomePublish() {
   
   console.log('Yayınlanacak parça sayısı:', allPbParts.length);
 
-  let added=0, skipped=0, errors=0;
-  _lastApiError = null;
-  for(const p of allPbParts) {
-    if(p.is_excluded || !p.custom_name || !p.custom_code) continue;
-    const exists = parts.find(x=>x.project===pb.project_name && (x.code||'').toLowerCase()===p.custom_code.toLowerCase());
-    if(exists){ skipped++; continue; }
-    const ops = Array.isArray(p.operations)?p.operations:(typeof p.operations==='string'?JSON.parse(p.operations||'[]'):[]);
-    const newPart = await dbInsert('parts',{
-      id:genId(), name:p.custom_name, code:p.custom_code,
-      project:pb.project_name, department_id:p.dept_id||null,
-      qty:p.custom_qty||1, qty_done:0, qty_pending:0, qty_reject:0,
-      status:'pending', material:p.custom_material||null,
-      notes: ops.length ? ops.map(o=>o.name).join(', ') : null
-    });
-    if(Array.isArray(newPart)&&newPart[0]){ parts.push(newPart[0]); added++; }
-    else { errors++; console.error('Parça eklenemedi:', p.custom_code, p.custom_name); }
-  }
+  const r = await pbomPublishParts(pb, allPbParts);
 
   await dbUpdate('project_bom',_activePbomId,{status:'published',published_at:new Date().toISOString()});
   pb.status='published'; pb.published_at=new Date().toISOString();
@@ -9461,17 +9521,9 @@ async function pbomePublish() {
   if(publishBtn) publishBtn.style.display='none';
   const badge=document.getElementById('pbome-status-badge');
   if(badge) badge.innerHTML='<span class="pbom-status-published">✅ Yayınlandı</span>';
-  
-  let msg = `✅ Yayınlandı! ${added} parça üretime çıkarıldı`;
-  if(skipped>0) msg += `, ${skipped} zaten mevcuttu`;
-  if(errors>0){
-    msg += `, ${errors} hata oluştu`;
-    if(_lastApiError) msg += ` (${_lastApiError})`;
-    toast(msg,'error');
-  } else {
-    toast(msg,'success');
-  }
-  console.log('Yayınlama tamamlandı — eklenen:', added, 'atlanan:', skipped, 'hata:', errors);
+
+  toast(pbomPublishMsg(r), r.errors?'error':'success');
+  console.log('Yayınlama tamamlandı —', r);
 }
 
 // ─── Projeye Özel Parça ───

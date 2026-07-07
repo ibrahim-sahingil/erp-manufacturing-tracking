@@ -83,6 +83,11 @@ public class BomPartRequest {
     @PositiveOrZero(message = "Kalinlik 0 veya pozitif olmali")
     private BigDecimal thicknessMm;
 
+    @jakarta.validation.constraints.Pattern(
+            regexp = "^(TEDARIK|HAMMADDE|YARI_MAMUL|MAMUL|SARF)?$",
+            message = "Malzeme turu TEDARIK/HAMMADDE/YARI_MAMUL/MAMUL/SARF olmali")
+    private String materialKind;
+
     /**
      * Esnek jsonb yapisi. Her item icindeki anahtarlar serbest.
      * Tipik: operationId (UUID), code (String), duration (Number), notes (String).

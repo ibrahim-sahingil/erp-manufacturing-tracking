@@ -106,6 +106,14 @@ public class ProjectBomPart extends BaseEntity {
     @Column(name = "custom_thickness_mm", precision = 15, scale = 4)
     private BigDecimal customThicknessMm;
 
+    /**
+     * Malzeme turu override'i (#7): TEDARIK/HAMMADDE/YARI_MAMUL/MAMUL/SARF.
+     * NULL ise sablondaki (bom_parts.material_kind) tur gecerli
+     * (resolved_material_kind response'ta hesaplanir).
+     */
+    @Column(name = "material_kind", length = 20)
+    private String materialKind;
+
     @Column(name = "dept_id")
     private UUID deptId;
 

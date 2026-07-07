@@ -76,6 +76,12 @@ public class BomPartUpdateRequest {
     @PositiveOrZero(message = "Kalinlik 0 veya pozitif olmali")
     private BigDecimal thicknessMm;
 
+    /** Bos string ("") gonderilirse tur TEMIZLENIR (null'a doner). */
+    @jakarta.validation.constraints.Pattern(
+            regexp = "^(TEDARIK|HAMMADDE|YARI_MAMUL|MAMUL|SARF)?$",
+            message = "Malzeme turu TEDARIK/HAMMADDE/YARI_MAMUL/MAMUL/SARF olmali")
+    private String materialKind;
+
     /** Esnek jsonb yapisi - BomPartRequest.operations ile ayni format. */
     private List<Map<String, Object>> operations;
 
