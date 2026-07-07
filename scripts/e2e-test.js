@@ -228,6 +228,20 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     await dbUpdate('parts', brkTotal.id, {status:'pending', qty_done:0});
     globalThis.parts = await dbGet('parts');
 
+    console.log('═══ B2: REPUBLISH SATIN ALMA ADEDİ (PLANNED) ═══');
+    // CVT adedi 8→10: republish PLANNED kalemin adedini güncellemeli
+    const pbpCvt = pbpsFresh.find(p=>codeOf(p)==='E2E-CVT');
+    check('CVT pbp adedi 10 yapıldı', await dbUpdate('project_bom_parts', pbpCvt.id, {custom_qty:10}));
+    let pbpsB2 = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm.id);
+    const rB2 = await pbomPublishParts({id:pbm.id, project_name:PROJ}, pbpsB2, tpl);
+    check('PLANNED kalem adedi güncellendi (purUpdated=1, adet 10)',
+      rB2.purUpdated===1 && Number(purchaseItems.find(i=>i.id===piCvt.id)?.quantity)===10,
+      JSON.stringify({purUpdated:rB2.purUpdated, q:purchaseItems.find(i=>i.id===piCvt.id)?.quantity}));
+    await dbUpdate('project_bom_parts', pbpCvt.id, {custom_qty:8});
+    pbpsB2 = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm.id);
+    const rB2b = await pbomPublishParts({id:pbm.id, project_name:PROJ}, pbpsB2, tpl);
+    check('adet 8\'e geri döndü', rB2b.purUpdated===1 && Number(purchaseItems.find(i=>i.id===piCvt.id)?.quantity)===8);
+
     console.log('═══ H: İŞ EMRİ BAŞLATMA ENGELİ ═══');
     const wo = await api('POST','/work-orders',{order_id:orderId, status:'planned', notes:'E2E',
       start_datetime:new Date().toISOString().slice(0,19)});
@@ -249,6 +263,15 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     let wh = whs.find(w=>w.is_active!==false);
     if(!wh){ wh = (await dbInsert('warehouses',{name:'E2E Depo'}))[0]; created.wh.push(wh.id); }
     check('sipariş ver (ORDERED)', await dbUpdate('purchase_items', piCvt.id, {status:'ORDERED'}));
+    // (B2) sipariş verilmiş kalemin adedi republish'te EZİLMEZ, uyarı sayılır
+    await dbUpdate('project_bom_parts', pbpCvt.id, {custom_qty:12});
+    const pbpsB2c = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm.id);
+    const rB2c = await pbomPublishParts({id:pbm.id, project_name:PROJ}, pbpsB2c, tpl);
+    globalThis.purchaseItems = await dbGet('purchase_items');
+    check('ORDERED kalem adedi korundu (purManual=1, adet 8)',
+      rB2c.purManual===1 && Number(purchaseItems.find(i=>i.id===piCvt.id)?.quantity)===8,
+      JSON.stringify({purManual:rB2c.purManual, q:purchaseItems.find(i=>i.id===piCvt.id)?.quantity}));
+    await dbUpdate('project_bom_parts', pbpCvt.id, {custom_qty:8});
     globalThis.purchaseItems = await dbGet('purchase_items');
     // 8 beklenirken 5 geldi, 1'i iade → 4 depoya girer, 4 beklemede kalır (kalem bölünür)
     const okPartial = await rcvDoReceive(piCvt.id, wh.id, 4, 1);

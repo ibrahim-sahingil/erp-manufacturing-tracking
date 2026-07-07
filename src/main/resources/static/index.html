@@ -10573,7 +10573,7 @@ function pbomeShowTree() {
 async function pbomPublishParts(pb, allPbParts, templateParts){
   const freshPur = await dbGet('purchase_items');
   if(Array.isArray(freshPur)) purchaseItems = freshPur;
-  const res = { added:0, skipped:0, updated:0, qtyBlocked:0, purAdded:0, purSkipped:0, errors:0, linked:0 };
+  const res = { added:0, skipped:0, updated:0, qtyBlocked:0, purAdded:0, purSkipped:0, purUpdated:0, purManual:0, errors:0, linked:0 };
   _lastApiError = null;
   const partIdByPbp = {}; // (#8) pbp.id → parts.id (üretime gidenler)
   const pbpById = {};
@@ -10617,13 +10617,28 @@ async function pbomPublishParts(pb, allPbParts, templateParts){
 
   for(const g of purGroups.values()){
     const p = g.rows[0], code = codeOf(p), name = nameOf(p);
+    const target = g.qty + (otherPurQty.get(code.toLowerCase())||0);
     const purExists = purchaseItems.find(x=>g.rows.some(r=>x.project_bom_part_id===r.id) ||
       (x.project_name===pb.project_name && (x.code||'').toLowerCase()===code.toLowerCase()));
-    if(purExists){ res.purSkipped++; continue; }
+    if(purExists){
+      // (B2) Yeniden yayınlamada toplam değiştiyse: PLANNED kalem güncellenir;
+      // sipariş süreci başlamışsa (ORDERED/RECEIVED/...) dokunulmaz, uyarı verilir
+      if(Number(purExists.quantity) !== target){
+        if(purExists.status==='PLANNED'){
+          const ok = await dbUpdate('purchase_items', purExists.id, {quantity: target});
+          if(ok){ purExists.quantity = target; res.purUpdated++; }
+          else res.errors++;
+        } else {
+          res.purManual++;
+          console.warn('Satın alma adedi elle kontrol edilmeli (sipariş süreci başlamış):', code, purExists.quantity+' → '+target);
+        }
+      }
+      res.purSkipped++; continue;
+    }
     const d = await dbInsert('purchase_items',{
       project_name: pb.project_name, project_bom_part_id: p.id,
       name, code,
-      quantity: g.qty, unit: p.custom_unit||p.resolved_unit||'adet',
+      quantity: target, unit: p.custom_unit||p.resolved_unit||'adet',
       material: p.custom_material||p.resolved_material||null,
       created_by: currentUser?.display_name||currentUser?.username||null
     });
@@ -10705,6 +10720,8 @@ function pbomPublishMsg(r){
   if(r.linked) msg += `, 🔗 ${r.linked} hiyerarşi bağı kuruldu`;
   if(r.updated) msg += `, 🔢 ${r.updated} parçanın adedi güncellendi`;
   if(r.qtyBlocked) msg += `, ⚠️ ${r.qtyBlocked} parçada adet güncellenmedi (tamamlanan üretim yeni hedefin üstünde)`;
+  if(r.purUpdated) msg += `, 🛒 ${r.purUpdated} satın alma kaleminin adedi güncellendi`;
+  if(r.purManual) msg += `, ⚠️ ${r.purManual} kalemin siparişi verilmiş — adedi elle kontrol edin`;
   if(r.skipped || r.purSkipped) msg += `, ${r.skipped + r.purSkipped} zaten mevcuttu`;
   if(r.errors){ msg += `, ${r.errors} hata`; if(_lastApiError) msg += ` (${_lastApiError})`; }
   return msg;
