@@ -56,6 +56,19 @@ ikinci kişi fikir/test notu sağlar, geliştirme yapmaz.
   `FIELD_XLATE` (alan adı çevirileri + UUID↔isim join'leri).
   **Backend'de endpoint/alan değişirse bu adapter da güncellenmeli.**
 - Entity'lerdeki doc comment'ler DB şemasını belgeler — şema sorusu olursa önce oraya bak.
+- **XSS / innerHTML kaçırma (E1 turu):** Kullanıcı verisi taşıyan HER yeni
+  veya değişen innerHTML şablonunda `h\`\`` tagged-template kullan (index.html
+  ~2050'de tanımlı): `h\`<div>${x}</div>\`` interpolasyonları OTOMATİK
+  esc'ler. Ham HTML için `${raw(html)}`, iç içe listelerde `${arr.map(x=>h\`…\`)}`
+  (`.join('')` YOK — h array'i kendi birleştirir), `onclick="fn('${…}')"` gibi
+  JS-in-attribute bağlamında `${raw(ea(x))}` (h'in HTML-esc'i JS'i bozar; sabit/
+  UUID argümanlar güvenli). Elle `esc()` hâlâ geçerli ama yeni kodda `h\`\``
+  tercih edilir (esc-unutma riskini yapısal olarak kaldırır). Geçiş kısmî:
+  güvenlik-hassas ekranlar (QR tarama/mal kabul, personel/bölüm/tedarikçi)
+  dönüştü; kalan esc'li kod güvenli, fırsatçı dönüşür. Dönüştürülen render'lar
+  `node scripts/verify-h-render.js` ile XSS-regresyona karşı korunur (yeni
+  fonksiyon dönüştükçe oraya senaryo ekle); `esc`/`raw`/`h` mekanizması
+  e2e-test.js'te de birim-testli (ikisi index.html ile AYNI tutulmalı).
 
 ## Çalışma Düzeni
 
