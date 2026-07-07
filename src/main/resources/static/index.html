@@ -7769,8 +7769,16 @@ async function whXferConfirm(){
     source_type:'WAREHOUSE_TRANSFER', performed_by:by, notes:note});
 
   if(x.kind==='loose'){
-    await mv(x.src,'OUT',null,x.name,x.code,x.unit,qty);
-    await mv(target,'IN',null,x.name,x.code,x.unit,qty);
+    // (B6) hareket çifti kontrollü yazılır: OUT girip IN düşerse kaynak
+    // depodan stok sessizce eksilirdi — OUT silinerek telafi edilir
+    const out = await mv(x.src,'OUT',null,x.name,x.code,x.unit,qty);
+    if(!Array.isArray(out)||!out[0]){ toast('Aktarım kaydedilemedi! (çıkış hareketi yazılamadı)','error'); _whXfer=null; return; }
+    const inn = await mv(target,'IN',null,x.name,x.code,x.unit,qty);
+    if(!Array.isArray(inn)||!inn[0]){
+      await dbDelete('warehouse_movements', out[0].id);
+      toast('Aktarım kaydedilemedi! (giriş hareketi yazılamadı, çıkış geri alındı)','error');
+      _whXfer=null; return;
+    }
   } else {
     const i = purchaseItems.find(p=>p.id===x.id);
     if(!i){ _whXfer=null; return; }
@@ -7795,8 +7803,9 @@ async function whXferConfirm(){
         currency:i.currency||'TRY', status:'IN_WAREHOUSE',
         notes:note, created_by:by});
       if(!Array.isArray(d)||!d[0]){
-        await dbUpdate('purchase_items', x.id, {quantity: x.maxQ});
-        i.quantity = x.maxQ;
+        // (B6) rollback: adetle birlikte bölünmüş kabul sayacı da geri yüklenir
+        await dbUpdate('purchase_items', x.id, {quantity: x.maxQ, received_qty: x.maxQ});
+        i.quantity = x.maxQ; i.received_qty = x.maxQ;
         toast('Aktarım başarısız!','error'); _whXfer=null; return;
       }
       const ni = d[0];
@@ -7804,7 +7813,15 @@ async function whXferConfirm(){
       // (B4) received_at orijinalden kopyalanır: mal kabulden gelen kalemin
       // bölünmüş parçası da whUndo'da RECEIVED'a dönebilsin (stok kökenli
       // kalemde damga yok → null gönderilir, backend yok sayar → IN_STOCK).
-      await dbUpdate('purchase_items', ni.id, {warehouse_id: target, received_by: i.received_by||null, received_qty: qty, received_at: i.received_at||null});
+      const wok = await dbUpdate('purchase_items', ni.id, {warehouse_id: target, received_by: i.received_by||null, received_qty: qty, received_at: i.received_at||null});
+      if(!wok){
+        // (B6) yeni kalem depoya bağlanamadı — bölme tamamen geri alınır
+        await dbDelete('purchase_items', ni.id);
+        await dbUpdate('purchase_items', x.id, {quantity: x.maxQ, received_qty: x.maxQ});
+        i.quantity = x.maxQ; i.received_qty = x.maxQ;
+        toast('Aktarım başarısız! (yeni kalem depoya bağlanamadı, bölme geri alındı)','error');
+        _whXfer=null; return;
+      }
       ni.warehouse_id = target; ni.status='IN_WAREHOUSE';
       ni.received_by = i.received_by||null; ni.received_qty = qty; ni.received_at = i.received_at||null;
       purchaseItems.push(ni);
