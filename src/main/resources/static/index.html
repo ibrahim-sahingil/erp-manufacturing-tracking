@@ -4285,34 +4285,118 @@ function woOnDeptChange() {
   document.getElementById('wo-step3').style.display = 'none';
 }
 
-function woLoadParts() {
+// (4. tur #4, görsel 102) Parça seçimi düz kart grid yerine ÜRÜN AĞACI olarak
+// gösterilir (parts.parent_part_id hiyerarşisi, #8'de yayınla kuruyor).
+// Bölüm filtresi eşleşmeyen parçaları soluk/seçilemez yapar (bağlam korunur).
+// Her düğümde malzeme durumu; satın almaya yönlenen BOM kalemleri (TEDARIK/
+// HAMMADDE/SARF) en yakın üretim atasının altında bilgi satırı olarak görünür.
+async function woLoadParts() {
   const proj = document.getElementById('wo-project').value;
   const deptId = document.getElementById('wo-dept').value;
   if (!proj) { toast('Proje seçin!', 'error'); return; }
 
-  // Filtrele
-  let filtered = parts.filter(p => (p.project||'(Proje Yok)') === proj);
-  if (deptId) filtered = filtered.filter(p => p.department_id === deptId);
+  // Malzeme/BOM bilgisi için taze veri (ağaçta durum çipleri doğru olsun)
+  const [pi] = await Promise.all([
+    dbGet('purchase_items','order=created_at.asc'),
+    loadProjectBoms()
+  ]);
+  if(Array.isArray(pi)) purchaseItems = pi;
+
+  const bucket = parts.filter(p => (p.project||'(Proje Yok)') === proj);
+  const selectable = p => !deptId || p.department_id === deptId;
+  const selCount = bucket.filter(selectable).length;
 
   const sub = document.getElementById('wo-step2-sub');
-  if (sub) sub.textContent = proj + (deptId ? ' › ' + (depts.find(d=>d.id===deptId)?.name||'') : '') + ' — ' + filtered.length + ' parça';
+  if (sub) sub.textContent = proj + (deptId ? ' › ' + (depts.find(d=>d.id===deptId)?.name||'') : '') + ' — ' + selCount + ' seçilebilir parça';
 
   const grid = document.getElementById('wo-parts-grid');
-  if (!filtered.length) {
-    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><span class="emoji">📦</span>Bu filtre için parça bulunamadı</div>`;
+  if (!bucket.length) {
+    grid.style.display = '';
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><span class="emoji">📦</span>Bu projede parça bulunamadı</div>`;
   } else {
-    grid.innerHTML = filtered.map(p => `
-      <div class="wo-part-item" id="wopi-${p.id}" onclick="woTogglePart('${p.id}','${ea(p.name)}','${ea(p.code)}')">
+    grid.style.display = 'block'; // grid yerine ağaç (girintili liste)
+
+    // Satın alma kalemlerini ağaca yerleştir: pbp hiyerarşisinden en yakın
+    // ÜRETİM atası (kodu parts'ta olan) bulunur; bulunamazsa alt bölümde listelenir
+    const codeKey = c => (c||'').trim().toLowerCase();
+    const partByCode = {};
+    bucket.forEach(p=>{ const k=codeKey(p.code); if(k && !partByCode[k]) partByCode[k]=p; });
+    const pbomIds = new Set(projectBoms.filter(b=>b.project_name===proj).map(b=>b.id));
+    const pbpById = {};
+    projectBomParts.forEach(p=>{ if(pbomIds.has(p.project_bom_id)) pbpById[p.id]=p; });
+    const projPur = purchaseItems.filter(i=>(i.project_name||'')===proj && i.status!=='CANCELLED');
+    const purByPart = {};   // part.id → [purchase_item]
+    const purLoose = [];    // ataya bağlanamayanlar
+    projPur.forEach(i=>{
+      if(partByCode[codeKey(i.code)]) return; // üretim parçasının kendi malzemesi — çip olarak gösterilir
+      let anc = i.project_bom_part_id ? pbpById[i.project_bom_part_id] : null;
+      let host = null, guard = 0;
+      while(anc && guard++ < 100){
+        anc = anc.parent_custom_id ? pbpById[anc.parent_custom_id] : null;
+        if(anc){ host = partByCode[codeKey(anc.custom_code||anc.resolved_code)]; if(host) break; }
+      }
+      if(host) (purByPart[host.id]=purByPart[host.id]||[]).push(i);
+      else purLoose.push(i);
+    });
+
+    const purRow = (i, depth) => {
+      const m = PUR_STATUS[i.status] || PUR_STATUS.PLANNED;
+      return `<div style="margin:2px 0 2px ${depth*22+30}px;padding:4px 10px;border-left:2px dashed ${m.color}66;font-family:var(--font-mono);font-size:10px;color:var(--muted)">
+        🛒 ${i.code?`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
+        · ${Number(i.quantity||1)} ${i.unit||'adet'}
+        <span style="color:${m.color}">${m.icon} ${m.label}</span>${i.status==='IN_WAREHOUSE'&&whName(i.warehouse_id)?` · 🗄️ ${whName(i.warehouse_id)}`:''}
+      </div>`;
+    };
+
+    const ids = new Set(bucket.map(p=>p.id));
+    const roots = bucket.filter(p=>!p.parent_part_id || !ids.has(p.parent_part_id));
+    const kidsOf = id => bucket.filter(p=>p.parent_part_id===id);
+    const nodeRow = (p, depth) => {
+      const ok = selectable(p);
+      const dept = p.department_id ? depts.find(d=>d.id===p.department_id) : null;
+      const row = `<div class="wo-part-item" id="wopi-${p.id}"
+          ${ok?`onclick="woTogglePart('${p.id}','${ea(p.name)}','${ea(p.code)}')"`:''}
+          style="margin:3px 0 3px ${depth*22}px;padding:8px 12px;display:flex;gap:10px;align-items:center;${ok?'':'opacity:.45;cursor:default'}">
         <span class="wo-part-check">✓</span>
-        <div class="wo-part-item-name">${p.name}</div>
-        <div class="wo-part-item-code">${p.code}${p.drawing?' · '+p.drawing:''}</div>
-        <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:4px">${p.material||''} ${p.qty?'· '+p.qty+' adet':''}</div>
-      </div>`).join('');
+        ${depth>0?`<span style="color:var(--muted);font-size:10px">└─</span>`:''}
+        <div style="min-width:0;flex:1">
+          <div class="wo-part-item-name" style="display:inline">${p.name}</div>
+          <span class="wo-part-item-code" style="margin-left:8px">${p.code}${p.drawing?' · '+p.drawing:''}</span>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">
+            ${p.material||''} ${p.qty?'· '+p.qty+' adet':''}
+            ${dept?`· 🏭 ${dept.name}`:''}
+            ${woMatChip(p)}
+          </div>
+        </div>
+      </div>`;
+      return row
+        + (purByPart[p.id]||[]).map(i=>purRow(i, depth+1)).join('')
+        + kidsOf(p.id).map(k=>nodeRow(k, depth+1)).join('');
+    };
+    let html = roots.map(p=>nodeRow(p,0)).join('');
+    if(purLoose.length){
+      html += `<div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:14px 0 4px">🛒 Satın alma malzemeleri (ağaç dışı) · ${purLoose.length}</div>`
+        + purLoose.map(i=>purRow(i,0)).join('');
+    }
+    grid.innerHTML = html;
   }
   _woSelectedParts.clear();
   document.getElementById('wo-selected-count').textContent = '';
   document.getElementById('wo-step2').style.display = 'block';
   document.getElementById('wo-step3').style.display = 'none';
+}
+
+// Üretim parçasının kendi malzemesinin satın alma durumu (proje + kod eşleşmesi)
+function woMatChip(p){
+  const code = (p.code||'').trim().toLowerCase();
+  if(!code) return '';
+  const rank = {IN_WAREHOUSE:5, IN_STOCK:4, RECEIVED:3, ORDERED:2, PLANNED:1};
+  const items = purchaseItems.filter(i=>(i.project_name||'')===(p.project||'')
+    && (i.code||'').trim().toLowerCase()===code && rank[i.status]);
+  if(!items.length) return '';
+  const best = items.reduce((a,b)=>(rank[b.status]||0)>(rank[a.status]||0)?b:a);
+  const m = PUR_STATUS[best.status];
+  return `<span style="font-family:var(--font-mono);font-size:9px;padding:1px 7px;border-radius:9px;border:1px solid ${m.color}44;color:${m.color};background:${m.color}11;margin-left:6px">🛒 ${m.icon} ${m.label}</span>`;
 }
 
 function woTogglePart(id, name, code) {
