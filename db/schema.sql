@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cqEFVA550ANwM7VjqXpor4OOrNnWFf45PdDTbkH7Vwk21Zi8XtlpUDMVz3mhhQP
+\restrict 2Xdtkn31UJ3Wo4sRLUJBcKTQKTy3vQEmoTcdaLPNmRXKy1Ny39BwmWXBMFrRKUL
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -219,6 +219,7 @@ CREATE TABLE public.parts (
     qty_done integer DEFAULT 0 NOT NULL,
     qty_pending integer DEFAULT 0 NOT NULL,
     qty_reject integer DEFAULT 0 NOT NULL,
+    parent_part_id uuid,
     CONSTRAINT parts_qty_done_nonneg CHECK ((qty_done >= 0)),
     CONSTRAINT parts_qty_pending_nonneg CHECK ((qty_pending >= 0)),
     CONSTRAINT parts_qty_reject_nonneg CHECK ((qty_reject >= 0))
@@ -1150,6 +1151,14 @@ ALTER TABLE ONLY public.parts
 
 
 --
+-- Name: parts parts_parent_part_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.parts
+    ADD CONSTRAINT parts_parent_part_fk FOREIGN KEY (parent_part_id) REFERENCES public.parts(id) ON DELETE SET NULL;
+
+
+--
 -- Name: project_bom project_bom_bom_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1385,5 +1394,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cqEFVA550ANwM7VjqXpor4OOrNnWFf45PdDTbkH7Vwk21Zi8XtlpUDMVz3mhhQP
+\unrestrict 2Xdtkn31UJ3Wo4sRLUJBcKTQKTy3vQEmoTcdaLPNmRXKy1Ny39BwmWXBMFrRKUL
 

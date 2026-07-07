@@ -31,6 +31,9 @@ import java.util.UUID;
  *   qty_done      int4          DEFAULT 0  (uretildi)
  *   qty_pending   int4          DEFAULT 0  (bekliyor)
  *   qty_reject    int4          DEFAULT 0  (red)
+ *   parent_part_id uuid         NULL (FK -> parts self, ON DELETE SET NULL;
+ *                                #8 islem bagimliligi: ust parca, alt parcalar
+ *                                bitmeden is emrine BASLATILAMAZ)
  *   created_at    timestamp     (BaseEntity'den)
  */
 @Entity
@@ -82,4 +85,11 @@ public class Part extends BaseEntity {
     @Column(name = "qty_reject", nullable = false)
     @Builder.Default
     private Integer qtyReject = 0;
+
+    /**
+     * Ust parca (#8 islem bagimliligi). BOM yayinlamada pbp hiyerarsisinden
+     * kurulur; BomPart deseninde oldugu gibi @ManyToOne yerine duz UUID.
+     */
+    @Column(name = "parent_part_id")
+    private UUID parentPartId;
 }

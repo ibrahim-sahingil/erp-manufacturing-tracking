@@ -30,6 +30,7 @@ public class PartResponse {
     private Integer qtyDone;
     private Integer qtyPending;
     private Integer qtyReject;
+    private UUID parentPartId;
     private LocalDateTime createdAt;
 
     public static PartResponse fromEntity(Part p) {
@@ -47,6 +48,7 @@ public class PartResponse {
                 .qtyDone(p.getQtyDone())
                 .qtyPending(p.getQtyPending())
                 .qtyReject(p.getQtyReject())
+                .parentPartId(p.getParentPartId())
                 .createdAt(p.getCreatedAt())
                 .build();
     }

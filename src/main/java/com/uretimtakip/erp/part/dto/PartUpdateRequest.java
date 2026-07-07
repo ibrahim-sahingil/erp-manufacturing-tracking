@@ -41,6 +41,18 @@ public class PartUpdateRequest {
 
     private UUID departmentId;
 
+    /** Ust parca bagi (#8): explicit null = bagi kaldir (presence takipli). */
+    @Setter(lombok.AccessLevel.NONE)
+    private UUID parentPartId;
+
+    @Setter(lombok.AccessLevel.NONE)
+    private boolean parentPartIdPresent;
+
+    public void setParentPartId(UUID parentPartId) {
+        this.parentPartId = parentPartId;
+        this.parentPartIdPresent = true;
+    }
+
     @PositiveOrZero(message = "Toplam adet negatif olamaz")
     private Integer totalQty;
 

@@ -75,6 +75,7 @@ public class PartService {
                 .material(request.getMaterial())
                 .orderId(request.getOrderId())
                 .departmentId(request.getDepartmentId())
+                .parentPartId(validateParent(request.getParentPartId(), null))
                 .totalQty(request.getTotalQty() != null ? request.getTotalQty() : 1)
                 .status(request.getStatus() != null ? request.getStatus() : "PENDING")
                 .description(request.getDescription())
@@ -114,6 +115,10 @@ public class PartService {
         if (request.getMaterial() != null) part.setMaterial(request.getMaterial());
         if (request.getOrderId() != null) part.setOrderId(request.getOrderId());
         if (request.getDepartmentId() != null) part.setDepartmentId(request.getDepartmentId());
+        // Ust parca bagi (#8): explicit null = kaldir
+        if (request.isParentPartIdPresent()) {
+            part.setParentPartId(validateParent(request.getParentPartId(), part.getId()));
+        }
         if (request.getTotalQty() != null) part.setTotalQty(request.getTotalQty());
         if (request.getStatus() != null) part.setStatus(request.getStatus());
         if (request.getDescription() != null) part.setDescription(request.getDescription());
@@ -132,6 +137,25 @@ public class PartService {
         Part part = findEntityById(id);
         partRepository.delete(part);
         log.info("Part deleted: id={}, code={}", id, part.getCode());
+    }
+
+    /**
+     * Ust parca dogrulamasi (#8): mevcut olmali ve parca kendisine
+     * baglanamamali. Gecerliyse ayni degeri dondurur.
+     */
+    private UUID validateParent(UUID parentId, UUID selfId) {
+        if (parentId == null) return null;
+        if (parentId.equals(selfId)) {
+            throw new BusinessException(
+                    "Parca kendisine ust parca olarak baglanamaz.",
+                    "PART_PARENT_SELF");
+        }
+        if (!partRepository.existsById(parentId)) {
+            throw new BusinessException(
+                    "Ust parca bulunamadi.",
+                    "PART_PARENT_NOT_FOUND");
+        }
+        return parentId;
     }
 
     /**

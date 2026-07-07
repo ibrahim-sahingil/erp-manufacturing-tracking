@@ -2207,6 +2207,25 @@ function woBadgeCounts(list){
 
 // Bölüm detayındaki İş Emirleri şeridi (akış adım 6: planlanan işler
 // bölümün dashboard'ına düşer, oradan kontrol edilir/ilerletilir)
+// (#8 arkadaş isteği) İşlem bağımlılığı: parts.parent_part_id hiyerarşisi.
+// Üst parçanın iş emri, bitmemiş alt parçaları varken BAŞLATILAMAZ.
+function partWaitingChildren(partId){
+  return parts.filter(x=>x.parent_part_id===partId && x.status!=='done');
+}
+function woWaitingChildren(woId){
+  const out = [];
+  workOrderParts.filter(wp=>wp.work_order_id===woId).forEach(wp=>{
+    const pd = parts.find(x=>x.id===wp.part_id);
+    if(!pd) return;
+    partWaitingChildren(pd.id).forEach(c=>out.push({parent:pd, child:c}));
+  });
+  return out;
+}
+function woStartBlockMsg(waiting){
+  const list = [...new Set(waiting.map(w=>`${w.child.code||w.child.name} (${w.parent.code||w.parent.name} için)`))];
+  return `⛔ Başlatılamaz — önce alt parçalar bitmeli: ${list.slice(0,4).join(', ')}${list.length>4?` +${list.length-4}`:''}`;
+}
+
 function deptWoStripHTML(deptId){
   const deptWos = workOrders
     .filter(w => w.project_name===_activeProject &&
@@ -2237,6 +2256,10 @@ function deptWoStripHTML(deptId){
       w.workspace_name ? '📍 '+w.workspace_name : '',
       w.notes ? '🗒 '+w.notes : ''
     ].filter(Boolean).join(' · ');
+    // (#8) Planlı iş emrinde bitmemiş alt parça uyarısı
+    const woWaiting = w.status==='planned' ? woWaitingChildren(w.id) : [];
+    const waitingNote = woWaiting.length
+      ? `<div style="font-family:var(--font-mono);font-size:10px;color:var(--red,#e74c3c);margin-top:4px">${woStartBlockMsg(woWaiting).replace('⛔ Başlatılamaz — önce','⏳ Başlatmadan önce')}</div>` : '';
     const btns = (ACTIONS[w.status]||[]).map(([s,txt])=>
       `<button class="btn btn-ghost btn-sm" onclick="dashWoSetStatus('${w.id}','${s}')">${txt}</button>`).join('');
 
@@ -2293,6 +2316,7 @@ function deptWoStripHTML(deptId){
             ${partNames?`<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${partNames}</span>`:''}
           </div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">${meta}</div>
+          ${waitingNote}
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           ${wops.length?`<button class="btn btn-ghost btn-sm" id="dwob-${w.id}" onclick="dashWoToggleParts('${w.id}')">🔧 Parçalar (${wops.length}) ${isOpen?'▴':'▾'}</button>`:''}
@@ -2321,6 +2345,11 @@ function dashWoToggleParts(woId){
 }
 
 async function dashWoSetStatus(id, status){
+  // (#8) Üst parçanın iş emri, alt parçalar bitmeden başlatılamaz
+  if(status==='inprogress'){
+    const waiting = woWaitingChildren(id);
+    if(waiting.length){ toast(woStartBlockMsg(waiting),'error'); return; }
+  }
   const ok = await dbUpdate('work_orders', id, {status});
   if(!ok){ toast('Durum güncellenemedi!','error'); return; }
   const w = workOrders.find(x=>x.id===id);
@@ -2708,6 +2737,11 @@ function partRowHTML(p, i, showDelete){
       <div class="part-name">${p.name}</div>
       <div class="part-code">${p.code}${p.drawing?' · '+p.drawing:''}</div>
       <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:3px">📅 ${createdAt}</div>
+      ${(()=>{ // (#8) bitmemiş alt parçalar
+        if(p.status==='done') return '';
+        const wc = partWaitingChildren(p.id);
+        return wc.length ? `<div style="font-family:var(--font-mono);font-size:10px;color:var(--yellow,#f5a623);margin-top:3px">⏳ Alt parçaları bekleniyor: ${wc.slice(0,3).map(c=>c.code||c.name).join(', ')}${wc.length>3?` +${wc.length-3}`:''}</div>` : '';
+      })()}
     </div>
     <div class="col-hide" style="font-family:var(--font-mono);font-size:11px">
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
@@ -4596,6 +4630,12 @@ async function submitWoRevise(id, oldStatus, oldUser, oldWorkspace, oldDt) {
   const newDt     = document.getElementById('wor-start-dt').value;
   const revisedBy = document.getElementById('wor-by').value;
 
+  // (#8) Revizeyle de olsa alt parçalar bitmeden başlatılamaz
+  if(newStatus==='inprogress' && oldStatus!=='inprogress'){
+    const waiting = woWaitingChildren(id);
+    if(waiting.length){ toast(woStartBlockMsg(waiting),'error'); return; }
+  }
+
   const wsId   = wsVal.split('|')[0];
   const wsName = wsVal.split('|')[1]||'';
 
@@ -4686,8 +4726,12 @@ function printWorkOrders() {
             const done = pd ? (pd.qty_done||0) : 0;
             const total = pd ? (pd.qty||p.qty||0) : (p.qty||0);
             const qrImg = pd ? qrDataUrl(getScanURL(pd.id), 90) : '';
+            // (#8) İş emri çıktısında alt parçalar listelenir
+            const kids = pd ? parts.filter(x=>x.parent_part_id===pd.id) : [];
+            const kidsLine = kids.length
+              ? `<div style="font-size:9px;color:#666;margin-top:3px">└ Alt parçalar: ${kids.map(k=>`${k.code||k.name} ${k.status==='done'?'✓':'⏳'}`).join(', ')}</div>` : '';
             return `<tr>
-              <td>${pd?.name || '(silinmiş parça)'}</td>
+              <td>${pd?.name || '(silinmiş parça)'}${kidsLine}</td>
               <td>${pd?.code || '—'}</td>
               <td style="text-align:center">${p.qty}</td>
               <td>${statusTrP} (${done}/${total})</td>
@@ -9997,8 +10041,11 @@ function pbomeShowTree() {
 async function pbomPublishParts(pb, allPbParts){
   const freshPur = await dbGet('purchase_items');
   if(Array.isArray(freshPur)) purchaseItems = freshPur;
-  const res = { added:0, skipped:0, purAdded:0, purSkipped:0, errors:0 };
+  const res = { added:0, skipped:0, purAdded:0, purSkipped:0, errors:0, linked:0 };
   _lastApiError = null;
+  const partIdByPbp = {}; // (#8) pbp.id → parts.id (üretime gidenler)
+  const pbpById = {};
+  allPbParts.forEach(p=>{ pbpById[p.id] = p; });
   for(const p of allPbParts){
     if(p.is_excluded || !p.custom_name || !p.custom_code) continue;
     const kind = p.material_kind || p.resolved_material_kind || null;
@@ -10018,7 +10065,7 @@ async function pbomPublishParts(pb, allPbParts){
       continue;
     }
     const exists = parts.find(x=>x.project===pb.project_name && (x.code||'').toLowerCase()===p.custom_code.toLowerCase());
-    if(exists){ res.skipped++; continue; }
+    if(exists){ partIdByPbp[p.id] = exists.id; res.skipped++; continue; }
     const ops = Array.isArray(p.operations)?p.operations:(typeof p.operations==='string'?JSON.parse(p.operations||'[]'):[]);
     const newPart = await dbInsert('parts',{
       id:genId(), name:p.custom_name, code:p.custom_code,
@@ -10027,14 +10074,37 @@ async function pbomPublishParts(pb, allPbParts){
       status:'pending', material:p.custom_material||null,
       notes: ops.length ? ops.map(o=>o.name).join(', ') : null
     });
-    if(Array.isArray(newPart)&&newPart[0]){ parts.push(newPart[0]); res.added++; }
+    if(Array.isArray(newPart)&&newPart[0]){ parts.push(newPart[0]); partIdByPbp[p.id] = newPart[0].id; res.added++; }
     else { res.errors++; console.error('Eklenemedi:', p.custom_code); }
+  }
+
+  // (#8) İKİNCİ GEÇİŞ — hiyerarşi bağlama: her üretim parçası, pbp ağacında
+  // en yakın ÜRETİME GİDEN atasına bağlanır (satın almaya yönlenen ya da
+  // hariç tutulan atalar atlanır; parts'a hiyerarşi böylece taşınır).
+  for(const p of allPbParts){
+    const childPartId = partIdByPbp[p.id];
+    if(!childPartId) continue;
+    let anc = p.parent_custom_id ? pbpById[p.parent_custom_id] : null;
+    let parentPartId = null;
+    while(anc){
+      if(partIdByPbp[anc.id] && partIdByPbp[anc.id]!==childPartId){ parentPartId = partIdByPbp[anc.id]; break; }
+      anc = anc.parent_custom_id ? pbpById[anc.parent_custom_id] : null;
+    }
+    const partObj = parts.find(x=>x.id===childPartId);
+    if(((partObj?partObj.parent_part_id:null)||null) !== parentPartId){
+      const ok = await dbUpdate('parts', childPartId, {parent_part_id: parentPartId});
+      if(ok){
+        if(partObj) partObj.parent_part_id = parentPartId;
+        if(parentPartId) res.linked++;
+      }
+    }
   }
   return res;
 }
 function pbomPublishMsg(r){
   let msg = `✅ Yayınlandı! ${r.added} parça üretime çıkarıldı`;
   if(r.purAdded) msg += `, 🛒 ${r.purAdded} kalem satın almaya aktarıldı`;
+  if(r.linked) msg += `, 🔗 ${r.linked} hiyerarşi bağı kuruldu`;
   if(r.skipped || r.purSkipped) msg += `, ${r.skipped + r.purSkipped} zaten mevcuttu`;
   if(r.errors){ msg += `, ${r.errors} hata`; if(_lastApiError) msg += ` (${_lastApiError})`; }
   return msg;

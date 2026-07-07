@@ -2,8 +2,10 @@
 
 ## DURUM (2026-07-07 gecesi güncellendi)
 - ✅ PAKET A (4a02c35, 1c98b21, e60e7f0) · B (#2 83132b1, #12 b3f2671) · C (aacaedb)
-  · D (4174579) · E (08f5816) · F (876a582) · G (3adc811) — hepsi master'da, push'landı.
-- ⏳ PAKET H: plan gereği ayrı tura bırakıldı (uygulanmadı).
+  · D (4174579) · E (08f5816) · F (876a582) · G (3adc811) · H — hepsi master'da, push'landı.
+- H notu: hiyerarşi bağları YAYINLA sırasında kurulur; eski yayınlanmış
+  projelerde bağlar için ilgili ağaç bir kez "🔄 Yeniden Yayınla" yapılmalı.
+  Kural ENGEL olarak uygulandı (uyarı+devam değil).
 - ⏳ E'nin "depodaki ürünü projeye aktar" maddesi uygulanmadı — kullanıcıyla
   netleşecek (movements'a project_name snapshot kolonu gerekebilir).
 - ⏳ #11 canlıda doğrulanacak (büyük olasılıkla eski sayfa — Ctrl+F5).

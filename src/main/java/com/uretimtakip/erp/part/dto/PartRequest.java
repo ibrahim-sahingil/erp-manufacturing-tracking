@@ -48,6 +48,9 @@ public class PartRequest {
 
     private UUID departmentId;
 
+    /** Ust parca (#8 islem bagimliligi) — BOM yayinlamada set edilir. */
+    private UUID parentPartId;
+
     @PositiveOrZero(message = "Toplam adet negatif olamaz")
     private Integer totalQty;
 
