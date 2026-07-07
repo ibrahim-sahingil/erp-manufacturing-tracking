@@ -37,6 +37,7 @@ function grab(name){
 (0,eval)(grab('woWaitingChildren'));
 (0,eval)(grab('woStartBlockMsg'));
 (0,eval)(grab('rcvDoReceive'));   // 4. tur: kısmi mal kabul çekirdeği
+(0,eval)(grab('_whItemStock'));   // O6: depo net stok hesabı (sevk uyarısının çekirdeği)
 
 // ── Shims (frontend adapter'ın minimal karşılığı) ──
 globalThis.currentUser = {display_name:'E2E Test'};
@@ -352,6 +353,19 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     check('kaynak plana bağlandı', await dbUpdate('purchase_items', piSac.id, {stock_plan_id:plan.id, needs_planning:false}));
     const sacFresh = (await dbGet('purchase_items')).find(i=>i.id===piSac.id);
     check('bağ + havuzdan düştü', sacFresh.stock_plan_id===plan.id && !sacFresh.needs_planning);
+
+    console.log('═══ O6: DEPO NET STOK HESABI (_whItemStock) ═══');
+    // dnShip eksi-stok uyarısı bu hesaba dayanır: SUM(IN)−SUM(OUT), kod önce
+    globalThis.whMovements = [
+      {warehouse_id:wh.id, item_code:'E2E-STK', item_name:'x', movement_type:'IN',  quantity:3},
+      {warehouse_id:wh.id, item_code:'E2E-STK', item_name:'x', movement_type:'OUT', quantity:1},
+      {warehouse_id:wh.id, item_code:'E2E-OTH', item_name:'y', movement_type:'IN',  quantity:5},
+      {warehouse_id:'baska-depo', item_code:'E2E-STK', item_name:'x', movement_type:'IN', quantity:9}
+    ];
+    check('net = IN−OUT, kod+depo eşleşmeli (3−1=2)', _whItemStock(wh.id,'x','E2E-STK')===2, _whItemStock(wh.id,'x','E2E-STK'));
+    check('eksiye düşen tespit: 2 stok < 10 sevk', (2 - 10) < 0);
+    check('farklı kod ayrı sayılır (5)', _whItemStock(wh.id,'y','E2E-OTH')===5);
+    globalThis.whMovements = [];
 
     console.log('═══ O4: SATIN ALMA KALEMİ SİLME GUARD\'I ═══');
     globalThis._lastApiError = null;

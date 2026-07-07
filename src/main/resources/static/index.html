@@ -8171,7 +8171,26 @@ async function dnShip(id){
   const items = deliveryItems.filter(i=>i.delivery_note_id===id);
   if(!items.length){ toast('Önce kalem ekleyin!','error'); return; }
   const whItems = items.filter(i=>i.warehouse_id);
-  if(!confirm(`İrsaliye sevk edilsin mi?\n${items.length} kalem${whItems.length?` (${whItems.length} tanesi depodan düşülecek)`:''}`)) return;
+  // (O6) Sevk depodan OUT yazar; manuel çıkıştaki gibi eksi stok uyarısı ver
+  // (engel değil — kullanıcı karar verir). whMovements irsaliye sekmesinde
+  // bayat olabileceğinden TAZE çekilir; aynı depoda aynı kod birden çok
+  // kalemdeyse düşüş kümülatif hesaplanır (running Map).
+  let shortMsg = '';
+  if(whItems.length){
+    const mv = await dbGet('warehouse_movements');
+    if(Array.isArray(mv)) whMovements = mv;
+    const running = new Map();
+    const short = [];
+    for(const i of whItems){
+      const key = i.warehouse_id+'|'+((i.item_code||i.item_name||'').trim().toLowerCase());
+      let net = running.has(key) ? running.get(key) : _whItemStock(i.warehouse_id, i.item_name, i.item_code);
+      const q = Number(i.quantity)>0?Number(i.quantity):1;
+      net -= q; running.set(key, net);
+      if(net < -1e-9) short.push(`• ${i.item_code?i.item_code+' — ':''}${i.item_name} (${whName(i.warehouse_id)||'depo'}): sevk ${Number(q)}, kalan ${Number(net.toFixed(4))}`);
+    }
+    if(short.length) shortMsg = `\n\n⚠ Şu kalemler depoda eksi stoğa düşecek:\n${short.join('\n')}`;
+  }
+  if(!confirm(`İrsaliye sevk edilsin mi?\n${items.length} kalem${whItems.length?` (${whItems.length} tanesi depodan düşülecek)`:''}${shortMsg}`)) return;
   const ok = await dbUpdate('delivery_notes', id, {status:'SHIPPED'});
   if(!ok) return;
   // Depo bağlı kalemler için OUT hareketi (geri almada delivery_note_id ile silinir)
