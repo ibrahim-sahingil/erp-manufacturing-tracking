@@ -1,5 +1,16 @@
 # Arkadaş İstekleri 3. Tur — Uygulama Planı (2026-07-07)
 
+## DURUM (2026-07-07 gecesi güncellendi)
+- ✅ PAKET A (4a02c35, 1c98b21, e60e7f0) · B (#2 83132b1, #12 b3f2671) · C (aacaedb)
+  · D (4174579) · E (08f5816) · F (876a582) · G (3adc811) — hepsi master'da, push'landı.
+- ⏳ PAKET H: plan gereği ayrı tura bırakıldı (uygulanmadı).
+- ⏳ E'nin "depodaki ürünü projeye aktar" maddesi uygulanmadı — kullanıcıyla
+  netleşecek (movements'a project_name snapshot kolonu gerekebilir).
+- ⏳ #11 canlıda doğrulanacak (büyük olasılıkla eski sayfa — Ctrl+F5).
+- Verilen kararlar: D→alt-sekme; F→türsüz (NULL) parçalar eski davranışla
+  parts'a; G→ölçü kataloğu (stock_sheets) + elle giriş İKİSİ birden; G onayda
+  plaka başına ayrı kalem yerine tür başına TEK kalem + adet.
+
 Kaynak: `Desktop/ERP test/3. test ve değişiklik adımı/` (1.txt + 4 görsel + plaka-mrp.html).
 Sıra, bağımlılık ve risk gözetilerek kuruldu. Her adım: derleme + Playwright E2E + ayrı commit/push.
 
