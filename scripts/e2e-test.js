@@ -44,6 +44,7 @@ globalThis._lastApiError = null;
 globalThis.parts = [];
 globalThis.purchaseItems = [];
 globalThis.workOrderParts = [];
+globalThis.projectBoms = []; // B1: pbomPublishParts kardeş pbom'ları buradan bulur
 let orderId = null, PROJ = 'E2E-TEST-'+Date.now().toString(36);
 
 async function api(method, path, body){
@@ -72,6 +73,9 @@ const EP = {parts:'parts', purchase_items:'purchase-items', project_bom:'project
 globalThis.dbGet = async (t,q)=>{
   let d = await api('GET','/'+EP[t]);
   if(!Array.isArray(d)) return [];
+  // B1: pbomPublishParts kardeş pbom'ları project_bom_id filtresiyle çeker
+  const byBom = /project_bom_id=eq\.([^&]+)/.exec(q||'');
+  if(byBom) d = d.filter(r=>r.project_bom_id===byBom[1]);
   if(t==='parts') d = d.map(partFromApi);
   return d;
 };
@@ -179,6 +183,50 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const brkFresh = parts.find(p=>p.project===PROJ && p.code==='E2E-BRK');
     check('adet güncellendi (updated=1, BRK qty 3)', r3.updated===1 && Number(brkFresh?.qty)===3,
       `updated=${r3.updated}, qty=${brkFresh?.qty}`);
+
+    console.log('═══ B1: ÇAPRAZ-PBOM ADET (aynı kod iki makinede) ═══');
+    // İkinci ürün ağacı aynı projeye bağlanır; E2E-BRK kodunu 5 adetle içerir.
+    // parts.qty proje-geneli toplam olmalı: 3 (pbm) + 5 (pbm2) = 8; republish
+    // ping-pong yapmamalı (eski hata: her yayın kendi toplamını yazıyordu).
+    const prod2 = await api('POST','/bom-products',{name:'E2E Ürün', code:'E2E-PRD2-'+Date.now().toString(36)});
+    const gvd2 = await api('POST','/bom-parts',{product_id:prod2.id, parent_id:null,
+      name:'E2E Gövde 2', code:'E2E-GVD2', quantity:1, material_kind:'MAMUL'});
+    const brkX = await api('POST','/bom-parts',{product_id:prod2.id, parent_id:gvd2.id,
+      name:'E2E Braket', code:'E2E-BRK', quantity:5});
+    check('ikinci ürün ağacı kuruldu', prod2&&gvd2&&brkX, _lastApiError||'');
+    const pbm2 = await api('POST','/project-bom',{project_name:PROJ, bom_product_id:prod2.id, status:'draft', created_by:'E2E'});
+    const pbps2 = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm2.id);
+    const tpl2 = (await dbGet('bom_parts')).filter(b=>b.product_id===prod2.id);
+    globalThis.projectBoms = [
+      {id:pbm.id,  project_name:PROJ, status:'published'},
+      {id:pbm2.id, project_name:PROJ, status:'published'}];
+    const r4 = await pbomPublishParts({id:pbm2.id, project_name:PROJ}, pbps2, tpl2);
+    globalThis.parts = await dbGet('parts');
+    let brkTotal = parts.find(p=>p.project===PROJ && p.code==='E2E-BRK');
+    check('BRK adedi iki pbom toplamı (3+5=8)', r4.updated===1 && Number(brkTotal?.qty)===8,
+      `updated=${r4.updated}, qty=${brkTotal?.qty}`);
+    const r5 = await pbomPublishParts({id:pbm.id, project_name:PROJ}, pbpsFresh, tpl);
+    globalThis.parts = await dbGet('parts');
+    brkTotal = parts.find(p=>p.project===PROJ && p.code==='E2E-BRK');
+    check('ilk pbom republish ping-pong yapmadı (qty 8 kaldı)',
+      r5.updated===0 && Number(brkTotal?.qty)===8, `updated=${r5.updated}, qty=${brkTotal?.qty}`);
+    // Tamamlanan üretim yeni hedefi aşıyorsa adet EZİLMEZ:
+    // pbm2'deki BRK 5→4 (hedef 3+4=7) ama qty_done=99 → güncelleme bloklanır
+    const pbpBrkX = pbps2.find(p=>codeOf(p)==='E2E-BRK');
+    await dbUpdate('project_bom_parts', pbpBrkX.id, {custom_qty:4});
+    await dbUpdate('parts', brkTotal.id, {status:'done', qty_done:99});
+    globalThis.parts = await dbGet('parts');
+    const pbps2b = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm2.id);
+    const r5b = await pbomPublishParts({id:pbm2.id, project_name:PROJ}, pbps2b, tpl2);
+    globalThis.parts = await dbGet('parts');
+    brkTotal = parts.find(p=>p.project===PROJ && p.code==='E2E-BRK');
+    check('qty_done > hedef iken adet EZİLMEDİ (qtyBlocked=1, qty 8 kaldı)',
+      r5b.qtyBlocked===1 && r5b.updated===0 && Number(brkTotal?.qty)===8,
+      JSON.stringify({updated:r5b.updated, blocked:r5b.qtyBlocked, qty:brkTotal?.qty}));
+    // geri al: pbm2 BRK adedi 5'e, üretim sayaçları sıfıra
+    await dbUpdate('project_bom_parts', pbpBrkX.id, {custom_qty:5});
+    await dbUpdate('parts', brkTotal.id, {status:'pending', qty_done:0});
+    globalThis.parts = await dbGet('parts');
 
     console.log('═══ H: İŞ EMRİ BAŞLATMA ENGELİ ═══');
     const wo = await api('POST','/work-orders',{order_id:orderId, status:'planned', notes:'E2E',
