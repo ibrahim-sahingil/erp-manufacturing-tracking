@@ -68,6 +68,21 @@ chk('scan: user option value kaçırıldı', scan.includes('<option value="Kişi
 chk('scan: kart/buton yapısı (raw) korundu', scan.includes('class="scan-card"') && scan.includes("submitScan('p1')"));
 chk('scan: log badge (raw) korundu', scan.includes('log-qty-badge log-qty-done') && scan.includes('✅ 2'));
 
+// ── renderReceive (QR mal kabul) ──
+global.PUR_STATUS={PLANNED:{icon:'📝',label:'Planlandı'}, IN_WAREHOUSE:{icon:'🏭',label:'Depoda'}, CANCELLED:{icon:'✖',label:'İptal'}};
+global.dbGet = async (t)=> t==='purchase_items'
+  ? [{id:'i1', name:'Kalem'+EVIL, project_name:'Prj<b>', code:'K&<D>', quantity:3, unit:'ad<i>', material:'Mat<script>', supplier:'Ted'+EVIL, status:'PLANNED'}]
+  : t==='warehouses' ? [{id:'w1', name:'Depo<b>', location:'Kat<i>', is_active:true}] : [];
+eval(grab('renderReceive'));
+await renderReceive('i1');
+const rcv=store['scan-content']||'';
+console.log('\nrenderReceive (QR mal kabul):');
+chk('receive: kalem adı onerror kaçırıldı', !rcv.includes('Kalem'+EVIL) && rcv.includes('Kalem&lt;img'));
+chk('receive: tedarikçi onerror kaçırıldı', rcv.includes('Ted&lt;img'));
+chk('receive: malzeme <script> kaçırıldı', rcv.includes('Mat&lt;script&gt;'));
+chk('receive: depo option adı kaçırıldı', rcv.includes('<option value="w1">Depo&lt;b&gt;'));
+chk('receive: yapı/buton (raw) korundu', rcv.includes('📦 QR Mal Kabul') && rcv.includes("receiveConfirm('i1')"));
+
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);
 }
