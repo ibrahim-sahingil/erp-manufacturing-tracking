@@ -2,6 +2,7 @@ package com.uretimtakip.erp.user;
 
 import com.uretimtakip.erp.common.exception.BusinessException;
 import com.uretimtakip.erp.common.exception.ResourceNotFoundException;
+import com.uretimtakip.erp.security.SecurityUtils;
 import com.uretimtakip.erp.user.dto.UserRequest;
 import com.uretimtakip.erp.user.dto.UserResponse;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +54,23 @@ public class UserService {
 
     @Transactional
     public UserResponse create(UserRequest request) {
+        // (K3) developer olmayan yalniz SADE personel karti ekleyebilir:
+        // hesap alanlari (username/sifre/permissions/is_active) veya
+        // developer rolu iceren istek hesap acma girisimidir.
+        if (!SecurityUtils.isDeveloper()) {
+            boolean accountFields =
+                    (request.getUsername() != null && !request.getUsername().isBlank())
+                    || resolveRawPassword(request) != null
+                    || (request.getPermissions() != null && !request.getPermissions().isEmpty())
+                    || request.getIsActive() != null;
+            if (accountFields || (request.getRole() != null
+                    && request.getRole().equalsIgnoreCase("developer"))) {
+                throw new BusinessException(
+                        "Hesap acma/yetki atama yalnizca gelistirici rolunun yetkisindedir.",
+                        "USER_ADMIN_ONLY");
+            }
+        }
+
         String fullName = resolveFullName(request);
         if (fullName == null || fullName.isBlank()) {
             throw new BusinessException("Ad (name/display_name) zorunlu", "USER_NAME_REQUIRED");
@@ -91,6 +109,28 @@ public class UserService {
     @Transactional
     public UserResponse update(UUID id, UserRequest request) {
         User user = findEntityById(id);
+
+        // (K3) developer olmayan yalniz KENDI sifresini degistirebilir —
+        // rol/permission/username/is_active degisikligi (kendi kaydinda bile)
+        // yetki yukseltme kapisidir, reddedilir.
+        if (!SecurityUtils.isDeveloper()) {
+            boolean self = user.getUsername() != null
+                    && user.getUsername().equals(SecurityUtils.username());
+            boolean onlyPassword = resolveRawPassword(request) != null
+                    && resolveFullName(request) == null
+                    && resolveDepartment(request) == null
+                    && request.getRole() == null
+                    && request.getIsActive() == null
+                    && request.getPermissions() == null
+                    && request.getPinCode() == null
+                    && (request.getUsername() == null || request.getUsername().isBlank());
+            if (!self || !onlyPassword) {
+                throw new BusinessException(
+                        "Kullanici duzenleme yalnizca gelistirici rolunun yetkisindedir "
+                                + "(kendi sifreni degistirmek haric).",
+                        "USER_ADMIN_ONLY");
+            }
+        }
 
         String fullName = resolveFullName(request);
         if (fullName != null && !fullName.isBlank()) {
@@ -142,6 +182,17 @@ public class UserService {
     @Transactional
     public void delete(UUID id) {
         User user = findEntityById(id);
+
+        // (K3) developer olmayan yalniz giris HESABI OLMAYAN personel kartini
+        // silebilir (personel sekmesi akisi). Sifreli hesap silme = admin isi.
+        if (!SecurityUtils.isDeveloper()
+                && (user.getPasswordHash() != null
+                    || "developer".equalsIgnoreCase(user.getRole()))) {
+            throw new BusinessException(
+                    "Hesap silme yalnizca gelistirici rolunun yetkisindedir.",
+                    "USER_ADMIN_ONLY");
+        }
+
         userRepository.delete(user);
         log.info("User deleted: id={}, username={}", id, user.getUsername());
     }

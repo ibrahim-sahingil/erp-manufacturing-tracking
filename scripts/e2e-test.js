@@ -359,6 +359,41 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     check('geri adlandırmada da taşındı', piBack===piMoved, piBack);
     globalThis.purchaseItems = await dbGet('purchase_items');
 
+    console.log('═══ K3: BACKEND ROL DENETİMİ ═══');
+    // Kısıtlı (developer olmayan, orders yetkisi olmayan) kullanıcıyla dene
+    const limited = await api('POST','/users',{username:'e2e.kisitli.'+Date.now().toString(36),
+      password:'e2etest123', name:'E2E Kısıtlı', role:'user', permissions:['dashboard']});
+    check('kısıtlı kullanıcı oluştu (dev token)', !!limited, _lastApiError||'');
+    const lr = await fetch(BASE+'auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:limited.username, password:'e2etest123'})}).then(r=>r.json()).catch(()=>null);
+    const LTOK = lr && lr.data && (lr.data.token||lr.data.access_token);
+    check('kısıtlı kullanıcı login oldu', !!LTOK);
+    const lapi = async (method,path,body)=>{
+      const r = await fetch(BASE+path.replace(/^\//,''), {method,
+        headers:{Authorization:'Bearer '+LTOK,'Content-Type':'application/json'},
+        body: body?JSON.stringify(body):undefined});
+      let j=null; try{ j=await r.json(); }catch(e){}
+      return {status:r.status, ok:!!j && j.success!==false, msg:j&&j.message};
+    };
+    const d1 = await lapi('DELETE','/orders/'+orderId);
+    check('kısıtlı: proje silme REDDEDİLDİ', d1.status===403 || !d1.ok, 'HTTP '+d1.status);
+    const d2 = await lapi('PUT','/orders/'+orderId, {project_name:PROJ+'-HACK', customer_name:'X'});
+    check('kısıtlı: proje düzenleme REDDEDİLDİ', d2.status===403 || !d2.ok, 'HTTP '+d2.status);
+    const d3 = await lapi('PUT','/users/'+limited.id, {role:'developer'});
+    check('kısıtlı: kendi rolünü yükseltme REDDEDİLDİ', !d3.ok, d3.msg||('HTTP '+d3.status));
+    const d4 = await lapi('POST','/users',{username:'e2e.hack', password:'x12345', role:'developer'});
+    check('kısıtlı: geliştirici hesabı açma REDDEDİLDİ', !d4.ok, d4.msg||('HTTP '+d4.status));
+    const d5 = await lapi('PUT','/users/'+limited.id, {password:'yeniSifre123'});
+    check('kısıtlı: KENDİ şifresini değiştirebildi', d5.ok, d5.msg||('HTTP '+d5.status));
+    const d6 = await lapi('POST','/users',{name:'E2E Personel Kartı', dept:'Kaynak', role:'Kaynakçı'});
+    check('kısıtlı: sade personel kartı ekleyebildi', d6.ok, d6.msg||('HTTP '+d6.status));
+    // temizlik (dev token): personel kartı + kısıtlı kullanıcı
+    // (EP tablosunda 'users' yok — doğrudan api ile silinir)
+    for(const u of (await api('GET','/users')||[]).filter(x=>x.full_name==='E2E Personel Kartı' || x.id===limited.id))
+      await api('DELETE','/users/'+u.id);
+    check('K3 test kullanıcıları silindi',
+      !(await api('GET','/users')||[]).some(x=>x.id===limited.id || x.full_name==='E2E Personel Kartı'));
+
     console.log('═══ K1: PROJE SİLME GUARD\'I ═══');
     // Bağlı kaydı (parça/iş emri/satın alma/BOM) olan proje silinememeli
     globalThis._lastApiError = null;

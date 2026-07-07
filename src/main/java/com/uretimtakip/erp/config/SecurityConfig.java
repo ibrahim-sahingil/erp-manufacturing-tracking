@@ -4,6 +4,7 @@ import com.uretimtakip.erp.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -59,6 +60,21 @@ public class SecurityConfig {
                         // Statik frontend (static/index.html) - login ekrani
                         // API cagrilari yine JWT ister
                         .requestMatchers("/", "/index.html", "/favicon.ico").permitAll()
+
+                        // (K3) Yikici uclar frontend'deki gorunurluk kurallariyla
+                        // AYNI sartla backend'de de denetlenir — JWT'si olan
+                        // herkes API'ye dogrudan istek atabilir (tunel acik).
+                        // Siparis/proje yazma: developer VEYA orders yetkisi
+                        // (frontend canEdit ile birebir; GET herkese acik kalir).
+                        .requestMatchers(HttpMethod.POST, "/api/orders/**")
+                            .hasAnyAuthority("ROLE_DEVELOPER", "orders_edit", "orders")
+                        .requestMatchers(HttpMethod.PUT, "/api/orders/**")
+                            .hasAnyAuthority("ROLE_DEVELOPER", "orders_edit", "orders")
+                        .requestMatchers(HttpMethod.DELETE, "/api/orders/**")
+                            .hasAnyAuthority("ROLE_DEVELOPER", "orders_edit", "orders")
+                        // Kullanici yazma uclari authenticated kalir; hesap/rol/
+                        // yetki degisiklikleri UserService'te alan bazli denetlenir
+                        // (personel karti ekleme + kendi sifreni degistirme serbest).
 
                         // Diger her endpoint icin authentication gerekli
                         .anyRequest().authenticated()
