@@ -229,6 +229,23 @@ public class PurchaseItemService {
     @Transactional
     public void delete(UUID id) {
         PurchaseItem item = findEntityById(id);
+
+        // (O4) Silme korkuluklari: depodaki kalem silinirse IN hareketi
+        // sahipsiz kalir ve stok ozeti "munferit stok" gibi sisip kalemle
+        // ayrisir; gruptaki kalem silinirse grup toplami sessizce degisir.
+        // NOT: warehouse_id kontrolu bilinclidir — bolme telafisi (B6) depoya
+        // BAGLANAMAMIS (warehouse_id null) IN_WAREHOUSE kaydini siler.
+        if ("IN_WAREHOUSE".equals(item.getStatus()) && item.getWarehouseId() != null) {
+            throw new BusinessException(
+                    "Depodaki kalem silinemez. Once 'Depodan Geri Al' ile cikarin.",
+                    "PURCHASE_ITEM_IN_WAREHOUSE");
+        }
+        if (item.getPurchaseOrderId() != null) {
+            throw new BusinessException(
+                    "Siparis grubuna bagli kalem silinemez. Once gruptan cikarin.",
+                    "PURCHASE_ITEM_IN_ORDER_GROUP");
+        }
+
         purchaseItemRepository.delete(item);
         log.info("PurchaseItem deleted: id={}, name={}", id, item.getName());
     }

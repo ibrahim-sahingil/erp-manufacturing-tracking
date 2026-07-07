@@ -353,6 +353,12 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const sacFresh = (await dbGet('purchase_items')).find(i=>i.id===piSac.id);
     check('bağ + havuzdan düştü', sacFresh.stock_plan_id===plan.id && !sacFresh.needs_planning);
 
+    console.log('═══ O4: SATIN ALMA KALEMİ SİLME GUARD\'I ═══');
+    globalThis._lastApiError = null;
+    await api('DELETE','/purchase-items/'+cvtSplit.id);
+    check('depodaki kalem SİLİNEMEDİ', /depodaki kalem silinemez/i.test(_lastApiError||''), _lastApiError);
+    check('kalem yerinde duruyor', (await dbGet('purchase_items')).some(x=>x.id===cvtSplit.id));
+
     console.log('═══ K2: PROJE ADI DEĞİŞİNCE STRING TABLOLAR TAŞINIYOR ═══');
     const RENAMED = PROJ+'-ADI';
     const ren = await api('PUT','/orders/'+orderId, {project_name:RENAMED, customer_name:'E2E Müşteri'});
@@ -417,14 +423,19 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
   } finally {
     // temizlik: ters sırayla, hatalar yutulur
     const del = async (t,id)=>{ if(id) await dbDelete(t,id).catch(()=>{}); };
-    // E2E hareketleri (rcvDoReceive'in yazdıkları dahil) kod önekiyle süpürülür
-    for(const m of (await dbGet('warehouse_movements')).filter(m=>(m.item_code||'').startsWith('E2E-')))
-      await del('warehouse_movements', m.id);
     for(const id of created.wop) await del('work_order_parts', id);
     for(const id of created.wo)  await del('work_orders', id);
+    // (O4/O5 guard'ları) depodaki kalem ve kaleme bağlı mal kabul hareketi
+    // silinemez: önce kalemler CANCELLED + depodan çözülür, kalemler
+    // silinince hareketlerin purchase_item_id bağı NULL'a düşer
+    for(const i of (await dbGet('purchase_items')).filter(x=>x.project_name===PROJ))
+      await dbUpdate('purchase_items', i.id, {status:'CANCELLED', warehouse_id:null});
     const piAll = await dbGet('purchase_items');
     for(const i of piAll.filter(x=>x.project_name===PROJ && x.stock_plan_id)) await del('purchase_items', i.id);
     for(const i of (await dbGet('purchase_items')).filter(x=>x.project_name===PROJ)) await del('purchase_items', i.id);
+    // E2E hareketleri (rcvDoReceive'in yazdıkları dahil) kod önekiyle süpürülür
+    for(const m of (await dbGet('warehouse_movements')).filter(m=>(m.item_code||'').startsWith('E2E-')))
+      await del('warehouse_movements', m.id);
     // (O1 guard'ları) iş emri bağı yukarıda silindi; ilerleme sayaçları ve
     // hiyerarşi bağı sıfırlanmadan parça silinemez
     const projParts = (await dbGet('parts')).filter(x=>x.project===PROJ);

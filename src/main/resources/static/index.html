@@ -6767,6 +6767,13 @@ async function purSetStatus(id, status){
 async function deletePurchaseItem(id){
   const item = purchaseItems.find(i=>i.id===id);
   if(!item) return;
+  // (O4) backend de reddeder; kullanıcıya sebebi baştan söyle
+  if(item.status==='IN_WAREHOUSE' && item.warehouse_id){
+    toast('Depodaki kalem silinemez — önce "Depodan Geri Al" ile çıkarın.','error'); return;
+  }
+  if(item.purchase_order_id){
+    toast('Sipariş grubuna bağlı kalem silinemez — önce gruptan çıkarın.','error'); return;
+  }
   if(!confirm(`"${item.name}" satın alma listesinden silinsin mi?`)) return;
   const ok = await dbDelete('purchase_items', id);
   if(!ok){ toast('Silinemedi!','error'); return; }
