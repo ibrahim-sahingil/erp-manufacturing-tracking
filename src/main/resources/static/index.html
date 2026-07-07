@@ -8858,9 +8858,10 @@ async function addBomPart() {
   const name = document.getElementById('bom-part-name').value.trim();
   const code = document.getElementById('bom-part-code').value.trim();
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
-  const dup = bomParts.find(p=>p.product_id===_activeBomProduct.id && (p.code||'').toLowerCase()===code.toLowerCase());
-  if(dup){ toast(`Bu ürün ağacında "${dup.code}" kodlu bir parça zaten var: ${dup.name}`,'error'); return; }
   const parentId = document.getElementById('bom-part-parent').value||null;
+  // Aynı kod farklı dallarda serbest (4. tur #1) — kontrol kardeşler arasında
+  const dup = bomParts.find(p=>p.product_id===_activeBomProduct.id && (p.parent_id||null)===parentId && (p.code||'').toLowerCase()===code.toLowerCase());
+  if(dup){ toast(`Aynı üst altında "${dup.code}" kodlu bir parça zaten var: ${dup.name}`,'error'); return; }
   const parentPart = parentId ? bomParts.find(p=>p.id===parentId) : null;
   const level = parentPart ? (parentPart.level||0)+1 : 0;
   const btn = document.getElementById('bom-add-part-btn');
@@ -8923,8 +8924,8 @@ async function addBomOperation() {
   const qty       = parseFloat(part.quantity) || 1;
   const totalTime = duration * qty;
 
-  if(bomParts.find(p=>(p.code||'').toLowerCase()===newCode.toLowerCase() && p.product_id===_activeBomProduct.id)){
-    toast(`"${newCode}" kodu zaten mevcut!`,'error'); return;
+  if(bomParts.find(p=>(p.code||'').toLowerCase()===newCode.toLowerCase() && p.product_id===_activeBomProduct.id && (p.parent_id||null)===(part.parent_id||null))){
+    toast(`"${newCode}" kodu aynı üst altında zaten mevcut!`,'error'); return;
   }
 
   const newParentData = await dbInsert('bom_parts',{
@@ -8999,6 +9000,7 @@ function renderBomList() {
       </div>
       <div style="display:flex;gap:4px;align-items:center">
         <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="editBomPart('${part.id}')" title="Ad / kod / malzeme düzenle">✏️ Düzenle</button>
+        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="bomCopyBranch('${part.id}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">📋 Kopyala</button>
         <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="editBomQty('${part.id}')" title="Miktarı düzenle">✏️ Miktar</button>
         <button class="icon-btn" title="Sil" onclick="deleteBomPart('${part.id}')">🗑️</button>
       </div>
@@ -9012,6 +9014,42 @@ function buildSortedTree(parentId, level) {
   let result = [];
   children.forEach(p=>{ result.push({part:p,level}); result = result.concat(buildSortedTree(p.id,level+1)); });
   return result;
+}
+
+// ─── Dal Kopyala (4. tur #1: aynalama parçalar — sol/sağ direk) ───
+// Parçayı ALT AĞACIYLA birlikte aynı üstün altına kopyalar. Kök koda -KOPYA
+// eklenir (kardeşler arasında benzersizlik); alt kodlar aynen korunur.
+async function bomCopyBranch(partId){
+  const src=bomParts.find(x=>x.id===partId);
+  if(!src||!_activeBomProduct) return;
+  const collect=pid=>bomParts.filter(p=>(p.parent_id||null)===pid)
+    .sort((a,b)=>(a.sort_order||0)-(b.sort_order||0))
+    .flatMap(k=>[k,...collect(k.id)]);
+  const branch=[src,...collect(src.id)];
+  if(!confirm(`"${src.code} — ${src.name}" ${branch.length>1?`alt ağacıyla birlikte (${branch.length} parça) `:''}kopyalansın mı?\n\nKopya aynı üstün altına eklenir; kök kodun sonuna -KOPYA gelir (sonra düzenleyin), alt parça kodları aynen korunur.`)) return;
+  let rootCode=src.code+'-KOPYA', n=2;
+  const sibs=bomParts.filter(p=>p.product_id===src.product_id && (p.parent_id||null)===(src.parent_id||null));
+  while(sibs.some(p=>(p.code||'').toLowerCase()===rootCode.toLowerCase())) rootCode=src.code+'-KOPYA'+(n++);
+  // Backend gönderilen id'yi yok sayar → parent bağı DÖNEN id ile kurulur
+  const idMap={};
+  let ok=0, fail=0;
+  for(const p of branch){
+    const ops=Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
+    const d=await dbInsert('bom_parts',{
+      product_id:src.product_id,
+      parent_id:p.id===partId?(src.parent_id||null):(idMap[p.parent_id]||null),
+      name:p.name, code:p.id===partId?rootCode:p.code,
+      quantity:p.quantity||1, unit:p.unit||'adet',
+      weight_kg:p.weight_kg||null, material:p.material||null,
+      material_kind:p.material_kind||null,
+      width_mm:p.width_mm||null, height_mm:p.height_mm||null, thickness_mm:p.thickness_mm||null,
+      operations:ops, level:p.level||0, sort_order:(p.sort_order||0)+1
+    });
+    if(Array.isArray(d)&&d[0]){ idMap[p.id]=d[0].id; bomParts.push(d[0]); ok++; }
+    else fail++;
+  }
+  renderBomContent();
+  toast(fail?`⚠ ${ok} parça kopyalandı, ${fail} satırda hata`:`📋 Dal kopyalandı (${ok} parça) — kök kod: "${rootCode}"`, fail?'error':'success');
 }
 
 // ─── Sürükle-Bırak ───
@@ -9208,8 +9246,8 @@ async function saveBomPartEdit(partId) {
   const code     = document.getElementById('bom-edit-code').value.trim();
   const material = document.getElementById('bom-edit-material').value.trim();
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
-  const dup = bomParts.find(p=>p.id!==partId && p.product_id===part.product_id && (p.code||'').toLowerCase()===code.toLowerCase());
-  if(dup){ toast(`Bu ürün ağacında "${dup.code}" kodlu bir parça zaten var: ${dup.name}`,'error'); return; }
+  const dup = bomParts.find(p=>p.id!==partId && p.product_id===part.product_id && (p.parent_id||null)===(part.parent_id||null) && (p.code||'').toLowerCase()===code.toLowerCase());
+  if(dup){ toast(`Aynı üst altında "${dup.code}" kodlu bir parça zaten var: ${dup.name}`,'error'); return; }
   // Olcu: bos birakmak = 0 gonderilir (backend'de null "dokunma" demek oldugu icin
   // temizleme 0 ile yapilir; 0 ekranda "olcu yok" sayilir)
   const width_mm = dimNum('bom-edit-width'), height_mm = dimNum('bom-edit-height'), thickness_mm = dimNum('bom-edit-thickness');
@@ -9453,15 +9491,15 @@ async function openPbomEditor(pbomId) {
     const origParts = Array.isArray(bpData)?bpData:[];
     if(origParts.length>0) {
       toast('Ana ürün ağacı kopyalanıyor ('+origParts.length+' parça)...','success');
-      // ID eşleştirme haritası (eski id → yeni id)
+      // ID eşleştirme: backend gönderilen id'yi YOK SAYAR, kendi UUID'sini
+      // üretir — parent bağı için DÖNEN gerçek id kullanılmalı (genId ile
+      // gönderilen parent_custom_id backend'de 500 veriyordu, bağlar kopuktu).
       const idMap = {};
-      origParts.forEach(p=>{ idMap[p.id]=genId(); });
       for(const p of origParts) {
-        const newId = idMap[p.id];
         const newParentId = p.parent_id ? (idMap[p.parent_id]||null) : null;
         const ops = Array.isArray(p.operations)?p.operations:[];
         const data = await dbInsert('project_bom_parts',{
-          id: newId, project_bom_id: pbomId, bom_part_id: p.id,
+          project_bom_id: pbomId, bom_part_id: p.id,
           is_excluded: false,
           custom_name: p.name, custom_code: p.code,
           custom_qty: p.quantity||1, custom_unit: p.unit||'adet',
@@ -9469,7 +9507,7 @@ async function openPbomEditor(pbomId) {
           dept_id: null, parent_custom_id: newParentId,
           operations: ops, level: p.level||0, sort_order: p.sort_order||0
         });
-        if(Array.isArray(data)&&data[0]) projectBomParts.push(data[0]);
+        if(Array.isArray(data)&&data[0]){ idMap[p.id]=data[0].id; projectBomParts.push(data[0]); }
       }
       toast('✅ '+origParts.length+' parça kopyalandı!','success');
     } else {
@@ -9574,9 +9612,10 @@ async function pbomeAddPart() {
   const name   = document.getElementById('pbome-part-name').value.trim();
   const code   = document.getElementById('pbome-part-code').value.trim();
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
-  const dup = _pbomeParts.find(p=>(p.custom_code||'').toLowerCase()===code.toLowerCase());
-  if(dup){ toast(`Bu ağaçta "${dup.custom_code}" kodlu bir parça zaten var: ${dup.custom_name}`,'error'); return; }
   const parentId = document.getElementById('pbome-part-parent').value||null;
+  // Aynı kod farklı dallarda serbest (4. tur #1) — kontrol kardeşler arasında
+  const dup = _pbomeParts.find(p=>(p.parent_custom_id||null)===parentId && (p.custom_code||'').toLowerCase()===code.toLowerCase());
+  if(dup){ toast(`Aynı üst altında "${dup.custom_code}" kodlu bir parça zaten var: ${dup.custom_name}`,'error'); return; }
   const parent   = parentId ? _pbomeParts.find(p=>p.id===parentId) : null;
   const level    = parent ? (parent.level||0)+1 : 0;
 
@@ -9623,8 +9662,8 @@ async function pbomeAddOp() {
   const qty     = parseFloat(part.custom_qty)||1;
   const ops     = [{name:opName,code:opCode,desc,duration_per_unit:dur||null,total_duration:dur?dur*qty:null}];
 
-  if(_pbomeParts.find(p=>(p.custom_code||'').toLowerCase()===newCode.toLowerCase())){
-    toast(`"${newCode}" kodu zaten mevcut!`,'error'); return;
+  if(_pbomeParts.find(p=>(p.custom_code||'').toLowerCase()===newCode.toLowerCase() && (p.parent_custom_id||null)===(part.parent_custom_id||null))){
+    toast(`"${newCode}" kodu aynı üst altında zaten mevcut!`,'error'); return;
   }
 
   // Yeni üst parça oluştur (aynı seviyede)
@@ -9703,6 +9742,7 @@ function pbomeRenderList() {
               ${depts.map(d=>`<option value="${d.id}"${d.id===p.dept_id?' selected':''}>${d.name}</option>`).join('')}
             </select>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditPart('${p.id}')" title="Ad / kod / malzeme düzenle">📝</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeCopyBranch('${p.id}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">📋</button>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditQty('${p.id}')" title="Miktar düzenle">✏️</button>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px;color:var(--red)" onclick="pbomeDeletePart('${p.id}')" title="Sil">🗑️</button>
           </div>
@@ -9812,8 +9852,8 @@ async function pbomeSavePartEdit(partId) {
   const code=document.getElementById('pbome-edit-code').value.trim();
   const material=document.getElementById('pbome-edit-material').value.trim();
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
-  const dup=_pbomeParts.find(x=>x.id!==partId && (x.custom_code||'').toLowerCase()===code.toLowerCase());
-  if(dup){ toast(`Bu ağaçta "${dup.custom_code}" kodlu bir parça zaten var: ${dup.custom_name}`,'error'); return; }
+  const dup=_pbomeParts.find(x=>x.id!==partId && (x.parent_custom_id||null)===(p.parent_custom_id||null) && (x.custom_code||'').toLowerCase()===code.toLowerCase());
+  if(dup){ toast(`Aynı üst altında "${dup.custom_code}" kodlu bir parça zaten var: ${dup.custom_name}`,'error'); return; }
   const custom_width_mm=dimNum('pbome-edit-width'), custom_height_mm=dimNum('pbome-edit-height'), custom_thickness_mm=dimNum('pbome-edit-thickness');
   const material_kind=document.getElementById('pbome-edit-kind').value; // ''=override'i temizle
   // PARTIAL update'te null "dokunma" demek — malzemeyi temizlemek icin bos string gonderilir
@@ -9826,6 +9866,49 @@ async function pbomeSavePartEdit(partId) {
   document.getElementById('pbome-edit-overlay')?.remove();
   pbomeRenderContent();
   toast('Parça güncellendi.','success');
+}
+
+// ─── Dal Kopyala (4. tur #1: aynalama parçalar — sol/sağ direk) ───
+// Parçayı ALT AĞACIYLA birlikte aynı üstün altına kopyalar. Kök parçanın
+// koduna -KOPYA eklenir (kardeşler arasında kod benzersiz olmalı); alt
+// parçaların kod/adları AYNEN korunur (farklı dalda aynı kod serbest).
+async function pbomeCopyBranch(partId){
+  const src=_pbomeParts.find(x=>x.id===partId);
+  if(!src||!_activePbomId) return;
+  const collect=pid=>_pbomeParts.filter(p=>(p.parent_custom_id||null)===pid)
+    .sort((a,b)=>(a.sort_order||0)-(b.sort_order||0))
+    .flatMap(k=>[k,...collect(k.id)]);
+  const branch=[src,...collect(src.id)];
+  if(!confirm(`"${src.custom_code} — ${src.custom_name}" ${branch.length>1?`alt ağacıyla birlikte (${branch.length} parça) `:''}kopyalansın mı?\n\nKopya aynı üstün altına eklenir; kök kodun sonuna -KOPYA gelir (sonra düzenleyin), alt parça kodları aynen korunur.`)) return;
+  let rootCode=src.custom_code+'-KOPYA', n=2;
+  const sibs=_pbomeParts.filter(p=>(p.parent_custom_id||null)===(src.parent_custom_id||null));
+  while(sibs.some(p=>(p.custom_code||'').toLowerCase()===rootCode.toLowerCase())) rootCode=src.custom_code+'-KOPYA'+(n++);
+  // Backend gönderilen id'yi yok sayar → parent bağı DÖNEN id ile kurulur
+  const idMap={};
+  let ok=0, fail=0;
+  for(const p of branch){
+    const ops=Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
+    const d=await dbInsert('project_bom_parts',{
+      project_bom_id:_activePbomId, bom_part_id:null,
+      is_excluded:p.is_excluded||false,
+      custom_name:p.custom_name,
+      custom_code:p.id===partId?rootCode:p.custom_code,
+      custom_qty:p.custom_qty||1, custom_unit:p.custom_unit||'adet',
+      custom_weight:p.custom_weight??null,
+      custom_material:p.custom_material??p.resolved_material??null,
+      custom_width_mm:p.custom_width_mm??p.resolved_width_mm??null,
+      custom_height_mm:p.custom_height_mm??p.resolved_height_mm??null,
+      custom_thickness_mm:p.custom_thickness_mm??p.resolved_thickness_mm??null,
+      material_kind:p.material_kind??p.resolved_material_kind??null,
+      dept_id:p.dept_id||null,
+      parent_custom_id:p.id===partId?(src.parent_custom_id||null):(idMap[p.parent_custom_id]||null),
+      operations:ops, level:p.level||0, sort_order:(p.sort_order||0)+1
+    });
+    if(Array.isArray(d)&&d[0]){ idMap[p.id]=d[0].id; _pbomeParts.push(d[0]); projectBomParts.push(d[0]); ok++; }
+    else fail++;
+  }
+  pbomeRenderContent();
+  toast(fail?`⚠ ${ok} parça kopyalandı, ${fail} satırda hata`:`📋 Dal kopyalandı (${ok} parça) — kök kod: "${rootCode}"`, fail?'error':'success');
 }
 
 // İşlem kaldır
@@ -10041,7 +10124,7 @@ function pbomeShowTree() {
 async function pbomPublishParts(pb, allPbParts, templateParts){
   const freshPur = await dbGet('purchase_items');
   if(Array.isArray(freshPur)) purchaseItems = freshPur;
-  const res = { added:0, skipped:0, purAdded:0, purSkipped:0, errors:0, linked:0 };
+  const res = { added:0, skipped:0, updated:0, purAdded:0, purSkipped:0, errors:0, linked:0 };
   _lastApiError = null;
   const partIdByPbp = {}; // (#8) pbp.id → parts.id (üretime gidenler)
   const pbpById = {};
@@ -10049,37 +10132,60 @@ async function pbomPublishParts(pb, allPbParts, templateParts){
   // Eski satırlarda override boş, değerler şablondan (resolved_*) gelir
   const codeOf = p => p.custom_code || p.resolved_code || null;
   const nameOf = p => p.custom_name || p.resolved_name || null;
+
+  // (4. tur #1) Aynı kod ağacın farklı dallarında serbest. parts ve satın
+  // almada kod proje içinde TEK satır olduğundan aynı kodlu satırlar
+  // gruplanır, adet TOPLANIR (yeniden yayınlamada adet güncellenir).
+  const prodGroups = new Map(), purGroups = new Map(); // codeLower → {rows, qty}
   for(const p of allPbParts){
     const code = codeOf(p), name = nameOf(p);
     if(p.is_excluded || !name || !code) continue;
     const kind = p.material_kind || p.resolved_material_kind || null;
-    const qty = p.custom_qty!=null ? p.custom_qty : (p.resolved_qty!=null ? p.resolved_qty : 1);
-    if(PURCHASE_KINDS.includes(kind)){
-      const purExists = purchaseItems.find(x=>x.project_bom_part_id===p.id ||
-        (x.project_name===pb.project_name && (x.code||'').toLowerCase()===code.toLowerCase()));
-      if(purExists){ res.purSkipped++; continue; }
-      const d = await dbInsert('purchase_items',{
-        project_name: pb.project_name, project_bom_part_id: p.id,
-        name, code,
-        quantity: qty, unit: p.custom_unit||p.resolved_unit||'adet',
-        material: p.custom_material||p.resolved_material||null,
-        created_by: currentUser?.display_name||currentUser?.username||null
-      });
-      if(Array.isArray(d)&&d[0]){ purchaseItems.push(d[0]); res.purAdded++; }
-      else { res.errors++; console.error('Satın almaya eklenemedi:', code); }
+    const qty = Number(p.custom_qty!=null ? p.custom_qty : (p.resolved_qty!=null ? p.resolved_qty : 1)) || 1;
+    const map = PURCHASE_KINDS.includes(kind) ? purGroups : prodGroups;
+    const g = map.get(code.toLowerCase()) || {rows:[], qty:0};
+    g.rows.push(p); g.qty += qty;
+    map.set(code.toLowerCase(), g);
+  }
+
+  for(const g of purGroups.values()){
+    const p = g.rows[0], code = codeOf(p), name = nameOf(p);
+    const purExists = purchaseItems.find(x=>g.rows.some(r=>x.project_bom_part_id===r.id) ||
+      (x.project_name===pb.project_name && (x.code||'').toLowerCase()===code.toLowerCase()));
+    if(purExists){ res.purSkipped++; continue; }
+    const d = await dbInsert('purchase_items',{
+      project_name: pb.project_name, project_bom_part_id: p.id,
+      name, code,
+      quantity: g.qty, unit: p.custom_unit||p.resolved_unit||'adet',
+      material: p.custom_material||p.resolved_material||null,
+      created_by: currentUser?.display_name||currentUser?.username||null
+    });
+    if(Array.isArray(d)&&d[0]){ purchaseItems.push(d[0]); res.purAdded++; }
+    else { res.errors++; console.error('Satın almaya eklenemedi:', code); }
+  }
+
+  for(const g of prodGroups.values()){
+    const p = g.rows[0], code = codeOf(p), name = nameOf(p);
+    const exists = parts.find(x=>x.project===pb.project_name && (x.code||'').toLowerCase()===code.toLowerCase());
+    if(exists){
+      g.rows.forEach(r=>{ partIdByPbp[r.id] = exists.id; });
+      // Yeniden yayınlamada toplam adet değiştiyse güncelle (dal eklenmiş olabilir)
+      if(Number(exists.qty) !== g.qty){
+        const ok = await dbUpdate('parts', exists.id, {qty: g.qty});
+        if(ok){ exists.qty = g.qty; res.updated++; }
+      }
+      res.skipped++;
       continue;
     }
-    const exists = parts.find(x=>x.project===pb.project_name && (x.code||'').toLowerCase()===code.toLowerCase());
-    if(exists){ partIdByPbp[p.id] = exists.id; res.skipped++; continue; }
     const ops = Array.isArray(p.operations)?p.operations:(typeof p.operations==='string'?JSON.parse(p.operations||'[]'):[]);
     const newPart = await dbInsert('parts',{
       id:genId(), name, code,
       project:pb.project_name, department_id:p.dept_id||null,
-      qty:qty||1, qty_done:0, qty_pending:0, qty_reject:0,
+      qty:g.qty, qty_done:0, qty_pending:0, qty_reject:0,
       status:'pending', material:p.custom_material||p.resolved_material||null,
       notes: ops.length ? ops.map(o=>o.name).join(', ') : null
     });
-    if(Array.isArray(newPart)&&newPart[0]){ parts.push(newPart[0]); partIdByPbp[p.id] = newPart[0].id; res.added++; }
+    if(Array.isArray(newPart)&&newPart[0]){ parts.push(newPart[0]); g.rows.forEach(r=>{ partIdByPbp[r.id] = newPart[0].id; }); res.added++; }
     else { res.errors++; console.error('Eklenemedi:', code); }
   }
 
@@ -10095,9 +10201,12 @@ async function pbomPublishParts(pb, allPbParts, templateParts){
     if(tpl && tpl.parent_id) return allPbParts.find(x=>x.bom_part_id===tpl.parent_id) || null;
     return null;
   };
+  const linkedThisPass = new Set(); // aynı koda toplanan parçada İLK dalın atası kazanır
   for(const p of allPbParts){
     const childPartId = partIdByPbp[p.id];
     if(!childPartId) continue;
+    if(linkedThisPass.has(childPartId)) continue;
+    linkedThisPass.add(childPartId);
     let anc = parentOf(p);
     let parentPartId = null;
     while(anc){
@@ -10119,6 +10228,7 @@ function pbomPublishMsg(r){
   let msg = `✅ Yayınlandı! ${r.added} parça üretime çıkarıldı`;
   if(r.purAdded) msg += `, 🛒 ${r.purAdded} kalem satın almaya aktarıldı`;
   if(r.linked) msg += `, 🔗 ${r.linked} hiyerarşi bağı kuruldu`;
+  if(r.updated) msg += `, 🔢 ${r.updated} parçanın adedi güncellendi`;
   if(r.skipped || r.purSkipped) msg += `, ${r.skipped + r.purSkipped} zaten mevcuttu`;
   if(r.errors){ msg += `, ${r.errors} hata`; if(_lastApiError) msg += ` (${_lastApiError})`; }
   return msg;
@@ -10189,8 +10299,8 @@ async function addPbomCustomPart(pbomId) {
   const parentId = document.getElementById('pbom-custom-parent')?.value||null;
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
 
-  const dupCheck = projectBomParts.find(p=>p.project_bom_id===pbomId && (p.custom_code||'').toLowerCase()===code.toLowerCase());
-  if(dupCheck){ toast(`Bu ağaçta "${dupCheck.custom_code}" kodlu bir parça zaten var: ${dupCheck.custom_name}`,'error'); return; }
+  const dupCheck = projectBomParts.find(p=>p.project_bom_id===pbomId && (p.parent_custom_id||null)===(parentId||null) && (p.custom_code||'').toLowerCase()===code.toLowerCase());
+  if(dupCheck){ toast(`Aynı üst altında "${dupCheck.custom_code}" kodlu bir parça zaten var: ${dupCheck.custom_name}`,'error'); return; }
 
   const existing = projectBomParts.filter(p=>p.project_bom_id===pbomId&&!p.bom_part_id);
   const parent   = existing.find(p=>p.id===parentId);

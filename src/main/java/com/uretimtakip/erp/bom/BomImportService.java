@@ -134,9 +134,14 @@ public class BomImportService {
                 if (error == null && name.isBlank()) error = "Parca adi bos.";
                 if (error == null && code.isBlank()) error = "Kod bos.";
                 if (error == null) {
-                    Integer prev = codeFirstRow.putIfAbsent(code.toLowerCase(), r + 1);
+                    // Ayni kod farkli dallarda SERBEST (4. tur #1: aynalama
+                    // parcalar). Hata yalnizca AYNI UST BASAMAK altinda tekrar.
+                    String key = (parentLevelNo == null ? "" : parentLevelNo)
+                            + "|" + code.toLowerCase();
+                    Integer prev = codeFirstRow.putIfAbsent(key, r + 1);
                     if (prev != null) {
-                        error = "Ayni kod dosyada " + prev + ". satirda da var: " + code;
+                        error = "Ayni kod ayni ust basamak altinda "
+                                + prev + ". satirda da var: " + code;
                     }
                 }
 

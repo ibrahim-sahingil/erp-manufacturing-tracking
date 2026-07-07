@@ -43,10 +43,36 @@ public interface BomPartRepository extends JpaRepository<BomPart, UUID> {
 
     boolean existsByParentId(UUID parentId);
 
-    /** Ayni urun agacinda harf duyarsiz kod kontrolu. */
-    boolean existsByProductIdAndCodeIgnoreCase(UUID productId, String code);
+    // Kod benzersizligi AYNI PARENT kapsaminda kontrol edilir (4. tur #1):
+    // ayni kod agacin farkli dallarinda serbestce tekrar kullanilabilir
+    // (aynalama parcalar: sol/sag direk icindeki ayni saclar).
+    boolean existsByProductIdAndParentIdAndCodeIgnoreCase(
+            UUID productId, UUID parentId, String code);
 
-    boolean existsByProductIdAndCodeIgnoreCaseAndIdNot(UUID productId, String code, UUID id);
+    boolean existsByProductIdAndParentIdIsNullAndCodeIgnoreCase(
+            UUID productId, String code);
+
+    boolean existsByProductIdAndParentIdAndCodeIgnoreCaseAndIdNot(
+            UUID productId, UUID parentId, String code, UUID id);
+
+    boolean existsByProductIdAndParentIdIsNullAndCodeIgnoreCaseAndIdNot(
+            UUID productId, String code, UUID id);
+
+    /** Ayni parent altinda (kardesler arasinda) harf duyarsiz kod var mi? */
+    default boolean existsSiblingCode(UUID productId, UUID parentId, String code) {
+        return parentId == null
+                ? existsByProductIdAndParentIdIsNullAndCodeIgnoreCase(productId, code)
+                : existsByProductIdAndParentIdAndCodeIgnoreCase(productId, parentId, code);
+    }
+
+    default boolean existsSiblingCodeExcept(UUID productId, UUID parentId,
+                                            String code, UUID exceptId) {
+        return parentId == null
+                ? existsByProductIdAndParentIdIsNullAndCodeIgnoreCaseAndIdNot(
+                        productId, code, exceptId)
+                : existsByProductIdAndParentIdAndCodeIgnoreCaseAndIdNot(
+                        productId, parentId, code, exceptId);
+    }
 
     long countByProductId(UUID productId);
 

@@ -76,12 +76,13 @@ public class BomPartService {
                     "BomProduct", "id", request.getProductId());
         }
 
-        // Ayni urun agacinda ayni kod (harf duyarsiz) iki kez olamaz
+        // Ayni parent altinda ayni kod (harf duyarsiz) iki kez olamaz.
+        // Farkli dallarda ayni kod SERBEST (4. tur #1: aynalama parcalar).
         if (request.getCode() != null && !request.getCode().isBlank()
-                && bomPartRepository.existsByProductIdAndCodeIgnoreCase(
-                        request.getProductId(), request.getCode())) {
+                && bomPartRepository.existsSiblingCode(
+                        request.getProductId(), request.getParentId(), request.getCode())) {
             throw new BusinessException(
-                    "Bu urun agacinda bu kodda bir parca zaten var: " + request.getCode(),
+                    "Ayni ust parca altinda bu kodda bir parca zaten var: " + request.getCode(),
                     "BOM_PART_CODE_EXISTS"
             );
         }
@@ -143,11 +144,15 @@ public class BomPartService {
             part.setName(request.getName());
         }
         if (request.getCode() != null && !request.getCode().isBlank()) {
+            // Kontrol, tasima da varsa HEDEF parent'a gore yapilir (4. tur #1)
+            UUID targetParent = request.isParentIdPresent()
+                    ? request.getParentId() : part.getParentId();
             if (!request.getCode().equalsIgnoreCase(part.getCode())
-                    && bomPartRepository.existsByProductIdAndCodeIgnoreCaseAndIdNot(
-                            part.getProductId(), request.getCode(), part.getId())) {
+                    && bomPartRepository.existsSiblingCodeExcept(
+                            part.getProductId(), targetParent,
+                            request.getCode(), part.getId())) {
                 throw new BusinessException(
-                        "Bu urun agacinda bu kodda bir parca zaten var: " + request.getCode(),
+                        "Ayni ust parca altinda bu kodda bir parca zaten var: " + request.getCode(),
                         "BOM_PART_CODE_EXISTS"
                 );
             }

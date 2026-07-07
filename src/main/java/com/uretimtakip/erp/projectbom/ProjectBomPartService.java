@@ -162,12 +162,14 @@ public class ProjectBomPartService {
                     "Department", "id", request.getDeptId());
         }
 
-        // Ayni proje agacinda ayni kod (harf duyarsiz) iki kez olamaz
+        // Ayni parent altinda ayni kod (harf duyarsiz) iki kez olamaz.
+        // Farkli dallarda ayni kod SERBEST (4. tur #1: aynalama parcalar).
         if (request.getCustomCode() != null && !request.getCustomCode().isBlank()
-                && projectBomPartRepository.existsByProjectBomIdAndCustomCodeIgnoreCase(
-                        request.getProjectBomId(), request.getCustomCode())) {
+                && projectBomPartRepository.existsSiblingCode(
+                        request.getProjectBomId(), request.getParentCustomId(),
+                        request.getCustomCode())) {
             throw new BusinessException(
-                    "Bu proje agacinda bu kodda bir parca zaten var: "
+                    "Ayni ust parca altinda bu kodda bir parca zaten var: "
                             + request.getCustomCode(),
                     "PBOM_PART_CODE_EXISTS"
             );
@@ -226,13 +228,15 @@ public class ProjectBomPartService {
             pbp.setCustomName(request.getCustomName());
         }
         if (request.getCustomCode() != null && !request.getCustomCode().isBlank()) {
+            // Kontrol, tasima da varsa HEDEF parent'a gore yapilir (4. tur #1)
+            UUID targetParent = request.isParentCustomIdPresent()
+                    ? request.getParentCustomId() : pbp.getParentCustomId();
             if (!request.getCustomCode().equalsIgnoreCase(pbp.getCustomCode())
-                    && projectBomPartRepository
-                            .existsByProjectBomIdAndCustomCodeIgnoreCaseAndIdNot(
-                                    pbp.getProjectBomId(), request.getCustomCode(),
-                                    pbp.getId())) {
+                    && projectBomPartRepository.existsSiblingCodeExcept(
+                            pbp.getProjectBomId(), targetParent,
+                            request.getCustomCode(), pbp.getId())) {
                 throw new BusinessException(
-                        "Bu proje agacinda bu kodda bir parca zaten var: "
+                        "Ayni ust parca altinda bu kodda bir parca zaten var: "
                                 + request.getCustomCode(),
                         "PBOM_PART_CODE_EXISTS"
                 );

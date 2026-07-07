@@ -28,11 +28,38 @@ public interface ProjectBomPartRepository extends JpaRepository<ProjectBomPart, 
 
     boolean existsByParentCustomId(UUID parentCustomId);
 
-    /** Ayni proje agacinda harf duyarsiz kod kontrolu. */
-    boolean existsByProjectBomIdAndCustomCodeIgnoreCase(UUID projectBomId, String customCode);
+    // Kod benzersizligi AYNI PARENT kapsaminda kontrol edilir (4. tur #1):
+    // ayni kod agacin farkli dallarinda serbestce tekrar kullanilabilir.
+    boolean existsByProjectBomIdAndParentCustomIdAndCustomCodeIgnoreCase(
+            UUID projectBomId, UUID parentCustomId, String customCode);
 
-    boolean existsByProjectBomIdAndCustomCodeIgnoreCaseAndIdNot(
+    boolean existsByProjectBomIdAndParentCustomIdIsNullAndCustomCodeIgnoreCase(
+            UUID projectBomId, String customCode);
+
+    boolean existsByProjectBomIdAndParentCustomIdAndCustomCodeIgnoreCaseAndIdNot(
+            UUID projectBomId, UUID parentCustomId, String customCode, UUID id);
+
+    boolean existsByProjectBomIdAndParentCustomIdIsNullAndCustomCodeIgnoreCaseAndIdNot(
             UUID projectBomId, String customCode, UUID id);
+
+    /** Ayni parent altinda (kardesler arasinda) harf duyarsiz kod var mi? */
+    default boolean existsSiblingCode(UUID projectBomId, UUID parentCustomId,
+                                      String customCode) {
+        return parentCustomId == null
+                ? existsByProjectBomIdAndParentCustomIdIsNullAndCustomCodeIgnoreCase(
+                        projectBomId, customCode)
+                : existsByProjectBomIdAndParentCustomIdAndCustomCodeIgnoreCase(
+                        projectBomId, parentCustomId, customCode);
+    }
+
+    default boolean existsSiblingCodeExcept(UUID projectBomId, UUID parentCustomId,
+                                            String customCode, UUID exceptId) {
+        return parentCustomId == null
+                ? existsByProjectBomIdAndParentCustomIdIsNullAndCustomCodeIgnoreCaseAndIdNot(
+                        projectBomId, customCode, exceptId)
+                : existsByProjectBomIdAndParentCustomIdAndCustomCodeIgnoreCaseAndIdNot(
+                        projectBomId, parentCustomId, customCode, exceptId);
+    }
 
     long countByParentCustomId(UUID parentCustomId);
 
