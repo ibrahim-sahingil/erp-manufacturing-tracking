@@ -9462,10 +9462,13 @@ async function bomCopyBranch(partId){
   const idMap={};
   let ok=0, fail=0;
   for(const p of branch){
+    // (B9) atası eklenememiş satır parent'sız (yetim) eklenmesin: branch
+    // derinlik-öncelikli olduğundan bu koruma alt ağacı zincirleme atlar
+    if(p.id!==partId && !idMap[p.parent_id]){ fail++; continue; }
     const ops=Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
     const d=await dbInsert('bom_parts',{
       product_id:src.product_id,
-      parent_id:p.id===partId?(src.parent_id||null):(idMap[p.parent_id]||null),
+      parent_id:p.id===partId?(src.parent_id||null):idMap[p.parent_id],
       name:p.name, code:p.id===partId?rootCode:p.code,
       quantity:p.quantity||1, unit:p.unit||'adet',
       weight_kg:p.weight_kg||null, material:p.material||null,
@@ -9477,7 +9480,7 @@ async function bomCopyBranch(partId){
     else fail++;
   }
   renderBomContent();
-  toast(fail?`⚠ ${ok} parça kopyalandı, ${fail} satırda hata`:`📋 Dal kopyalandı (${ok} parça) — kök kod: "${rootCode}"`, fail?'error':'success');
+  toast(fail?`⚠ ${ok} parça kopyalandı, ${fail} satır kopyalanamadı (hata ya da atası eklenemedi)`:`📋 Dal kopyalandı (${ok} parça) — kök kod: "${rootCode}"`, fail?'error':'success');
 }
 
 // ─── Sürükle-Bırak ───
@@ -10371,6 +10374,9 @@ async function pbomeCopyBranch(partId){
   const idMap={};
   let ok=0, fail=0;
   for(const p of branch){
+    // (B9) atası eklenememiş satır parent'sız (yetim) eklenmesin: branch
+    // derinlik-öncelikli olduğundan bu koruma alt ağacı zincirleme atlar
+    if(p.id!==partId && !idMap[p.parent_custom_id]){ fail++; continue; }
     const ops=Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
     const d=await dbInsert('project_bom_parts',{
       project_bom_id:_activePbomId, bom_part_id:null,
@@ -10385,14 +10391,14 @@ async function pbomeCopyBranch(partId){
       custom_thickness_mm:p.custom_thickness_mm??p.resolved_thickness_mm??null,
       material_kind:p.material_kind??p.resolved_material_kind??null,
       dept_id:p.dept_id||null,
-      parent_custom_id:p.id===partId?(src.parent_custom_id||null):(idMap[p.parent_custom_id]||null),
+      parent_custom_id:p.id===partId?(src.parent_custom_id||null):idMap[p.parent_custom_id],
       operations:ops, level:p.level||0, sort_order:(p.sort_order||0)+1
     });
     if(Array.isArray(d)&&d[0]){ idMap[p.id]=d[0].id; _pbomeParts.push(d[0]); projectBomParts.push(d[0]); ok++; }
     else fail++;
   }
   pbomeRenderContent();
-  toast(fail?`⚠ ${ok} parça kopyalandı, ${fail} satırda hata`:`📋 Dal kopyalandı (${ok} parça) — kök kod: "${rootCode}"`, fail?'error':'success');
+  toast(fail?`⚠ ${ok} parça kopyalandı, ${fail} satır kopyalanamadı (hata ya da atası eklenemedi)`:`📋 Dal kopyalandı (${ok} parça) — kök kod: "${rootCode}"`, fail?'error':'success');
 }
 
 // İşlem kaldır
