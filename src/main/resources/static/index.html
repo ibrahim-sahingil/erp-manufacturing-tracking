@@ -5983,8 +5983,12 @@ async function rcvDoReceive(id, whId, accepted, returned){
       return false;
     }
     const ni = d[0];
-    await dbUpdate('purchase_items', ni.id, {warehouse_id:whId, received_by:by, received_qty:accepted});
-    Object.assign(ni, {status:'IN_WAREHOUSE', warehouse_id:whId, received_by:by, received_qty:accepted});
+    // (B4) bölünen kalem ŞU AN teslim alınıyor — received_at damgası olmadan
+    // whUndo onu IN_STOCK'a düşürüp mal kabul akışından koparıyordu.
+    // Backend LocalDateTime beklediğinden yerel saat, dilimsiz gönderilir.
+    const rcvAt = new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,19);
+    await dbUpdate('purchase_items', ni.id, {warehouse_id:whId, received_by:by, received_qty:accepted, received_at:rcvAt});
+    Object.assign(ni, {status:'IN_WAREHOUSE', warehouse_id:whId, received_by:by, received_qty:accepted, received_at:rcvAt});
     purchaseItems.push(ni);
     mvItemId = ni.id;
   }
@@ -7788,10 +7792,13 @@ async function whXferConfirm(){
         toast('Aktarım başarısız!','error'); _whXfer=null; return;
       }
       const ni = d[0];
-      // create endpoint'i warehouse_id almaz — ayrı update ile bağlanır
-      await dbUpdate('purchase_items', ni.id, {warehouse_id: target, received_by: i.received_by||null, received_qty: qty});
+      // create endpoint'i warehouse_id almaz — ayrı update ile bağlanır.
+      // (B4) received_at orijinalden kopyalanır: mal kabulden gelen kalemin
+      // bölünmüş parçası da whUndo'da RECEIVED'a dönebilsin (stok kökenli
+      // kalemde damga yok → null gönderilir, backend yok sayar → IN_STOCK).
+      await dbUpdate('purchase_items', ni.id, {warehouse_id: target, received_by: i.received_by||null, received_qty: qty, received_at: i.received_at||null});
       ni.warehouse_id = target; ni.status='IN_WAREHOUSE';
-      ni.received_by = i.received_by||null; ni.received_qty = qty;
+      ni.received_by = i.received_by||null; ni.received_qty = qty; ni.received_at = i.received_at||null;
       purchaseItems.push(ni);
       await mv(x.src,'OUT',x.id,i.name,i.code||null,i.unit||'adet',qty);
       await mv(target,'IN',ni.id,i.name,i.code||null,i.unit||'adet',qty);

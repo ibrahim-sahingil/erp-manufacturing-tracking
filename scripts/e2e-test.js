@@ -309,6 +309,8 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
       Number(cvtSplit?.quantity)===4 && cvtSplit?.status==='IN_WAREHOUSE'
       && Number(cvtSplit?.received_qty)===4 && cvtSplit?.received_by==='E2E Test',
       `q=${cvtSplit?.quantity} s=${cvtSplit?.status} alan=${cvtSplit?.received_by}`);
+    check('bölünen kalem received_at damgalı (B4 — whUndo RECEIVED\'a döndürebilir)',
+      !!cvtSplit?.received_at, cvtSplit?.received_at);
     const mvIn = (await dbGet('warehouse_movements')).find(m=>m.purchase_item_id===cvtSplit?.id);
     check('IN hareketi kabul adediyle (4, GOODS_RECEIPT)',
       mvIn && Number(mvIn.quantity)===4 && mvIn.movement_type==='IN' && mvIn.source_type==='GOODS_RECEIPT');

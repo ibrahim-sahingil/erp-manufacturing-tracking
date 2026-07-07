@@ -8,6 +8,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -26,7 +27,9 @@ import java.util.UUID;
  *    purchase_order_id: gruptan cikarma explicit null - sadece DRAFT grupta)
  *
  * projectName ve projectBomPartId IMMUTABLE - gelse de service ignore eder.
- * Durum gecis damgalari (ordered_at/received_at) service'te atilir.
+ * Durum gecis damgalari (ordered_at/received_at) service'te atilir;
+ * received_at ayrica bolunen kalemlere damga tasimak icin dogrudan
+ * gonderilebilir (4. tur B4).
  */
 @Getter
 @Setter
@@ -143,6 +146,14 @@ public class PurchaseItemUpdateRequest {
 
     @PositiveOrZero(message = "Kabul edilen adet 0 veya pozitif olmali")
     private BigDecimal receivedQty;
+
+    /**
+     * Mal kabul damgasi (4. tur B4): kismi kabul/depo aktarimi ile BOLUNEN
+     * kalemler create yolundan geldigi icin damga alamiyordu; whUndo bu
+     * damgaya gore RECEIVED/IN_STOCK karari verir. Yalniz non-null geldiginde
+     * yazilir (temizlenemez); frontend bolme yollari gonderir.
+     */
+    private LocalDateTime receivedAt;
 
     @PositiveOrZero(message = "Iade adedi 0 veya pozitif olmali")
     private BigDecimal returnedQty;
