@@ -2045,7 +2045,8 @@ function ea(s){ return (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace
 // enterpolasyonunda kullanılır — adına <img onerror=...> yazılan kayıt
 // ekranı açan herkeste kod çalıştırmasın. textContent kullanan yerlerde
 // (toast) ve confirm/prompt metinlerinde KULLANILMAZ (entity görünür).
-function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+const _ESC_MAP={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+function esc(s){ return String(s??'').replace(/[&<>"']/g, c=>_ESC_MAP[c]); }
 
 // ─── Ölçü yardımcıları (sac/profil mm ölçüleri; 0 veya boş = ölçü yok) ───
 function dimVal(v){ const n=parseFloat(v); return (isFinite(n)&&n>0)?n:''; }
@@ -5619,7 +5620,7 @@ function refreshSupplierDatalist(){
   let dl = document.getElementById('sup-datalist');
   if(!dl){ dl = document.createElement('datalist'); dl.id = 'sup-datalist'; document.body.appendChild(dl); }
   dl.innerHTML = suppliers.filter(s=>s.is_active!==false)
-    .map(s=>`<option value="${(s.name||'').replace(/"/g,'&quot;')}">`).join('');
+    .map(s=>`<option value="${esc(s.name)}">`).join('');
 }
 
 // Yazılan ad kartotekte yoksa oluşturur (kayıt akışlarını bloklamasın diye
@@ -6847,7 +6848,7 @@ function editPurchaseItem(id){
       <div><label style="font-size:11px;color:var(--muted)">Miktar${qtyLocked?' 🔒':''}</label><input type="number" id="pe-qty" value="${i.quantity!=null?Number(i.quantity):1}" min="0" step="0.01" style="${inp}" ${qtyLocked?'disabled title="Depoya girmiş kalemin miktarı değiştirilemez — önce Depodan Geri Al"':''}>
         ${qtyLocked?'<div style="font-size:10px;color:var(--muted);margin-top:3px">🔒 Depodaki kalemde miktar kilitli (stok defteri tutarlılığı) — düzeltme için önce "Depodan Geri Al".</div>':''}</div>
       <div><label style="font-size:11px;color:var(--muted)">Birim</label><input type="text" id="pe-unit" value="${esc(i.unit||'adet')}" style="${inp}"></div>
-      <div><label style="font-size:11px;color:var(--muted)">Tedarikçi</label><input type="text" id="pe-supplier" list="sup-datalist" value="${(i.supplier||'').replace(/"/g,'&quot;')}" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Tedarikçi</label><input type="text" id="pe-supplier" list="sup-datalist" value="${esc(i.supplier)}" style="${inp}"></div>
       <div><label style="font-size:11px;color:var(--muted)">Termin</label><input type="date" id="pe-date" value="${i.expected_date||''}" style="${inp}"></div>
       <div><label style="font-size:11px;color:var(--muted)">Birim Fiyat</label><input type="number" id="pe-price" value="${i.unit_price!=null?Number(i.unit_price):''}" min="0" step="0.01" style="${inp}"></div>
       <div><label style="font-size:11px;color:var(--muted)">Para Birimi</label>
@@ -6856,7 +6857,7 @@ function editPurchaseItem(id){
         </select>
       </div>
     </div>
-    <div style="margin-top:10px"><label style="font-size:11px;color:var(--muted)">Not</label><input type="text" id="pe-notes" value="${(i.notes||'').replace(/"/g,'&quot;')}" style="${inp}"></div>
+    <div style="margin-top:10px"><label style="font-size:11px;color:var(--muted)">Not</label><input type="text" id="pe-notes" value="${esc(i.notes)}" style="${inp}"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
       <button class="btn btn-ghost" onclick="document.getElementById('pur-edit-overlay').remove()">İptal</button>
       <button class="btn btn-primary" onclick="savePurchaseEdit('${i.id}')">💾 Kaydet</button>
@@ -8561,8 +8562,8 @@ function whmEditWarehouse(id){
       <h3 style="margin-bottom:4px">✏️ Depoyu Düzenle</h3>
       <p style="margin-bottom:14px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">🗄️ ${esc(w.name)}</p>
       <div style="display:grid;gap:10px">
-        <div><label style="font-size:11px;color:var(--muted)">Depo Adı</label><input type="text" id="whm-e-name" value="${w.name.replace(/"/g,'&quot;')}" style="${inp}"></div>
-        <div><label style="font-size:11px;color:var(--muted)">Konum</label><input type="text" id="whm-e-location" value="${(w.location||'').replace(/"/g,'&quot;')}" style="${inp}"></div>
+        <div><label style="font-size:11px;color:var(--muted)">Depo Adı</label><input type="text" id="whm-e-name" value="${esc(w.name)}" style="${inp}"></div>
+        <div><label style="font-size:11px;color:var(--muted)">Konum</label><input type="text" id="whm-e-location" value="${esc(w.location)}" style="${inp}"></div>
         <div><label style="font-size:11px;color:var(--muted)">Sorumlu</label>
           <select id="whm-e-resp" style="${inp}">
             <option value="">— Sorumlu yok —</option>
@@ -9708,17 +9709,17 @@ function editBomPart(partId) {
     <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:18px">${esc(part.code)} — ${esc(part.name)}</p>
     <div class="form-group" style="margin-bottom:12px">
       <label>Parça Adı</label>
-      <input type="text" id="bom-edit-name" value="${(part.name||'').replace(/"/g,'&quot;')}" style="${inStyle}">
+      <input type="text" id="bom-edit-name" value="${esc(part.name)}" style="${inStyle}">
     </div>
     <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
       <div class="form-group">
         <label>Kod</label>
-        <input type="text" id="bom-edit-code" value="${(part.code||'').replace(/"/g,'&quot;')}" style="${inStyle}"
+        <input type="text" id="bom-edit-code" value="${esc(part.code)}" style="${inStyle}"
           onkeydown="if(event.key==='Enter')saveBomPartEdit('${partId}')">
       </div>
       <div class="form-group">
         <label>Malzeme</label>
-        <input type="text" id="bom-edit-material" value="${(part.material||'').replace(/"/g,'&quot;')}" style="${inStyle}"
+        <input type="text" id="bom-edit-material" value="${esc(part.material)}" style="${inStyle}"
           onkeydown="if(event.key==='Enter')saveBomPartEdit('${partId}')">
       </div>
     </div>
@@ -10372,15 +10373,15 @@ function pbomeEditPart(partId) {
     <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:18px">${esc(p.custom_code)} — ${esc(p.custom_name)}</p>
     <div class="form-group" style="margin-bottom:12px">
       <label>Parça Adı</label>
-      <input type="text" id="pbome-edit-name" value="${(p.custom_name||'').replace(/"/g,'&quot;')}" style="${inStyle}">
+      <input type="text" id="pbome-edit-name" value="${esc(p.custom_name)}" style="${inStyle}">
     </div>
     <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
       <div class="form-group"><label>Kod</label>
-        <input type="text" id="pbome-edit-code" value="${(p.custom_code||'').replace(/"/g,'&quot;')}" style="${inStyle}"
+        <input type="text" id="pbome-edit-code" value="${esc(p.custom_code)}" style="${inStyle}"
           onkeydown="if(event.key==='Enter')pbomeSavePartEdit('${partId}')">
       </div>
       <div class="form-group"><label>Malzeme</label>
-        <input type="text" id="pbome-edit-material" value="${(p.custom_material||'').replace(/"/g,'&quot;')}" style="${inStyle}"
+        <input type="text" id="pbome-edit-material" value="${esc(p.custom_material)}" style="${inStyle}"
           onkeydown="if(event.key==='Enter')pbomeSavePartEdit('${partId}')">
       </div>
     </div>
