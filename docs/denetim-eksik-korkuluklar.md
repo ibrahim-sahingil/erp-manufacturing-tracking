@@ -120,3 +120,66 @@ limiti + üst basamak doğrulaması; irsaliyede sevk edilmişi silme engeli.
 ## Önerilen ele alma sırası
 K1 → K2 → K3 (birlikte "veri güvenliği turu") → O1..O5 (silme/tutarlılık turu)
 → O6..O8 → U'lar fırsat buldukça.
+
+---
+
+# EK — 2. Tarama Bulguları (aynı gün, derin tarama)
+
+### E1 (🔴/🟠 Orta-Yüksek). XSS: kullanıcı girdileri innerHTML'e ham basılıyor
+Parça/proje/tedarikçi/depo adları, notlar vb. yüzlerce noktada `${p.name}` gibi
+kaçışsız innerHTML'e gidiyor. Adına `<img src=x onerror=...>` yazılan bir kayıt,
+o ekranı açan HERKESİN tarayıcısında kod çalıştırır. "Beni hatırla" JWT'yi
+localStorage'da tuttuğu için (E7) oturum çalınabilir. Tünelle dışa açılan ve
+birden çok kişinin kullandığı ortamda ciddi.
+**Öneri:** Merkezi `esc()` yardımcı fonksiyonu + innerHTML enterpolasyonlarında
+kullanım. Büyük ama mekanik iş; en azından ad/not alanlarından başlanmalı.
+
+### E2 (🟠 Orta). Ondalık adetler yayınlamada sessizce kesiliyor
+BOM adetleri `numeric(15,4)` (2.5 kg, 1.2 m olabilir); üretim tablosu
+`parts.total_qty` ise INTEGER. Yayınlamada 2.5 → 2'ye sessizce yuvarlanır
+(Jackson float→int), birim bilgisi de parts'a hiç taşınmaz. kg/m/m² birimli
+hammaddelerde üretim adedi yanlış görünür.
+**Öneri:** `total_qty`'yi numeric'e migrate et (+ parts'a birim kolonu) YA DA
+yayınlamada tam sayı olmayan adetlerde uyarı verip yukarı yuvarla.
+
+### E3 (🟠 Orta). Basılı QR fişlerin linkleri kalıcı değil
+QR içerikleri `location.origin` ile üretiliyor (mal kabul fişi, parça fişi).
+Tünel adresi her açılışta değiştiği için dün trycloudflare'den basılan fişin
+QR'ı bugün ÖLÜ; localhost'tan basılan fiş yalnız o makinede çalışır.
+**Öneri:** Kalıcı adres (adlandırılmış cloudflare tüneli / sabit domain) ya da
+QR içeriğini salt kalem-id yapıp uygulama içinden "QR okut" akışı.
+
+### E4 (🟡 Küçük-Orta). Parça kodu değişince kod-eşleşmeli zeka kopuyor
+"Malzemesi hazır/siparişte" şeridi, planlama ağacındaki malzeme çipleri ve
+yayınlamadaki "zaten var" kontrolü proje+kod eşleşmesiyle çalışıyor. Üretim
+parçasının ya da satın alma kaleminin kodu düzenlenirse bu bağlar sessizce
+kopar (iki taraf ayrı ayrı düzenlenebilir, senkron yok).
+**Öneri:** Kod düzenlenirken karşı tarafta eşleşen kayıt varsa kullanıcıya
+"satın alma kalemi de güncellensin mi?" diye sor.
+
+### E5 (🟡 Küçük). İptal edilen plakanın kaynak kalemleri havuza dönmüyor
+MRP onayında kaynak kalemlere `stock_plan_id` bağlanıp `needs_planning=false`
+yapılıyor. Plaka kalemi ✖ İptal edilirse (normal durum butonuyla mümkün)
+kaynaklar iptal plakaya bağlı kalır; plaka silinirse bağ NULL olur ama
+needs_planning false kaldığı için parçalar planlama havuzuna OTOMATİK dönmez —
+plakası iptal edilen parçalar planlamadan kaybolur.
+**Öneri:** Plaka kalemi iptal/silinirken kaynakları çöz ve needs_planning=true
+ile havuza geri koy (ya da kullanıcıya sor).
+
+### E6 (🟡 Küçük). Yayınla çift tetiklenmeye açık
+`openAndPublishPbom` çalışırken buton disable edilmiyor. parts DB'deki unique
+indeksle korunuyor ama purchase_items için benzersizlik YOK — üst üste iki
+yayınlama koşarsa mükerrer satın alma kalemi oluşabilir.
+**Öneri:** Yayınla/Bağlantı Oluştur gibi async butonlarda çalışırken disable
+deseni (bazı formlarda zaten var).
+
+### E7 (bilgi). "Beni hatırla" JWT'yi localStorage'da tutuyor
+Şifre saklanmıyor (doğru tasarım); ama E1'deki XSS ile birleşince token
+çalınabilir. E1 çözülürse bu kabul edilebilir risk.
+
+### 2. taramada temiz çıkanlar (bilgi)
+Proje tarihlerinde başlangıç>bitiş kontrolü var; kayıt butonlarının çoğunda
+async sırasında disable var; "beni hatırla" şifreyi değil token'ı saklıyor;
+modallı onay akışlarında (aktarım/kabul) overlay ilk satırda kaldırıldığı için
+çift tıklama riski düşük; proje↔ürün bağında DB unique kısıtı çift kaydı
+engelliyor.
