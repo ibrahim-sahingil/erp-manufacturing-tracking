@@ -30,6 +30,9 @@ public interface PartRepository extends JpaRepository<Part, UUID> {
     /** Proje silme guard'i (K1): projeye bagli parca sayisi. */
     long countByOrderId(UUID orderId);
 
+    /** Parca silme guard'i (O1): alt parca sayisi. */
+    long countByParentPartId(UUID parentPartId);
+
     /**
      * Belirli departmana atanmis parcalar.
      */

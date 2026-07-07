@@ -5,6 +5,7 @@ import com.uretimtakip.erp.common.exception.ResourceNotFoundException;
 import com.uretimtakip.erp.part.dto.PartRequest;
 import com.uretimtakip.erp.part.dto.PartResponse;
 import com.uretimtakip.erp.part.dto.PartUpdateRequest;
+import com.uretimtakip.erp.workorder.WorkOrderPartRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
 public class PartService {
 
     private final PartRepository partRepository;
+    private final WorkOrderPartRepository workOrderPartRepository;
 
     @Transactional(readOnly = true)
     public List<PartResponse> listAll() {
@@ -135,6 +137,34 @@ public class PartService {
     @Transactional
     public void delete(UUID id) {
         Part part = findEntityById(id);
+
+        // (O1) Silme korkuluklari — BOM taraflarindaki desenle ayni:
+        // is emri bagi / uretim ilerlemesi / alt parca varken tek confirm
+        // ile silinmesin (work_order_parts + part_logs CASCADE gider,
+        // alt parcalarin ust bagi sessizce NULL olurdu).
+        long workOrderCount = workOrderPartRepository.countByPartId(id);
+        if (workOrderCount > 0) {
+            throw new BusinessException(
+                    "Bu parca " + workOrderCount + " is emrine bagli, silinemez. "
+                            + "Once is emirlerinden cikarin.",
+                    "PART_IN_WORK_ORDER");
+        }
+        int progress = (part.getQtyDone() != null ? part.getQtyDone() : 0)
+                + (part.getQtyReject() != null ? part.getQtyReject() : 0);
+        if (progress > 0) {
+            throw new BusinessException(
+                    "Bu parcanin uretim ilerlemesi var (" + progress + " adet islenmis), "
+                            + "silinemez. Yanlis kayit ise once ilerlemeyi sifirlayin.",
+                    "PART_HAS_PROGRESS");
+        }
+        long childCount = partRepository.countByParentPartId(id);
+        if (childCount > 0) {
+            throw new BusinessException(
+                    "Bu parcanin " + childCount + " alt parcasi var, silinemez. "
+                            + "Once alt parcalari silin ya da baska ust parcaya tasiyin.",
+                    "PART_HAS_CHILDREN");
+        }
+
         partRepository.delete(part);
         log.info("Part deleted: id={}, code={}", id, part.getCode());
     }

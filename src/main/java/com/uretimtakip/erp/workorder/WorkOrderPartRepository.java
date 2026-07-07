@@ -18,5 +18,8 @@ public interface WorkOrderPartRepository extends JpaRepository<WorkOrderPart, UU
 
     boolean existsByWorkOrderIdAndPartId(UUID workOrderId, UUID partId);
 
+    /** Parca silme guard'i (O1): parcanin bagli oldugu is emri sayisi. */
+    long countByPartId(UUID partId);
+
     void deleteByWorkOrderId(UUID workOrderId);
 }

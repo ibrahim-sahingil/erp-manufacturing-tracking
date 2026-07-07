@@ -284,6 +284,14 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     waiting = woWaitingChildren(wo.id);
     check('ikisi bitince engel kalktı', waiting.length===0, waiting.length);
 
+    console.log('═══ O1: PARÇA SİLME GUARD\'LARI ═══');
+    globalThis._lastApiError = null;
+    await api('DELETE','/parts/'+partGvd.id);
+    check('iş emrine bağlı parça SİLİNEMEDİ', /is emrine bagli/i.test(_lastApiError||''), _lastApiError);
+    globalThis._lastApiError = null;
+    await api('DELETE','/parts/'+partPlt.id);
+    check('üretim ilerlemesi olan parça SİLİNEMEDİ', /ilerleme/i.test(_lastApiError||''), _lastApiError);
+
     console.log('═══ 4.TUR #3: KISMİ MAL KABUL (gerçek rcvDoReceive) ═══');
     let whs = await dbGet('warehouses');
     let wh = whs.find(w=>w.is_active!==false);
@@ -417,7 +425,11 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const piAll = await dbGet('purchase_items');
     for(const i of piAll.filter(x=>x.project_name===PROJ && x.stock_plan_id)) await del('purchase_items', i.id);
     for(const i of (await dbGet('purchase_items')).filter(x=>x.project_name===PROJ)) await del('purchase_items', i.id);
-    for(const p of (await dbGet('parts')).filter(x=>x.project===PROJ)) await del('parts', p.id);
+    // (O1 guard'ları) iş emri bağı yukarıda silindi; ilerleme sayaçları ve
+    // hiyerarşi bağı sıfırlanmadan parça silinemez
+    const projParts = (await dbGet('parts')).filter(x=>x.project===PROJ);
+    for(const p of projParts) await dbUpdate('parts', p.id, {status:'pending', qty_done:0, qty_reject:0, parent_part_id:null});
+    for(const p of projParts) await del('parts', p.id);
     for(const pb of (await dbGet('project_bom')).filter(x=>x.project_name===PROJ)) await del('project_bom', pb.id);
     for(const bp of (await dbGet('bom_products')).filter(x=>(x.name||'')==='E2E Ürün')) await del('bom_products', bp.id);
     for(const id of created.wh) await del('warehouses', id);
