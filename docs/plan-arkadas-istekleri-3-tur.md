@@ -13,7 +13,8 @@
   parts'a; G→ölçü kataloğu (stock_sheets) + elle giriş İKİSİ birden; G onayda
   plaka başına ayrı kalem yerine tür başına TEK kalem + adet.
 
-Kaynak: `Desktop/ERP test/3. test ve değişiklik adımı/` (1.txt + 4 görsel + plaka-mrp.html).
+Kaynak: `Desktop/ERP proje/02 - Test ve Istekler/3. test ve değişiklik adımı/`
+(1.txt + 4 görsel + plaka-mrp.html; klasör 07.07'de "ERP proje" altına taşındı).
 Sıra, bağımlılık ve risk gözetilerek kuruldu. Her adım: derleme + Playwright E2E + ayrı commit/push.
 
 ## Durum notları
