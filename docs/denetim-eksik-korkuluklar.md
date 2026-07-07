@@ -37,7 +37,25 @@ HİÇBİR DÜZELTME YAPILMADI — önce karar bekleniyor. Önem sırasına göre
 > KALAN İYİLEŞTİRME (ayrı tur): innerHTML'e gideni OTOMATİK kaçıran
 > tagged-template helper'ı (h`...`) — nokta-nokta esc kırılgan (bu
 > inceleme 12 kaçak buldu), ama ~262 şablonun geçişi hacimli.
-> Sırada: O6 (irsaliye sevkinde stok kontrolü) → U'lar.
+>
+> **O6 + U sertleştirme turu (`sertlestirme-o6-u` dalı):**
+> O6 189ce71 (irsaliye sevkinde eksi-stok uyarısı: taze stok + kümülatif
+> _whItemStock, sevk onayında bildir — engel değil) · U1 4d9b334
+> (geçmişi olan kullanıcı silme 500 yerine dostça engel; personel
+> ekranına pasife alma + deleteUser onay/hata kontrolü; renderUsers E1
+> kaçağı da kapatıldı) · U2+U3 7829665 (bölüm silmede etkilenecek parça
+> sayısı, iş emri silmede durum uyarısı, ikisinde eksik ok kontrolü) ·
+> U5 fbce631 (login brute-force için IP başına hız sınırı — 10 başarısız/
+> 15dk → 15dk blok; başarılı giriş sıfırlar; elle doğrulandı).
+> BİLİNÇLİ ERTELENEN: U4 (QR eşzamanlı giriş yarışı — optimistic locking
+> gerektirir, denetimde 'düşük risk, log tablosu gerçeği tutuyor' damgalı)
+> ve U7 (yayınlama atomik değil — 'kabul edilebilir, tekrar-yayınla
+> telafi ediyor'). U5 operasyonel notu: test hesabı (testdev/test1234)
+> tünel gerçek kullanıcılara açılmadan önce güçlendirilmeli/pasife alınmalı.
+>
+> DENETİMDEKİ TÜM MADDELER KAPANDI (K1-3, O1-8, U1-8; O8 geçersizdi,
+> U4/U7 bilinçli ertelendi). Kalan tek büyük iş: E1 tagged-template
+> geçişi (opsiyonel, ayrı refactor turu).
 
 ## 🔴 KRİTİK
 
