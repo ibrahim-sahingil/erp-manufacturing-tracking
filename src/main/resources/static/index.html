@@ -1062,30 +1062,19 @@
     <button class="planning-tab" onclick="switchWarehouseTab('manage')">🗄️ Depo Yönetimi</button>
   </div>
 
-  <!-- Depo Görünümü -->
+  <!-- Depo Görünümü (#5 arkadaş isteği: proje bazlı / depo bazlı iki mod) -->
   <div class="planning-section active" id="wh-tab-view">
     <div class="form-card" style="margin-bottom:16px">
-      <div class="form-row">
-        <div class="form-group" style="flex:1"><label>Proje</label>
-          <select id="wh-project-sel" onchange="renderWarehouseList()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
-            <option value="">— Tüm projeler —</option>
-          </select>
-        </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" id="whv-btn-project" onclick="whvSetMode('project')">📁 Proje Bazlı</button>
+        <button class="btn btn-ghost btn-sm" id="whv-btn-warehouse" onclick="whvSetMode('warehouse')">🗄️ Depo Bazlı</button>
+        <select id="whv-wh-sel" onchange="renderWarehouseList()" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:8px 12px;outline:none">
+          <option value="">— Depo seçin —</option>
+        </select>
+        <div id="wh-summary" style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto"></div>
       </div>
-      <div id="wh-summary" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>
     </div>
-
-    <!-- Beklenen girişler -->
-    <div id="wh-pending-wrap" style="margin-bottom:20px">
-      <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">📦 Beklenen Girişler</div>
-      <div id="wh-pending"></div>
-    </div>
-
-    <!-- Depodakiler -->
-    <div>
-      <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">🏭 Depoda</div>
-      <div id="wh-list"></div>
-    </div>
+    <div id="whv-content"></div>
   </div>
 
   <!-- Depo Yönetimi -->
@@ -6474,20 +6463,22 @@ function _whActivateTab(tab){
 function switchWarehouseTab(tab){ _whActivateTab(tab); }
 
 async function renderWarehouse(){
-  const [pi, ws] = await Promise.all([
+  const [pi, ws, mv] = await Promise.all([
     dbGet('purchase_items','order=created_at.asc'),
-    dbGet('warehouses')
+    dbGet('warehouses'),
+    dbGet('warehouse_movements','order=created_at.desc') // münferit (projesiz) stok için (#5)
   ]);
   purchaseItems = Array.isArray(pi) ? pi : purchaseItems;
   warehouses = Array.isArray(ws) ? ws : warehouses;
+  whMovements = Array.isArray(mv) ? mv : whMovements;
 
-  const sel = document.getElementById('wh-project-sel');
+  // Depo bazlı mod için depo dropdown'u
+  const sel = document.getElementById('whv-wh-sel');
   if(sel){
     const cur = sel.value;
-    const projNames = [...new Set(purchaseItems.map(i=>i.project_name).filter(Boolean))].sort();
-    sel.innerHTML = '<option value="">— Tüm projeler —</option>' +
-      projNames.map(n=>`<option value="${n}">${n}</option>`).join('');
-    if(projNames.includes(cur)) sel.value = cur;
+    sel.innerHTML = '<option value="">— Depo seçin —</option>' +
+      warehouses.map(w=>`<option value="${w.id}">${w.name}${w.is_active===false?' (pasif)':''}</option>`).join('');
+    if(warehouses.some(w=>w.id===cur)) sel.value = cur;
   }
   renderWarehouseList();
   if(document.getElementById('wh-tab-manage')?.classList.contains('active')) renderWarehouseManage();
@@ -6521,43 +6512,186 @@ function whRow(i, actionsHTML){
   </div>`;
 }
 
+// ─── Depo Görünümü iki modda (#5 arkadaş isteği) ───
+// Proje bazlı: proje kartları → malzemelerin depo dağılımı + beklenenler + PDF
+// Depo bazlı:  depo seç → içindekiler proje gruplu + münferit (projesiz)
+let _whvMode = 'project';
+let _whvActiveProj = null;
+
+function whvSetMode(mode){
+  _whvMode = mode;
+  const pBtn = document.getElementById('whv-btn-project');
+  const wBtn = document.getElementById('whv-btn-warehouse');
+  if(pBtn){ pBtn.classList.toggle('btn-primary', mode==='project'); pBtn.classList.toggle('btn-ghost', mode!=='project'); }
+  if(wBtn){ wBtn.classList.toggle('btn-primary', mode==='warehouse'); wBtn.classList.toggle('btn-ghost', mode!=='warehouse'); }
+  const sel = document.getElementById('whv-wh-sel');
+  if(sel) sel.style.display = mode==='warehouse' ? '' : 'none';
+  renderWarehouseList();
+}
+
 function renderWarehouseList(){
-  const pendEl = document.getElementById('wh-pending');
-  const listEl = document.getElementById('wh-list');
-  const sumEl  = document.getElementById('wh-summary');
-  if(!listEl) return;
-  const proj  = document.getElementById('wh-project-sel')?.value || '';
-  const items = proj ? purchaseItems.filter(i=>i.project_name===proj) : purchaseItems;
+  const el = document.getElementById('whv-content');
+  const sumEl = document.getElementById('wh-summary');
+  if(!el) return;
 
-  const inWh    = items.filter(i=>i.status==='IN_WAREHOUSE');
-  // Girişi beklenenler: sipariş verildi / teslim alındı / stokta (henüz depoya aktarılmadı)
-  const pending = items.filter(i=>['ORDERED','RECEIVED','IN_STOCK'].includes(i.status));
-
+  const inWhAll = purchaseItems.filter(i=>i.status==='IN_WAREHOUSE');
+  const pendingAll = purchaseItems.filter(i=>['ORDERED','RECEIVED','IN_STOCK'].includes(i.status));
   if(sumEl){
     const today = new Date(); today.setHours(0,0,0,0);
-    const late = pending.filter(i=>i.status==='ORDERED' && i.expected_date && new Date(i.expected_date)<today).length;
+    const late = pendingAll.filter(i=>i.status==='ORDERED' && i.expected_date && new Date(i.expected_date)<today).length;
     const chip = (icon,txt,color) =>
       `<span style="font-family:var(--font-mono);font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid ${color}44;color:${color};background:${color}11">${icon} ${txt}</span>`;
     sumEl.innerHTML =
-      chip('🏭','Depoda: '+inWh.length,'#2ecc71') +
-      chip('📦','Beklenen: '+pending.length,'#2980b9') +
+      chip('🏭','Depoda: '+inWhAll.length,'#2ecc71') +
+      chip('📦','Beklenen: '+pendingAll.length,'#2980b9') +
       (late ? chip('⚠','Termini geçen: '+late,'#e74c3c') : '');
   }
 
-  if(pendEl){
-    pendEl.innerHTML = pending.length ? pending.map(i=>{
-      const btn = (i.status==='RECEIVED'||i.status==='IN_STOCK')
-        ? `<button class="btn btn-primary btn-sm" onclick="whTransfer('${i.id}')">🏭 Depoya Aktar</button>`
-        : `<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">teslim bekleniyor</span>`;
-      return whRow(i, btn);
-    }).join('')
-    : `<div class="empty-state" style="padding:18px"><span class="emoji">📦</span>Beklenen giriş yok</div>`;
-  }
+  el.innerHTML = _whvMode==='warehouse' ? whvWarehouseHTML() : whvProjectHTML();
+}
 
-  listEl.innerHTML = inWh.length
-    ? inWh.map(i=>whRow(i,
-        `<button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)).join('')
-    : `<div class="empty-state" style="padding:18px"><span class="emoji">🏭</span>${proj?'Bu projede depoya girmiş malzeme yok':'Depoda malzeme yok'}</div>`;
+// ── Proje bazlı görünüm: proje kartları (accordion) ──
+function whvProjectHTML(){
+  const rel = purchaseItems.filter(i=>['ORDERED','RECEIVED','IN_STOCK','IN_WAREHOUSE'].includes(i.status));
+  if(!rel.length) return `<div class="empty-state"><span class="emoji">🏭</span>Depoya girmiş veya beklenen malzeme yok</div>`;
+  const groups = {};
+  rel.forEach(i=>{ const k=i.project_name||'—'; (groups[k]=groups[k]||[]).push(i); });
+  return Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([proj,list])=>{
+    const inWh = list.filter(i=>i.status==='IN_WAREHOUSE');
+    const pending = list.filter(i=>i.status!=='IN_WAREHOUSE');
+    const open = _whvActiveProj===proj;
+    let body = '';
+    if(open){
+      // Depodakiler DEPO başlığı altında gruplu (depo dağılımı)
+      const whGroups = {};
+      inWh.forEach(i=>{ const k=whName(i.warehouse_id)||'—'; (whGroups[k]=whGroups[k]||[]).push(i); });
+      body = `<div style="margin-top:12px">`;
+      Object.entries(whGroups).sort(([a],[b])=>a.localeCompare(b,'tr')).forEach(([wn,items])=>{
+        body += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--green,#2ecc71);margin:10px 0 6px">🗄️ ${wn} · ${items.length} malzeme</div>`
+          + items.map(i=>whRow(i, `<button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)).join('');
+      });
+      if(pending.length){
+        body += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#2980b9;margin:14px 0 6px">📦 Beklenen Girişler · ${pending.length}</div>`
+          + pending.map(i=>{
+            const btn = (i.status==='RECEIVED'||i.status==='IN_STOCK')
+              ? `<button class="btn btn-primary btn-sm" onclick="whTransfer('${i.id}')">🏭 Depoya Aktar</button>`
+              : `<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">teslim bekleniyor</span>`;
+            return whRow(i, btn);
+          }).join('');
+      }
+      body += `</div>`;
+    }
+    return `<div class="pbom-card" style="margin-bottom:12px">
+      <div class="pbom-card-header" onclick="whvToggleProj('${ea(proj)}')" style="cursor:pointer">
+        <div>
+          <div class="pbom-card-title">📁 ${proj}</div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
+            ${inWh.length?`🏭 ${inWh.length} depoda`:''}${inWh.length&&pending.length?' · ':''}${pending.length?`📦 ${pending.length} beklenen`:''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center" onclick="event.stopPropagation()">
+          <button class="btn btn-ghost btn-sm" onclick="whvProjectPDF('${ea(proj)}')" title="Proje depo raporu yazdır">🖨 PDF</button>
+          <span style="font-family:var(--font-mono);font-size:14px;color:var(--muted);cursor:pointer" onclick="whvToggleProj('${ea(proj)}')">${open?'▾':'▸'}</span>
+        </div>
+      </div>
+      ${body}
+    </div>`;
+  }).join('');
+}
+
+function whvToggleProj(proj){
+  _whvActiveProj = _whvActiveProj===proj ? null : proj;
+  renderWarehouseList();
+}
+
+// ── Depo bazlı görünüm: seçilen deponun içi proje gruplu + münferit ──
+function whvWarehouseHTML(){
+  const whId = document.getElementById('whv-wh-sel')?.value || '';
+  if(!whId) return `<div class="empty-state"><span class="emoji">🗄️</span>Yukarıdan bir depo seçin</div>`;
+
+  const inWh = purchaseItems.filter(i=>i.status==='IN_WAREHOUSE' && i.warehouse_id===whId);
+  const projGroups = {};
+  inWh.forEach(i=>{ const k=i.project_name||'—'; (projGroups[k]=projGroups[k]||[]).push(i); });
+
+  // Münferit: purchase_item bağı olmayan hareketlerden net stok (IN - OUT)
+  const map = new Map();
+  whMovements.filter(m=>m.warehouse_id===whId && !m.purchase_item_id).forEach(m=>{
+    const key = (m.item_code || m.item_name || '').trim().toLowerCase() + '|' + (m.unit||'adet');
+    const e = map.get(key) || { name:m.item_name, code:m.item_code, unit:m.unit||'adet', net:0 };
+    e.net += (m.movement_type==='IN' ? 1 : -1) * Number(m.quantity || 0);
+    map.set(key, e);
+  });
+  const loose = [...map.values()].filter(r=>Math.abs(r.net)>1e-9)
+    .sort((a,b)=>a.name.localeCompare(b.name,'tr'));
+
+  if(!inWh.length && !loose.length)
+    return `<div class="empty-state"><span class="emoji">🏭</span>Bu depoda malzeme yok</div>`;
+
+  let html = '';
+  Object.entries(projGroups).sort(([a],[b])=>a.localeCompare(b,'tr')).forEach(([proj,items])=>{
+    html += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:14px 0 6px">📁 ${proj} · ${items.length} malzeme</div>`
+      + items.map(i=>whRow(i, `<button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)).join('');
+  });
+  if(loose.length){
+    html += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:14px 0 6px">📦 Münferit (projesiz) · ${loose.length} kalem</div>`
+      + loose.map(r=>{
+        const c = r.net > 0 ? '#2ecc71' : '#e74c3c';
+        return `<div class="pbom-card" style="border-left:3px solid ${c};padding:8px 14px">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0">
+              ${r.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${r.code}</span>`:''}
+              <span>${r.name}</span>
+            </div>
+            <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${r.unit}</span>
+          </div>
+        </div>`;
+      }).join('');
+  }
+  return html;
+}
+
+// ── Proje depo raporu PDF (🖨) ──
+function whvProjectPDF(proj){
+  const rel = purchaseItems.filter(i=>i.project_name===proj &&
+    ['ORDERED','RECEIVED','IN_STOCK','IN_WAREHOUSE'].includes(i.status));
+  if(!rel.length){ toast('Bu projede yazdırılacak malzeme yok!','error'); return; }
+  const printDate = new Date().toLocaleString('tr-TR',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const row = i => `<tr>
+    <td>${i.code||'—'}</td><td>${i.name}</td>
+    <td style="text-align:right">${Number(i.quantity||1)} ${i.unit||'adet'}</td>
+    <td>${i.status==='IN_WAREHOUSE' ? '🗄️ '+(whName(i.warehouse_id)||'Depoda') : (PUR_STATUS[i.status]?.label||i.status)}</td>
+    <td>${i.supplier||'—'}</td>
+    <td>${i.received_at?new Date(i.received_at).toLocaleDateString('tr-TR'):(i.expected_date?'Termin: '+new Date(i.expected_date).toLocaleDateString('tr-TR'):'—')}</td>
+  </tr>`;
+  const inWh = rel.filter(i=>i.status==='IN_WAREHOUSE');
+  const pending = rel.filter(i=>i.status!=='IN_WAREHOUSE');
+  const table = rows => `<table class="wr-tbl"><tr><th>Kod</th><th>Malzeme</th><th style="text-align:right">Miktar</th><th>Durum / Depo</th><th>Tedarikçi</th><th>Tarih</th></tr>${rows}</table>`;
+  const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
+<title>Depo Raporu — ${proj}</title>
+<style>
+  @page { size: A4; margin: 15mm 12mm; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size:11px; color:#1a1a1a; }
+  .print-header { border-bottom:3px solid #f5a623; padding-bottom:10px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:flex-end; }
+  .print-logo { font-size:22px; font-weight:900; letter-spacing:2px; color:#f5a623; }
+  .print-meta { font-size:10px; color:#666; text-align:right; }
+  h2 { font-size:13px; margin:16px 0 6px; color:#333; }
+  .wr-tbl { width:100%; border-collapse:collapse; }
+  .wr-tbl th { background:#f7f7f7; text-align:left; font-size:9px; text-transform:uppercase; color:#555; }
+  .wr-tbl th, .wr-tbl td { padding:5px 8px; border:1px solid #ddd; font-size:10px; }
+  @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+</style></head><body>
+  <div class="print-header">
+    <div><div class="print-logo">ÜretimTakip</div><div style="font-size:11px;color:#666;margin-top:4px">Proje Depo Raporu — 📁 ${proj}</div></div>
+    <div class="print-meta">Çıktı Tarihi: ${printDate}<br>🏭 Depoda: ${inWh.length} · 📦 Beklenen: ${pending.length}</div>
+  </div>
+  ${inWh.length?`<h2>🏭 Depodaki Malzemeler (${inWh.length})</h2>`+table(inWh.map(row).join('')):''}
+  ${pending.length?`<h2>📦 Beklenen Girişler (${pending.length})</h2>`+table(pending.map(row).join('')):''}
+  <div style="margin-top:16px;padding-top:8px;border-top:1px solid #ddd;font-size:9px;color:#999;text-align:center">ÜretimTakip · ${printDate}</div>
+</body></html>`;
+  const w = window.open('','_blank','width=900,height=700');
+  w.document.write(html); w.document.close(); w.focus();
+  setTimeout(()=>{ w.print(); }, 600);
 }
 
 // Depoya aktarım: hedef depo seçtirir (0 depo → yönetime yönlendir,
