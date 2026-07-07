@@ -359,6 +359,12 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     check('depodaki kalem SİLİNEMEDİ', /depodaki kalem silinemez/i.test(_lastApiError||''), _lastApiError);
     check('kalem yerinde duruyor', (await dbGet('purchase_items')).some(x=>x.id===cvtSplit.id));
 
+    console.log('═══ O5: HAREKET DEFTERİ SİLME KISITI ═══');
+    globalThis._lastApiError = null;
+    await api('DELETE','/warehouse-movements/'+mvIn.id);
+    check('kaleme bağlı mal kabul hareketi SİLİNEMEDİ', /defterden silinemez/i.test(_lastApiError||''), _lastApiError);
+    check('hareket yerinde duruyor', (await dbGet('warehouse_movements')).some(m=>m.id===mvIn.id));
+
     console.log('═══ K2: PROJE ADI DEĞİŞİNCE STRING TABLOLAR TAŞINIYOR ═══');
     const RENAMED = PROJ+'-ADI';
     const ren = await api('PUT','/orders/'+orderId, {project_name:RENAMED, customer_name:'E2E Müşteri'});

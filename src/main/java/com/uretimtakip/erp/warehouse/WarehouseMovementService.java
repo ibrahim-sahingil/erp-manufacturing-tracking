@@ -2,6 +2,8 @@ package com.uretimtakip.erp.warehouse;
 
 import com.uretimtakip.erp.common.exception.BusinessException;
 import com.uretimtakip.erp.common.exception.ResourceNotFoundException;
+import com.uretimtakip.erp.delivery.DeliveryNoteRepository;
+import com.uretimtakip.erp.purchasing.PurchaseItemRepository;
 import com.uretimtakip.erp.warehouse.dto.WarehouseMovementRequest;
 import com.uretimtakip.erp.warehouse.dto.WarehouseMovementResponse;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +38,8 @@ public class WarehouseMovementService {
 
     private final WarehouseMovementRepository warehouseMovementRepository;
     private final WarehouseRepository warehouseRepository;
+    private final PurchaseItemRepository purchaseItemRepository;
+    private final DeliveryNoteRepository deliveryNoteRepository;
 
     @Transactional(readOnly = true)
     public List<WarehouseMovementResponse> listAll() {
@@ -99,6 +103,36 @@ public class WarehouseMovementService {
     public void delete(UUID id) {
         WarehouseMovement movement = warehouseMovementRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("WarehouseMovement", "id", id));
+
+        // (O5) Defter tutarliligi: bagli kaydi YASAYAN otomatik hareketler
+        // silinemez — kalem IN_WAREHOUSE gorunurken stok ozetinden dusmesi
+        // (veya sevk cikisinin geri sismesi) sessiz tutarsizlik yaratir.
+        // MANUAL ve WAREHOUSE_TRANSFER serbesttir; kalem silinmisse bag
+        // SET NULL oldugundan artik hareket de silinebilir.
+        String src = movement.getSourceType();
+        if (("GOODS_RECEIPT".equals(src) || "PURCHASE_TRANSFER".equals(src))
+                && movement.getPurchaseItemId() != null
+                && purchaseItemRepository.existsById(movement.getPurchaseItemId())) {
+            throw new BusinessException(
+                    "Bu hareket satin alma kalemine bagli (mal kabul / depo aktarimi), "
+                            + "defterden silinemez. Duzeltme icin kalemi 'Depodan Geri Al' "
+                            + "ile cikarin.",
+                    "WAREHOUSE_MOVEMENT_LINKED");
+        }
+        if ("DELIVERY".equals(src) && movement.getDeliveryNoteId() != null) {
+            // Sevk cikisi yalniz irsaliye geri alma akisinda silinir:
+            // dnUnship once irsaliyeyi DRAFT'a dondurur, sonra siler.
+            boolean shipped = deliveryNoteRepository.findById(movement.getDeliveryNoteId())
+                    .map(dn -> !"DRAFT".equals(dn.getStatus()))
+                    .orElse(false);
+            if (shipped) {
+                throw new BusinessException(
+                        "Sevk edilmis irsaliyenin depo cikisi silinemez. "
+                                + "Once irsaliyede 'Sevki Geri Al' kullanin.",
+                        "WAREHOUSE_MOVEMENT_LINKED");
+            }
+        }
+
         warehouseMovementRepository.delete(movement);
         log.info("WarehouseMovement deleted: id={}, item={}", id, movement.getItemName());
     }
