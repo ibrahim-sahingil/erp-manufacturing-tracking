@@ -2977,17 +2977,37 @@ async function addUser(){
   renderUsers(); toast('Personel eklendi.','success');
 }
 async function deleteUser(id){
-  await dbDelete('users',id);
-  users=users.filter(u=>u.id!==id); renderUsers();
+  const u = users.find(x=>x.id===id);
+  if(!u) return;
+  // (U1) Üretim kaydı/onayı olan personel backend'de silinemez; onaysız
+  // silme yerine net onay + hata gösterimi (backend dostça mesajı _showApiError'da)
+  if(!confirm(`"${u.name}" personeli silinsin mi?\n(Üretim kaydı veya sipariş onayı varsa silinemez — geçmişi korumak için "Pasife Al" kullanın.)`)) return;
+  const ok = await dbDelete('users',id);
+  if(!ok) return; // sebep (ör. geçmişi var) backend mesajıyla gösterildi
+  users=users.filter(x=>x.id!==id); renderUsers();
+  toast('Personel silindi.','success');
+}
+// (U1) Geçmişi olan personel silinemez → pasife alma alternatifi
+async function toggleUserActive(id){
+  const u = users.find(x=>x.id===id);
+  if(!u) return;
+  const target = u.is_active===false; // pasifse aktifleştir
+  const ok = await dbUpdate('users', id, {is_active: target});
+  if(!ok) return; // yetki (K3: developer) vb. backend mesajıyla gösterildi
+  u.is_active = target; renderUsers();
+  toast(target?'▶ Personel aktifleştirildi':'⏸ Personel pasife alındı','success');
 }
 function renderUsers(){
   const grid = document.getElementById('users-grid');
   if(!users.length){ grid.innerHTML=`<div class="empty-state"><span class="emoji">👷</span>Personel eklenmedi</div>`; return; }
-  grid.innerHTML = users.map(u=>`<div class="user-card">
-    <div class="user-avatar">${u.name.charAt(0)}</div>
-    <div style="flex:1"><div class="user-name">${esc(u.name)}</div><div class="user-role">${[u.dept,u.role].filter(Boolean).join(' · ')}</div></div>
-    <button class="icon-btn" onclick="deleteUser('${u.id}')">✕</button>
-  </div>`).join('');
+  grid.innerHTML = users.map(u=>{
+    const passive = u.is_active===false;
+    return `<div class="user-card"${passive?' style="opacity:.55"':''}>
+    <div class="user-avatar">${esc(u.name.charAt(0))}</div>
+    <div style="flex:1"><div class="user-name">${esc(u.name)}${passive?' <span style="font-size:10px;color:var(--muted)">(pasif)</span>':''}</div><div class="user-role">${esc([u.dept,u.role].filter(Boolean).join(' · '))}</div></div>
+    <button class="icon-btn" onclick="toggleUserActive('${u.id}')" title="${passive?'Aktifleştir':'Pasife al'}">${passive?'▶':'⏸'}</button>
+    <button class="icon-btn" onclick="deleteUser('${u.id}')" title="Sil">✕</button>
+  </div>`;}).join('');
 }
 
 // ═══ QR ═══

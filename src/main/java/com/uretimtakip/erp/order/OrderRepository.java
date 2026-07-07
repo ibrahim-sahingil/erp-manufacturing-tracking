@@ -38,4 +38,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
      * Belirli musteriye ait siparisler.
      */
     List<Order> findByCustomerName(String customerName);
+
+    /** Kullanici silme guard'i (U1): bu kullaniciyi onaylayan olarak tutan siparis sayisi. */
+    long countByApprovedBy(UUID approvedBy);
 }

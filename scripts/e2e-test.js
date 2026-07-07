@@ -293,6 +293,20 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     await api('DELETE','/parts/'+partPlt.id);
     check('üretim ilerlemesi olan parça SİLİNEMEDİ', /ilerleme/i.test(_lastApiError||''), _lastApiError);
 
+    console.log('═══ U1: GEÇMİŞİ OLAN KULLANICI SİLİNEMEZ (500 yerine dostça) ═══');
+    const u1user = await api('POST','/users',{name:'E2E U1 Personel', role:'Operatör'});
+    check('U1 test personeli oluştu', !!u1user, _lastApiError||'');
+    const u1log = await api('POST','/part-logs',{part_id:partGvd.id, user_id:u1user.id, qty_done:1});
+    check('personele üretim kaydı bağlandı', !!u1log, _lastApiError||'');
+    globalThis._lastApiError = null;
+    await api('DELETE','/users/'+u1user.id);
+    check('üretim kaydı olan personel SİLİNEMEDİ (dostça mesaj)', /uretim kaydi|silinemez/i.test(_lastApiError||''), _lastApiError);
+    check('personel yerinde duruyor', (await api('GET','/users')||[]).some(x=>x.id===u1user.id));
+    // temizlik: önce log, sonra personel (log kalırsa personel silinemez)
+    await api('DELETE','/part-logs/'+u1log.id);
+    await api('DELETE','/users/'+u1user.id);
+    check('U1 temizlik: log+personel silindi', !(await api('GET','/users')||[]).some(x=>x.id===u1user.id));
+
     console.log('═══ 4.TUR #3: KISMİ MAL KABUL (gerçek rcvDoReceive) ═══');
     let whs = await dbGet('warehouses');
     let wh = whs.find(w=>w.is_active!==false);

@@ -2,6 +2,8 @@ package com.uretimtakip.erp.user;
 
 import com.uretimtakip.erp.common.exception.BusinessException;
 import com.uretimtakip.erp.common.exception.ResourceNotFoundException;
+import com.uretimtakip.erp.order.OrderRepository;
+import com.uretimtakip.erp.part.PartLogRepository;
 import com.uretimtakip.erp.security.SecurityUtils;
 import com.uretimtakip.erp.user.dto.UserRequest;
 import com.uretimtakip.erp.user.dto.UserResponse;
@@ -38,6 +40,8 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PartLogRepository partLogRepository;
+    private final OrderRepository orderRepository;
 
     @Transactional(readOnly = true)
     public List<UserResponse> listAll() {
@@ -191,6 +195,20 @@ public class UserService {
             throw new BusinessException(
                     "Hesap silme yalnizca gelistirici rolunun yetkisindedir.",
                     "USER_ADMIN_ONLY");
+        }
+
+        // (U1) part_logs.user_id (NOT NULL) ve orders.approved_by FK'larinda
+        // ON DELETE kurali yok; referansi olan kullanici silinince DB ham
+        // INTERNAL_ERROR verirdi. Dostca engelle + "pasife alin" yonlendir.
+        long logCount = partLogRepository.countByUserId(id);
+        long approvalCount = orderRepository.countByApprovedBy(id);
+        if (logCount + approvalCount > 0) {
+            StringBuilder sb = new StringBuilder("Bu kullanici silinemez:");
+            if (logCount > 0) sb.append(" ").append(logCount).append(" uretim kaydi,");
+            if (approvalCount > 0) sb.append(" ").append(approvalCount).append(" siparis onayi,");
+            sb.setLength(sb.length() - 1);
+            sb.append(" var. Gecmisi korumak icin kullaniciyi PASIFE ALIN (silmeyin).");
+            throw new BusinessException(sb.toString(), "USER_HAS_HISTORY");
         }
 
         userRepository.delete(user);

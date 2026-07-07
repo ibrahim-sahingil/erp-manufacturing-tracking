@@ -24,6 +24,9 @@ public interface PartLogRepository extends JpaRepository<PartLog, UUID> {
      */
     List<PartLog> findByUserIdOrderByCreatedAtDesc(UUID userId);
 
+    /** Kullanici silme guard'i (U1): kullanicinin uretim log sayisi. */
+    long countByUserId(UUID userId);
+
     /**
      * Belirli parca + kullanici (analiz icin).
      */
