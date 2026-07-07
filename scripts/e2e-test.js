@@ -38,6 +38,7 @@ function grab(name){
 (0,eval)(grab('woStartBlockMsg'));
 (0,eval)(grab('rcvDoReceive'));   // 4. tur: kısmi mal kabul çekirdeği
 (0,eval)(grab('_whItemStock'));   // O6: depo net stok hesabı (sevk uyarısının çekirdeği)
+(0,eval)(grab('_unlinkPlanSources')); // E5: plaka iptal/silmede kaynakları havuza döndürme
 
 // ── Shims (frontend adapter'ın minimal karşılığı) ──
 globalThis.currentUser = {display_name:'E2E Test'};
@@ -367,6 +368,14 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     check('kaynak plana bağlandı', await dbUpdate('purchase_items', piSac.id, {stock_plan_id:plan.id, needs_planning:false}));
     const sacFresh = (await dbGet('purchase_items')).find(i=>i.id===piSac.id);
     check('bağ + havuzdan düştü', sacFresh.stock_plan_id===plan.id && !sacFresh.needs_planning);
+    // (E5) Plaka iptal/silinince kaynak havuza geri döner (çekirdek: _unlinkPlanSources)
+    globalThis.purchaseItems = await dbGet('purchase_items');
+    const freed = await _unlinkPlanSources(plan.id);
+    check('plaka çözüldü: 1 kaynak havuza döndü', freed===1, freed);
+    const sacFreed = (await dbGet('purchase_items')).find(i=>i.id===piSac.id);
+    check('kaynak: stock_plan_id null + needs_planning true',
+      !sacFreed.stock_plan_id && sacFreed.needs_planning===true,
+      JSON.stringify({sp:sacFreed.stock_plan_id, np:sacFreed.needs_planning}));
 
     console.log('═══ E2: ONDALIK ADET ÜRETİMDE YUKARI YUVARLANIR ═══');
     // parts.total_qty INTEGER — ondalık BOM adedi eskiden sessizce kesiliyordu.

@@ -6790,12 +6790,32 @@ async function addPurchaseItem(){
   renderPurchaseList();
 }
 
+// (E5) Bir MRP plakası/profili iptal/silinince, ona bağlı kaynak kalemleri
+// çöz ve planlama havuzuna geri koy — yoksa kaynaklar iptal plakaya asılı
+// kalır (needs_planning=false) ve planlamadan sessizce kaybolurdu.
+async function _unlinkPlanSources(planId){
+  const sources = purchaseItems.filter(x=>x.stock_plan_id===planId);
+  for(const s of sources){
+    const ok = await dbUpdate('purchase_items', s.id, {stock_plan_id:null, needs_planning:true});
+    if(ok){ s.stock_plan_id = null; s.needs_planning = true; }
+  }
+  return sources.length;
+}
+
 async function purSetStatus(id, status){
   // Depo entegrasyonu: depoya giris/cikis her zaman whTransfer/whUndo uzerinden
   // yapilir ki hedef depo secilsin ve hareket defterine yazilsin.
   const cur = purchaseItems.find(x=>x.id===id);
   if(status === 'IN_WAREHOUSE') return whTransfer(id);
   if(cur && cur.status === 'IN_WAREHOUSE' && status !== 'IN_WAREHOUSE') return whUndo(id);
+  // (E5) İptal edilen plakaya bağlı kaynakları havuza döndür (onaylı)
+  if(status === 'CANCELLED'){
+    const srcCount = purchaseItems.filter(x=>x.stock_plan_id===id).length;
+    if(srcCount){
+      if(!confirm(`Bu kalem ${srcCount} kaynak kalemin plakası/profili. İptal edilirse o kaynaklar planlama havuzuna geri döner. Devam edilsin mi?`)) return;
+      await _unlinkPlanSources(id);
+    }
+  }
   const ok = await dbUpdate('purchase_items', id, {status});
   if(!ok){ toast('Durum güncellenemedi!','error'); return; }
   // Damgalar backend'de atılır — listeyi tazele
@@ -6816,7 +6836,11 @@ async function deletePurchaseItem(id){
   if(item.purchase_order_id){
     toast('Sipariş grubuna bağlı kalem silinemez — önce gruptan çıkarın.','error'); return;
   }
-  if(!confirm(`"${item.name}" satın alma listesinden silinsin mi?`)) return;
+  // (E5) Bu kalem bir MRP plakası ise, bağlı kaynakları havuza döndüreceğiz
+  const srcCount = purchaseItems.filter(x=>x.stock_plan_id===id).length;
+  const extra = srcCount ? `\n\n${srcCount} kaynak kalem planlama havuzuna geri dönecek.` : '';
+  if(!confirm(`"${item.name}" satın alma listesinden silinsin mi?${extra}`)) return;
+  if(srcCount) await _unlinkPlanSources(id);
   const ok = await dbDelete('purchase_items', id);
   if(!ok){ toast('Silinemedi!','error'); return; }
   purchaseItems = purchaseItems.filter(i=>i.id!==id);
