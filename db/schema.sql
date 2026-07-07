@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 2Xdtkn31UJ3Wo4sRLUJBcKTQKTy3vQEmoTcdaLPNmRXKy1Ny39BwmWXBMFrRKUL
+\restrict UaZOPztf0MigyZ9BC1QS0j10AAVXQlBiHdNxwxG1omvQI4orpVImmm15i0GPFDV
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -457,7 +457,7 @@ CREATE TABLE public.warehouse_movements (
     created_at timestamp without time zone DEFAULT now(),
     delivery_note_id uuid,
     CONSTRAINT warehouse_movements_quantity_check CHECK ((quantity > (0)::numeric)),
-    CONSTRAINT warehouse_movements_source_check CHECK (((source_type)::text = ANY ((ARRAY['MANUAL'::character varying, 'PURCHASE_TRANSFER'::character varying, 'GOODS_RECEIPT'::character varying, 'DELIVERY'::character varying])::text[]))),
+    CONSTRAINT warehouse_movements_source_check CHECK (((source_type)::text = ANY (ARRAY[('MANUAL'::character varying)::text, ('PURCHASE_TRANSFER'::character varying)::text, ('GOODS_RECEIPT'::character varying)::text, ('DELIVERY'::character varying)::text, ('WAREHOUSE_TRANSFER'::character varying)::text]))),
     CONSTRAINT warehouse_movements_type_check CHECK (((movement_type)::text = ANY ((ARRAY['IN'::character varying, 'OUT'::character varying])::text[])))
 );
 
@@ -1394,5 +1394,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 2Xdtkn31UJ3Wo4sRLUJBcKTQKTy3vQEmoTcdaLPNmRXKy1Ny39BwmWXBMFrRKUL
+\unrestrict UaZOPztf0MigyZ9BC1QS0j10AAVXQlBiHdNxwxG1omvQI4orpVImmm15i0GPFDV
 

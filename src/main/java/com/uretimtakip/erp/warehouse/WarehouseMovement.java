@@ -27,6 +27,9 @@ import java.util.UUID;
  *   GOODS_RECEIPT     - QR mal kabul (?receive= sayfasi; purchase_item_id dolu)
  *   DELIVERY          - irsaliye sevki (delivery_note_id dolu; irsaliye geri
  *                       alinirsa bu hareketler SILINIR - sil+yeniden gir deseni)
+ *   WAREHOUSE_TRANSFER- depolar arasi aktarim (4. tur #2): kaynak depoya OUT +
+ *                       hedef depoya IN cifti; kalem bagli aktarimda
+ *                       purchase_item_id dolu, munferit stokta NULL
  *
  * item_name/item_code SNAPSHOT'tir: kaynak satin alma kalemi silinse de
  * (purchase_item_id SET NULL olur) hareket gecmisi anlamli kalir.

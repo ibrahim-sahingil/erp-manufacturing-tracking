@@ -31,7 +31,8 @@ public class WarehouseMovementService {
 
     /** DB'deki warehouse_movements_source_check ile ayni liste. */
     private static final Set<String> VALID_SOURCES = Set.of(
-            "MANUAL", "PURCHASE_TRANSFER", "GOODS_RECEIPT", "DELIVERY");
+            "MANUAL", "PURCHASE_TRANSFER", "GOODS_RECEIPT", "DELIVERY",
+            "WAREHOUSE_TRANSFER");
 
     private final WarehouseMovementRepository warehouseMovementRepository;
     private final WarehouseRepository warehouseRepository;

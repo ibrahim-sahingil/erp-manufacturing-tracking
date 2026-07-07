@@ -7186,7 +7186,8 @@ function whvProjectHTML(){
       body = `<div style="margin-top:12px">`;
       Object.entries(whGroups).sort(([a],[b])=>a.localeCompare(b,'tr')).forEach(([wn,items])=>{
         body += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--green,#2ecc71);margin:10px 0 6px">🗄️ ${wn} · ${items.length} malzeme</div>`
-          + items.map(i=>whRow(i, `<button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)).join('');
+          + items.map(i=>whRow(i, `<button class="btn btn-ghost btn-sm" onclick="whXferItem('${i.id}')" title="Başka depoya aktar">🔁 Aktar</button>
+              <button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)).join('');
       });
       if(pending.length){
         body += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#2980b9;margin:14px 0 6px">📦 Beklenen Girişler · ${pending.length}</div>`
@@ -7248,7 +7249,8 @@ function whvWarehouseHTML(){
   let html = '';
   Object.entries(projGroups).sort(([a],[b])=>a.localeCompare(b,'tr')).forEach(([proj,items])=>{
     html += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:14px 0 6px">📁 ${proj} · ${items.length} malzeme</div>`
-      + items.map(i=>whRow(i, `<button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)).join('');
+      + items.map(i=>whRow(i, `<button class="btn btn-ghost btn-sm" onclick="whXferItem('${i.id}')" title="Başka depoya aktar">🔁 Aktar</button>
+          <button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)).join('');
   });
   if(loose.length){
     html += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:14px 0 6px">📦 Münferit (projesiz) · ${loose.length} kalem</div>`
@@ -7260,7 +7262,10 @@ function whvWarehouseHTML(){
               ${r.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${r.code}</span>`:''}
               <span>${r.name}</span>
             </div>
-            <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${r.unit}</span>
+            <span style="display:flex;gap:8px;align-items:center">
+              <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${r.unit}</span>
+              ${r.net>0?`<button class="btn btn-ghost btn-sm" onclick="whXferLoose('${whId}','${ea(r.name)}','${ea(r.code||'')}','${ea(r.unit)}',${r.net})" title="Başka depoya aktar">🔁</button>`:''}
+            </span>
           </div>
         </div>`;
       }).join('');
@@ -7410,6 +7415,117 @@ async function whUndo(id){
   renderWarehouseList();
   renderPurchaseList();
   if(document.getElementById('pur-tab-receiving')?.classList.contains('active')) renderReceiving();
+}
+
+// ═══ DEPOLAR ARASI AKTARIM (4. tur #2) ═══
+// Kaynak depoya OUT + hedef depoya IN (source_type=WAREHOUSE_TRANSFER).
+// Kalem bağlı aktarımda adet kısmiyse kalem BÖLÜNÜR (orijinal azalır,
+// hedef depoda yeni kalem oluşur); münferit stokta yalnız hareket çifti.
+let _whXfer = null; // {kind:'item'|'loose', ...} — modal onayına taşınan bağlam
+
+function whXferItem(id){
+  const i = purchaseItems.find(x=>x.id===id);
+  if(!i || i.status!=='IN_WAREHOUSE' || !i.warehouse_id) return;
+  const others = warehouses.filter(w=>w.is_active!==false && w.id!==i.warehouse_id);
+  if(!others.length){ toast('Aktarılacak başka aktif depo yok!','error'); return; }
+  _whXfer = {kind:'item', id, src:i.warehouse_id, maxQ:Number(i.quantity)||1, unit:i.unit||'adet'};
+  _whXferOpenModal(`${i.code?i.code+' — ':''}${i.name}`, others);
+}
+
+function whXferLoose(whId, name, code, unit, net){
+  const others = warehouses.filter(w=>w.is_active!==false && w.id!==whId);
+  if(!others.length){ toast('Aktarılacak başka aktif depo yok!','error'); return; }
+  _whXfer = {kind:'loose', src:whId, name, code:code||null, maxQ:Number(net)||0, unit:unit||'adet'};
+  _whXferOpenModal(`${code?code+' — ':''}${name}`, others);
+}
+
+function _whXferOpenModal(label, targets){
+  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none';
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'whx-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:400px;text-align:left">
+    <h3 style="margin-bottom:4px">🔁 Depolar Arası Aktarım</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${label}<br>Kaynak: 🗄️ ${whName(_whXfer.src)||'—'} · mevcut ${Number(_whXfer.maxQ.toFixed(4))} ${_whXfer.unit}</p>
+    <div class="form-row" style="grid-template-columns:2fr 1fr;margin-bottom:16px">
+      <div class="form-group"><label>Hedef Depo</label>
+        <select id="whx-target" style="${inp}">
+          ${targets.map(w=>`<option value="${w.id}">${w.name}${w.location?' — '+w.location:''}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Adet</label>
+        <input type="number" id="whx-qty" value="${Number(_whXfer.maxQ.toFixed(4))}" min="0.001" max="${_whXfer.maxQ}" step="0.001" style="${inp}"
+          onkeydown="if(event.key==='Enter')whXferConfirm()">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('whx-overlay').remove();_whXfer=null">İptal</button>
+      <button class="btn btn-primary" onclick="whXferConfirm()">🔁 Aktar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(()=>{const el=document.getElementById('whx-qty');if(el){el.focus();el.select();}},100);
+}
+
+async function whXferConfirm(){
+  const x = _whXfer;
+  if(!x) return;
+  const target = document.getElementById('whx-target')?.value;
+  const qty = parseFloat(document.getElementById('whx-qty')?.value);
+  if(!target){ toast('Hedef depo seçin!','error'); return; }
+  if(!qty || qty<=0){ toast('Geçerli adet girin!','error'); return; }
+  if(qty > x.maxQ+1e-9){ toast('En fazla '+Number(x.maxQ.toFixed(4))+' '+x.unit+' aktarılabilir!','error'); return; }
+  document.getElementById('whx-overlay')?.remove();
+  const by = currentUser?.display_name||currentUser?.username||null;
+  const note = 'Depolar arası aktarım: '+(whName(x.src)||'—')+' → '+(whName(target)||'—');
+  const mv = (whId,type,itemId,name,code,unit,q)=>dbInsert('warehouse_movements',{
+    warehouse_id:whId, purchase_item_id:itemId, item_name:name, item_code:code,
+    movement_type:type, quantity:q, unit,
+    source_type:'WAREHOUSE_TRANSFER', performed_by:by, notes:note});
+
+  if(x.kind==='loose'){
+    await mv(x.src,'OUT',null,x.name,x.code,x.unit,qty);
+    await mv(target,'IN',null,x.name,x.code,x.unit,qty);
+  } else {
+    const i = purchaseItems.find(p=>p.id===x.id);
+    if(!i){ _whXfer=null; return; }
+    if(qty >= x.maxQ-1e-9){
+      // Tam aktarım: kalem hedef depoya taşınır
+      const ok = await dbUpdate('purchase_items', x.id, {warehouse_id: target});
+      if(!ok){ toast('Aktarılamadı!','error'); _whXfer=null; return; }
+      i.warehouse_id = target;
+      await mv(x.src,'OUT',x.id,i.name,i.code||null,i.unit||'adet',qty);
+      await mv(target,'IN',x.id,i.name,i.code||null,i.unit||'adet',qty);
+    } else {
+      // Kısmi: kalem bölünür — orijinal adedi azalır, hedefte yeni kalem
+      const ok = await dbUpdate('purchase_items', x.id, {quantity: x.maxQ-qty});
+      if(!ok){ toast('Aktarılamadı!','error'); _whXfer=null; return; }
+      i.quantity = x.maxQ-qty;
+      const d = await dbInsert('purchase_items',{
+        project_name:i.project_name, name:i.name, code:i.code||null,
+        quantity:qty, unit:i.unit||'adet', material:i.material||null,
+        supplier:i.supplier||null, unit_price:i.unit_price||null,
+        currency:i.currency||'TRY', status:'IN_WAREHOUSE',
+        notes:note, created_by:by});
+      if(!Array.isArray(d)||!d[0]){
+        await dbUpdate('purchase_items', x.id, {quantity: x.maxQ});
+        i.quantity = x.maxQ;
+        toast('Aktarım başarısız!','error'); _whXfer=null; return;
+      }
+      const ni = d[0];
+      // create endpoint'i warehouse_id almaz — ayrı update ile bağlanır
+      await dbUpdate('purchase_items', ni.id, {warehouse_id: target});
+      ni.warehouse_id = target; ni.status='IN_WAREHOUSE';
+      purchaseItems.push(ni);
+      await mv(x.src,'OUT',x.id,i.name,i.code||null,i.unit||'adet',qty);
+      await mv(target,'IN',ni.id,i.name,i.code||null,i.unit||'adet',qty);
+    }
+  }
+  _whXfer = null;
+  toast('🔁 '+(whName(target)||'Hedef depo')+' deposuna aktarıldı ('+qty+' '+x.unit+')','success');
+  const mvs = await dbGet('warehouse_movements','order=created_at.desc');
+  if(Array.isArray(mvs)) whMovements = mvs;
+  renderWarehouseList();
 }
 
 // ═══ İRSALİYE (dahili sevk irsaliyesi + PDF — resmî e-İrsaliye DEĞİL) ═══
@@ -7956,7 +8072,7 @@ function printGoodsReceiptPDF(itemIds){
 }
 
 // ─── Depo Yönetimi alt sekmesi ───
-const WH_SOURCE_LABELS = { MANUAL:'Manuel', PURCHASE_TRANSFER:'Satın Alma', GOODS_RECEIPT:'QR Mal Kabul', DELIVERY:'İrsaliye' };
+const WH_SOURCE_LABELS = { MANUAL:'Manuel', PURCHASE_TRANSFER:'Satın Alma', GOODS_RECEIPT:'QR Mal Kabul', DELIVERY:'İrsaliye', WAREHOUSE_TRANSFER:'Depolar Arası' };
 
 async function renderWarehouseManage(){
   const us = await getRef('users');
