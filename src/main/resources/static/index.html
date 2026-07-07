@@ -6819,6 +6819,10 @@ async function purQuickPriceSave(id){
 function editPurchaseItem(id){
   const i = purchaseItems.find(x=>x.id===id);
   if(!i) return;
+  // (O3) Depoya girmiş/teslim alınmış kalemde miktar düzenlenemez: depo
+  // hareketi (IN) ve received_qty eski adette kalır, stok özeti ile kalem
+  // listesi sessizce ayrışırdı. Düzeltme için önce "Depodan Geri Al".
+  const qtyLocked = ['IN_WAREHOUSE','RECEIVED'].includes(i.status);
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.id = 'pur-edit-overlay';
@@ -6827,7 +6831,8 @@ function editPurchaseItem(id){
     <h3 style="margin-bottom:4px">✏️ Kalemi Düzenle</h3>
     <p style="margin-bottom:14px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${i.name} · 📁 ${i.project_name}</p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div><label style="font-size:11px;color:var(--muted)">Miktar</label><input type="number" id="pe-qty" value="${i.quantity!=null?Number(i.quantity):1}" min="0" step="0.01" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Miktar${qtyLocked?' 🔒':''}</label><input type="number" id="pe-qty" value="${i.quantity!=null?Number(i.quantity):1}" min="0" step="0.01" style="${inp}" ${qtyLocked?'disabled title="Depoya girmiş kalemin miktarı değiştirilemez — önce Depodan Geri Al"':''}>
+        ${qtyLocked?'<div style="font-size:10px;color:var(--muted);margin-top:3px">🔒 Depodaki kalemde miktar kilitli (stok defteri tutarlılığı) — düzeltme için önce "Depodan Geri Al".</div>':''}</div>
       <div><label style="font-size:11px;color:var(--muted)">Birim</label><input type="text" id="pe-unit" value="${i.unit||'adet'}" style="${inp}"></div>
       <div><label style="font-size:11px;color:var(--muted)">Tedarikçi</label><input type="text" id="pe-supplier" list="sup-datalist" value="${(i.supplier||'').replace(/"/g,'&quot;')}" style="${inp}"></div>
       <div><label style="font-size:11px;color:var(--muted)">Termin</label><input type="date" id="pe-date" value="${i.expected_date||''}" style="${inp}"></div>
@@ -6848,10 +6853,14 @@ function editPurchaseItem(id){
 }
 
 async function savePurchaseEdit(id){
+  const item  = purchaseItems.find(x=>x.id===id);
   const qty   = parseFloat(document.getElementById('pe-qty').value);
   const price = parseFloat(document.getElementById('pe-price').value);
+  // (O3) depodaki/teslim alınmış kalemde miktar gönderilmez (kilitli alan;
+  // partial update'te alan yoksa backend dokunmaz)
+  const qtyLocked = item && ['IN_WAREHOUSE','RECEIVED'].includes(item.status);
   const body = {
-    quantity: isNaN(qty) ? 1 : qty,
+    quantity: qtyLocked ? undefined : (isNaN(qty) ? 1 : qty),
     unit:     document.getElementById('pe-unit').value.trim() || 'adet',
     supplier: document.getElementById('pe-supplier').value.trim() || null,
     unit_price: isNaN(price) ? null : price,
