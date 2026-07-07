@@ -40,6 +40,26 @@ function grab(name){
 (0,eval)(grab('_whItemStock'));   // O6: depo net stok hesabı (sevk uyarısının çekirdeği)
 (0,eval)(grab('_unlinkPlanSources')); // E5: plaka iptal/silmede kaynakları havuza döndürme
 
+// (E1 tagged-template) h`` mekanizması — index.html'deki esc/raw/_hval/h ile
+// AYNI OLMALI (değişirse İKİSİNİ de güncelle; 'h' ismi grab substring'iyle
+// çakıştığından burada elle kopya tutulur). Aşağıdaki testler mekanizmanın
+// davranışsal doğruluğunu (çift kaçırma, nested, raw, nullish) korur.
+globalThis.esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+globalThis.raw = s => { const r = new String(s==null?'':String(s)); r.__html = true; return r; };
+globalThis._hval = v => (v==null||v===false||v===true)?'':(v&&v.__html)?v.toString():Array.isArray(v)?v.map(_hval).join(''):esc(v);
+globalThis.h = (strings,...vals)=>{ let out=strings[0]; for(let i=0;i<vals.length;i++) out+=_hval(vals[i])+strings[i+1]; return raw(out); };
+console.log('═══ E1 TAGGED-TEMPLATE: h`` mekanizması ═══');
+check('esc: kullanıcı verisi kaçırılır',
+  h`<b>${'<img src=x onerror=alert(1)>'}</b>`.toString()==='<b>&lt;img src=x onerror=alert(1)&gt;</b>');
+check('raw: ham HTML korunur',
+  h`<div>${raw('<i>x</i>')}</div>`.toString()==='<div><i>x</i></div>');
+check('nested array: ÇİFT kaçırma YOK',
+  h`<ul>${['a<b','c&d'].map(x=>h`<li>${x}</li>`)}</ul>`.toString()==='<ul><li>a&lt;b</li><li>c&amp;d</li></ul>');
+check('nullish/bool → boş dize',
+  h`x${null}${undefined}${false}${true}y`.toString()==='xy');
+check('tırnak/ampersand kaçırma',
+  h`${'A & "B" \'C\''}`.toString()==='A &amp; &quot;B&quot; &#39;C&#39;');
+
 // ── Shims (frontend adapter'ın minimal karşılığı) ──
 globalThis.currentUser = {display_name:'E2E Test'};
 globalThis._lastApiError = null;

@@ -2048,6 +2048,31 @@ function ea(s){ return (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace
 const _ESC_MAP={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
 function esc(s){ return String(s??'').replace(/[&<>"']/g, c=>_ESC_MAP[c]); }
 
+// ─── (E1 tagged-template) Otomatik-kaçıran HTML şablonu ───
+// h`<div>${x}</div>` — interpolasyonları VARSAYILAN olarak esc()'ler, yani
+// yeni şablonlarda "esc unutma" riski kalkar (güvenli-varsayılan). Kurallar:
+//   • Kullanıcı verisi:  ${x}                → otomatik esc'lenir.
+//   • Ham HTML gerekli:  ${raw(htmlString)}  → kaçırılmadan basılır.
+//   • İç içe şablon:      ${items.map(i=>h`…`)} → h`` sonucu işaretli
+//     olduğundan ham birleşir (ÇİFT kaçırma YOK; iç h zaten esc'ledi).
+//   • null/undefined/false/true → '' (koşullu ${cond && h`…`} için pratik).
+//   • onclick="fn('${…}')" gibi JS-in-attribute bağlamında değer h`` ile
+//     esc'lenmemeli; ea() kullan ve ham geçir: ${raw(ea(userValue))}.
+//     (Basit UUID/sabit argümanlar zaten güvenlidir, raw gerekmez.)
+// innerHTML'e atanınca işaretli String otomatik düz metne çözülür.
+function raw(s){ const r = new String(s==null?'':String(s)); r.__html = true; return r; }
+function _hval(v){
+  if(v==null || v===false || v===true) return '';
+  if(v && v.__html) return v.toString();
+  if(Array.isArray(v)) return v.map(_hval).join('');
+  return esc(v);
+}
+function h(strings, ...vals){
+  let out = strings[0];
+  for(let i=0;i<vals.length;i++) out += _hval(vals[i]) + strings[i+1];
+  return raw(out);
+}
+
 // ─── Ölçü yardımcıları (sac/profil mm ölçüleri; 0 veya boş = ölçü yok) ───
 function dimVal(v){ const n=parseFloat(v); return (isFinite(n)&&n>0)?n:''; }
 function dimNum(id){ const el=document.getElementById(id); const n=parseFloat(el?el.value:''); return (isFinite(n)&&n>0)?n:0; }
@@ -3004,17 +3029,20 @@ async function toggleUserActive(id){
   u.is_active = target; renderUsers();
   toast(target?'▶ Personel aktifleştirildi':'⏸ Personel pasife alındı','success');
 }
+// (E1 tagged-template PİLOT) Bu fonksiyon h`` ile yeniden yazıldı: artık
+// interpolasyonlar VARSAYILAN esc'li — esc() çağrıları kalktı, ham parçalar
+// (koşullu stil/rozet) raw() ile işaretli. Deseni yaymadan önce referans.
 function renderUsers(){
   const grid = document.getElementById('users-grid');
-  if(!users.length){ grid.innerHTML=`<div class="empty-state"><span class="emoji">👷</span>Personel eklenmedi</div>`; return; }
-  grid.innerHTML = users.map(u=>{
+  if(!users.length){ grid.innerHTML = h`<div class="empty-state"><span class="emoji">👷</span>Personel eklenmedi</div>`; return; }
+  grid.innerHTML = h`${users.map(u=>{
     const passive = u.is_active===false;
-    return `<div class="user-card"${passive?' style="opacity:.55"':''}>
-    <div class="user-avatar">${esc(u.name.charAt(0))}</div>
-    <div style="flex:1"><div class="user-name">${esc(u.name)}${passive?' <span style="font-size:10px;color:var(--muted)">(pasif)</span>':''}</div><div class="user-role">${esc([u.dept,u.role].filter(Boolean).join(' · '))}</div></div>
+    return h`<div class="user-card"${passive?raw(' style="opacity:.55"'):''}>
+    <div class="user-avatar">${u.name.charAt(0)}</div>
+    <div style="flex:1"><div class="user-name">${u.name}${passive?raw(' <span style="font-size:10px;color:var(--muted)">(pasif)</span>'):''}</div><div class="user-role">${[u.dept,u.role].filter(Boolean).join(' · ')}</div></div>
     <button class="icon-btn" onclick="toggleUserActive('${u.id}')" title="${passive?'Aktifleştir':'Pasife al'}">${passive?'▶':'⏸'}</button>
     <button class="icon-btn" onclick="deleteUser('${u.id}')" title="Sil">✕</button>
-  </div>`;}).join('');
+  </div>`;})}`;
 }
 
 // ═══ QR ═══
