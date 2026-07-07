@@ -10038,7 +10038,7 @@ function pbomeShowTree() {
 // TEDARIK/HAMMADDE/SARF → satın alma kalemi (parts'a GİRMEZ);
 // YARI_MAMUL/MAMUL/türsüz → üretim (parts, eski davranış).
 // Mükerrer kontrolü: parts proje+kod; purchase_items pbp bağı veya proje+kod.
-async function pbomPublishParts(pb, allPbParts){
+async function pbomPublishParts(pb, allPbParts, templateParts){
   const freshPur = await dbGet('purchase_items');
   if(Array.isArray(freshPur)) purchaseItems = freshPur;
   const res = { added:0, skipped:0, purAdded:0, purSkipped:0, errors:0, linked:0 };
@@ -10046,49 +10046,63 @@ async function pbomPublishParts(pb, allPbParts){
   const partIdByPbp = {}; // (#8) pbp.id → parts.id (üretime gidenler)
   const pbpById = {};
   allPbParts.forEach(p=>{ pbpById[p.id] = p; });
+  // Eski satırlarda override boş, değerler şablondan (resolved_*) gelir
+  const codeOf = p => p.custom_code || p.resolved_code || null;
+  const nameOf = p => p.custom_name || p.resolved_name || null;
   for(const p of allPbParts){
-    if(p.is_excluded || !p.custom_name || !p.custom_code) continue;
+    const code = codeOf(p), name = nameOf(p);
+    if(p.is_excluded || !name || !code) continue;
     const kind = p.material_kind || p.resolved_material_kind || null;
+    const qty = p.custom_qty!=null ? p.custom_qty : (p.resolved_qty!=null ? p.resolved_qty : 1);
     if(PURCHASE_KINDS.includes(kind)){
       const purExists = purchaseItems.find(x=>x.project_bom_part_id===p.id ||
-        (x.project_name===pb.project_name && (x.code||'').toLowerCase()===p.custom_code.toLowerCase()));
+        (x.project_name===pb.project_name && (x.code||'').toLowerCase()===code.toLowerCase()));
       if(purExists){ res.purSkipped++; continue; }
       const d = await dbInsert('purchase_items',{
         project_name: pb.project_name, project_bom_part_id: p.id,
-        name: p.custom_name, code: p.custom_code,
-        quantity: p.custom_qty!=null?p.custom_qty:1, unit: p.custom_unit||'adet',
+        name, code,
+        quantity: qty, unit: p.custom_unit||p.resolved_unit||'adet',
         material: p.custom_material||p.resolved_material||null,
         created_by: currentUser?.display_name||currentUser?.username||null
       });
       if(Array.isArray(d)&&d[0]){ purchaseItems.push(d[0]); res.purAdded++; }
-      else { res.errors++; console.error('Satın almaya eklenemedi:', p.custom_code); }
+      else { res.errors++; console.error('Satın almaya eklenemedi:', code); }
       continue;
     }
-    const exists = parts.find(x=>x.project===pb.project_name && (x.code||'').toLowerCase()===p.custom_code.toLowerCase());
+    const exists = parts.find(x=>x.project===pb.project_name && (x.code||'').toLowerCase()===code.toLowerCase());
     if(exists){ partIdByPbp[p.id] = exists.id; res.skipped++; continue; }
     const ops = Array.isArray(p.operations)?p.operations:(typeof p.operations==='string'?JSON.parse(p.operations||'[]'):[]);
     const newPart = await dbInsert('parts',{
-      id:genId(), name:p.custom_name, code:p.custom_code,
+      id:genId(), name, code,
       project:pb.project_name, department_id:p.dept_id||null,
-      qty:p.custom_qty||1, qty_done:0, qty_pending:0, qty_reject:0,
-      status:'pending', material:p.custom_material||null,
+      qty:qty||1, qty_done:0, qty_pending:0, qty_reject:0,
+      status:'pending', material:p.custom_material||p.resolved_material||null,
       notes: ops.length ? ops.map(o=>o.name).join(', ') : null
     });
     if(Array.isArray(newPart)&&newPart[0]){ parts.push(newPart[0]); partIdByPbp[p.id] = newPart[0].id; res.added++; }
-    else { res.errors++; console.error('Eklenemedi:', p.custom_code); }
+    else { res.errors++; console.error('Eklenemedi:', code); }
   }
 
   // (#8) İKİNCİ GEÇİŞ — hiyerarşi bağlama: her üretim parçası, pbp ağacında
   // en yakın ÜRETİME GİDEN atasına bağlanır (satın almaya yönlenen ya da
   // hariç tutulan atalar atlanır; parts'a hiyerarşi böylece taşınır).
+  // Üst çözümü: parent_custom_id; yoksa şablon hiyerarşisi (bom_parts.parent_id).
+  const tplById = {};
+  (templateParts||[]).forEach(b=>{ tplById[b.id] = b; });
+  const parentOf = p => {
+    if(p.parent_custom_id) return pbpById[p.parent_custom_id] || null;
+    const tpl = p.bom_part_id ? tplById[p.bom_part_id] : null;
+    if(tpl && tpl.parent_id) return allPbParts.find(x=>x.bom_part_id===tpl.parent_id) || null;
+    return null;
+  };
   for(const p of allPbParts){
     const childPartId = partIdByPbp[p.id];
     if(!childPartId) continue;
-    let anc = p.parent_custom_id ? pbpById[p.parent_custom_id] : null;
+    let anc = parentOf(p);
     let parentPartId = null;
     while(anc){
       if(partIdByPbp[anc.id] && partIdByPbp[anc.id]!==childPartId){ parentPartId = partIdByPbp[anc.id]; break; }
-      anc = anc.parent_custom_id ? pbpById[anc.parent_custom_id] : null;
+      anc = parentOf(anc);
     }
     const partObj = parts.find(x=>x.id===childPartId);
     if(((partObj?partObj.parent_part_id:null)||null) !== parentPartId){
@@ -10124,7 +10138,9 @@ async function openAndPublishPbom(pbomId) {
 
   console.log('Yayınlanacak parça sayısı:', allPbParts.length);
 
-  const r = await pbomPublishParts(pb, allPbParts);
+  // Şablon parçaları: eski satırlarda hiyerarşi bom_parts.parent_id'de (#8)
+  const tplData = await dbGet('bom_parts','product_id=eq.'+prod.id);
+  const r = await pbomPublishParts(pb, allPbParts, Array.isArray(tplData)?tplData:[]);
 
   await dbUpdate('project_bom', pbomId, {status:'published', published_at:new Date().toISOString()});
   pb.status='published'; pb.published_at=new Date().toISOString();
@@ -10146,7 +10162,9 @@ async function pbomePublish() {
   
   console.log('Yayınlanacak parça sayısı:', allPbParts.length);
 
-  const r = await pbomPublishParts(pb, allPbParts);
+  // Şablon parçaları: eski satırlarda hiyerarşi bom_parts.parent_id'de (#8)
+  const tplData = await dbGet('bom_parts','product_id=eq.'+prod.id);
+  const r = await pbomPublishParts(pb, allPbParts, Array.isArray(tplData)?tplData:[]);
 
   await dbUpdate('project_bom',_activePbomId,{status:'published',published_at:new Date().toISOString()});
   pb.status='published'; pb.published_at=new Date().toISOString();
