@@ -345,6 +345,14 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const sacFresh = (await dbGet('purchase_items')).find(i=>i.id===piSac.id);
     check('bağ + havuzdan düştü', sacFresh.stock_plan_id===plan.id && !sacFresh.needs_planning);
 
+    console.log('═══ K1: PROJE SİLME GUARD\'I ═══');
+    // Bağlı kaydı (parça/iş emri/satın alma/BOM) olan proje silinememeli
+    globalThis._lastApiError = null;
+    await api('DELETE','/orders/'+orderId);
+    check('bağlı kaydı olan proje SİLİNEMEDİ', /silinemez/i.test(_lastApiError||''), _lastApiError);
+    const ordStill = (await api('GET','/orders')||[]).some(x=>x.id===orderId);
+    check('proje yerinde duruyor', ordStill);
+
     console.log('═══ TEMİZLİK ═══');
   } catch(e){
     failures++;

@@ -32,4 +32,7 @@ public interface ProjectBomRepository extends JpaRepository<ProjectBom, UUID> {
     boolean existsByProjectNameAndBomProductId(String projectName, UUID bomProductId);
 
     long countByBomProductId(UUID bomProductId);
+
+    /** Proje silme guard'i (K1): projeye bagli urun agaci baglantisi sayisi. */
+    long countByProjectName(String projectName);
 }

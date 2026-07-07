@@ -5,6 +5,10 @@ import com.uretimtakip.erp.common.exception.ResourceNotFoundException;
 import com.uretimtakip.erp.order.dto.OrderItemRequest;
 import com.uretimtakip.erp.order.dto.OrderRequest;
 import com.uretimtakip.erp.order.dto.OrderResponse;
+import com.uretimtakip.erp.part.PartRepository;
+import com.uretimtakip.erp.projectbom.ProjectBomRepository;
+import com.uretimtakip.erp.purchasing.PurchaseItemRepository;
+import com.uretimtakip.erp.workorder.WorkOrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +27,10 @@ import java.util.stream.Collectors;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final PartRepository partRepository;
+    private final WorkOrderRepository workOrderRepository;
+    private final PurchaseItemRepository purchaseItemRepository;
+    private final ProjectBomRepository projectBomRepository;
 
     @Transactional(readOnly = true)
     public List<OrderResponse> listAll() {
@@ -135,6 +143,26 @@ public class OrderService {
     @Transactional
     public void delete(UUID id) {
         Order order = findEntityById(id);
+
+        // (K1) Tek onayla tum proje verisinin gitmesini engelle:
+        // parts/work_orders/departments CASCADE ile topluca silinirdi;
+        // purchase_items/project_bom proje adini STRING tuttugundan silinmeyip
+        // sahipsiz kalirdi. Bagli kaydi olan proje silinemez.
+        long parts = partRepository.countByOrderId(id);
+        long workOrders = workOrderRepository.countByOrderId(id);
+        long purchaseItems = purchaseItemRepository.countByProjectName(order.getProjectName());
+        long projectBoms = projectBomRepository.countByProjectName(order.getProjectName());
+        if (parts + workOrders + purchaseItems + projectBoms > 0) {
+            StringBuilder sb = new StringBuilder("Bu proje silinemez, bagli kayitlari var:");
+            if (parts > 0) sb.append(" ").append(parts).append(" uretim parcasi,");
+            if (workOrders > 0) sb.append(" ").append(workOrders).append(" is emri,");
+            if (purchaseItems > 0) sb.append(" ").append(purchaseItems).append(" satin alma kalemi,");
+            if (projectBoms > 0) sb.append(" ").append(projectBoms).append(" urun agaci baglantisi,");
+            sb.setLength(sb.length() - 1);
+            sb.append(". Once bunlari silin/tasiyin.");
+            throw new BusinessException(sb.toString(), "ORDER_HAS_DEPENDENT_DATA");
+        }
+
         orderRepository.delete(order);
         log.info("Order deleted: id={}, project={}", id, order.getProjectName());
     }

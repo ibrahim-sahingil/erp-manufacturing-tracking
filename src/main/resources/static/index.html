@@ -3679,7 +3679,24 @@ function editOrder(id) {
 }
 
 async function deleteOrder(id) {
-  if(!confirm('Bu siparişi silmek istiyor musunuz?')) return;
+  const o = orders.find(x=>x.id===id);
+  if(!o) return;
+  const proj = o.project_name;
+  // (K1) Canlı sayım: bağlı kaydı olan proje backend'de de silinemez —
+  // kullanıcıya jenerik confirm yerine neyin engellediğini/gideceğini söyle
+  const [pAll, wAll, piAll, pbAll] = await Promise.all([
+    dbGet('parts'), dbGet('work_orders'), dbGet('purchase_items'), dbGet('project_bom')]);
+  const nParts = (pAll||[]).filter(p=>p.project===proj).length;
+  const nWo    = (wAll||[]).filter(w=>w.project_name===proj).length;
+  const nPur   = (piAll||[]).filter(i=>i.project_name===proj).length;
+  const nBom   = (pbAll||[]).filter(b=>b.project_name===proj).length;
+  if(nParts+nWo+nPur+nBom){
+    const list = [nParts?nParts+' üretim parçası':'', nWo?nWo+' iş emri':'',
+      nPur?nPur+' satın alma kalemi':'', nBom?nBom+' ürün ağacı bağlantısı':''].filter(Boolean).join(', ');
+    toast(`"${proj}" silinemez — bağlı kayıtları var: ${list}. Önce bunları silin/taşıyın.`,'error');
+    return;
+  }
+  if(!confirm(`"${proj}" projesi silinsin mi?\n\nSipariş kaydıyla birlikte bölümleri ve proje tarihleri de silinecek. Bu işlem geri alınamaz!`)) return;
   const ok = await dbDelete('orders',id);
   if(!ok){ toast('Silinemedi!','error'); return; }
   orders = orders.filter(o=>o.id!==id);

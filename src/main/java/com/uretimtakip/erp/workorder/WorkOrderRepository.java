@@ -11,6 +11,9 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, UUID> {
 
     List<WorkOrder> findByOrderId(UUID orderId);
 
+    /** Proje silme guard'i (K1): projeye bagli is emri sayisi. */
+    long countByOrderId(UUID orderId);
+
     List<WorkOrder> findByWorkspaceId(UUID workspaceId);
 
     List<WorkOrder> findByDepartmentId(UUID departmentId);

@@ -13,6 +13,9 @@ public interface PurchaseItemRepository extends JpaRepository<PurchaseItem, UUID
 
     boolean existsByProjectBomPartId(UUID projectBomPartId);
 
+    /** Proje silme guard'i (K1): projeye bagli satin alma kalemi sayisi. */
+    long countByProjectName(String projectName);
+
     boolean existsByWarehouseId(UUID warehouseId);
 
     List<PurchaseItem> findByPurchaseOrderId(UUID purchaseOrderId);
