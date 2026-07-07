@@ -142,6 +142,18 @@ public class PurchaseItemService {
         if (request.getNeedsPlanning() != null) {
             item.setNeedsPlanning(request.getNeedsPlanning());
         }
+        // Mal kabul bilgileri (4. tur #3)
+        if (request.isReceivedByPresent()) {
+            item.setReceivedBy(request.getReceivedBy() != null
+                    && !request.getReceivedBy().isBlank()
+                    ? request.getReceivedBy() : null);
+        }
+        if (request.getReceivedQty() != null) {
+            item.setReceivedQty(request.getReceivedQty());
+        }
+        if (request.getReturnedQty() != null) {
+            item.setReturnedQty(request.getReturnedQty());
+        }
         if (request.isStockPlanIdPresent()) {
             // Plaka/profil bagi (#10 MRP): hedef kalem mevcut olmali
             if (request.getStockPlanId() != null

@@ -125,6 +125,28 @@ public class PurchaseItemUpdateRequest {
     /** Ihtiyac planlama havuzu isareti (#10 plaka MRP). */
     private Boolean needsPlanning;
 
+    /**
+     * Mal kabul bilgileri (4. tur #3). received_by presence takipli:
+     * whUndo geri alirken explicit null ile temizler.
+     */
+    @Setter(lombok.AccessLevel.NONE)
+    @Size(max = 150, message = "Teslim alan en fazla 150 karakter olabilir")
+    private String receivedBy;
+
+    @Setter(lombok.AccessLevel.NONE)
+    private boolean receivedByPresent;
+
+    public void setReceivedBy(String receivedBy) {
+        this.receivedBy = receivedBy;
+        this.receivedByPresent = true;
+    }
+
+    @PositiveOrZero(message = "Kabul edilen adet 0 veya pozitif olmali")
+    private BigDecimal receivedQty;
+
+    @PositiveOrZero(message = "Iade adedi 0 veya pozitif olmali")
+    private BigDecimal returnedQty;
+
     /** Kaynak kalemin baglandigi plaka/profil kalemi (explicit null = bagi coz). */
     @Setter(lombok.AccessLevel.NONE)
     private UUID stockPlanId;

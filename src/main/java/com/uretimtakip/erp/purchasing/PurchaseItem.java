@@ -132,6 +132,20 @@ public class PurchaseItem extends BaseEntity {
     @Column(name = "received_at")
     private LocalDateTime receivedAt;
 
+    /** Mal kabulu yapan hesap (4. tur #3 — kim teslim aldi). */
+    @Column(name = "received_by", length = 150)
+    private String receivedBy;
+
+    /** Depoya kabul edilen toplam adet (kismi mal kabul, 4. tur #3). */
+    @Column(name = "received_qty", nullable = false, precision = 15, scale = 4)
+    @Builder.Default
+    private BigDecimal receivedQty = BigDecimal.ZERO;
+
+    /** Tedarikciye iade edilen toplam adet (yeniden beklenir, 4. tur #3). */
+    @Column(name = "returned_qty", nullable = false, precision = 15, scale = 4)
+    @Builder.Default
+    private BigDecimal returnedQty = BigDecimal.ZERO;
+
     @Column(name = "created_by", length = 150)
     private String createdBy;
 }

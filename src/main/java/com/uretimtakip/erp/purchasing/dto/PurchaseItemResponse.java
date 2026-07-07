@@ -43,6 +43,9 @@ public class PurchaseItemResponse {
     private UUID stockPlanId;
     private LocalDateTime orderedAt;
     private LocalDateTime receivedAt;
+    private String receivedBy;
+    private BigDecimal receivedQty;
+    private BigDecimal returnedQty;
     private String createdBy;
     private LocalDateTime createdAt;
 
@@ -68,6 +71,9 @@ public class PurchaseItemResponse {
                 .stockPlanId(e.getStockPlanId())
                 .orderedAt(e.getOrderedAt())
                 .receivedAt(e.getReceivedAt())
+                .receivedBy(e.getReceivedBy())
+                .receivedQty(e.getReceivedQty())
+                .returnedQty(e.getReturnedQty())
                 .createdBy(e.getCreatedBy())
                 .createdAt(e.getCreatedAt())
                 .build();

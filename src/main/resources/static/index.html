@@ -5731,24 +5731,38 @@ async function renderReceiving(){
     const waiting = list.filter(i=>i.status==='ORDERED');
     const arrived = list.filter(i=>i.status!=='ORDERED');
     const open = _rcvActiveProj===proj;
-    const rows = !open ? '' : `<div style="margin-top:10px">` + list
+    // Toplu aktarım (4. tur #3): bekleyen/teslim alınmış satırlar işaretlenip
+    // tek seferde istenilen depoya alınır
+    const selectable = list.filter(i=>['ORDERED','RECEIVED'].includes(i.status));
+    const bulkBar = !open || !selectable.length ? '' :
+      `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;padding:8px 10px;background:var(--surface2);border:1px dashed var(--border);border-radius:8px">
+        <button class="btn btn-ghost btn-sm" onclick="document.querySelectorAll('.rcv-chk').forEach(c=>c.checked=true)">Tümünü Seç</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.querySelectorAll('.rcv-chk').forEach(c=>c.checked=false)">Bırak</button>
+        <button class="btn btn-primary btn-sm" onclick="rcvBulkModal()">✅ Seçilenleri Depoya Al</button>
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">işaretli kalemler tam adetle kabul edilir</span>
+      </div>`;
+    const rows = !open ? '' : bulkBar + `<div style="margin-top:10px">` + list
       .sort((a,b)=>(a.status==='ORDERED'?0:1)-(b.status==='ORDERED'?0:1))
       .map(i=>{
         const isWaiting = i.status==='ORDERED';
         const icon = isWaiting ? '⏳' : '✅';
+        const ret = Number(i.returned_qty)||0;
         const meta = [
-          Number(i.quantity||1)+' '+(i.unit||'adet'),
+          Number(i.quantity||1)+' '+(i.unit||'adet')+(isWaiting?' bekleniyor':''),
+          ret ? '↩ '+ret+' iade edildi' : '',
           i.supplier ? '🏢 '+i.supplier : '',
-          i.expected_date ? '📆 '+new Date(i.expected_date).toLocaleDateString('tr-TR') : '',
-          i.status==='IN_WAREHOUSE' ? '🏭 '+(whName(i.warehouse_id)||'Depoda') : (i.status==='RECEIVED'?'📥 Teslim alındı':'')
+          i.expected_date && isWaiting ? '📆 '+new Date(i.expected_date).toLocaleDateString('tr-TR') : '',
+          i.status==='IN_WAREHOUSE' ? '🏭 '+(whName(i.warehouse_id)||'Depoda') : (i.status==='RECEIVED'?'📥 Teslim alındı':''),
+          !isWaiting && i.received_by ? '👤 '+i.received_by : ''
         ].filter(Boolean).join(' · ');
         return `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--border);flex-wrap:wrap">
-          <span style="font-family:var(--font-mono);font-size:11px;min-width:0;flex:1">
-            ${icon} ${i.code?`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
-            <span style="color:var(--muted)"> · ${meta}</span>
+          <span style="font-family:var(--font-mono);font-size:11px;min-width:0;flex:1;display:flex;gap:8px;align-items:center">
+            ${['ORDERED','RECEIVED'].includes(i.status)?`<input type="checkbox" class="rcv-chk" value="${i.id}" style="accent-color:var(--accent);flex-shrink:0">`:''}
+            <span style="min-width:0">${icon} ${i.code?`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
+            <span style="color:var(--muted)"> · ${meta}</span></span>
           </span>
           <span style="display:flex;gap:4px;flex-shrink:0">
-            ${isWaiting?`<button class="btn btn-primary btn-sm" onclick="whTransfer('${i.id}')">✅ Geldi (depoya al)</button>`:''}
+            ${isWaiting?`<button class="btn btn-primary btn-sm" onclick="rcvReceiveModal('${i.id}')">✅ Geldi (depoya al)</button>`:''}
             ${i.status==='RECEIVED'?`<button class="btn btn-ghost btn-sm" onclick="whTransfer('${i.id}')">🏭 Depoya Aktar</button>`:''}
             ${['ORDERED','RECEIVED'].includes(i.status)?`<button class="btn btn-ghost btn-sm" onclick="printGoodsReceiptPDF(['${i.id}'])" title="QR'lı mal kabul fişi">📄 Fiş</button>`:''}
           </span>
@@ -5772,6 +5786,173 @@ async function renderReceiving(){
 function rcvToggle(proj){
   _rcvActiveProj = _rcvActiveProj===proj ? null : proj;
   renderReceiving();
+}
+
+// ─── Kısmi mal kabul (4. tur #3): gelen adet + iade adet + hedef depo ───
+// kabul = gelen − iade → depoya girer. Kabul, sipariş adedinden azsa kalem
+// BÖLÜNÜR: kabul edilen kadar yeni IN_WAREHOUSE kalem; orijinal ORDERED
+// kalan adetle beklemeye devam eder (iade edilen yeniden beklenir).
+function rcvReceiveModal(id){
+  const i = purchaseItems.find(x=>x.id===id);
+  if(!i) return;
+  const act = warehouses.filter(w=>w.is_active!==false);
+  if(!act.length){ toast('Önce Depo Yönetimi sekmesinden bir depo tanımlayın!','error'); return; }
+  const total = Number(i.quantity)||1;
+  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none';
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'rcv-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:440px;text-align:left">
+    <h3 style="margin-bottom:4px">📥 Mal Kabul</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${i.code?i.code+' — ':''}${i.name}<br>Beklenen: ${total} ${i.unit||'adet'}${Number(i.returned_qty)?` · ↩ daha önce ${Number(i.returned_qty)} iade`:''}</p>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Hedef Depo</label>
+      <select id="rcvm-wh" style="${inp}">
+        ${act.map(w=>`<option value="${w.id}">${w.name}${w.location?' — '+w.location:''}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:8px">
+      <div class="form-group"><label>Gelen Adet</label>
+        <input type="number" id="rcvm-arrived" value="${total}" min="0" max="${total}" step="0.001" style="${inp}" oninput="rcvModalCalc(${total})">
+      </div>
+      <div class="form-group"><label>İade Adet (gelenden reddedilen)</label>
+        <input type="number" id="rcvm-returned" value="0" min="0" step="0.001" style="${inp}" oninput="rcvModalCalc(${total})">
+      </div>
+    </div>
+    <div id="rcvm-summary" style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('rcv-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" onclick="rcvReceiveConfirm('${id}')">✅ Kabul Et</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  rcvModalCalc(total);
+  setTimeout(()=>{const el=document.getElementById('rcvm-arrived');if(el){el.focus();el.select();}},100);
+}
+
+function rcvModalCalc(total){
+  const g = parseFloat(document.getElementById('rcvm-arrived')?.value)||0;
+  const r = parseFloat(document.getElementById('rcvm-returned')?.value)||0;
+  const kabul = Math.max(0, g-r);
+  const kalan = Math.max(0, total-kabul);
+  const el = document.getElementById('rcvm-summary');
+  if(el) el.innerHTML = `🏭 Depoya girecek: <span style="color:var(--green,#2ecc71)">${Number(kabul.toFixed(4))}</span>`
+    + (r?` · ↩ iade: <span style="color:#e74c3c">${Number(r.toFixed(4))}</span>`:'')
+    + ` · ⏳ beklemede kalacak: <span style="color:var(--yellow,#f5a623)">${Number(kalan.toFixed(4))}</span>`;
+}
+
+async function rcvReceiveConfirm(id){
+  const i = purchaseItems.find(x=>x.id===id);
+  if(!i) return;
+  const total = Number(i.quantity)||1;
+  const whId = document.getElementById('rcvm-wh')?.value;
+  const arrived = parseFloat(document.getElementById('rcvm-arrived')?.value)||0;
+  const returned = parseFloat(document.getElementById('rcvm-returned')?.value)||0;
+  if(!whId){ toast('Depo seçin!','error'); return; }
+  if(arrived<=0 && returned<=0){ toast('Gelen veya iade adedi girin!','error'); return; }
+  if(returned > arrived+1e-9){ toast('İade, gelen adetten fazla olamaz!','error'); return; }
+  if(arrived > total+1e-9){ toast('Gelen, beklenen adetten ('+total+') fazla olamaz!','error'); return; }
+  document.getElementById('rcv-overlay')?.remove();
+  const ok = await rcvDoReceive(id, whId, arrived-returned, returned);
+  if(!ok){ toast('Mal kabul kaydedilemedi!','error'); return; }
+  const kabul = arrived-returned;
+  toast(kabul>0 ? '📥 '+Number(kabul.toFixed(4))+' '+(i.unit||'adet')+' depoya alındı'+(returned?' · '+returned+' iade kaydedildi':'') : '↩ '+returned+' iade kaydedildi','success');
+  renderReceiving();
+  renderPurchaseList();
+  renderWarehouseList();
+}
+
+// Ortak kabul çekirdeği: accepted depoya girer, returned iade sayacına eklenir
+async function rcvDoReceive(id, whId, accepted, returned){
+  const i = purchaseItems.find(x=>x.id===id);
+  if(!i) return false;
+  const total = Number(i.quantity)||1;
+  const by = currentUser?.display_name||currentUser?.username||null;
+  const retTotal = (Number(i.returned_qty)||0) + (returned||0);
+  let mvItemId = id, mvNote = 'Mal kabul' + (returned?` (${returned} iade)`:'');
+
+  if(accepted<=0){
+    // Hiçbiri kabul edilmedi — yalnız iade sayacı işlenir, kalem beklemede kalır
+    const ok = await dbUpdate('purchase_items', id, {returned_qty: retTotal});
+    if(ok) i.returned_qty = retTotal;
+    return ok;
+  }
+  if(accepted >= total-1e-9){
+    // Tam kabul
+    const ok = await dbUpdate('purchase_items', id, {status:'IN_WAREHOUSE', warehouse_id:whId, received_by:by, received_qty:total, returned_qty:retTotal});
+    if(!ok) return false;
+    Object.assign(i, {status:'IN_WAREHOUSE', warehouse_id:whId, received_by:by, received_qty:total, returned_qty:retTotal});
+  } else {
+    // Kısmi kabul: kalem bölünür
+    const remain = total - accepted;
+    const ok = await dbUpdate('purchase_items', id, {quantity:remain, returned_qty:retTotal});
+    if(!ok) return false;
+    i.quantity = remain; i.returned_qty = retTotal;
+    const d = await dbInsert('purchase_items',{
+      project_name:i.project_name, name:i.name, code:i.code||null,
+      quantity:accepted, unit:i.unit||'adet', material:i.material||null,
+      supplier:i.supplier||null, unit_price:i.unit_price||null,
+      currency:i.currency||'TRY', status:'IN_WAREHOUSE',
+      notes:'Kısmi mal kabul ('+accepted+'/'+total+')', created_by:by});
+    if(!Array.isArray(d)||!d[0]){
+      await dbUpdate('purchase_items', id, {quantity:total});
+      i.quantity = total;
+      return false;
+    }
+    const ni = d[0];
+    await dbUpdate('purchase_items', ni.id, {warehouse_id:whId, received_by:by, received_qty:accepted});
+    Object.assign(ni, {status:'IN_WAREHOUSE', warehouse_id:whId, received_by:by, received_qty:accepted});
+    purchaseItems.push(ni);
+    mvItemId = ni.id;
+  }
+  await dbInsert('warehouse_movements',{
+    warehouse_id: whId, purchase_item_id: mvItemId,
+    item_name: i.name, item_code: i.code||null,
+    movement_type: 'IN', quantity: accepted, unit: i.unit||'adet',
+    source_type: 'GOODS_RECEIPT', performed_by: by, notes: mvNote});
+  return true;
+}
+
+// ─── Toplu depoya alma (4. tur #3, görsel 101) ───
+function rcvBulkModal(){
+  const ids = [...document.querySelectorAll('.rcv-chk:checked')].map(c=>c.value);
+  if(!ids.length){ toast('Önce kalem işaretleyin!','error'); return; }
+  const act = warehouses.filter(w=>w.is_active!==false);
+  if(!act.length){ toast('Önce Depo Yönetimi sekmesinden bir depo tanımlayın!','error'); return; }
+  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none';
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'rcv-bulk-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:400px;text-align:left">
+    <h3 style="margin-bottom:4px">✅ Toplu Mal Kabul</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${ids.length} kalem tam adetle seçilen depoya alınacak</p>
+    <div class="form-group" style="margin-bottom:18px">
+      <label>Hedef Depo</label>
+      <select id="rcv-bulk-wh" style="${inp}">
+        ${act.map(w=>`<option value="${w.id}">${w.name}${w.location?' — '+w.location:''}</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('rcv-bulk-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" onclick='rcvBulkConfirm(${JSON.stringify(ids)})'>✅ Depoya Al (${ids.length})</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function rcvBulkConfirm(ids){
+  const whId = document.getElementById('rcv-bulk-wh')?.value;
+  document.getElementById('rcv-bulk-overlay')?.remove();
+  if(!whId) return;
+  let ok=0, fail=0;
+  for(const id of ids){
+    const done = await rcvDoReceive(id, whId, Number(purchaseItems.find(x=>x.id===id)?.quantity)||1, 0);
+    done ? ok++ : fail++;
+  }
+  toast(fail ? `⚠ ${ok} kalem alındı, ${fail} kalemde hata` : `🏭 ${ok} kalem ${whName(whId)||'depoya'} alındı`, fail?'error':'success');
+  renderReceiving();
+  renderPurchaseList();
+  renderWarehouseList();
 }
 
 // ═══ İHTİYAÇ PLANLAMA — PLAKA MRP (#10 arkadaş isteği) ═══
@@ -7112,7 +7293,9 @@ function whRow(i, actionsHTML){
     `${Number(i.quantity||1)} ${i.unit||'adet'}`,
     i.material ? '🔩 '+i.material : '',
     i.supplier ? '🏢 '+i.supplier : '',
-    ...dates
+    ...dates,
+    i.status==='IN_WAREHOUSE' && i.received_by ? '👤 '+i.received_by : '',
+    Number(i.returned_qty) ? '↩ '+Number(i.returned_qty)+' iade' : ''
   ].filter(Boolean).join(' · ');
   return `<div class="pbom-card" style="border-left:3px solid ${m.color}">
     <div class="pbom-card-header">
@@ -7360,12 +7543,17 @@ function whConfirmTransfer(id){
 }
 
 async function whDoTransfer(id, warehouseId){
-  const ok = await dbUpdate('purchase_items', id, {status:'IN_WAREHOUSE', warehouse_id: warehouseId});
+  const by = currentUser?.display_name || currentUser?.username || null;
+  const qFull = Number(purchaseItems.find(x=>x.id===id)?.quantity) || 1;
+  // received_by/received_qty: kim teslim aldı + kabul edilen adet (4. tur #3)
+  const ok = await dbUpdate('purchase_items', id, {status:'IN_WAREHOUSE', warehouse_id: warehouseId, received_by: by, received_qty: qFull});
   if(!ok){ toast('Aktarılamadı!','error'); return; }
   const i = purchaseItems.find(x=>x.id===id);
   if(i){
     i.status = 'IN_WAREHOUSE';
     i.warehouse_id = warehouseId;
+    i.received_by = by;
+    i.received_qty = qFull;
     const q = Number(i.quantity);
     await dbInsert('warehouse_movements', {
       warehouse_id: warehouseId,
@@ -7392,10 +7580,12 @@ async function whUndo(id){
   // Teslim alınmışsa RECEIVED'a, stok kalemiyse IN_STOCK'a geri döner
   const back = i.received_at ? 'RECEIVED' : 'IN_STOCK';
   const oldWh = i.warehouse_id || null;
-  const ok = await dbUpdate('purchase_items', id, {status:back, warehouse_id:null});
+  const ok = await dbUpdate('purchase_items', id, {status:back, warehouse_id:null, received_by:null, received_qty:0});
   if(!ok){ toast('Geri alınamadı!','error'); return; }
   i.status = back;
   i.warehouse_id = null;
+  i.received_by = null;
+  i.received_qty = 0;
   if(oldWh){
     const q = Number(i.quantity);
     await dbInsert('warehouse_movements', {
@@ -7498,9 +7688,11 @@ async function whXferConfirm(){
       await mv(target,'IN',x.id,i.name,i.code||null,i.unit||'adet',qty);
     } else {
       // Kısmi: kalem bölünür — orijinal adedi azalır, hedefte yeni kalem
-      const ok = await dbUpdate('purchase_items', x.id, {quantity: x.maxQ-qty});
+      // (kabul sayacı da bölünür: depodaki kalemde received_qty == quantity)
+      const ok = await dbUpdate('purchase_items', x.id, {quantity: x.maxQ-qty, received_qty: x.maxQ-qty});
       if(!ok){ toast('Aktarılamadı!','error'); _whXfer=null; return; }
       i.quantity = x.maxQ-qty;
+      i.received_qty = x.maxQ-qty;
       const d = await dbInsert('purchase_items',{
         project_name:i.project_name, name:i.name, code:i.code||null,
         quantity:qty, unit:i.unit||'adet', material:i.material||null,
@@ -7514,8 +7706,9 @@ async function whXferConfirm(){
       }
       const ni = d[0];
       // create endpoint'i warehouse_id almaz — ayrı update ile bağlanır
-      await dbUpdate('purchase_items', ni.id, {warehouse_id: target});
+      await dbUpdate('purchase_items', ni.id, {warehouse_id: target, received_by: i.received_by||null, received_qty: qty});
       ni.warehouse_id = target; ni.status='IN_WAREHOUSE';
+      ni.received_by = i.received_by||null; ni.received_qty = qty;
       purchaseItems.push(ni);
       await mv(x.src,'OUT',x.id,i.name,i.code||null,i.unit||'adet',qty);
       await mv(target,'IN',ni.id,i.name,i.code||null,i.unit||'adet',qty);
@@ -7983,7 +8176,8 @@ async function receiveConfirm(id){
   const i=Array.isArray(items)?items[0]:null;
   if(!i){ toast('Kalem bulunamadı!','error'); return; }
   if(i.status==='IN_WAREHOUSE'){ renderReceive(id); return; } // biri önce davranmış
-  const ok=await dbUpdate('purchase_items', id, {status:'IN_WAREHOUSE', warehouse_id: whId});
+  const rcvBy=currentUser?.display_name||currentUser?.username||null;
+  const ok=await dbUpdate('purchase_items', id, {status:'IN_WAREHOUSE', warehouse_id: whId, received_by: rcvBy, received_qty: Number(i.quantity)||1});
   if(!ok){ toast('Mal kabul yapılamadı!','error'); return; }
   const q=Number(i.quantity);
   await dbInsert('warehouse_movements',{

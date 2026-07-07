@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict UaZOPztf0MigyZ9BC1QS0j10AAVXQlBiHdNxwxG1omvQI4orpVImmm15i0GPFDV
+\restrict 7nROESsSmU8QZlsfai2LH8b9jM2MHvwTddv2dGkcPvYPFed6JeuedWx5b1hZ9Zz
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -327,6 +327,9 @@ CREATE TABLE public.purchase_items (
     purchase_order_id uuid,
     needs_planning boolean DEFAULT false NOT NULL,
     stock_plan_id uuid,
+    received_by character varying(150),
+    received_qty numeric(15,4) DEFAULT 0 NOT NULL,
+    returned_qty numeric(15,4) DEFAULT 0 NOT NULL,
     CONSTRAINT purchase_items_status_check CHECK (((status)::text = ANY ((ARRAY['PLANNED'::character varying, 'ORDERED'::character varying, 'RECEIVED'::character varying, 'IN_WAREHOUSE'::character varying, 'IN_STOCK'::character varying, 'CANCELLED'::character varying])::text[])))
 );
 
@@ -1394,5 +1397,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict UaZOPztf0MigyZ9BC1QS0j10AAVXQlBiHdNxwxG1omvQI4orpVImmm15i0GPFDV
+\unrestrict 7nROESsSmU8QZlsfai2LH8b9jM2MHvwTddv2dGkcPvYPFed6JeuedWx5b1hZ9Zz
 
