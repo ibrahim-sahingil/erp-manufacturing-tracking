@@ -1351,10 +1351,10 @@
     <div class="form-card" style="margin-bottom:20px">
       <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:14px">+ Yeni Proje Bağlantısı</div>
       <div class="form-row">
-        <div class="form-group"><label>Ürün Ağacı *</label>
-          <select id="pbom-product-sel" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
-            <option value="">— Ürün seçin —</option>
-          </select>
+        <div class="form-group"><label>Ürün Ağaçları * <span style="text-transform:none;color:var(--muted)">(birden fazla seçilebilir)</span></label>
+          <div id="pbom-product-multi" style="max-height:132px;overflow-y:auto;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:6px 10px;font-family:var(--font-mono);font-size:12px">
+            <span style="color:var(--muted)">— Ürün ağacı yok —</span>
+          </div>
         </div>
         <div class="form-group"><label>Proje *</label>
           <select id="pbom-project-sel" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
@@ -8488,10 +8488,18 @@ async function loadProjectBoms() {
 }
 
 function renderPbomDropdowns() {
-  // Ürün ağacı dropdown
-  const pSel = document.getElementById('pbom-product-sel');
-  if(pSel) pSel.innerHTML = '<option value="">— Ürün seçin —</option>' +
-    bomProducts.map(p=>`<option value="${p.id}">${p.name}${p.code?' ('+p.code+')':''}</option>`).join('');
+  // Ürün ağacı çoklu seçim listesi (#1 arkadaş isteği: aynı projeye birden
+  // fazla ürün tek seferde bağlanabilsin — görsel 100)
+  const pMulti = document.getElementById('pbom-product-multi');
+  if(pMulti){
+    const checked = new Set([...pMulti.querySelectorAll('.pbom-prod-chk:checked')].map(c=>c.value));
+    pMulti.innerHTML = bomProducts.length
+      ? bomProducts.map(p=>`<label style="display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer">
+          <input type="checkbox" class="pbom-prod-chk" value="${p.id}" ${checked.has(p.id)?'checked':''} style="accent-color:var(--accent)">
+          <span>${p.name}${p.code?' <span style="color:var(--muted)">('+p.code+')</span>':''}</span>
+        </label>`).join('')
+      : '<span style="color:var(--muted)">— Ürün ağacı yok —</span>';
+  }
   // Proje dropdown
   const prSel = document.getElementById('pbom-project-sel');
   if(prSel) {
@@ -8502,20 +8510,25 @@ function renderPbomDropdowns() {
 }
 
 async function createProjectBom() {
-  const bomProdId = document.getElementById('pbom-product-sel').value;
-  const projName  = document.getElementById('pbom-project-sel').value;
-  if(!bomProdId||!projName){ toast('Ürün ve proje seçin!','error'); return; }
-  // Zaten var mı?
-  if(projectBoms.find(pb=>pb.bom_product_id===bomProdId&&pb.project_name===projName)){
-    toast('Bu proje için bu ürün ağacı zaten bağlı!','error'); return;
+  // Çoklu seçim: işaretli her ürün için ayrı project_bom satırı (#1)
+  const prodIds  = [...document.querySelectorAll('.pbom-prod-chk:checked')].map(c=>c.value);
+  const projName = document.getElementById('pbom-project-sel').value;
+  if(!prodIds.length||!projName){ toast('En az bir ürün ve proje seçin!','error'); return; }
+  let ok = 0, skipped = 0;
+  for(const bomProdId of prodIds){
+    if(projectBoms.find(pb=>pb.bom_product_id===bomProdId&&pb.project_name===projName)){ skipped++; continue; }
+    const data = await dbInsert('project_bom',{
+      id: genId(), project_name: projName, bom_product_id: bomProdId,
+      status:'draft', created_by: currentUser?.display_name||currentUser?.username||'—'
+    });
+    if(Array.isArray(data)&&data[0]){ projectBoms.unshift(data[0]); ok++; }
   }
-  const data = await dbInsert('project_bom',{
-    id: genId(), project_name: projName, bom_product_id: bomProdId,
-    status:'draft', created_by: currentUser?.display_name||currentUser?.username||'—'
-  });
-  if(!Array.isArray(data)||!data[0]){ toast('Kayıt hatası!','error'); return; }
-  projectBoms.unshift(data[0]);
-  toast('Bağlantı oluşturuldu! Parçaları düzenleyip yayınlayın.','success');
+  if(!ok){
+    toast(skipped?'Seçilen ürünler bu projeye zaten bağlı!':'Kayıt hatası!','error');
+    return;
+  }
+  toast(`${ok} bağlantı oluşturuldu${skipped?` (${skipped} zaten bağlıydı)`:''}! Parçaları düzenleyip yayınlayın.`,'success');
+  document.querySelectorAll('.pbom-prod-chk:checked').forEach(c=>c.checked=false);
   renderProjectBomList();
 }
 
@@ -8527,7 +8540,14 @@ function renderProjectBomList() {
     el.innerHTML=`<div class="empty-state"><span class="emoji">🔗</span>Henüz proje bağlantısı oluşturulmadı</div>`;
     return;
   }
-  el.innerHTML = projectBoms.map(pb => {
+  // Kartlar PROJE başlığı altında gruplanır (#1 arkadaş isteği, görsel 100)
+  const groups = {};
+  projectBoms.forEach(pb=>{ const k=pb.project_name||'—'; (groups[k]=groups[k]||[]).push(pb); });
+  el.innerHTML = Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([proj,list])=>
+    `<div style="font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:20px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px">
+      📁 ${proj} <span style="color:var(--muted);text-transform:none">· ${list.length} ürün ağacı</span>
+    </div>` +
+    list.map(pb => {
     const prod = bomProducts.find(p=>p.id===pb.bom_product_id);
     const isPublished = pb.status==='published';
     const pbParts = projectBomParts.filter(p=>p.project_bom_id===pb.id);
@@ -8536,9 +8556,9 @@ function renderProjectBomList() {
     return `<div class="pbom-card">
       <div class="pbom-card-header">
         <div>
-          <div class="pbom-card-title">📁 ${pb.project_name}</div>
+          <div class="pbom-card-title">🌳 ${prod?.name||'—'} ${prod?.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">(${prod.code})</span>`:''}</div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
-            🌳 ${prod?.name||'—'} ${prod?.code?'('+prod.code+')':''} · ${excCount>0?excCount+' parça hariç tutuldu · ':''}
+            ${excCount>0?excCount+' parça hariç tutuldu · ':''}
             ${isPublished?'Yayınlandı: '+new Date(pb.published_at).toLocaleDateString('tr-TR'):'Taslak'}
           </div>
         </div>
@@ -8551,7 +8571,7 @@ function renderProjectBomList() {
         </div>
       </div>
     </div>`;
-  }).join('');
+  }).join('')).join('');
 }
 
 // ─── Proje Ürün Ağacı Düzenleyici (Tam Ekran View) ───
