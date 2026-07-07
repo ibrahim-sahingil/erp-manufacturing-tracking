@@ -2041,6 +2041,11 @@ function genId(){ return Date.now().toString(36)+Math.random().toString(36).slic
 // dizesini, &quot; ise çift tırnaklı HTML attribute'unu korur (4. tur B8;
 // attribute değeri JS'e geçmeden entity-decode edildiğinden " geri gelir).
 function ea(s){ return (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+// (E1) Merkezi HTML kaçırma: kullanıcı girdisi taşıyan her innerHTML
+// enterpolasyonunda kullanılır — adına <img onerror=...> yazılan kayıt
+// ekranı açan herkeste kod çalıştırmasın. textContent kullanan yerlerde
+// (toast) ve confirm/prompt metinlerinde KULLANILMAZ (entity görünür).
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 // ─── Ölçü yardımcıları (sac/profil mm ölçüleri; 0 veya boş = ölçü yok) ───
 function dimVal(v){ const n=parseFloat(v); return (isFinite(n)&&n>0)?n:''; }
@@ -2254,9 +2259,9 @@ function deptWoStripHTML(deptId){
       + (resolved.length>3 ? ` +${resolved.length-3}` : '');
     const meta = [
       fmtDt(w.start_datetime) ? '🕐 '+fmtDt(w.start_datetime)+(fmtDt(w.end_datetime)?' → '+fmtDt(w.end_datetime):'') : '',
-      w.assigned_user ? '👷 '+w.assigned_user : '',
-      w.workspace_name ? '📍 '+w.workspace_name : '',
-      w.notes ? '🗒 '+w.notes : ''
+      w.assigned_user ? '👷 '+esc(w.assigned_user) : '',
+      w.workspace_name ? '📍 '+esc(w.workspace_name) : '',
+      w.notes ? '🗒 '+esc(w.notes) : ''
     ].filter(Boolean).join(' · ');
     // (#8) Planlı iş emrinde bitmemiş alt parça uyarısı
     const woWaiting = w.status==='planned' ? woWaitingChildren(w.id) : [];
@@ -2287,7 +2292,7 @@ function deptWoStripHTML(deptId){
           const bd=qt2?Math.round(qd/qt2*100):0, br=qt2?Math.round(qr2/qt2*100):0;
           const bp=qt2?100-bd-br:0;
           return `<div class="report-table-row">
-            <div><div style="font-size:13px;font-weight:600">${pd.name}</div><div style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${pd.code}</div></div>
+            <div><div style="font-size:13px;font-weight:600">${esc(pd.name)}</div><div style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${esc(pd.code)}</div></div>
             <div class="report-num" style="color:var(--green)">${qd}</div>
             <div class="report-num rtc-hide" style="color:var(--yellow)">${qp2}</div>
             <div class="report-num rtc-hide" style="color:var(--red)">${qr2}</div>
@@ -2442,11 +2447,11 @@ function renderBreadcrumb(){
   let html = `<button class="breadcrumb-btn" onclick="renderDashboard()">🏠 Projeler</button>`;
   if(_activeProject){
     html += `<span class="breadcrumb-sep">›</span>`;
-    if(_activeDept) html += `<button class="breadcrumb-btn" onclick="openProject('${ea(_activeProject)}')">${_activeProject}</button>`;
-    else html += `<span class="breadcrumb-current">${_activeProject}</span>`;
+    if(_activeDept) html += `<button class="breadcrumb-btn" onclick="openProject('${ea(_activeProject)}')">${esc(_activeProject)}</button>`;
+    else html += `<span class="breadcrumb-current">${esc(_activeProject)}</span>`;
   }
   if(_activeDept){
-    html += `<span class="breadcrumb-sep">›</span><span class="breadcrumb-current">${_activeDept.name}</span>`;
+    html += `<span class="breadcrumb-sep">›</span><span class="breadcrumb-current">${esc(_activeDept.name)}</span>`;
   }
   bc.innerHTML = html;
 }
@@ -2495,7 +2500,7 @@ function renderProjectCards(){
     const woLine = woBadgeCounts(workOrders.filter(w=>(w.project_name||'(Proje Yok)')===name));
     return `<div class="project-card${pinned?' pinned':''}" onclick="openProject('${ea(name)}')">
       <button class="pin-btn${pinned?' active':''}" onclick="togglePin('project','${ea(name)}',event)" title="${pinned?'Sabitlemeyi kaldır':'Sabitle'}">📌</button>
-      <div class="project-card-name">${name}</div>
+      <div class="project-card-name">${esc(name)}</div>
       <div class="project-card-count">${t?`${t} parça &middot; %${qdp} tamamlandı <span style="font-size:10px;opacity:.6">(adet bazlı)</span>`:`Üretimde parça yok`}</div>
       ${woLine?`<div style="font-family:var(--font-mono);font-size:10px;margin-top:2px">📋 ${woLine}</div>`:''}
       ${waitCnt?`<div style="font-family:var(--font-mono);font-size:10px;color:var(--yellow);margin-top:2px">⏳ ${waitCnt} parça · satın alma / üretim planlaması bekliyor</div>`:''}
@@ -2590,7 +2595,7 @@ function openProject(name){
     const colors = ['#e05c2d','#2980b9','#8e44ad','#16a085','#d35400','#27ae60','#c0392b','#2c3e50','#f39c12'];
     const ci = depts.filter(x=>x.project===name).indexOf(dept) % colors.length;
     html += `<div class="dept-card" style="--c:${colors[ci]}" onclick="openDept('${dept.id}','${ea(dept.name)}')">
-      <div class="dept-card-name">${dept.name}</div>
+      <div class="dept-card-name">${esc(dept.name)}</div>
       <div class="dept-card-count">${t} parça &middot; %${qdpct} tamamlandı <span style="font-size:9px;opacity:.6">(adet)</span></div>
       <div class="dept-mini-bars">
         <div class="pmb-done" style="flex:${qdpct}"></div>
@@ -2700,7 +2705,7 @@ function openDept(deptId, deptName){
         const bp=qt?Math.round(qp/qt*100):0;
         const br=qt?Math.round(qr/qt*100):0;
         return `<div class="report-table-row">
-          <div><div style="font-size:13px;font-weight:600">${p.name}</div><div style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${p.code}</div></div>
+          <div><div style="font-size:13px;font-weight:600">${esc(p.name)}</div><div style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${esc(p.code)}</div></div>
           <div class="report-num" style="color:var(--green)">${qd}</div>
           <div class="report-num rtc-hide" style="color:var(--yellow)">${qp}</div>
           <div class="report-num rtc-hide" style="color:var(--red)">${qr}</div>
@@ -2736,8 +2741,8 @@ function partRowHTML(p, i, showDelete){
   return `<div class="part-row">
     <div class="part-num">${String(i+1).padStart(2,'0')}</div>
     <div>
-      <div class="part-name">${p.name}</div>
-      <div class="part-code">${p.code}${p.drawing?' · '+p.drawing:''}</div>
+      <div class="part-name">${esc(p.name)}</div>
+      <div class="part-code">${esc(p.code)}${p.drawing?' · '+p.drawing:''}</div>
       <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:3px">📅 ${createdAt}</div>
       ${(()=>{ // (#8) bitmemiş alt parçalar
         if(p.status==='done') return '';
@@ -2775,7 +2780,7 @@ function updateDeptSelect(){
     return;
   }
   sel.innerHTML = '<option value="">— Bölüm seçin —</option>' +
-    projDepts.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+    projDepts.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('');
 }
 
 async function addPart(){
@@ -2860,7 +2865,7 @@ function updatePartsFilters(skipRender){
   const curDept = df.value;
   const projDepts = projFilter ? depts.filter(d=>d.project===projFilter) : depts;
   df.innerHTML = '<option value="">Tüm Bölümler</option>' +
-    projDepts.map(d=>`<option value="${d.id}"${d.id===curDept?' selected':''}>${d.name}</option>`).join('');
+    projDepts.map(d=>`<option value="${d.id}"${d.id===curDept?' selected':''}>${esc(d.name)}</option>`).join('');
   if(!skipRender) renderPartsFiltered();
 }
 
@@ -2887,7 +2892,7 @@ function renderPartsFiltered(){
   });
   list.innerHTML = Object.entries(byProject).map(([proj,byDept])=>`
     <div style="margin-bottom:28px">
-      <div class="divider-title">📁 ${proj}</div>
+      <div class="divider-title">📁 ${esc(proj)}</div>
       ${Object.entries(byDept).map(([dname,plist])=>`
         <div style="margin-bottom:16px">
           <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--accent);letter-spacing:1px;margin-bottom:8px;margin-left:4px">🏭 ${dname} — ${plist.length} parça</div>
@@ -2949,10 +2954,10 @@ function renderDeptList(){
   depts.forEach(d=>{ if(!byProject[d.project]) byProject[d.project]=[]; byProject[d.project].push(d); });
   el.innerHTML = Object.entries(byProject).map(([proj,list])=>`
     <div style="margin-bottom:16px">
-      <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--accent);letter-spacing:1px;margin-bottom:8px">📁 ${proj}</div>
+      <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--accent);letter-spacing:1px;margin-bottom:8px">📁 ${esc(proj)}</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
         ${list.map(d=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 14px;display:flex;align-items:center;gap:10px">
-          <span style="font-family:var(--font-mono);font-size:12px">${d.name}</span>
+          <span style="font-family:var(--font-mono);font-size:12px">${esc(d.name)}</span>
           <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${parts.filter(p=>p.department_id===d.id).length} parça</span>
           <button class="icon-btn" style="width:22px;height:22px;font-size:11px" onclick="deleteDept('${d.id}')">✕</button>
         </div>`).join('')}
@@ -2979,7 +2984,7 @@ function renderUsers(){
   if(!users.length){ grid.innerHTML=`<div class="empty-state"><span class="emoji">👷</span>Personel eklenmedi</div>`; return; }
   grid.innerHTML = users.map(u=>`<div class="user-card">
     <div class="user-avatar">${u.name.charAt(0)}</div>
-    <div style="flex:1"><div class="user-name">${u.name}</div><div class="user-role">${[u.dept,u.role].filter(Boolean).join(' · ')}</div></div>
+    <div style="flex:1"><div class="user-name">${esc(u.name)}</div><div class="user-role">${[u.dept,u.role].filter(Boolean).join(' · ')}</div></div>
     <button class="icon-btn" onclick="deleteUser('${u.id}')">✕</button>
   </div>`).join('');
 }
@@ -3020,7 +3025,7 @@ async function renderScan(id){
   const content=document.getElementById('scan-content');
   if(!p){ content.innerHTML=`<div class="not-found"><div class="icon">⚠️</div><h2>Parça Bulunamadı</h2><p>Bu QR koda ait kayıt mevcut değil.</p></div>`; return; }
 
-  const userOptions=ux.map(u=>`<option value="${u.name}">${u.name}${u.dept?' ('+u.dept+')':''}</option>`).join('');
+  const userOptions=ux.map(u=>`<option value="${esc(u.name)}">${esc(u.name)}${u.dept?' ('+u.dept+')':''}</option>`).join('');
   const totalDone   = logs.reduce((s,l)=>s+(parseInt(l.qty_done)||0),0);
   const totalReject = logs.reduce((s,l)=>s+(parseInt(l.qty_reject)||0),0);
   // Bekliyor = toplam adet - yapılan - reddedilen
@@ -3036,7 +3041,7 @@ async function renderScan(id){
     ].filter(Boolean).join('');
     return `<div class="log-entry">
       <span class="log-time">${new Date(l.created_at).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
-      <span class="log-user">${l.username}</span>
+      <span class="log-user">${esc(l.username)}</span>
       <div class="log-qtys">${qtys}</div>
       ${l.note?`<div class="log-note">📝 ${l.note}</div>`:''}
     </div>`;
@@ -3044,17 +3049,17 @@ async function renderScan(id){
 
   content.innerHTML=`
     <div class="scan-card">
-      <div class="scan-part-name">${p.name}</div>
-      <div class="scan-drawing">📐 ${p.drawing||'Teknik Resim'} · ${p.code}</div>
+      <div class="scan-part-name">${esc(p.name)}</div>
+      <div class="scan-drawing">📐 ${esc(p.drawing||'Teknik Resim')} · ${esc(p.code)}</div>
       ${p.department?`<div class="scan-dept-tag">🏭 ${p.department}</div>`:''}
       <div class="scan-meta">
-        <div class="scan-meta-item"><label>Malzeme</label><span>${p.material||'—'}</span></div>
+        <div class="scan-meta-item"><label>Malzeme</label><span>${esc(p.material||'—')}</span></div>
         <div class="scan-meta-item"><label>Toplam Adet</label><span>${p.qty||'—'}</span></div>
         <div class="scan-meta-item"><label>Proje</label><span>${p.project||'—'}</span></div>
         <div class="scan-meta-item"><label>Durum</label><span>${p.status==='done'?'✅ Yapıldı':p.status==='reject'?'❌ Red':'⏳ Bekliyor'}</span></div>
         <div class="scan-meta-item" style="grid-column:span 2"><label>📅 Kayıt Tarihi</label><span style="font-size:12px">${p.created_at ? new Date(p.created_at).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'}</span></div>
       </div>
-      ${p.description?`<div style="background:var(--surface2);border-radius:6px;padding:10px 14px;font-size:13px;color:var(--muted);margin-bottom:20px">${p.description}</div>`:''}
+      ${p.description?`<div style="background:var(--surface2);border-radius:6px;padding:10px 14px;font-size:13px;color:var(--muted);margin-bottom:20px">${esc(p.description)}</div>`:''}
       <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:8px">📊 Bugüne Kadar Toplam</div>
       <div class="qty-totals">
         <div class="qty-total-card done-card"><div class="qty-total-num">${totalDone}</div><div class="qty-total-lbl">Yapıldı</div></div>
@@ -3174,7 +3179,7 @@ async function showLog(id,name){
     ].filter(Boolean).join('');
     return `<div class="log-entry">
       <span class="log-time">${new Date(l.created_at).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
-      <span class="log-user">${l.username}</span>
+      <span class="log-user">${esc(l.username)}</span>
       <div class="log-qtys">${qtys}</div>
       ${l.note?`<div class="log-note">📝 ${l.note}</div>`:''}
     </div>`;
@@ -3182,7 +3187,7 @@ async function showLog(id,name){
   const overlay=document.createElement('div');
   overlay.className='modal-overlay open';
   overlay.innerHTML=`<div class="modal" style="max-width:560px;width:95vw;text-align:left">
-    <h3 style="margin-bottom:4px">${name}</h3>
+    <h3 style="margin-bottom:4px">${esc(name)}</h3>
     <p style="margin-bottom:12px">İşlem Geçmişi</p>
     <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
       <span class="log-qty-badge log-qty-done" style="padding:5px 14px;font-size:12px">✅ Toplam ${td}</span>
@@ -3247,7 +3252,7 @@ function renderStatsView() {
         <label>Personel</label>
         <select id="stat-user">
           <option value="">Tüm Personel</option>
-          ${users.map(u=>`<option value="${u.name}">${u.name}</option>`).join('')}
+          ${users.map(u=>`<option value="${esc(u.name)}">${esc(u.name)}</option>`).join('')}
         </select>
       </div>
       <button class="btn btn-primary" onclick="loadStats()">🔍 Filtrele</button>
@@ -3329,7 +3334,7 @@ async function loadStats() {
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
         <div class="personnel-avatar" style="background:${color};flex-shrink:0">${name.charAt(0)}</div>
         <div>
-          <div class="personnel-name">${name}</div>
+          <div class="personnel-name">${esc(name)}</div>
           <div class="personnel-dept">${userInfo?[userInfo.dept,userInfo.role].filter(Boolean).join(' · '):'—'}</div>
         </div>
       </div>
@@ -3406,7 +3411,7 @@ function renderDetailTable(logs, partsMap) {
         <div style="font-weight:600;font-size:13px">${p?p.name:'—'}</div>
         <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${p?p.code:l.part_id} ${p&&p.project?'· '+p.project:''}</div>
       </div>
-      <div style="font-family:var(--font-mono);font-size:11px;color:var(--accent);text-align:center">${l.username}</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--accent);text-align:center">${esc(l.username)}</div>
       <div style="font-family:var(--font-display);font-size:18px;color:var(--green);text-align:center">${qd}</div>
       <div style="font-family:var(--font-display);font-size:18px;color:var(--yellow);text-align:center" class="stc-hide">${qp}</div>
       <div style="font-family:var(--font-display);font-size:18px;color:var(--red);text-align:center" class="stc-hide">${qr}</div>
@@ -3494,7 +3499,7 @@ async function renderOrders() {
   if(sel) {
     const cur = sel.value;
     sel.innerHTML = '<option value="">— Seçin —</option>' +
-      users.map(u=>`<option value="${u.name}"${u.name===cur?' selected':''}>${u.name}${u.dept?' ('+u.dept+')':''}</option>`).join('');
+      users.map(u=>`<option value="${esc(u.name)}"${u.name===cur?' selected':''}>${esc(u.name)}${u.dept?' ('+u.dept+')':''}</option>`).join('');
   }
 
   if(!orders.length) await loadOrders();
@@ -3535,7 +3540,7 @@ async function renderOrders() {
     const itemsHTML = items.length ? `
       <table class="order-items-table">
         <tr><th>Parça / Makine</th><th>Açıklama</th><th style="text-align:right">Adet</th></tr>
-        ${items.map(it=>`<tr><td><b>${it.name||'—'}</b></td><td style="color:var(--muted)">${it.desc||'—'}</td><td style="text-align:right">${it.qty||'—'}</td></tr>`).join('')}
+        ${items.map(it=>`<tr><td><b>${esc(it.name||'—')}</b></td><td style="color:var(--muted)">${it.desc||'—'}</td><td style="text-align:right">${it.qty||'—'}</td></tr>`).join('')}
       </table>` : `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-bottom:10px">Kalem girilmemiş</div>`;
 
     const pinned = isPinned('order', o.id);
@@ -3552,19 +3557,19 @@ async function renderOrders() {
       <button class="pin-btn${pinned?' active':''}" onclick="togglePin('order','${o.id}',event)" title="${pinned?'Sabitlemeyi kaldır':'Sabitle'}">📌</button>
       <div class="order-card-header" style="padding-right:32px">
         <div>
-          <div class="order-card-title">${o.project_name||'—'}</div>
-          <div class="order-card-customer">👤 ${o.customer_name||'—'} ${o.customer_email?'· '+o.customer_email:''} ${o.customer_phone?'· '+o.customer_phone:''}</div>
+          <div class="order-card-title">${esc(o.project_name||'—')}</div>
+          <div class="order-card-customer">👤 ${esc(o.customer_name||'—')} ${o.customer_email?'· '+o.customer_email:''} ${o.customer_phone?'· '+o.customer_phone:''}</div>
         </div>
         <span class="order-status-badge ${st.cls}"><span class="dot" style="background:currentColor"></span>${st.lbl}</span>
       </div>
       <div class="order-meta-grid">
-        <div class="order-meta-item"><label>📍 Konum</label><span>${o.location||'—'}</span></div>
+        <div class="order-meta-item"><label>📍 Konum</label><span>${esc(o.location||'—')}</span></div>
         <div class="order-meta-item"><label>⏱ Teslim Süresi</label><span>${o.delivery_days?o.delivery_days+' Gün':'—'}</span></div>
-        <div class="order-meta-item"><label>✅ Onaylayan</label><span>${o.approved_by||'—'}</span></div>
+        <div class="order-meta-item"><label>✅ Onaylayan</label><span>${esc(o.approved_by||'—')}</span></div>
         <div class="order-meta-item"><label>📅 Tarih</label><span>${createdAt}</span></div>
       </div>
       ${itemsHTML}
-      ${o.notes?`<div style="background:var(--surface2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-bottom:10px">📝 ${o.notes}</div>`:''}
+      ${o.notes?`<div style="background:var(--surface2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-bottom:10px">📝 ${esc(o.notes)}</div>`:''}
       <div class="order-card-footer">
         <div>
           <div class="order-price">${priceStr}</div>
@@ -3589,7 +3594,7 @@ function addOrderItem(name='', desc='', qty='') {
   row.className = 'order-item-row';
   row.id = id;
   row.innerHTML = `
-    <input type="text" placeholder="Parça / Makine adı" value="${name}" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 12px;outline:none;width:100%">
+    <input type="text" placeholder="Parça / Makine adı" value="${esc(name)}" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 12px;outline:none;width:100%">
     <input type="text" placeholder="Açıklama / model" value="${desc}" class="oir-hide" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 12px;outline:none;width:100%">
     <input type="number" placeholder="Adet" value="${qty}" min="1" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 8px;outline:none;width:100%;text-align:center">
     <button onclick="document.getElementById('${id}').remove()" style="width:32px;height:38px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--red);cursor:pointer;font-size:14px">✕</button>`;
@@ -3745,7 +3750,7 @@ function renderPdForm() {
   if(!sel) return;
   const cur = sel.value;
   sel.innerHTML = '<option value="">— Sipariş seçin —</option>' +
-    orders.map(o=>`<option value="${o.project_name}"${o.project_name===cur?' selected':''}>${o.project_name}</option>`).join('');
+    orders.map(o=>`<option value="${esc(o.project_name)}"${o.project_name===cur?' selected':''}>${esc(o.project_name)}</option>`).join('');
 }
 
 async function loadAndRenderPd() {
@@ -3811,13 +3816,13 @@ function openReviseModal(id) {
   overlay.className='modal-overlay open';
   overlay.id='revise-overlay';
   overlay.innerHTML=`<div class="revise-modal">
-    <h3>🔄 REVİZE: ${d.project_name}</h3>
+    <h3>🔄 REVİZE: ${esc(d.project_name)}</h3>
     <div class="form-group" style="margin-bottom:12px"><label>Yeni Başlangıç Tarihi *</label><input type="date" id="rv-start" value="${d.start_date}" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none"></div>
     <div class="form-group" style="margin-bottom:12px"><label>Yeni Bitiş Tarihi *</label><input type="date" id="rv-end" value="${d.end_date}" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none"></div>
     <div class="form-group" style="margin-bottom:12px"><label>Onaylayan</label>
       <select id="rv-user" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
         <option value="">— Seçin —</option>
-        ${users.map(u=>`<option value="${u.name}">${u.name}</option>`).join('')}
+        ${users.map(u=>`<option value="${esc(u.name)}">${esc(u.name)}</option>`).join('')}
       </select>
     </div>
     <div class="form-group" style="margin-bottom:20px"><label>Revize Açıklaması * <span style="color:var(--red)">(Zorunlu)</span></label>
@@ -3873,14 +3878,14 @@ async function renderPdList() {
           <span style="color:var(--yellow)">${r.old_start} → ${r.old_end}</span>
           <span style="color:var(--muted)">→</span>
           <span style="color:var(--green)">${r.new_start} → ${r.new_end}</span>
-          ${r.revised_by?`<span style="color:var(--accent)">${r.revised_by}</span>`:''}
+          ${r.revised_by?`<span style="color:var(--accent)">${esc(r.revised_by)}</span>`:''}
           <span style="color:var(--text);flex:1">📝 ${r.reason}</span>
         </div>`).join('')}
       </div>` : '';
 
     return `<div class="pd-card">
       <div class="pd-card-header">
-        <div class="pd-project-name">${d.project_name}</div>
+        <div class="pd-project-name">${esc(d.project_name)}</div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-ghost btn-sm" onclick="openReviseModal('${d.id}')">🔄 Revize</button>
           <button class="btn btn-ghost btn-sm" onclick="deletePd('${d.id}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">🗑️</button>
@@ -4184,7 +4189,7 @@ function showGanttTooltip(e, name, start, end, days, color) {
   el.id = 'gantt-tip';
   el.className = 'gantt-tooltip';
   el.innerHTML = `
-    <div class="gantt-tooltip-title" style="color:${color}">${name}</div>
+    <div class="gantt-tooltip-title" style="color:${color}">${esc(name)}</div>
     <div class="gantt-tooltip-row"><span class="gantt-tooltip-label">Başlangıç:</span><span>${new Date(start+'T00:00:00').toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'})}</span></div>
     <div class="gantt-tooltip-row"><span class="gantt-tooltip-label">Bitiş:</span><span>${new Date(end+'T00:00:00').toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'})}</span></div>
     <div class="gantt-tooltip-row"><span class="gantt-tooltip-label">Süre:</span><span style="color:var(--accent);font-weight:700">${days} gün</span></div>
@@ -4245,7 +4250,7 @@ async function initWorkOrders() {
   const proj = document.getElementById('wo-project');
   if (proj) {
     proj.innerHTML = '<option value="">— Proje seçin —</option>' +
-      orders.map(o=>`<option value="${o.project_name}">${o.project_name}</option>`).join('');
+      orders.map(o=>`<option value="${esc(o.project_name)}">${esc(o.project_name)}</option>`).join('');
   }
   // Proje filtre dropdown (liste)
   const projF = document.getElementById('wo-project-filter');
@@ -4263,13 +4268,13 @@ async function initWorkOrders() {
       workspaces = Array.isArray(d)?d:[];
     }
     ws.innerHTML = '<option value="">— Seçin —</option>' +
-      workspaces.map(w=>`<option value="${w.id}">${w.name}</option>`).join('');
+      workspaces.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('');
   }
   // User dropdown
   const u = document.getElementById('wo-user');
   if (u) {
     u.innerHTML = '<option value="">— Seçin —</option>' +
-      users.map(u=>`<option value="${u.name}">${u.name}${u.dept?' ('+u.dept+')':''}</option>`).join('');
+      users.map(u=>`<option value="${esc(u.name)}">${esc(u.name)}${u.dept?' ('+u.dept+')':''}</option>`).join('');
   }
   // Varsayılan datetime
   const dt = document.getElementById('wo-start-dt');
@@ -4291,7 +4296,7 @@ function woOnProjectChange() {
   const deptSel = document.getElementById('wo-dept');
   const projDepts = depts.filter(d => d.project === proj);
   deptSel.innerHTML = proj
-    ? '<option value="">— Bölüm seçin —</option>' + projDepts.map(d=>`<option value="${d.id}">${d.name}</option>`).join('')
+    ? '<option value="">— Bölüm seçin —</option>' + projDepts.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')
     : '<option value="">— Önce proje seçin —</option>';
   _woSelectedParts.clear();
   document.getElementById('wo-step2').style.display = 'none';
@@ -4361,9 +4366,9 @@ async function woLoadParts() {
     const purRow = (i, depth) => {
       const m = PUR_STATUS[i.status] || PUR_STATUS.PLANNED;
       return `<div style="margin:2px 0 2px ${depth*22+30}px;padding:4px 10px;border-left:2px dashed ${m.color}66;font-family:var(--font-mono);font-size:10px;color:var(--muted)">
-        🛒 ${i.code?`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
-        · ${Number(i.quantity||1)} ${i.unit||'adet'}
-        <span style="color:${m.color}">${m.icon} ${m.label}</span>${i.status==='IN_WAREHOUSE'&&whName(i.warehouse_id)?` · 🗄️ ${whName(i.warehouse_id)}`:''}
+        🛒 ${i.code?`<span style="color:var(--accent)">${esc(i.code)}</span> — `:''}${esc(i.name)}
+        · ${Number(i.quantity||1)} ${esc(i.unit||'adet')}
+        <span style="color:${m.color}">${m.icon} ${m.label}</span>${i.status==='IN_WAREHOUSE'&&whName(i.warehouse_id)?` · 🗄️ ${esc(whName(i.warehouse_id))}`:''}
       </div>`;
     };
 
@@ -4379,11 +4384,11 @@ async function woLoadParts() {
         <span class="wo-part-check">✓</span>
         ${depth>0?`<span style="color:var(--muted);font-size:10px">└─</span>`:''}
         <div style="min-width:0;flex:1">
-          <div class="wo-part-item-name" style="display:inline">${p.name}</div>
-          <span class="wo-part-item-code" style="margin-left:8px">${p.code}${p.drawing?' · '+p.drawing:''}</span>
+          <div class="wo-part-item-name" style="display:inline">${esc(p.name)}</div>
+          <span class="wo-part-item-code" style="margin-left:8px">${esc(p.code)}${p.drawing?' · '+p.drawing:''}</span>
           <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">
-            ${p.material||''} ${p.qty?'· '+p.qty+' adet':''}
-            ${dept?`· 🏭 ${dept.name}`:''}
+            ${esc(p.material||'')} ${p.qty?'· '+p.qty+' adet':''}
+            ${dept?`· 🏭 ${esc(dept.name)}`:''}
             ${woMatChip(p)}
           </div>
         </div>
@@ -4438,7 +4443,7 @@ function woStep2Next() {
   const summary = document.getElementById('wo-selected-parts-summary');
   summary.innerHTML = `
     <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:8px">Seçilen Parçalar (${selected.length})</div>
-    <div class="wo-summary-chips">${selected.map(p=>`<span class="wo-summary-chip">📦 ${p.name} <span style="opacity:.6">${p.code}</span></span>`).join('')}</div>`;
+    <div class="wo-summary-chips">${selected.map(p=>`<span class="wo-summary-chip">📦 ${esc(p.name)} <span style="opacity:.6">${esc(p.code)}</span></span>`).join('')}</div>`;
   document.getElementById('wo-step3').style.display = 'block';
   document.getElementById('wo-step3').scrollIntoView({behavior:'smooth'});
 }
@@ -4635,7 +4640,7 @@ async function renderWorkOrders() {
             <span style="color:var(--accent)">${r.field_changed}</span>
             <span style="color:var(--muted)">→</span>
             <span style="color:var(--green)">${r.new_value}</span>
-            ${r.revised_by?`<span style="color:var(--accent)">${r.revised_by}</span>`:''}
+            ${r.revised_by?`<span style="color:var(--accent)">${esc(r.revised_by)}</span>`:''}
             <span style="color:var(--text);flex:1">📝 ${r.reason}</span>
           </div>`).join('')}
         </div>` : '';
@@ -4655,13 +4660,13 @@ async function renderWorkOrders() {
           ${isChecked ? '✓' : ''}
         </div>
         <div class="wo-info-grid">
-          <div class="wo-info-item"><span class="wo-info-label">🏭 Çalışma Alanı</span><span class="wo-info-value">${w.workspace_name||'—'}</span></div>
-          <div class="wo-info-item"><span class="wo-info-label">👤 Personel</span><span class="wo-info-value">${w.assigned_user||'—'}</span></div>
+          <div class="wo-info-item"><span class="wo-info-label">🏭 Çalışma Alanı</span><span class="wo-info-value">${esc(w.workspace_name||'—')}</span></div>
+          <div class="wo-info-item"><span class="wo-info-label">👤 Personel</span><span class="wo-info-value">${esc(w.assigned_user||'—')}</span></div>
           <div class="wo-info-item"><span class="wo-info-label">📅 Başlangıç</span><span class="wo-info-value">${dt}</span></div>
           <div class="wo-info-item"><span class="wo-info-label">📦 Toplam Parça</span><span class="wo-info-value">${wParts.length} kalem</span></div>
         </div>
         ${partsTableHTML}
-        ${w.notes?`<div style="background:var(--surface2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-bottom:10px">📝 ${w.notes}</div>`:''}
+        ${w.notes?`<div style="background:var(--surface2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-bottom:10px">📝 ${esc(w.notes)}</div>`:''}
         ${revHTML}
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
           <button class="btn btn-ghost btn-sm" onclick="openWoReviseModal('${w.id}','${ea(w.project_name)}','${w.status}','${ea(w.assigned_user||'')}','${ea(w.workspace_name||'')}','${w.start_datetime||''}')">🔄 Revize</button>
@@ -4672,7 +4677,7 @@ async function renderWorkOrders() {
 
     return `<div style="margin-bottom:28px">
       <div style="font-family:var(--font-display);font-size:20px;letter-spacing:2px;color:var(--accent);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
-        📁 ${projName}
+        📁 ${esc(projName)}
         <span style="font-family:var(--font-mono);font-size:12px;color:var(--muted);font-weight:400">${woList.length} iş emri</span>
       </div>
       ${cards}
@@ -4690,7 +4695,7 @@ function openWoReviseModal(id, proj, status, user, workspace, startDt) {
 
   overlay.innerHTML = `<div class="revise-modal" style="width:500px">
     <h3>🔄 İŞ EMRİ REVİZE</h3>
-    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${proj}</p>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${esc(proj)}</p>
 
     <div class="form-group" style="margin-bottom:12px"><label>Durum</label>
       <select id="wor-status" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
@@ -4703,13 +4708,13 @@ function openWoReviseModal(id, proj, status, user, workspace, startDt) {
     <div class="form-group" style="margin-bottom:12px"><label>Atanan Personel</label>
       <select id="wor-user" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
         <option value="">— Seçin —</option>
-        ${users.map(u=>`<option value="${u.name}"${u.name===user?' selected':''}>${u.name}${u.dept?' ('+u.dept+')':''}</option>`).join('')}
+        ${users.map(u=>`<option value="${esc(u.name)}"${u.name===user?' selected':''}>${esc(u.name)}${u.dept?' ('+u.dept+')':''}</option>`).join('')}
       </select>
     </div>
     <div class="form-group" style="margin-bottom:12px"><label>Çalışma Alanı</label>
       <select id="wor-workspace" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
         <option value="">— Seçin —</option>
-        ${workspaces.map(w=>`<option value="${w.id}|${ea(w.name)}"${w.name===workspace?' selected':''}>${w.name}</option>`).join('')}
+        ${workspaces.map(w=>`<option value="${w.id}|${ea(w.name)}"${w.name===workspace?' selected':''}>${esc(w.name)}</option>`).join('')}
       </select>
     </div>
     <div class="form-group" style="margin-bottom:12px"><label>Başlangıç Tarihi & Saati</label>
@@ -4718,7 +4723,7 @@ function openWoReviseModal(id, proj, status, user, workspace, startDt) {
     <div class="form-group" style="margin-bottom:12px"><label>Onaylayan</label>
       <select id="wor-by" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
         <option value="">— Seçin —</option>
-        ${users.map(u=>`<option value="${u.name}">${u.name}</option>`).join('')}
+        ${users.map(u=>`<option value="${esc(u.name)}">${esc(u.name)}</option>`).join('')}
       </select>
     </div>
     <div class="form-group" style="margin-bottom:20px">
@@ -4864,14 +4869,14 @@ function printWorkOrders() {
         </div>
         <table class="wo-print-info">
           <tr>
-            <td><b>Proje</b></td><td>${w.project_name||'—'}</td>
-            <td><b>Çalışma Alanı</b></td><td>${w.workspace_name||'—'}</td>
+            <td><b>Proje</b></td><td>${esc(w.project_name||'—')}</td>
+            <td><b>Çalışma Alanı</b></td><td>${esc(w.workspace_name||'—')}</td>
           </tr>
           <tr>
-            <td><b>Personel</b></td><td>${w.assigned_user||'—'}</td>
+            <td><b>Personel</b></td><td>${esc(w.assigned_user||'—')}</td>
             <td><b>Başlangıç</b></td><td>${dt}</td>
           </tr>
-          ${w.notes ? `<tr><td><b>Not</b></td><td colspan="3">${w.notes}</td></tr>` : ''}
+          ${w.notes ? `<tr><td><b>Not</b></td><td colspan="3">${esc(w.notes)}</td></tr>` : ''}
         </table>
         <div class="wo-print-parts-title">PARÇA LİSTESİ (${wParts.length} kalem)</div>
         <table class="wo-print-parts">
@@ -4887,7 +4892,7 @@ function printWorkOrders() {
     }).join('');
 
     return `<div class="proj-section">
-      <div class="proj-title">PROJE: ${projName}</div>
+      <div class="proj-title">PROJE: ${esc(projName)}</div>
       ${cards}
     </div>`;
   }).join('');
@@ -5145,7 +5150,7 @@ function renderWoGantt() {
         const bh = RH - 16;
         const color = WO_COLORS[w.status] || '#2980b9';
         const wParts = workOrderParts.filter(p => p.work_order_id === w.id);
-        const label = w.assigned_user ? `${w.assigned_user}` : (wParts.length ? `${wParts.length} parça` : '');
+        const label = w.assigned_user ? `${esc(w.assigned_user)}` : (wParts.length ? `${wParts.length} parça` : '');
 
         bars += `
           <g style="cursor:pointer" onclick="">
@@ -5239,8 +5244,8 @@ function renderWorkspaces() {
           <div class="ws-member-item">
             <div class="ws-member-avatar">${m.user_name.charAt(0).toUpperCase()}</div>
             <div style="flex:1">
-              <div class="ws-member-name">${m.user_name}</div>
-              ${m.role ? `<div class="ws-member-role">${m.role}</div>` : ''}
+              <div class="ws-member-name">${esc(m.user_name)}</div>
+              ${m.role ? `<div class="ws-member-role">${esc(m.role)}</div>` : ''}
             </div>
             <button class="icon-btn" style="width:26px;height:26px;font-size:11px" onclick="removeWsMember('${m.id}','${w.id}')">✕</button>
           </div>`).join('')
@@ -5249,8 +5254,8 @@ function renderWorkspaces() {
     return `<div class="ws-card">
       <div class="ws-card-header">
         <div>
-          <div class="ws-card-title">${icon} ${w.name}</div>
-          ${w.description ? `<div class="ws-card-desc">${w.description}</div>` : ''}
+          <div class="ws-card-title">${icon} ${esc(w.name)}</div>
+          ${w.description ? `<div class="ws-card-desc">${esc(w.description)}</div>` : ''}
         </div>
         <span class="ws-type-badge ${typeCss}">${typeLbl}</span>
       </div>
@@ -5309,7 +5314,7 @@ function openWsMemberModal(wsId, wsName) {
   const sel = document.getElementById('ws-member-select');
   const existingNames = wsMembers.filter(m => m.workspace_id === wsId).map(m => m.user_name);
   sel.innerHTML = '<option value="">— Listeden seçin —</option>' +
-    users.map(u => `<option value="${u.name}"${existingNames.includes(u.name)?' disabled style="color:var(--muted)"':''}>${u.name}${u.dept?' ('+u.dept+')':''}${existingNames.includes(u.name)?' ✓':''}</option>`).join('');
+    users.map(u => `<option value="${esc(u.name)}"${existingNames.includes(u.name)?' disabled style="color:var(--muted)"':''}>${esc(u.name)}${u.dept?' ('+u.dept+')':''}${existingNames.includes(u.name)?' ✓':''}</option>`).join('');
 
   // Mevcut üyeler
   renderWsCurrentMembers(wsId);
@@ -5332,8 +5337,8 @@ function renderWsCurrentMembers(wsId) {
         <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border)">
           <div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#000;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:13px;flex-shrink:0">${m.user_name.charAt(0)}</div>
           <div style="flex:1">
-            <div style="font-size:13px;font-weight:600">${m.user_name}</div>
-            ${m.role?`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${m.role}</div>`:''}
+            <div style="font-size:13px;font-weight:600">${esc(m.user_name)}</div>
+            ${m.role?`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${esc(m.role)}</div>`:''}
           </div>
           <button onclick="removeWsMember('${m.id}','${wsId}')" style="background:transparent;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:2px 6px">✕</button>
         </div>`).join('')}
@@ -5663,15 +5668,15 @@ function renderSuppliersModalList(){
   el.innerHTML = suppliers.map(s=>{
     const passive = s.is_active===false;
     const meta = [
-      s.contact_person ? '👤 '+s.contact_person : '',
-      s.phone ? '☎ '+s.phone : '',
-      s.email ? '✉ '+s.email : '',
-      s.tax_number ? 'VKN: '+s.tax_number+(s.tax_office?' / '+s.tax_office:'') : (s.tax_office||''),
-      s.notes ? '🗒 '+s.notes : ''
+      s.contact_person ? '👤 '+esc(s.contact_person) : '',
+      s.phone ? '☎ '+esc(s.phone) : '',
+      s.email ? '✉ '+esc(s.email) : '',
+      s.tax_number ? 'VKN: '+esc(s.tax_number)+(s.tax_office?' / '+esc(s.tax_office):'') : esc(s.tax_office||''),
+      s.notes ? '🗒 '+esc(s.notes) : ''
     ].filter(Boolean).join(' · ');
     return `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px dashed var(--border);${passive?'opacity:.45':''}">
       <div style="min-width:0">
-        <div style="font-family:var(--font-mono);font-size:12px"><b>${s.name}</b>${passive?' <span style="font-size:10px;color:var(--muted)">(pasif)</span>':''}</div>
+        <div style="font-family:var(--font-mono);font-size:12px"><b>${esc(s.name)}</b>${passive?' <span style="font-size:10px;color:var(--muted)">(pasif)</span>':''}</div>
         ${meta?`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">${meta}</div>`:''}
       </div>
       <div style="display:flex;gap:4px;flex-shrink:0">
@@ -5862,17 +5867,17 @@ async function renderReceiving(){
         const icon = isWaiting ? '⏳' : '✅';
         const ret = Number(i.returned_qty)||0;
         const meta = [
-          Number(i.quantity||1)+' '+(i.unit||'adet')+(isWaiting?' bekleniyor':''),
+          Number(i.quantity||1)+' '+esc(i.unit||'adet')+(isWaiting?' bekleniyor':''),
           ret ? '↩ '+ret+' iade edildi' : '',
-          i.supplier ? '🏢 '+i.supplier : '',
+          i.supplier ? '🏢 '+esc(i.supplier) : '',
           i.expected_date && isWaiting ? '📆 '+new Date(i.expected_date).toLocaleDateString('tr-TR') : '',
-          i.status==='IN_WAREHOUSE' ? '🏭 '+(whName(i.warehouse_id)||'Depoda') : (i.status==='RECEIVED'?'📥 Teslim alındı':''),
-          !isWaiting && i.received_by ? '👤 '+i.received_by : ''
+          i.status==='IN_WAREHOUSE' ? '🏭 '+esc(whName(i.warehouse_id)||'Depoda') : (i.status==='RECEIVED'?'📥 Teslim alındı':''),
+          !isWaiting && i.received_by ? '👤 '+esc(i.received_by) : ''
         ].filter(Boolean).join(' · ');
         return `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--border);flex-wrap:wrap">
           <span style="font-family:var(--font-mono);font-size:11px;min-width:0;flex:1;display:flex;gap:8px;align-items:center">
             ${['ORDERED','RECEIVED'].includes(i.status)?`<input type="checkbox" class="rcv-chk" value="${i.id}" style="accent-color:var(--accent);flex-shrink:0">`:''}
-            <span style="min-width:0">${icon} ${i.code?`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
+            <span style="min-width:0">${icon} ${i.code?`<span style="color:var(--accent)">${esc(i.code)}</span> — `:''}${esc(i.name)}
             <span style="color:var(--muted)"> · ${meta}</span></span>
           </span>
           <span style="display:flex;gap:4px;flex-shrink:0">
@@ -5885,7 +5890,7 @@ async function renderReceiving(){
     return `<div class="pbom-card" style="margin-bottom:12px">
       <div class="pbom-card-header" onclick="rcvToggle('${ea(proj)}')" style="cursor:pointer">
         <div>
-          <div class="pbom-card-title">📁 ${proj}</div>
+          <div class="pbom-card-title">📁 ${esc(proj)}</div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
             ${waiting.length?`⏳ ${waiting.length} bekleyen`:''}${waiting.length&&arrived.length?' · ':''}${arrived.length?`✅ ${arrived.length} gelen`:''}
           </div>
@@ -5918,11 +5923,11 @@ function rcvReceiveModal(id){
   overlay.id = 'rcv-overlay';
   overlay.innerHTML = `<div class="modal" style="width:440px;text-align:left">
     <h3 style="margin-bottom:4px">📥 Mal Kabul</h3>
-    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${i.code?i.code+' — ':''}${i.name}<br>Beklenen: ${total} ${i.unit||'adet'}${Number(i.returned_qty)?` · ↩ daha önce ${Number(i.returned_qty)} iade`:''}</p>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${i.code?esc(i.code)+' — ':''}${esc(i.name)}<br>Beklenen: ${total} ${esc(i.unit||'adet')}${Number(i.returned_qty)?` · ↩ daha önce ${Number(i.returned_qty)} iade`:''}</p>
     <div class="form-group" style="margin-bottom:12px">
       <label>Hedef Depo</label>
       <select id="rcvm-wh" style="${inp}">
-        ${act.map(w=>`<option value="${w.id}">${w.name}${w.location?' — '+w.location:''}</option>`).join('')}
+        ${act.map(w=>`<option value="${w.id}">${esc(w.name)}${w.location?' — '+w.location:''}</option>`).join('')}
       </select>
     </div>
     <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:8px">
@@ -6052,7 +6057,7 @@ function rcvBulkModal(){
     <div class="form-group" style="margin-bottom:18px">
       <label>Hedef Depo</label>
       <select id="rcv-bulk-wh" style="${inp}">
-        ${act.map(w=>`<option value="${w.id}">${w.name}${w.location?' — '+w.location:''}</option>`).join('')}
+        ${act.map(w=>`<option value="${w.id}">${esc(w.name)}${w.location?' — '+w.location:''}</option>`).join('')}
       </select>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
@@ -6140,8 +6145,8 @@ async function renderMrp(){
         return `<div style="display:flex;gap:10px;align-items:center;padding:6px 4px;border-bottom:1px dashed var(--border);flex-wrap:wrap">
           <input type="checkbox" class="mrp-chk" value="${i.id}" checked style="accent-color:var(--accent)">
           <span style="font-family:var(--font-mono);font-size:11px;min-width:0;flex:1">
-            ${i.code?`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
-            <span style="color:var(--muted)"> · ${Number(i.quantity||1)} ${i.unit||'adet'} · 📁 ${i.project_name}${i.material?' · 🔩'+i.material:''}</span>
+            ${i.code?`<span style="color:var(--accent)">${esc(i.code)}</span> — `:''}${esc(i.name)}
+            <span style="color:var(--muted)"> · ${Number(i.quantity||1)} ${esc(i.unit||'adet')} · 📁 ${esc(i.project_name)}${i.material?' · 🔩'+i.material:''}</span>
           </span>
           <span style="display:flex;gap:4px;align-items:center;font-family:var(--font-mono);font-size:10px;color:var(--muted)">
             En <input type="number" id="mrp-w-${i.id}" value="${d.w||''}" min="0" style="${inp}">
@@ -6169,7 +6174,7 @@ function renderMrpParams(){
           <div><label style="font-size:10px;color:var(--muted);display:block">Katalog</label>
             <select id="mrp-sac-sel" style="${inp};min-width:170px" onchange="mrpSacSelChange()">
               <option value="">— elle gir —</option>
-              ${sacs.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}
+              ${sacs.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}
             </select>
           </div>
           <div><label style="font-size:10px;color:var(--muted);display:block">Plaka En</label><input type="number" id="mrp-sac-w" value="1350" min="1" style="${inp};width:84px"></div>
@@ -6186,7 +6191,7 @@ function renderMrpParams(){
           <div><label style="font-size:10px;color:var(--muted);display:block">Katalog</label>
             <select id="mrp-prf-sel" style="${inp};min-width:170px" onchange="mrpPrfSelChange()">
               <option value="">— elle gir —</option>
-              ${profs.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}
+              ${profs.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}
             </select>
           </div>
           <div><label style="font-size:10px;color:var(--muted);display:block">Profil boyu (mm)</label><input type="number" id="mrp-prf-len" value="6000" min="1" style="${inp};width:90px"></div>
@@ -6571,7 +6576,7 @@ function ssRenderList(){
     return `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px dashed var(--border);${s.is_active===false?'opacity:.45':''}">
       <span style="font-family:var(--font-mono);font-size:12px">
         <span style="font-size:10px;padding:1px 6px;border-radius:8px;border:1px solid var(--border);color:var(--muted)">${s.kind}</span>
-        <b> ${s.name}</b>
+        <b> ${esc(s.name)}</b>
         <span style="color:var(--muted)"> · ${dims}${s.material?' · '+s.material:''}</span>
       </span>
       <button class="btn btn-ghost btn-sm" onclick="ssDelete('${s.id}')" style="color:var(--red,#e74c3c)">🗑</button>
@@ -6672,15 +6677,15 @@ function renderPurchaseList(){
     const planParent = i.stock_plan_id ? purchaseItems.find(x=>x.id===i.stock_plan_id) : null;
     const isPlanItem = purchaseItems.some(x=>x.stock_plan_id===i.id);
     const meta = [
-      `${Number(i.quantity||1)} ${i.unit||'adet'}`,
-      i.material ? '🔩 '+i.material : '',
-      i.supplier ? '🏢 '+i.supplier : '',
+      `${Number(i.quantity||1)} ${esc(i.unit||'adet')}`,
+      i.material ? '🔩 '+esc(i.material) : '',
+      i.supplier ? '🏢 '+esc(i.supplier) : '',
       priceTxt, dateTxt,
       i.project_bom_part_id ? '🌳 ağaçtan' : '',
       i.needs_planning ? '📐 planlama havuzunda' : '',
-      planParent ? '📐 → '+planParent.name : '',
+      planParent ? '📐 → '+esc(planParent.name) : '',
       isPlanItem ? '📐 MRP planı' : '',
-      i.notes ? '🗒 '+i.notes : ''
+      i.notes ? '🗒 '+esc(i.notes) : ''
     ].filter(Boolean).join(' · ');
 
     return `<div class="pbom-card" style="border-left:3px solid ${m.color}">
@@ -6689,13 +6694,13 @@ function renderPurchaseList(){
           ${selectable?`<input type="checkbox" ${purSelected.has(i.id)?'checked':''} onchange="purToggleSel('${i.id}',this.checked)" title="Toplu sipariş için seç" style="width:16px;height:16px;margin-top:3px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">`:''}
           <div style="min-width:0">
           <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            ${i.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${i.code}</span>`:''}
-            ${i.name}
+            ${i.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${esc(i.code)}</span>`:''}
+            ${esc(i.name)}
             <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${m.color}44;color:${m.color};background:${m.color}11">${m.icon} ${m.label}</span>
-            ${group?`<span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--muted)">📦 ${group.name}</span>`:''}
+            ${group?`<span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--muted)">📦 ${esc(group.name)}</span>`:''}
           </div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
-            📁 ${i.project_name} · ${meta}
+            📁 ${esc(i.project_name)} · ${meta}
           </div>
           </div>
         </div>
@@ -6793,7 +6798,7 @@ function purQuickPrice(id){
   overlay.id = 'pur-qprice-overlay';
   overlay.innerHTML = `<div class="modal" style="width:340px;text-align:left">
     <h3 style="margin-bottom:4px">💰 Hızlı Fiyat</h3>
-    <p style="margin-bottom:12px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${i.code?i.code+' — ':''}${i.name}</p>
+    <p style="margin-bottom:12px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${i.code?esc(i.code)+' — ':''}${esc(i.name)}</p>
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
       <div><label style="font-size:11px;color:var(--muted)">Birim Fiyat</label><input type="number" id="qp-price" value="${i.unit_price!=null?Number(i.unit_price):''}" min="0" step="0.01" style="${inp}" onkeydown="if(event.key==='Enter')purQuickPriceSave('${i.id}')"></div>
       <div><label style="font-size:11px;color:var(--muted)">Para</label>
@@ -6836,11 +6841,11 @@ function editPurchaseItem(id){
   const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 11px;outline:none';
   overlay.innerHTML = `<div class="modal" style="width:520px;text-align:left">
     <h3 style="margin-bottom:4px">✏️ Kalemi Düzenle</h3>
-    <p style="margin-bottom:14px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${i.name} · 📁 ${i.project_name}</p>
+    <p style="margin-bottom:14px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${esc(i.name)} · 📁 ${esc(i.project_name)}</p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><label style="font-size:11px;color:var(--muted)">Miktar${qtyLocked?' 🔒':''}</label><input type="number" id="pe-qty" value="${i.quantity!=null?Number(i.quantity):1}" min="0" step="0.01" style="${inp}" ${qtyLocked?'disabled title="Depoya girmiş kalemin miktarı değiştirilemez — önce Depodan Geri Al"':''}>
         ${qtyLocked?'<div style="font-size:10px;color:var(--muted);margin-top:3px">🔒 Depodaki kalemde miktar kilitli (stok defteri tutarlılığı) — düzeltme için önce "Depodan Geri Al".</div>':''}</div>
-      <div><label style="font-size:11px;color:var(--muted)">Birim</label><input type="text" id="pe-unit" value="${i.unit||'adet'}" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Birim</label><input type="text" id="pe-unit" value="${esc(i.unit||'adet')}" style="${inp}"></div>
       <div><label style="font-size:11px;color:var(--muted)">Tedarikçi</label><input type="text" id="pe-supplier" list="sup-datalist" value="${(i.supplier||'').replace(/"/g,'&quot;')}" style="${inp}"></div>
       <div><label style="font-size:11px;color:var(--muted)">Termin</label><input type="date" id="pe-date" value="${i.expected_date||''}" style="${inp}"></div>
       <div><label style="font-size:11px;color:var(--muted)">Birim Fiyat</label><input type="number" id="pe-price" value="${i.unit_price!=null?Number(i.unit_price):''}" min="0" step="0.01" style="${inp}"></div>
@@ -6909,7 +6914,7 @@ function openPurImport(){
   overlay.id = 'pur-import-overlay';
   overlay.innerHTML = `<div class="modal" style="width:640px;max-height:80vh;display:flex;flex-direction:column;text-align:left">
     <h3 style="margin-bottom:4px">🌳 Ürün Ağacından Aktar</h3>
-    <p style="margin-bottom:12px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">📁 ${proj} · ${candidates.length} parça aktarılabilir · Satın alınacakları işaretleyin</p>
+    <p style="margin-bottom:12px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">📁 ${esc(proj)} · ${candidates.length} parça aktarılabilir · Satın alınacakları işaretleyin</p>
     <div style="margin-bottom:8px;display:flex;gap:8px">
       <button class="btn btn-ghost btn-sm" onclick="purImportToggleAll(true)">Tümünü Seç</button>
       <button class="btn btn-ghost btn-sm" onclick="purImportToggleAll(false)">Tümünü Bırak</button>
@@ -6926,9 +6931,9 @@ function openPurImport(){
         return `
         <label style="display:flex;gap:10px;align-items:center;padding:7px 10px;border-radius:4px;cursor:pointer;font-family:var(--font-mono);font-size:12px" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
           <input type="checkbox" class="pur-import-chk" value="${p.id}" ${preChecked?'checked':''}>
-          <span style="color:var(--accent);min-width:120px">${p.custom_code||'—'}</span>
-          <span style="flex:1">${'&nbsp;'.repeat((p.level||0)*3)}${p.custom_name||'—'} ${kindBadge(kind)}${dup?` <span style="color:#f5a623;font-size:10px;border:1px solid rgba(245,166,35,.4);border-radius:3px;padding:1px 5px">⚠ aynı kod zaten kalemde (adet ${Number(dup.quantity)||0})</span>`:''}</span>
-          <span style="color:var(--muted)">${Number(p.custom_qty||1)} ${p.custom_unit||'adet'}${p.custom_material?' · '+p.custom_material:''}</span>
+          <span style="color:var(--accent);min-width:120px">${esc(p.custom_code||'—')}</span>
+          <span style="flex:1">${'&nbsp;'.repeat((p.level||0)*3)}${esc(p.custom_name||'—')} ${kindBadge(kind)}${dup?` <span style="color:#f5a623;font-size:10px;border:1px solid rgba(245,166,35,.4);border-radius:3px;padding:1px 5px">⚠ aynı kod zaten kalemde (adet ${Number(dup.quantity)||0})</span>`:''}</span>
+          <span style="color:var(--muted)">${Number(p.custom_qty||1)} ${esc(p.custom_unit||'adet')}${p.custom_material?' · '+p.custom_material:''}</span>
         </label>`;}).join('')}
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
@@ -7013,7 +7018,7 @@ function poCreateFromSelection(){
       <input type="text" id="po-create-name" value="${defName}" style="${inp}">
     </div>
     <div style="max-height:180px;overflow:auto;font-family:var(--font-mono);font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-bottom:16px">
-      ${selItems.map(i=>`<div>• ${i.code?i.code+' — ':''}${i.name} <span style="opacity:.7">(${Number(i.quantity||1)} ${i.unit||'adet'} · ${i.project_name})</span></div>`).join('')}
+      ${selItems.map(i=>`<div>• ${i.code?esc(i.code)+' — ':''}${esc(i.name)} <span style="opacity:.7">(${Number(i.quantity||1)} ${esc(i.unit||'adet')} · ${esc(i.project_name)})</span></div>`).join('')}
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="document.getElementById('po-create-overlay').remove()">İptal</button>
@@ -7081,8 +7086,8 @@ function renderPurchaseOrders(){
     const itemRows = items.length ? items.map(i=>
       `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--border);flex-wrap:wrap">
         <span style="font-family:var(--font-mono);font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">
-          ${i.code?`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
-          <span style="color:var(--muted)"> · ${Number(i.quantity||1)} ${i.unit||'adet'} · 📁 ${i.project_name}</span>
+          ${i.code?`<span style="color:var(--accent)">${esc(i.code)}</span> — `:''}${esc(i.name)}
+          <span style="color:var(--muted)"> · ${Number(i.quantity||1)} ${esc(i.unit||'adet')} · 📁 ${esc(i.project_name)}</span>
         </span>
         <span style="display:flex;gap:4px;align-items:center;flex-shrink:0">
           ${canPrice?`<input type="number" id="poip-${i.id}" value="${i.unit_price!=null?Number(i.unit_price):''}" placeholder="birim fiyat" min="0" step="0.01" style="${inp};width:95px;padding:4px 6px;font-size:11px">
@@ -7103,8 +7108,8 @@ function renderPurchaseOrders(){
       && memberKey.has(i.project_name+'|'+i.code.toLowerCase()))
       .map(i=>`<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px dashed var(--border)">
         <span style="font-family:var(--font-mono);font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">
-          🔀 ${i.code?`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
-          <span style="color:var(--muted)"> · ${Number(i.quantity||1)} ${i.unit||'adet'} · ${i.status==='IN_WAREHOUSE'?'🏭 '+(whName(i.warehouse_id)||'Depoda'):'📥 Teslim alındı'}</span>
+          🔀 ${i.code?`<span style="color:var(--accent)">${esc(i.code)}</span> — `:''}${esc(i.name)}
+          <span style="color:var(--muted)"> · ${Number(i.quantity||1)} ${esc(i.unit||'adet')} · ${i.status==='IN_WAREHOUSE'?'🏭 '+esc(whName(i.warehouse_id)||'Depoda'):'📥 Teslim alındı'}</span>
         </span>
       </div>`).join('');
     // Kalem fiyatları toplamı (girilenlerden; teklif toplamıyla kıyas için)
@@ -7119,13 +7124,13 @@ function renderPurchaseOrders(){
       const meta = [
         q.total_price!=null ? '💰 '+purFmtMoney(q.total_price)+' '+(q.currency||'TRY') : '',
         q.delivery_date ? '📆 '+new Date(q.delivery_date).toLocaleDateString('tr-TR') : '',
-        q.contact_info ? '☎ '+q.contact_info : '',
-        q.notes ? '🗒 '+q.notes : ''
+        q.contact_info ? '☎ '+esc(q.contact_info) : '',
+        q.notes ? '🗒 '+esc(q.notes) : ''
       ].filter(Boolean).join(' · ');
       return `<div style="border:1px solid ${c};border-radius:6px;padding:8px 12px;margin-bottom:6px;${isWinner?'background:#27ae6011':''}">
         <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
           <span style="font-family:var(--font-mono);font-size:12px">
-            🏢 <b>${q.supplier_name}</b>
+            🏢 <b>${esc(q.supplier_name)}</b>
             ${isWinner?'<span style="color:#27ae60;font-size:10px"> ✔ ONAYLANAN</span>':''}
           </span>
           <span style="display:flex;gap:6px;align-items:center">
@@ -7133,7 +7138,7 @@ function renderPurchaseOrders(){
             ${isDraft?`<button class="btn btn-ghost btn-sm" onclick="poDeleteQuote('${q.id}')" title="Teklifi sil">🗑</button>`:''}
           </span>
         </div>
-        ${!isWinner && q.rejection_reason ? `<div style="font-family:var(--font-mono);font-size:10px;color:#e74c3c;margin-top:4px">✖ Elenme gerekçesi: ${q.rejection_reason}</div>`:''}
+        ${!isWinner && q.rejection_reason ? `<div style="font-family:var(--font-mono);font-size:10px;color:#e74c3c;margin-top:4px">✖ Elenme gerekçesi: ${esc(q.rejection_reason)}</div>`:''}
       </div>`;
     }).join('') : `<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">Henüz teklif girilmedi</div>`;
 
@@ -7154,7 +7159,7 @@ function renderPurchaseOrders(){
     // Onay bilgisi
     const approvalInfo = (o.status==='APPROVED'||o.status==='ORDERED') && o.approval_note
       ? `<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:8px;border-left:2px solid #27ae60;padding-left:10px">
-          ✔ Onay: ${o.approval_note}${o.approved_by?` — <b>${o.approved_by}</b>`:''}${o.approved_at?' · '+new Date(o.approved_at).toLocaleString('tr-TR'):''}
+          ✔ Onay: ${esc(o.approval_note)}${o.approved_by?` — <b>${esc(o.approved_by)}</b>`:''}${o.approved_at?' · '+new Date(o.approved_at).toLocaleString('tr-TR'):''}
         </div>` : '';
 
     // Duruma göre aksiyonlar
@@ -7180,11 +7185,11 @@ function renderPurchaseOrders(){
       <div class="pbom-card-header">
         <div style="min-width:0">
           <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            📦 ${o.name}
+            📦 ${esc(o.name)}
             <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${m.color}44;color:${m.color};background:${m.color}11">${m.icon} ${m.label}</span>
           </div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
-            ${items.length} kalem · ${quotes.length} teklif${o.created_by?' · 👤 '+o.created_by:''} · 🕓 ${new Date(o.created_at).toLocaleDateString('tr-TR')}
+            ${items.length} kalem · ${quotes.length} teklif${o.created_by?' · 👤 '+esc(o.created_by):''} · 🕓 ${new Date(o.created_at).toLocaleDateString('tr-TR')}
           </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${actions}</div>
@@ -7285,7 +7290,7 @@ function poApprove(orderId){
   overlay.id = 'po-approve-overlay';
   overlay.innerHTML = `<div class="modal" style="width:560px;max-height:85vh;overflow:auto;text-align:left">
     <h3 style="margin-bottom:4px">✔ Sipariş Onayı</h3>
-    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">📦 ${o.name} — onaylanacak firmayı seçin; elenen her firma için gerekçe yazın.</p>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">📦 ${esc(o.name)} — onaylanacak firmayı seçin; elenen her firma için gerekçe yazın.</p>
     <div style="display:grid;gap:8px;margin-bottom:14px">
       ${quotes.map(q=>{
         const meta = [
@@ -7295,7 +7300,7 @@ function poApprove(orderId){
         return `<div style="border:1px solid var(--border);border-radius:6px;padding:10px 12px">
           <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-family:var(--font-mono);font-size:12px">
             <input type="radio" name="po-app-quote" value="${q.id}" onchange="poApproveRadioChange()" style="accent-color:var(--accent)">
-            <b>${q.supplier_name}</b><span style="color:var(--muted)">${meta}</span>
+            <b>${esc(q.supplier_name)}</b><span style="color:var(--muted)">${meta}</span>
           </label>
           <input type="text" id="po-rej-${q.id}" placeholder="Neden tercih edilmedi? *" style="${inp};margin-top:8px">
         </div>`;
@@ -7436,7 +7441,7 @@ async function renderWarehouse(){
   if(sel){
     const cur = sel.value;
     sel.innerHTML = '<option value="">— Depo seçin —</option>' +
-      warehouses.map(w=>`<option value="${w.id}">${w.name}${w.is_active===false?' (pasif)':''}</option>`).join('');
+      warehouses.map(w=>`<option value="${w.id}">${esc(w.name)}${w.is_active===false?' (pasif)':''}</option>`).join('');
     if(warehouses.some(w=>w.id===cur)) sel.value = cur;
   }
   renderWarehouseList();
@@ -7450,23 +7455,23 @@ function whRow(i, actionsHTML){
   if(i.received_at) dates.push('📥 Teslim: '+new Date(i.received_at).toLocaleDateString('tr-TR'));
   if(i.expected_date && !i.received_at) dates.push('📆 Termin: '+new Date(i.expected_date).toLocaleDateString('tr-TR'));
   const meta = [
-    `${Number(i.quantity||1)} ${i.unit||'adet'}`,
-    i.material ? '🔩 '+i.material : '',
-    i.supplier ? '🏢 '+i.supplier : '',
+    `${Number(i.quantity||1)} ${esc(i.unit||'adet')}`,
+    i.material ? '🔩 '+esc(i.material) : '',
+    i.supplier ? '🏢 '+esc(i.supplier) : '',
     ...dates,
-    i.status==='IN_WAREHOUSE' && i.received_by ? '👤 '+i.received_by : '',
+    i.status==='IN_WAREHOUSE' && i.received_by ? '👤 '+esc(i.received_by) : '',
     Number(i.returned_qty) ? '↩ '+Number(i.returned_qty)+' iade' : ''
   ].filter(Boolean).join(' · ');
   return `<div class="pbom-card" style="border-left:3px solid ${m.color}">
     <div class="pbom-card-header">
       <div style="min-width:0">
         <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          ${i.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${i.code}</span>`:''}
-          ${i.name}
+          ${i.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${esc(i.code)}</span>`:''}
+          ${esc(i.name)}
           <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${m.color}44;color:${m.color};background:${m.color}11">${m.icon} ${m.label}</span>
-          ${i.status==='IN_WAREHOUSE' && whName(i.warehouse_id) ? `<span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--muted)">🗄️ ${whName(i.warehouse_id)}</span>` : ''}
+          ${i.status==='IN_WAREHOUSE' && whName(i.warehouse_id) ? `<span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--muted)">🗄️ ${esc(whName(i.warehouse_id))}</span>` : ''}
         </div>
-        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">📁 ${i.project_name} · ${meta}</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">📁 ${esc(i.project_name)} · ${meta}</div>
       </div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${actionsHTML}</div>
     </div>
@@ -7528,7 +7533,7 @@ function whvProjectHTML(){
       inWh.forEach(i=>{ const k=whName(i.warehouse_id)||'—'; (whGroups[k]=whGroups[k]||[]).push(i); });
       body = `<div style="margin-top:12px">`;
       Object.entries(whGroups).sort(([a],[b])=>a.localeCompare(b,'tr')).forEach(([wn,items])=>{
-        body += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--green,#2ecc71);margin:10px 0 6px">🗄️ ${wn} · ${items.length} malzeme</div>`
+        body += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--green,#2ecc71);margin:10px 0 6px">🗄️ ${esc(wn)} · ${items.length} malzeme</div>`
           + items.map(i=>whRow(i, `<button class="btn btn-ghost btn-sm" onclick="whXferItem('${i.id}')" title="Başka depoya aktar">🔁 Aktar</button>
               <button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)).join('');
       });
@@ -7546,7 +7551,7 @@ function whvProjectHTML(){
     return `<div class="pbom-card" style="margin-bottom:12px">
       <div class="pbom-card-header" onclick="whvToggleProj('${ea(proj)}')" style="cursor:pointer">
         <div>
-          <div class="pbom-card-title">📁 ${proj}</div>
+          <div class="pbom-card-title">📁 ${esc(proj)}</div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
             ${inWh.length?`🏭 ${inWh.length} depoda`:''}${inWh.length&&pending.length?' · ':''}${pending.length?`📦 ${pending.length} beklenen`:''}
           </div>
@@ -7591,7 +7596,7 @@ function whvWarehouseHTML(){
 
   let html = '';
   Object.entries(projGroups).sort(([a],[b])=>a.localeCompare(b,'tr')).forEach(([proj,items])=>{
-    html += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:14px 0 6px">📁 ${proj} · ${items.length} malzeme</div>`
+    html += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:14px 0 6px">📁 ${esc(proj)} · ${items.length} malzeme</div>`
       + items.map(i=>whRow(i, `<button class="btn btn-ghost btn-sm" onclick="whXferItem('${i.id}')" title="Başka depoya aktar">🔁 Aktar</button>
           <button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)).join('');
   });
@@ -7602,11 +7607,11 @@ function whvWarehouseHTML(){
         return `<div class="pbom-card" style="border-left:3px solid ${c};padding:8px 14px">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between">
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0">
-              ${r.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${r.code}</span>`:''}
-              <span>${r.name}</span>
+              ${r.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${esc(r.code)}</span>`:''}
+              <span>${esc(r.name)}</span>
             </div>
             <span style="display:flex;gap:8px;align-items:center">
-              <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${r.unit}</span>
+              <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${esc(r.unit)}</span>
               ${r.net>0?`<button class="btn btn-ghost btn-sm" onclick="whXferLoose('${whId}','${ea(r.name)}','${ea(r.code||'')}','${ea(r.unit)}',${r.net})" title="Başka depoya aktar">🔁</button>`:''}
             </span>
           </div>
@@ -7623,17 +7628,17 @@ function whvProjectPDF(proj){
   if(!rel.length){ toast('Bu projede yazdırılacak malzeme yok!','error'); return; }
   const printDate = new Date().toLocaleString('tr-TR',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
   const row = i => `<tr>
-    <td>${i.code||'—'}</td><td>${i.name}</td>
-    <td style="text-align:right">${Number(i.quantity||1)} ${i.unit||'adet'}</td>
-    <td>${i.status==='IN_WAREHOUSE' ? '🗄️ '+(whName(i.warehouse_id)||'Depoda') : (PUR_STATUS[i.status]?.label||i.status)}</td>
-    <td>${i.supplier||'—'}</td>
+    <td>${esc(i.code||'—')}</td><td>${esc(i.name)}</td>
+    <td style="text-align:right">${Number(i.quantity||1)} ${esc(i.unit||'adet')}</td>
+    <td>${i.status==='IN_WAREHOUSE' ? '🗄️ '+esc(whName(i.warehouse_id)||'Depoda') : (PUR_STATUS[i.status]?.label||i.status)}</td>
+    <td>${esc(i.supplier||'—')}</td>
     <td>${i.received_at?new Date(i.received_at).toLocaleDateString('tr-TR'):(i.expected_date?'Termin: '+new Date(i.expected_date).toLocaleDateString('tr-TR'):'—')}</td>
   </tr>`;
   const inWh = rel.filter(i=>i.status==='IN_WAREHOUSE');
   const pending = rel.filter(i=>i.status!=='IN_WAREHOUSE');
   const table = rows => `<table class="wr-tbl"><tr><th>Kod</th><th>Malzeme</th><th style="text-align:right">Miktar</th><th>Durum / Depo</th><th>Tedarikçi</th><th>Tarih</th></tr>${rows}</table>`;
   const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
-<title>Depo Raporu — ${proj}</title>
+<title>Depo Raporu — ${esc(proj)}</title>
 <style>
   @page { size: A4; margin: 15mm 12mm; }
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -7648,7 +7653,7 @@ function whvProjectPDF(proj){
   @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
 </style></head><body>
   <div class="print-header">
-    <div><div class="print-logo">ÜretimTakip</div><div style="font-size:11px;color:#666;margin-top:4px">Proje Depo Raporu — 📁 ${proj}</div></div>
+    <div><div class="print-logo">ÜretimTakip</div><div style="font-size:11px;color:#666;margin-top:4px">Proje Depo Raporu — 📁 ${esc(proj)}</div></div>
     <div class="print-meta">Çıktı Tarihi: ${printDate}<br>🏭 Depoda: ${inWh.length} · 📦 Beklenen: ${pending.length}</div>
   </div>
   ${inWh.length?`<h2>🏭 Depodaki Malzemeler (${inWh.length})</h2>`+table(inWh.map(row).join('')):''}
@@ -7685,7 +7690,7 @@ async function whTransfer(id){
     <div class="form-group" style="margin-bottom:18px">
       <label>Hedef Depo</label>
       <select id="wh-target-sel" style="${inp}">
-        ${act.map(w=>`<option value="${w.id}">${w.name}${w.location?' — '+w.location:''}</option>`).join('')}
+        ${act.map(w=>`<option value="${w.id}">${esc(w.name)}${w.location?' — '+w.location:''}</option>`).join('')}
       </select>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
@@ -7779,14 +7784,14 @@ function whXferItem(id){
   const others = warehouses.filter(w=>w.is_active!==false && w.id!==i.warehouse_id);
   if(!others.length){ toast('Aktarılacak başka aktif depo yok!','error'); return; }
   _whXfer = {kind:'item', id, src:i.warehouse_id, maxQ:Number(i.quantity)||1, unit:i.unit||'adet'};
-  _whXferOpenModal(`${i.code?i.code+' — ':''}${i.name}`, others);
+  _whXferOpenModal(`${i.code?esc(i.code)+' — ':''}${esc(i.name)}`, others);
 }
 
 function whXferLoose(whId, name, code, unit, net){
   const others = warehouses.filter(w=>w.is_active!==false && w.id!==whId);
   if(!others.length){ toast('Aktarılacak başka aktif depo yok!','error'); return; }
   _whXfer = {kind:'loose', src:whId, name, code:code||null, maxQ:Number(net)||0, unit:unit||'adet'};
-  _whXferOpenModal(`${code?code+' — ':''}${name}`, others);
+  _whXferOpenModal(`${code?esc(code)+' — ':''}${esc(name)}`, others);
 }
 
 function _whXferOpenModal(label, targets){
@@ -7796,11 +7801,11 @@ function _whXferOpenModal(label, targets){
   overlay.id = 'whx-overlay';
   overlay.innerHTML = `<div class="modal" style="width:400px;text-align:left">
     <h3 style="margin-bottom:4px">🔁 Depolar Arası Aktarım</h3>
-    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${label}<br>Kaynak: 🗄️ ${whName(_whXfer.src)||'—'} · mevcut ${Number(_whXfer.maxQ.toFixed(4))} ${_whXfer.unit}</p>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${label}<br>Kaynak: 🗄️ ${esc(whName(_whXfer.src)||'—')} · mevcut ${Number(_whXfer.maxQ.toFixed(4))} ${esc(_whXfer.unit)}</p>
     <div class="form-row" style="grid-template-columns:2fr 1fr;margin-bottom:16px">
       <div class="form-group"><label>Hedef Depo</label>
         <select id="whx-target" style="${inp}">
-          ${targets.map(w=>`<option value="${w.id}">${w.name}${w.location?' — '+w.location:''}</option>`).join('')}
+          ${targets.map(w=>`<option value="${w.id}">${esc(w.name)}${w.location?' — '+w.location:''}</option>`).join('')}
         </select>
       </div>
       <div class="form-group"><label>Adet</label>
@@ -7934,7 +7939,7 @@ async function renderDelivery(){
   if(sel){
     const cur = sel.value;
     sel.innerHTML = '<option value="">— Proje yok —</option>' +
-      orders.map(o=>`<option value="${o.id}">${o.project_name}</option>`).join('');
+      orders.map(o=>`<option value="${o.id}">${esc(o.project_name)}</option>`).join('');
     sel.value = cur;
   }
   renderDnDetail();
@@ -8050,8 +8055,8 @@ function renderDnDetail(){
     <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--border)">
       <span style="font-family:var(--font-mono);font-size:12px;min-width:0">
         <span style="color:var(--muted)">${String(idx+1).padStart(2,'0')}</span>
-        ${i.item_code?`<span style="color:var(--accent)"> ${i.item_code}</span> —`:''} ${i.item_name}
-        <span style="color:var(--muted)"> · ${Number(i.quantity)} ${i.unit||'adet'}${i.warehouse_id?' · 🗄️ '+(whName(i.warehouse_id)||'depo'):''}${i.notes?' · 🗒 '+i.notes:''}</span>
+        ${i.item_code?`<span style="color:var(--accent)"> ${esc(i.item_code)}</span> —`:''} ${esc(i.item_name)}
+        <span style="color:var(--muted)"> · ${Number(i.quantity)} ${esc(i.unit||'adet')}${i.warehouse_id?' · 🗄️ '+esc(whName(i.warehouse_id)||'depo'):''}${i.notes?' · 🗒 '+esc(i.notes):''}</span>
       </span>
       ${isDraft?`<button class="btn btn-ghost btn-sm" onclick="dnDeleteItem('${i.id}')" title="Kalemi sil">🗑</button>`:''}
     </div>`).join('')
@@ -8135,8 +8140,8 @@ async function dnPickFromStock(noteId){
     <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px">Seçilen kalem sevk edildiğinde stoktan düşer</p>
     <div style="max-height:45vh;overflow:auto">
       ${rows.map((r,i)=>`<div onclick="dnStockPicked(${i})" style="display:flex;justify-content:space-between;gap:10px;padding:9px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-        <span style="font-family:var(--font-mono);font-size:12px;min-width:0">${r.code?`<span style="color:var(--accent)">${r.code}</span> — `:''}${r.name}<span style="color:var(--muted)"> · 🗄️ ${whName(r.wh)||'—'}</span></span>
-        <span style="font-family:var(--font-mono);font-size:12px;color:var(--green);white-space:nowrap">${Number(r.net.toFixed(4))} ${r.unit}</span>
+        <span style="font-family:var(--font-mono);font-size:12px;min-width:0">${r.code?`<span style="color:var(--accent)">${esc(r.code)}</span> — `:''}${esc(r.name)}<span style="color:var(--muted)"> · 🗄️ ${esc(whName(r.wh)||'—')}</span></span>
+        <span style="font-family:var(--font-mono);font-size:12px;color:var(--green);white-space:nowrap">${Number(r.net.toFixed(4))} ${esc(r.unit)}</span>
       </div>`).join('')}
     </div>
     <div style="display:flex;justify-content:flex-end;margin-top:12px">
@@ -8225,11 +8230,11 @@ function dnPrint(id){
   const fmtD = v => v ? new Date(v).toLocaleDateString('tr-TR') : '—';
   const rows = items.length ? items.map((i,idx)=>`<tr>
       <td style="text-align:center">${idx+1}</td>
-      <td>${i.item_code||'—'}</td>
-      <td>${i.item_name}</td>
+      <td>${esc(i.item_code||'—')}</td>
+      <td>${esc(i.item_name)}</td>
       <td style="text-align:right">${Number(i.quantity)}</td>
-      <td>${i.unit||'adet'}</td>
-      <td>${i.notes||''}</td>
+      <td>${esc(i.unit||'adet')}</td>
+      <td>${esc(i.notes||'')}</td>
     </tr>`).join('')
     : `<tr><td colspan="6" style="text-align:center;color:#999">Kalem yok</td></tr>`;
   const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
@@ -8278,7 +8283,7 @@ function dnPrint(id){
         <tr><td><b>Taşıyıcı</b></td><td>${n.carrier||'—'}</td></tr>
         <tr><td><b>Proje</b></td><td>${proj||'—'}</td></tr>
         <tr><td><b>Durum</b></td><td>${(DN_STATUS[n.status]||{}).label||n.status}${n.shipped_at?' · '+new Date(n.shipped_at).toLocaleString('tr-TR'):''}</td></tr>
-        ${n.notes?`<tr><td><b>Not</b></td><td>${n.notes}</td></tr>`:''}
+        ${n.notes?`<tr><td><b>Not</b></td><td>${esc(n.notes)}</td></tr>`:''}
       </table>
     </div>
   </div>
@@ -8323,7 +8328,7 @@ async function renderReceive(id){
     ['Durum', `${m.icon} ${m.label}`]
   ].map(([k,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border)">
       <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted);text-transform:uppercase">${k}</span>
-      <span style="font-size:13px;text-align:right">${v}</span></div>`).join('');
+      <span style="font-size:13px;text-align:right">${esc(v)}</span></div>`).join('');
 
   let action;
   if(i.status==='IN_WAREHOUSE'){
@@ -8339,7 +8344,7 @@ async function renderReceive(id){
     action=`<div style="margin-top:16px">
       <label style="font-family:var(--font-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Hedef Depo</label>
       <select id="rcv-wh" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font-mono);font-size:14px;padding:12px;outline:none;margin-top:6px">
-        ${act.map(w=>`<option value="${w.id}">${w.name}${w.location?' — '+w.location:''}</option>`).join('')}
+        ${act.map(w=>`<option value="${w.id}">${esc(w.name)}${w.location?' — '+w.location:''}</option>`).join('')}
       </select>
       <button class="btn btn-primary" style="width:100%;margin-top:14px;padding:14px;font-size:15px" onclick="receiveConfirm('${i.id}')">✅ Mal Kabul — Depoya Al</button>
     </div>`;
@@ -8348,7 +8353,7 @@ async function renderReceive(id){
   content.innerHTML=`
     <div class="scan-card">
       <div style="font-family:var(--font-mono);font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px">📦 QR Mal Kabul</div>
-      <div class="scan-part-name">${i.name}</div>
+      <div class="scan-part-name">${esc(i.name)}</div>
       <div style="margin-top:14px">${infoRows}</div>
       ${action}
     </div>`;
@@ -8394,7 +8399,7 @@ function printGoodsReceiptPDF(itemIds){
     const kidsHTML = planKids.length ? `
       <div style="margin-top:8px;padding:6px 8px;background:#eef4fb;border:1px dashed #2980b9;border-radius:4px;font-size:9px;color:#1a4a6e">
         <b>📐 Bu plakadan/profilden çıkacak parçalar (${planKids.length}):</b><br>
-        ${planKids.map(k=>`• ${k.code?k.code+' — ':''}${k.name} (${Number(k.quantity||1)} ${k.unit||'adet'} · ${k.project_name})`).join('<br>')}
+        ${planKids.map(k=>`• ${k.code?esc(k.code)+' — ':''}${esc(k.name)} (${Number(k.quantity||1)} ${esc(k.unit||'adet')} · ${esc(k.project_name)})`).join('<br>')}
       </div>` : '';
     const rows=[
       ['Proje',i.project_name||'—'],['Kod',i.code||'—'],
@@ -8402,12 +8407,12 @@ function printGoodsReceiptPDF(itemIds){
       ['Malzeme',i.material||'—'],['Tedarikçi',i.supplier||'—'],
       ['Sipariş Grubu',group?group.name:'—'],
       ['Beklenen Tarih',i.expected_date?new Date(i.expected_date).toLocaleDateString('tr-TR'):'—']
-    ].map(([k,v])=>`<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('');
+    ].map(([k,v])=>`<tr><td><b>${k}</b></td><td>${esc(v)}</td></tr>`).join('');
     return `<div class="gr-card">
       <div class="gr-head">
         <div>
-          <div class="gr-title">${i.name}</div>
-          <div class="gr-sub">${i.code||''}</div>
+          <div class="gr-title">${esc(i.name)}</div>
+          <div class="gr-sub">${esc(i.code||'')}</div>
         </div>
         <div style="text-align:center">
           ${qr?`<img src="${qr}" style="width:88px;height:88px;display:block">`:''}
@@ -8476,14 +8481,14 @@ async function renderWarehouseManage(){
   const mvSel = document.getElementById('whm-mv-wh');
   if(mvSel){
     mvSel.innerHTML = act.length
-      ? act.map(w=>`<option value="${w.id}">${w.name}</option>`).join('')
+      ? act.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('')
       : '<option value="">— Önce depo tanımlayın —</option>';
   }
   const fSel = document.getElementById('whm-mv-filter');
   if(fSel){
     const cur = fSel.value;
     fSel.innerHTML = '<option value="">— Tüm depolar —</option>' +
-      warehouses.map(w=>`<option value="${w.id}">${w.name}</option>`).join('');
+      warehouses.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('');
     if(warehouses.some(w=>w.id===cur)) fSel.value = cur;
   }
   renderWhMovements();
@@ -8511,7 +8516,7 @@ function renderWhmList(){
       <div class="pbom-card-header">
         <div style="min-width:0">
           <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            🗄️ ${w.name}
+            🗄️ ${esc(w.name)}
             <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${c}44;color:${c};background:${c}11">${active?'AKTİF':'PASİF'}</span>
           </div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">${meta}</div>
@@ -8553,7 +8558,7 @@ function whmEditWarehouse(id){
     overlay.id = 'whm-edit-overlay';
     overlay.innerHTML = `<div class="modal" style="width:420px;text-align:left">
       <h3 style="margin-bottom:4px">✏️ Depoyu Düzenle</h3>
-      <p style="margin-bottom:14px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">🗄️ ${w.name}</p>
+      <p style="margin-bottom:14px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">🗄️ ${esc(w.name)}</p>
       <div style="display:grid;gap:10px">
         <div><label style="font-size:11px;color:var(--muted)">Depo Adı</label><input type="text" id="whm-e-name" value="${w.name.replace(/"/g,'&quot;')}" style="${inp}"></div>
         <div><label style="font-size:11px;color:var(--muted)">Konum</label><input type="text" id="whm-e-location" value="${(w.location||'').replace(/"/g,'&quot;')}" style="${inp}"></div>
@@ -8683,11 +8688,11 @@ function renderWhStock(){
     return `<div class="pbom-card" style="border-left:3px solid ${c};padding:8px 14px">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0">
-          ${r.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${r.code}</span>`:''}
-          <span>${r.name}</span>
-          ${!f?`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">🗄️ ${whName(r.wh)||'—'}</span>`:''}
+          ${r.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${esc(r.code)}</span>`:''}
+          <span>${esc(r.name)}</span>
+          ${!f?`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">🗄️ ${esc(whName(r.wh)||'—')}</span>`:''}
         </div>
-        <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${r.unit}</span>
+        <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${esc(r.unit)}</span>
       </div>
     </div>`;
   }).join('');
@@ -8708,19 +8713,19 @@ function renderWhMovements(){
     const c = isIn ? '#2ecc71' : '#e74c3c';
     const src = WH_SOURCE_LABELS[m.source_type] || m.source_type;
     const meta = [
-      '🗄️ '+(whName(m.warehouse_id)||'—'),
-      Number(m.quantity)+' '+(m.unit||'adet'),
-      m.performed_by ? '👤 '+m.performed_by : '',
+      '🗄️ '+esc(whName(m.warehouse_id)||'—'),
+      Number(m.quantity)+' '+esc(m.unit||'adet'),
+      m.performed_by ? '👤 '+esc(m.performed_by) : '',
       '🕓 '+new Date(m.created_at).toLocaleString('tr-TR'),
-      m.notes ? '📝 '+m.notes : ''
+      m.notes ? '📝 '+esc(m.notes) : ''
     ].filter(Boolean).join(' · ');
     return `<div class="pbom-card" style="border-left:3px solid ${c}">
       <div class="pbom-card-header">
         <div style="min-width:0">
           <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <span style="color:${c};font-family:var(--font-mono);font-size:12px">${isIn?'⬇ GİRİŞ':'⬆ ÇIKIŞ'}</span>
-            ${m.item_code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${m.item_code}</span>`:''}
-            ${m.item_name}
+            ${m.item_code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${esc(m.item_code)}</span>`:''}
+            ${esc(m.item_name)}
             <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--muted)">${src}</span>
           </div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">${meta}</div>
@@ -8823,7 +8828,7 @@ async function renderAppUsers() {
           <span class="appuser-role-badge" style="margin-left:6px">${u.role==='developer'?'Geliştirici':'Kullanıcı'}</span>
           ${!u.is_active?'<span style="background:rgba(231,76,60,.15);color:var(--red);border:1px solid rgba(231,76,60,.3);border-radius:10px;padding:2px 8px;font-family:var(--font-mono);font-size:10px;margin-left:6px">Pasif</span>':''}
         </div>
-        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:4px">@${u.username}</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:4px">@${esc(u.username)}</div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
           <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">Şifre:</span>
           <span style="font-family:var(--font-mono);font-size:12px;letter-spacing:2px" title="Şifreler şifrelenmiş (BCrypt) saklanır, görüntülenemez">•••••••• 🔒</span>
@@ -8854,7 +8859,7 @@ function editAppUserPerms(id) {
   overlay.id = 'perm-overlay';
   overlay.innerHTML = `<div class="modal" style="width:460px;text-align:left">
     <h3 style="margin-bottom:4px">Yetki Düzenle</h3>
-    <p style="margin-bottom:16px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${u.display_name||u.username} · @${u.username}</p>
+    <p style="margin-bottom:16px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${u.display_name||u.username} · @${esc(u.username)}</p>
     <div class="perm-grid" id="edit-perms">
       ${allPerms.map(p => `
         <div class="perm-item ${perms.includes(p)?'checked':''}" data-perm="${p}" onclick="togglePerm(this)">
@@ -9096,14 +9101,14 @@ function renderBomProductSelect() {
   if(!sel) return;
   const cur = sel.value;
   sel.innerHTML = '<option value="">— Ürün seçin —</option>' +
-    bomProducts.map(p=>`<option value="${p.id}"${p.id===cur?' selected':''}>${p.name} ${p.code?'('+p.code+')':''}</option>`).join('');
+    bomProducts.map(p=>`<option value="${p.id}"${p.id===cur?' selected':''}>${esc(p.name)} ${p.code?'('+p.code+')':''}</option>`).join('');
 }
 
 function renderBomOpDefSelect() {
   const sel = document.getElementById('bom-op-def-select');
   if(!sel) return;
   sel.innerHTML = '<option value="">— İşlem seçin —</option>' +
-    bomOpDefs.map(op=>`<option value="${op.id}">${op.name} (${op.code})</option>`).join('');
+    bomOpDefs.map(op=>`<option value="${op.id}">${esc(op.name)} (${esc(op.code)})</option>`).join('');
 }
 
 function onBomOpDefChange() {
@@ -9191,10 +9196,10 @@ function renderOpDefsList() {
   el.innerHTML = bomOpDefs.map(op=>`
     <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border-radius:6px;margin-bottom:6px;border:1px solid var(--border)">
       <div style="flex:1">
-        <div style="font-weight:600;font-size:13px">${op.name}
-          <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:4px;padding:1px 7px;margin-left:6px">${op.code}</span>
+        <div style="font-weight:600;font-size:13px">${esc(op.name)}
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:4px;padding:1px 7px;margin-left:6px">${esc(op.code)}</span>
         </div>
-        ${op.description?`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:2px">${op.description}</div>`:''}
+        ${op.description?`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:2px">${esc(op.description)}</div>`:''}
       </div>
       <button class="icon-btn" onclick="deleteBomOpDef('${op.id}')" title="Sil" style="color:var(--red)">🗑️</button>
     </div>`).join('');
@@ -9322,14 +9327,14 @@ function renderParentSelect() {
   const sel = document.getElementById('bom-part-parent');
   if(!sel) return;
   sel.innerHTML = '<option value="">— Ana ürün altına ekle —</option>' +
-    bomParts.map(p=>`<option value="${p.id}">${'  '.repeat(p.level||0)}${p.code} — ${p.name}</option>`).join('');
+    bomParts.map(p=>`<option value="${p.id}">${'  '.repeat(p.level||0)}${esc(p.code)} — ${esc(p.name)}</option>`).join('');
 }
 
 function renderOpPartSelect() {
   const sel = document.getElementById('bom-op-part');
   if(!sel) return;
   sel.innerHTML = '<option value="">— Parça seçin —</option>' +
-    bomParts.map(p=>`<option value="${p.id}">${p.code} — ${p.name}</option>`).join('');
+    bomParts.map(p=>`<option value="${p.id}">${esc(p.code)} — ${esc(p.name)}</option>`).join('');
 }
 
 // ─── Malzeme türü (#7 arkadaş isteği) ───
@@ -9469,7 +9474,7 @@ function renderBomList() {
     const ops = Array.isArray(part.operations) ? part.operations : JSON.parse(part.operations||'[]');
     const opsHTML = ops.length ? `<div class="bom-ops">${ops.map((o,oi)=>{
       const timeStr = o.duration_per_unit ? ` ⏱${o.total_duration?.toFixed(1)||'?'}dk` : '';
-      return `<span class="bom-op-tag">⚙ ${o.name} (${o.code})${timeStr} <button onclick="removeBomOp('${part.id}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px;margin-left:2px">✕</button></span>`;
+      return `<span class="bom-op-tag">⚙ ${esc(o.name)} (${esc(o.code)})${timeStr} <button onclick="removeBomOp('${part.id}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px;margin-left:2px">✕</button></span>`;
     }).join('')}</div>` : '';
     const indent = level * 24;
     return `<div class="bom-part-row" data-id="${part.id}" data-level="${level}"
@@ -9482,13 +9487,13 @@ function renderBomList() {
         style="margin-left:${indent}px">
       <span class="bom-drag-handle">⠿</span>
       ${level>0?`<span style="color:var(--muted);font-size:10px;margin-right:4px">${'└─'.repeat(1)}</span>`:''}
-      <span class="bom-part-code">${part.code}</span>
+      <span class="bom-part-code">${esc(part.code)}</span>
       <div style="flex:1">
-        <div class="bom-part-name-cell">${part.name} ${kindBadge(part.material_kind)}</div>
+        <div class="bom-part-name-cell">${esc(part.name)} ${kindBadge(part.material_kind)}</div>
         <div class="bom-part-meta">
-          <span id="bom-qty-display-${part.id}" style="cursor:pointer;border-bottom:1px dashed var(--muted)" onclick="editBomQty('${part.id}')" title="Miktarı düzenle">${part.quantity} ${part.unit}</span>
+          <span id="bom-qty-display-${part.id}" style="cursor:pointer;border-bottom:1px dashed var(--muted)" onclick="editBomQty('${part.id}')" title="Miktarı düzenle">${part.quantity} ${esc(part.unit)}</span>
           ${part.weight_kg?`<span>⚖ ${part.weight_kg} kg</span>`:''}
-          ${part.material?`<span>🔩 ${part.material}</span>`:''}
+          ${part.material?`<span>🔩 ${esc(part.material)}</span>`:''}
           ${dimLabel(part.width_mm,part.height_mm,part.thickness_mm)?`<span>📐 ${dimLabel(part.width_mm,part.height_mm,part.thickness_mm)}</span>`:''}
         </div>
         ${opsHTML}
@@ -9646,7 +9651,7 @@ function editBomQty(partId) {
   overlay.id = 'bom-qty-overlay';
   overlay.innerHTML = `<div class="modal" style="width:340px;text-align:left">
     <h3 style="margin-bottom:4px">✏️ Miktar Düzenle</h3>
-    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:18px">${part.code} — ${part.name}</p>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:18px">${esc(part.code)} — ${esc(part.name)}</p>
     <div class="form-row" style="grid-template-columns:2fr 1fr;margin-bottom:18px">
       <div class="form-group">
         <label>Miktar</label>
@@ -9699,7 +9704,7 @@ function editBomPart(partId) {
   overlay.id = 'bom-edit-overlay';
   overlay.innerHTML = `<div class="modal" style="width:420px;text-align:left">
     <h3 style="margin-bottom:4px">✏️ Parça Düzenle</h3>
-    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:18px">${part.code} — ${part.name}</p>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:18px">${esc(part.code)} — ${esc(part.name)}</p>
     <div class="form-group" style="margin-bottom:12px">
       <label>Parça Adı</label>
       <input type="text" id="bom-edit-name" value="${(part.name||'').replace(/"/g,'&quot;')}" style="${inStyle}">
@@ -9805,15 +9810,15 @@ function renderBomTreeSvg() {
       .sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
     return children.map(p=>{
       const ops = Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
-      const opBadges = ops.map(o=>{ const t=o.duration_per_unit?` ⏱${(o.total_duration||0).toFixed(1)}dk`:""; return `<span style="background:rgba(41,128,185,.15);border:1px solid rgba(41,128,185,.3);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${o.name}(${o.code})${t}</span>`; }).join(" ");
+      const opBadges = ops.map(o=>{ const t=o.duration_per_unit?` ⏱${(o.total_duration||0).toFixed(1)}dk`:""; return `<span style="background:rgba(41,128,185,.15);border:1px solid rgba(41,128,185,.3);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${esc(o.name)}(${esc(o.code)})${t}</span>`; }).join(" ");
       const childrenHtml = buildNode(p.id, level+1);
       return `<div class="bom-tree-node">
         <div class="bom-tree-item" style="margin-left:${level*4}px">
-          <span style="color:var(--accent);font-weight:700">${p.code}</span>
-          <span>${p.name}</span>
-          <span style="color:var(--muted);font-size:10px">${p.quantity} ${p.unit}</span>
+          <span style="color:var(--accent);font-weight:700">${esc(p.code)}</span>
+          <span>${esc(p.name)}</span>
+          <span style="color:var(--muted);font-size:10px">${p.quantity} ${esc(p.unit)}</span>
           ${p.weight_kg?`<span style="color:var(--muted);font-size:10px">⚖${p.weight_kg}kg</span>`:''}
-          ${p.material?`<span style="color:var(--muted);font-size:10px">🔩${p.material}</span>`:''}
+          ${p.material?`<span style="color:var(--muted);font-size:10px">🔩${esc(p.material)}</span>`:''}
           ${dimLabel(p.width_mm,p.height_mm,p.thickness_mm)?`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.width_mm,p.height_mm,p.thickness_mm)}</span>`:''}
           ${opBadges}
         </div>
@@ -9827,8 +9832,8 @@ function renderBomTreeSvg() {
   container.innerHTML = `
     <div class="bom-tree-node">
       <div class="bom-tree-item root">
-        🏭 <span>${p.code?p.code+' — ':''}${p.name}</span>
-        <span style="color:var(--muted);font-size:10px">${p.unit}</span>
+        🏭 <span>${p.code?esc(p.code)+' — ':''}${esc(p.name)}</span>
+        <span style="color:var(--muted);font-size:10px">${esc(p.unit)}</span>
         <span style="color:var(--muted);font-size:10px">${bomParts.length} parça</span>
       </div>
       <div class="bom-tree-children">${rootChildren}</div>
@@ -9839,7 +9844,7 @@ function renderBomTreeSvg() {
 async function exportBomExcel() {
   if(!_activeBomProduct) return;
   const BOM = '\uFEFF';
-  let csv = BOM + `ÜRÜN AĞACI — ${_activeBomProduct.name} (${_activeBomProduct.code||''})\n\n`;
+  let csv = BOM + `ÜRÜN AĞACI — ${_activeBomProduct.name} (${_activeBomProduct.code||''})\n\n`; // CSV metin çıktısı — esc() KULLANILMAZ
   csv += 'Seviye;Parça Kodu;Parça Adı;Miktar;Birim;Ağırlık(kg);Malzeme;İşlemler;Birim Süre(dk);Toplam Süre(dk);Üst Parça\n';
   const sorted = buildSortedTree(null,0);
   sorted.forEach(({part,level})=>{
@@ -9930,7 +9935,7 @@ function pbomRenderMachineRows(){
       <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted);width:18px;flex-shrink:0">${idx+1}.</span>
       <select style="${inp}" onchange="pbomMachineChange(${idx},this.value)">
         <option value="">— Makine seçin —</option>
-        ${opts.map(p=>`<option value="${p.id}" ${p.id===val?'selected':''}>${p.name}${p.code?' ('+p.code+')':''}</option>`).join('')}
+        ${opts.map(p=>`<option value="${p.id}" ${p.id===val?'selected':''}>${esc(p.name)}${p.code?' ('+p.code+')':''}</option>`).join('')}
       </select>
       ${_pbomMachineSel.length>1?`<button class="btn btn-ghost btn-sm" onclick="pbomRemoveMachineRow(${idx})" title="Satırı kaldır" style="color:var(--red);flex-shrink:0">✕</button>`:''}
     </div>`;
@@ -9995,7 +10000,7 @@ function renderProjectBomList() {
   projectBoms.forEach(pb=>{ const k=pb.project_name||'—'; (groups[k]=groups[k]||[]).push(pb); });
   el.innerHTML = Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([proj,list])=>
     `<div style="font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:20px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px">
-      📁 ${proj} <span style="color:var(--muted);text-transform:none">· ${list.length} ürün ağacı</span>
+      📁 ${esc(proj)} <span style="color:var(--muted);text-transform:none">· ${list.length} ürün ağacı</span>
     </div>` +
     list.map(pb => {
     const prod = bomProducts.find(p=>p.id===pb.bom_product_id);
@@ -10006,7 +10011,7 @@ function renderProjectBomList() {
     return `<div class="pbom-card">
       <div class="pbom-card-header">
         <div>
-          <div class="pbom-card-title">🌳 ${prod?.name||'—'} ${prod?.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">(${prod.code})</span>`:''}</div>
+          <div class="pbom-card-title">🌳 ${prod?.name||'—'} ${prod?.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">(${esc(prod.code)})</span>`:''}</div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
             ${excCount>0?excCount+' parça hariç tutuldu · ':''}
             ${isPublished?'Yayınlandı: '+new Date(pb.published_at).toLocaleDateString('tr-TR'):'Taslak'}
@@ -10118,21 +10123,21 @@ function pbomeRenderParentSelect() {
   const sel = document.getElementById('pbome-part-parent');
   if(!sel) return;
   sel.innerHTML = '<option value="">— Ana seviye —</option>' +
-    _pbomeParts.map(p=>`<option value="${p.id}">${'  '.repeat(p.level||0)}${p.custom_code} — ${p.custom_name}</option>`).join('');
+    _pbomeParts.map(p=>`<option value="${p.id}">${'  '.repeat(p.level||0)}${esc(p.custom_code)} — ${esc(p.custom_name)}</option>`).join('');
 }
 
 function pbomeRenderOpPartSelect() {
   const sel = document.getElementById('pbome-op-part');
   if(!sel) return;
   sel.innerHTML = '<option value="">— Parça seçin —</option>' +
-    _pbomeParts.map(p=>`<option value="${p.id}">${p.custom_code} — ${p.custom_name}</option>`).join('');
+    _pbomeParts.map(p=>`<option value="${p.id}">${esc(p.custom_code)} — ${esc(p.custom_name)}</option>`).join('');
 }
 
 function pbomeRenderOpDefSelect() {
   const sel = document.getElementById('pbome-op-def');
   if(!sel) return;
   sel.innerHTML = '<option value="">— İşlem seçin —</option>' +
-    bomOpDefs.map(op=>`<option value="${op.id}">${op.name} (${op.code})</option>`).join('');
+    bomOpDefs.map(op=>`<option value="${op.id}">${esc(op.name)} (${esc(op.code)})</option>`).join('');
 }
 
 function pbomeOnOpDefChange() {
@@ -10263,7 +10268,7 @@ function pbomeRenderList() {
       .map(p=>{
         const ops=Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
         const dept=p.dept_id?depts.find(d=>d.id===p.dept_id):null;
-        const opsHTML=ops.length?`<div class="bom-ops">${ops.map((o,oi)=>`<span class="bom-op-tag">⚙${o.name}(${o.code})${o.duration_per_unit?` ⏱${(o.total_duration||0).toFixed(0)}dk`:''} <button onclick="pbomeRemoveOp('${p.id}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px">✕</button></span>`).join('')}</div>`:''
+        const opsHTML=ops.length?`<div class="bom-ops">${ops.map((o,oi)=>`<span class="bom-op-tag">⚙${esc(o.name)}(${esc(o.code)})${o.duration_per_unit?` ⏱${(o.total_duration||0).toFixed(0)}dk`:''} <button onclick="pbomeRemoveOp('${p.id}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px">✕</button></span>`).join('')}</div>`:''
         const isFromBom = !!p.bom_part_id;
         const indent = level*24;
         const children = buildTree(p.id,level+1);
@@ -10277,15 +10282,15 @@ function pbomeRenderList() {
           style="margin-left:${indent}px;${isFromBom?'':'border-left:3px solid var(--green)'}">
           <span class="bom-drag-handle">⠿</span>
           ${level>0?`<span style="color:var(--muted);font-size:10px;margin-right:2px">└─</span>`:''}
-          <span class="bom-part-code" style="${isFromBom?'':'color:var(--green)'}">${p.custom_code}</span>
+          <span class="bom-part-code" style="${isFromBom?'':'color:var(--green)'}">${esc(p.custom_code)}</span>
           <div style="flex:1">
-            <div class="bom-part-name-cell">${p.custom_name}${isFromBom?'':' ⭐'} ${kindBadge(p.material_kind||p.resolved_material_kind)}</div>
+            <div class="bom-part-name-cell">${esc(p.custom_name)}${isFromBom?'':' ⭐'} ${kindBadge(p.material_kind||p.resolved_material_kind)}</div>
             <div class="bom-part-meta">
-              <span>${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
+              <span>${p.custom_qty||1} ${esc(p.custom_unit||'adet')}</span>
               ${p.custom_weight?`<span>⚖${p.custom_weight}kg</span>`:''}
-              ${p.custom_material?`<span>🔩${p.custom_material}</span>`:''}
+              ${p.custom_material?`<span>🔩${esc(p.custom_material)}</span>`:''}
               ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?`<span>📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
-              ${dept?`<span style="color:#2980b9">🏭${dept.name}</span>`:''}
+              ${dept?`<span style="color:#2980b9">🏭${esc(dept.name)}</span>`:''}
             </div>
             ${opsHTML}
           </div>
@@ -10293,7 +10298,7 @@ function pbomeRenderList() {
             <select onchange="pbomeSetDept('${p.id}',this.value)"
               style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:4px 6px;outline:none;max-width:130px">
               <option value="">— Bölüm —</option>
-              ${depts.map(d=>`<option value="${d.id}"${d.id===p.dept_id?' selected':''}>${d.name}</option>`).join('')}
+              ${depts.map(d=>`<option value="${d.id}"${d.id===p.dept_id?' selected':''}>${esc(d.name)}</option>`).join('')}
             </select>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditPart('${p.id}')" title="Ad / kod / malzeme düzenle">📝</button>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeCopyBranch('${p.id}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">📋</button>
@@ -10321,7 +10326,7 @@ function pbomeEditQty(partId) {
   const overlay=document.createElement('div'); overlay.className='modal-overlay open'; overlay.id='pbome-qty-overlay';
   overlay.innerHTML=`<div class="modal" style="width:320px;text-align:left">
     <h3 style="margin-bottom:14px">✏️ Miktar Düzenle</h3>
-    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">${p.custom_code} — ${p.custom_name}</p>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">${esc(p.custom_code)} — ${esc(p.custom_name)}</p>
     <div class="form-row" style="grid-template-columns:2fr 1fr;margin-bottom:16px">
       <div class="form-group"><label>Miktar</label>
         <input type="number" id="pbome-qty-val" value="${p.custom_qty||1}" min="0.001" step="0.001"
@@ -10363,7 +10368,7 @@ function pbomeEditPart(partId) {
   const overlay=document.createElement('div'); overlay.className='modal-overlay open'; overlay.id='pbome-edit-overlay';
   overlay.innerHTML=`<div class="modal" style="width:420px;text-align:left">
     <h3 style="margin-bottom:4px">📝 Parça Düzenle</h3>
-    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:18px">${p.custom_code} — ${p.custom_name}</p>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:18px">${esc(p.custom_code)} — ${esc(p.custom_name)}</p>
     <div class="form-group" style="margin-bottom:12px">
       <label>Parça Adı</label>
       <input type="text" id="pbome-edit-name" value="${(p.custom_name||'').replace(/"/g,'&quot;')}" style="${inStyle}">
@@ -10575,8 +10580,8 @@ function xlsImportRenderList(){
     return `<div style="display:flex;gap:8px;align-items:center;padding:5px 6px;margin-left:${(r.level||0)*22}px;border-left:2px solid ${r.error?'var(--red)':'var(--border)'};${r.error?'opacity:.8':''}">
       <input type="checkbox" ${checked?'checked':''} ${r.error?'disabled':''} onchange="xlsImportToggle('${r.level_no}',this.checked)">
       <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);min-width:44px">${r.level_no}</span>
-      <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">${r.code||'—'}</span>
-      <span style="font-size:12px">${r.name||'—'}</span>
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">${esc(r.code||'—')}</span>
+      <span style="font-size:12px">${esc(r.name||'—')}</span>
       <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${r.quantity||1} adet${r.material?' · 🔩'+r.material:''}${dims?' · 📐'+dims:''}</span>
       ${kindBadge(r.material_kind)}
       ${r.error?`<span style="font-family:var(--font-mono);font-size:10px;color:var(--red)">⚠ ${r.error}</span>`:''}
@@ -10651,13 +10656,13 @@ function pbomeShowTree() {
         const isCustom=!p.bom_part_id;
         return `<div class="bom-tree-node">
           <div class="bom-tree-item" style="margin-left:${level*4}px${isCustom?';border-color:var(--green)':''}">
-            <span style="color:${isCustom?'var(--green)':'var(--accent)'};font-weight:700">${p.custom_code}</span>
-            <span>${p.custom_name}${isCustom?' ⭐':''}</span>
-            <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
+            <span style="color:${isCustom?'var(--green)':'var(--accent)'};font-weight:700">${esc(p.custom_code)}</span>
+            <span>${esc(p.custom_name)}${isCustom?' ⭐':''}</span>
+            <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${esc(p.custom_unit||'adet')}</span>
             ${p.custom_weight?`<span style="color:var(--muted);font-size:10px">⚖${p.custom_weight}kg</span>`:''}
             ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
-            ${dept?`<span style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;font-size:10px;color:#2980b9">🏭${dept.name}</span>`:''}
-            ${ops.map(o=>`<span style="background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.2);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${o.name}(${o.code})</span>`).join('')}
+            ${dept?`<span style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;font-size:10px;color:#2980b9">🏭${esc(dept.name)}</span>`:''}
+            ${ops.map(o=>`<span style="background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.2);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${esc(o.name)}(${esc(o.code)})</span>`).join('')}
           </div>
           ${children?`<div class="bom-tree-children">${children}</div>`:''}
         </div>`;
@@ -10939,7 +10944,7 @@ function renderPbomCustomParts(pbomId) {
   if(parentSel) {
     const cur = parentSel.value;
     parentSel.innerHTML = '<option value="">— Ana seviye —</option>' +
-      customParts.map(p=>`<option value="${p.id}"${p.id===cur?' selected':''}>${'  '.repeat(p.level||0)}${p.custom_code} — ${p.custom_name}</option>`).join('');
+      customParts.map(p=>`<option value="${p.id}"${p.id===cur?' selected':''}>${'  '.repeat(p.level||0)}${esc(p.custom_code)} — ${esc(p.custom_name)}</option>`).join('');
   }
 
   if(!customParts.length){ el.innerHTML=''; return; }
@@ -10961,15 +10966,15 @@ function renderPbomCustomParts(pbomId) {
           ondragend="cpDragEnd()">
           <span class="bom-drag-handle" style="color:var(--green)">⠿</span>
           ${level>0?`<span style="color:var(--muted);font-size:10px;margin-right:2px">└─</span>`:''}
-          <span class="bom-part-code" style="color:var(--green)">${p.custom_code}</span>
+          <span class="bom-part-code" style="color:var(--green)">${esc(p.custom_code)}</span>
           <div style="flex:1">
-            <div class="bom-part-name-cell">${p.custom_name}</div>
+            <div class="bom-part-name-cell">${esc(p.custom_name)}</div>
             <div class="bom-part-meta">
-              <span>${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
+              <span>${p.custom_qty||1} ${esc(p.custom_unit||'adet')}</span>
               ${p.custom_weight?`<span>⚖${p.custom_weight}kg</span>`:''}
-              ${p.custom_material?`<span>🔩${p.custom_material}</span>`:''}
-              ${dept?`<span style="color:#2980b9">🏭${dept.name}</span>`:''}
-              ${ops.map(o=>`<span class="bom-op-tag">⚙${o.name}(${o.code})</span>`).join('')}
+              ${p.custom_material?`<span>🔩${esc(p.custom_material)}</span>`:''}
+              ${dept?`<span style="color:#2980b9">🏭${esc(dept.name)}</span>`:''}
+              ${ops.map(o=>`<span class="bom-op-tag">⚙${esc(o.name)}(${esc(o.code)})</span>`).join('')}
             </div>
           </div>
           <div style="display:flex;gap:4px;flex-shrink:0">
@@ -11010,11 +11015,11 @@ function openPbomCustomEdit(partId, pbomId) {
     <h3 style="margin-bottom:14px">✏️ Parça Düzenle</h3>
     <div class="form-row" style="grid-template-columns:2fr 1fr;margin-bottom:10px">
       <div class="form-group"><label>Parça Adı *</label>
-        <input type="text" id="pce-name" value="${p.custom_name||''}"
+        <input type="text" id="pce-name" value="${esc(p.custom_name||'')}"
           style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 12px;outline:none">
       </div>
       <div class="form-group"><label>Kod *</label>
-        <input type="text" id="pce-code" value="${p.custom_code||''}"
+        <input type="text" id="pce-code" value="${esc(p.custom_code||'')}"
           style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 12px;outline:none">
       </div>
     </div>
@@ -11033,13 +11038,13 @@ function openPbomCustomEdit(partId, pbomId) {
       <div class="form-group"><label>Bölüm</label>
         <select id="pce-dept" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 12px;outline:none">
           <option value="">— Bölüm —</option>
-          ${depts.map(d=>`<option value="${d.id}"${d.id===p.dept_id?' selected':''}>${d.name}</option>`).join('')}
+          ${depts.map(d=>`<option value="${d.id}"${d.id===p.dept_id?' selected':''}>${esc(d.name)}</option>`).join('')}
         </select>
       </div>
       <div class="form-group"><label>Üst Parça</label>
         <select id="pce-parent" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 12px;outline:none">
           <option value="">— Ana seviye —</option>
-          ${customParts.map(cp=>`<option value="${cp.id}"${cp.id===p.parent_custom_id?' selected':''}>${cp.custom_code} — ${cp.custom_name}</option>`).join('')}
+          ${customParts.map(cp=>`<option value="${cp.id}"${cp.id===p.parent_custom_id?' selected':''}>${esc(cp.custom_code)} — ${esc(cp.custom_name)}</option>`).join('')}
         </select>
       </div>
     </div>
@@ -11085,13 +11090,13 @@ function openPbomCustomOp(partId, pbomId) {
   overlay.className='modal-overlay open'; overlay.id='pbom-cop-overlay';
   overlay.innerHTML=`<div class="modal" style="width:460px;text-align:left">
     <h3 style="margin-bottom:4px">⚙ İşlem Ekle</h3>
-    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${p.custom_code} — ${p.custom_name}</p>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${esc(p.custom_code)} — ${esc(p.custom_name)}</p>
 
     <!-- Mevcut işlemler -->
     ${ops.length?`<div style="margin-bottom:14px">
       <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Mevcut İşlemler</div>
       ${ops.map((o,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border-radius:4px;margin-bottom:4px">
-        <span class="bom-op-tag">⚙ ${o.name} (${o.code})</span>
+        <span class="bom-op-tag">⚙ ${esc(o.name)} (${esc(o.code)})</span>
         <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);flex:1">${o.desc||''}</span>
         <button onclick="removePbomCustomOp('${partId}','${pbomId}',${i})" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:12px">✕</button>
       </div>`).join('')}
@@ -11102,7 +11107,7 @@ function openPbomCustomOp(partId, pbomId) {
       <label>Tanımlı İşlemden Seç</label>
       <select id="cop-def-sel" onchange="onCopDefChange()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 12px;outline:none">
         <option value="">— İşlem seçin —</option>
-        ${bomOpDefs.map(op=>`<option value="${op.id}">${op.name} (${op.code})</option>`).join('')}
+        ${bomOpDefs.map(op=>`<option value="${op.id}">${esc(op.name)} (${esc(op.code)})</option>`).join('')}
       </select>
     </div>
     <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:10px">
@@ -11259,13 +11264,13 @@ async function viewPublishedBom(pbomId) {
         const children = buildTreeNode(p.id, level+1);
         return `<div class="bom-tree-node">
           <div class="bom-tree-item" style="${isCustom?'border-color:var(--green);':''}">
-            <span style="color:${isCustom?'var(--green)':'var(--accent)'};font-weight:700">${p.custom_code}</span>
-            <span>${p.custom_name}${isCustom?' ⭐':''}</span>
-            <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
+            <span style="color:${isCustom?'var(--green)':'var(--accent)'};font-weight:700">${esc(p.custom_code)}</span>
+            <span>${esc(p.custom_name)}${isCustom?' ⭐':''}</span>
+            <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${esc(p.custom_unit||'adet')}</span>
             ${p.custom_weight?`<span style="color:var(--muted);font-size:10px">⚖${p.custom_weight}kg</span>`:''}
             ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
-            ${dept?`<span style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;font-size:10px;color:#2980b9">🏭${dept.name}</span>`:''}
-            ${ops.map(o=>`<span style="background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.2);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${o.name}(${o.code})</span>`).join('')}
+            ${dept?`<span style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;font-size:10px;color:#2980b9">🏭${esc(dept.name)}</span>`:''}
+            ${ops.map(o=>`<span style="background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.2);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${esc(o.name)}(${esc(o.code)})</span>`).join('')}
             ${partStatus}
           </div>
           ${children?`<div class="bom-tree-children">${children}</div>`:''}
@@ -11279,9 +11284,9 @@ async function viewPublishedBom(pbomId) {
   overlay.innerHTML = `<div class="modal" style="width:min(860px,96vw);height:90vh;text-align:left;display:flex;flex-direction:column">
     <div style="flex-shrink:0;margin-bottom:14px;display:flex;align-items:flex-start;justify-content:space-between">
       <div>
-        <h3>🌳 ${pb.project_name} — Proje Ürün Ağacı</h3>
+        <h3>🌳 ${esc(pb.project_name)} — Proje Ürün Ağacı</h3>
         <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:4px">
-          ${prod.name}${prod.code?' ('+prod.code+')':''} · Yayınlandı: ${new Date(pb.published_at).toLocaleDateString('tr-TR')}
+          ${esc(prod.name)}${prod.code?' ('+prod.code+')':''} · Yayınlandı: ${new Date(pb.published_at).toLocaleDateString('tr-TR')}
           · ${pbParts.filter(p=>!p.is_excluded).length} parça
         </p>
       </div>
@@ -11290,8 +11295,8 @@ async function viewPublishedBom(pbomId) {
     <div style="overflow-y:auto;flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;min-height:0">
       <div class="bom-tree-node">
         <div class="bom-tree-item root">
-          🏭 <span>${prod.code?prod.code+' — ':''}${prod.name}</span>
-          <span style="color:var(--muted);font-size:10px">${pb.project_name}</span>
+          🏭 <span>${prod.code?esc(prod.code)+' — ':''}${esc(prod.name)}</span>
+          <span style="color:var(--muted);font-size:10px">${esc(pb.project_name)}</span>
         </div>
         <div class="bom-tree-children">${buildTreeNode(null,0)||'<div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;padding:10px">Parça yok</div>'}</div>
       </div>
