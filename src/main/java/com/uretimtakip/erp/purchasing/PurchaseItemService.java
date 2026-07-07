@@ -192,6 +192,14 @@ public class PurchaseItemService {
             if ("RECEIVED".equals(request.getStatus()) && item.getReceivedAt() == null) {
                 item.setReceivedAt(LocalDateTime.now());
             }
+            // Mal Kabul'de ORDERED'dan dogrudan depoya alinabiliyor (#4):
+            // siparisi verilmis kalem depoya girdiyse teslim de alinmistir.
+            // (IN_STOCK yolunda orderedAt null oldugundan damga atilmaz;
+            // whUndo'nun IN_STOCK'a geri dusme mantigi bozulmaz.)
+            if ("IN_WAREHOUSE".equals(request.getStatus())
+                    && item.getReceivedAt() == null && item.getOrderedAt() != null) {
+                item.setReceivedAt(LocalDateTime.now());
+            }
         }
 
         PurchaseItem saved = purchaseItemRepository.save(item);
