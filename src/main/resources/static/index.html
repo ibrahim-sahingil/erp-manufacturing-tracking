@@ -2037,7 +2037,10 @@ let _activeProject=null, _activeDept=null;
 const STANDARD_DEPTS = ['Kaynak','Montaj','Elektrikhane','Talaşlı İmalat','Kaplama','Paketleme','Sevkiyat','Boyahane','Kontrol'];
 
 function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
-function ea(s){ return (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+// onclick="fn('${ea(x)}')" deseni için kaçırma: ters eğik + tek tırnak JS
+// dizesini, &quot; ise çift tırnaklı HTML attribute'unu korur (4. tur B8;
+// attribute değeri JS'e geçmeden entity-decode edildiğinden " geri gelir).
+function ea(s){ return (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
 
 // ─── Ölçü yardımcıları (sac/profil mm ölçüleri; 0 veya boş = ölçü yok) ───
 function dimVal(v){ const n=parseFloat(v); return (isFinite(n)&&n>0)?n:''; }
