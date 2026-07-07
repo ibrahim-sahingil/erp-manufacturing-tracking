@@ -21,11 +21,22 @@ HİÇBİR DÜZELTME YAPILMADI — önce karar bekleniyor. Önem sırasına göre
 > WAREHOUSE_TRANSFER serbest, DELIVERY yalnız DRAFT irsaliyede).
 > E2E'ye O1/O4/O5 senaryoları eklendi, tümü geçiyor.
 >
-> **E1 XSS turu (aynı gün, `xss-esc-e1` dalı, a221caf):** merkezi esc()
-> + 262 innerHTML enterpolasyonu kaçırıldı (codemod + elle tamamlama;
-> toast/confirm/CSV/veri şablonları bilinçli dışarıda). Render
-> fonksiyonları E2E kapsamında olmadığından merge öncesi /code-review
-> ultra önerilir. E7 (localStorage JWT) E1 kapandığında kabul edilebilir.
+> **E1 XSS turu (`xss-esc-e1` dalı, master'a alındı):** merkezi esc()
+> + 262 innerHTML enterpolasyonu kaçırıldı (a221caf, codemod + elle
+> tamamlama; toast/confirm/CSV/veri şablonları bilinçli dışarıda).
+> Ardından yerel /code-review high (8 açı + 2 doğrulayıcı, ultra hakkı
+> harcanmadı) codemod'un ATLADIĞI 12 XSS noktasını buldu — kardeşi
+> esc'li ama kendisi ham kalan alanlar (bf0f2ba): sipariş kalemi
+> açıklaması, müşteri e-posta/telefon, QR tarama ekranında bölüm+proje
+> adı, çizim no, revize geçmişi alanları, personel <option> bölüm adı;
+> ayrıca supEdit'te global esc'i gölgeleyen yerel "yalnız tırnak" sürümü
+> kaldırıldı. Temizlik (5adb16f): esc() tek-regex'e alındı + 11 eski
+> elle .replace(/"/g) kalıntısı esc()'e devredildi (ea() tanımı ve
+> JSON-in-onclick bilinçli hariç). E7 (localStorage JWT) E1 kapandığı
+> için artık kabul edilebilir.
+> KALAN İYİLEŞTİRME (ayrı tur): innerHTML'e gideni OTOMATİK kaçıran
+> tagged-template helper'ı (h`...`) — nokta-nokta esc kırılgan (bu
+> inceleme 12 kaçak buldu), ama ~262 şablonun geçişi hacimli.
 > Sırada: O6 (irsaliye sevkinde stok kontrolü) → U'lar.
 
 ## 🔴 KRİTİK
