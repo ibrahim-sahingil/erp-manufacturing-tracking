@@ -53,18 +53,24 @@ HİÇBİR DÜZELTME YAPILMADI — önce karar bekleniyor. Önem sırasına göre
 > telafi ediyor'). U5 operasyonel notu: test hesabı (testdev/test1234)
 > tünel gerçek kullanıcılara açılmadan önce güçlendirilmeli/pasife alınmalı.
 >
-> DURUM ÖZETİ (DÜZELTME): K/O/U grupları kapandı — K1-3 ✅, O1-6 ✅
+> DURUM ÖZETİ (GÜNCEL): K/O/U grupları kapandı — K1-3 ✅, O1-6 ✅
 > (O7=B1, O8 geçersiz), U1/U2/U3/U5 ✅ (U6=B7, U8=B8; U4/U7 ertelendi).
-> E SERİSİ HENÜZ TAM DEĞİL: E1 ✅ (XSS), E7 kabul edilebilir; ama
-> E2/E3/E4/E5/E6 HÂLÂ AÇIK:
->   - E2 (🟠) total_qty INTEGER → ondalık BOM adedi yayınlamada kesiliyor
->     (canlı doğrulandı). En öncelikli açık madde.
->   - E3 (🟠) QR fiş linkleri location.origin'e bağlı → tünel adresi
->     değişince ölü. Operasyonel (kalıcı adres) — kod değil.
->   - E4 (🟡) parça/kalem kodu değişince kod-eşleşmeli zeka kopuyor.
->   - E5 (🟡) iptal edilen plakanın kaynak kalemleri havuza dönmüyor.
->   - E6 (🟡) yayınla çift tetiklenebilir (purchase_items'ta benzersizlik yok).
-> Kalan opsiyonel büyük iş: E1 tagged-template (h`...`) geçişi.
+> E SERİSİ de kapandı (`e-serisi-duzeltmeleri` dalı):
+>   - E1 ✅ (XSS) · E7 E1 ile kabul edilebilir.
+>   - E2 ✅ yayınlamada ondalık parts adedi Math.ceil ile yukarı yuvarlanır
+>     + uyarı (parts modeli tam-sayı; numeric migrate BİLİNÇLİ yapılmadı,
+>     ondalık malzeme zaten HAMMADDE/TEDARİK → satın almaya gider).
+>   - E5 ✅ iptal/silinen plakanın kaynakları planlama havuzuna dönüyor
+>     (_unlinkPlanSources; purSetStatus CANCELLED + deletePurchaseItem).
+>   - E6 ✅ yayınlama _publishing kilidiyle çift-tetiklemeye karşı korundu.
+>   - E4 GEÇERSİZ (07.08 doğrulandı): parts kodu UI'dan HİÇ düzenlenmiyor
+>     (dbUpdate('parts') yalnız status/qty/parent), purchase_items kodu da
+>     editPurchaseItem'de yok. Kod-eşleşmeli bağın iki ucu da sabit →
+>     tarif edilen kopma erişilemez. Kod değişikliği gerekmiyor.
+>   - E3 OPERASYONEL (kod değil): QR fiş linkleri location.origin'e bağlı,
+>     tünel adresi değişince ölür → kalıcı adres/adlandırılmış tünel gerekir.
+> Kalan tek opsiyonel iş: E1 tagged-template (h`...`) sürdürülebilirlik
+> refactoru. Denetimdeki KOD gerektiren tüm bulgular kapandı.
 
 ## 🔴 KRİTİK
 
