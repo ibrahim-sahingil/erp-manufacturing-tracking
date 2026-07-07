@@ -180,9 +180,11 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const partBrk  = parts.find(p=>p.project===PROJ && p.code==='E2E-BRK');
     check('PLT.parent === GVD', partPlt?.parent_part_id===partGvd?.id);
     check('PLT2.parent === GVD', partPlt2?.parent_part_id===partGvd?.id);
-    check('BRK tek satır, adet TOPLAMI 2, parent İLK dal (PLT)',
-      Number(partBrk?.qty)===2 && partBrk?.parent_part_id===partPlt?.id,
-      `qty=${partBrk?.qty}`);
+    // Aynı koda toplanan parçada "ilk dalın atası kazanır" — hangi dalın ilk
+    // geldiği liste sırasına (UUID) bağlı ve bilinçli keyfi; iki dal da geçerli
+    check('BRK tek satır, adet TOPLAMI 2, parent dallardan biri (PLT/PLT2)',
+      Number(partBrk?.qty)===2 && [partPlt?.id, partPlt2?.id].includes(partBrk?.parent_part_id),
+      `qty=${partBrk?.qty}, parent=${partBrk?.parent_part_id===partPlt?.id?'PLT':(partBrk?.parent_part_id===partPlt2?.id?'PLT2':'?')}`);
     const piSac = purchaseItems.find(i=>i.project_name===PROJ && i.code==='E2E-SAC');
     const piCvt = purchaseItems.find(i=>i.project_name===PROJ && i.code==='E2E-CVT');
     check('SAC satın almada TEK kalem, adet TOPLAMI 2', Number(piSac?.quantity)===2, piSac?.quantity);
