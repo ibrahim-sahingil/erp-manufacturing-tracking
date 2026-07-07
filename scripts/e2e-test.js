@@ -345,6 +345,20 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const sacFresh = (await dbGet('purchase_items')).find(i=>i.id===piSac.id);
     check('bağ + havuzdan düştü', sacFresh.stock_plan_id===plan.id && !sacFresh.needs_planning);
 
+    console.log('═══ K2: PROJE ADI DEĞİŞİNCE STRING TABLOLAR TAŞINIYOR ═══');
+    const RENAMED = PROJ+'-ADI';
+    const ren = await api('PUT','/orders/'+orderId, {project_name:RENAMED, customer_name:'E2E Müşteri'});
+    check('proje adı değişti', !!ren && ren.project_name===RENAMED, _lastApiError||'');
+    const piMoved = (await dbGet('purchase_items')).filter(i=>i.project_name===RENAMED).length;
+    const pbMoved = (await dbGet('project_bom')).filter(b=>b.project_name===RENAMED).length;
+    const piOrphan = (await dbGet('purchase_items')).filter(i=>i.project_name===PROJ).length;
+    check('satın alma + BOM bağları yeni ada taşındı (sahipsiz kayıt 0)',
+      piMoved>=2 && pbMoved>=1 && piOrphan===0, `pi=${piMoved} pb=${pbMoved} orphan=${piOrphan}`);
+    await api('PUT','/orders/'+orderId, {project_name:PROJ, customer_name:'E2E Müşteri'});
+    const piBack = (await dbGet('purchase_items')).filter(i=>i.project_name===PROJ).length;
+    check('geri adlandırmada da taşındı', piBack===piMoved, piBack);
+    globalThis.purchaseItems = await dbGet('purchase_items');
+
     console.log('═══ K1: PROJE SİLME GUARD\'I ═══');
     // Bağlı kaydı (parça/iş emri/satın alma/BOM) olan proje silinememeli
     globalThis._lastApiError = null;

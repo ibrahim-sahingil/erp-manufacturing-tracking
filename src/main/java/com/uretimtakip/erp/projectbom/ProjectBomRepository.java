@@ -1,6 +1,9 @@
 package com.uretimtakip.erp.projectbom;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -35,4 +38,13 @@ public interface ProjectBomRepository extends JpaRepository<ProjectBom, UUID> {
 
     /** Proje silme guard'i (K1): projeye bagli urun agaci baglantisi sayisi. */
     long countByProjectName(String projectName);
+
+    /**
+     * Proje yeniden adlandirma senkronu (K2): BOM baglantilari projeye
+     * STRING ile bagli oldugundan orders.project_name degisince burasi da
+     * ayni transaction'da guncellenir (OrderService.update cagirir).
+     */
+    @Modifying
+    @Query("UPDATE ProjectBom b SET b.projectName = :newName WHERE b.projectName = :oldName")
+    int renameProjectName(@Param("oldName") String oldName, @Param("newName") String newName);
 }

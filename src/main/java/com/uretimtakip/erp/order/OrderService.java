@@ -98,6 +98,7 @@ public class OrderService {
     @Transactional
     public OrderResponse update(UUID id, OrderRequest request) {
         Order order = findEntityById(id);
+        String oldProjectName = order.getProjectName();
 
         // Eger proje adi degistiyse ve baska bir siparista ayni isim varsa hata
         if (!order.getProjectName().equals(request.getProjectName())
@@ -136,6 +137,18 @@ public class OrderService {
 
         Order updated = orderRepository.save(order);
         log.info("Order updated: id={}, project={}", updated.getId(), updated.getProjectName());
+
+        // (K2) Proje adi degistiyse STRING ile bagli tablolar da ayni
+        // transaction'da tasinir — yoksa satin alma / urun agaci baglantilari
+        // eski ada takili kalir, proje ekranda ikiye bolunmus gorunur.
+        if (!oldProjectName.equals(updated.getProjectName())) {
+            int renamedItems = purchaseItemRepository.renameProjectName(
+                    oldProjectName, updated.getProjectName());
+            int renamedBoms = projectBomRepository.renameProjectName(
+                    oldProjectName, updated.getProjectName());
+            log.info("Project renamed '{}' -> '{}': purchase_items={}, project_bom={}",
+                    oldProjectName, updated.getProjectName(), renamedItems, renamedBoms);
+        }
 
         return OrderResponse.fromEntity(updated);
     }
