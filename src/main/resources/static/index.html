@@ -973,6 +973,7 @@
   <div class="planning-tabs" id="purchasing-tabs">
     <button class="planning-tab active" onclick="switchPurchasingTab('items')">📝 Kalemler</button>
     <button class="planning-tab" onclick="switchPurchasingTab('orders')">📦 Toplu Sipariş &amp; Teklif</button>
+    <button class="planning-tab" onclick="switchPurchasingTab('receiving')">📥 Mal Kabul</button>
   </div>
 
   <!-- Kalemler -->
@@ -1041,6 +1042,12 @@
   <!-- Toplu Sipariş & Teklif -->
   <div class="planning-section" id="pur-tab-orders">
     <div id="po-list"></div>
+  </div>
+
+  <!-- Mal Kabul (#4 arkadaş isteği): proje kartları → sipariş verilen kalemler -->
+  <div class="planning-section" id="pur-tab-receiving">
+    <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">Proje kartına tıklayın · ⏳ siparişte olanlar "✅ Geldi" ile depoya alınır · 📄 QR'lı mal kabul fişi buradan yazdırılır</div>
+    <div id="rcv-list"></div>
   </div>
 </div>
 
@@ -5634,8 +5641,74 @@ function _purActivateTab(tab){
     s.classList.toggle('active', s.id==='pur-tab-'+tab));
   if(tab==='orders') renderPurchaseOrders();
   if(tab==='items') renderPurchaseList();
+  if(tab==='receiving') renderReceiving();
 }
 function switchPurchasingTab(tab){ _purActivateTab(tab); }
+
+// ═══ MAL KABUL (#4 arkadaş isteği) ═══
+// Proje kartları; açılınca o projenin sipariş verilen kalemleri:
+// ⏳ ORDERED (bekleyen) → "✅ Geldi (depoya al)" = whTransfer;
+// ✅ RECEIVED / IN_WAREHOUSE (gelen). QR fişi butonu da satırda.
+let _rcvActiveProj = null;
+
+async function renderReceiving(){
+  const el = document.getElementById('rcv-list');
+  if(!el) return;
+  const pi = await dbGet('purchase_items','order=created_at.asc');
+  if(Array.isArray(pi)) purchaseItems = pi;
+  const rel = purchaseItems.filter(i=>['ORDERED','RECEIVED','IN_WAREHOUSE'].includes(i.status));
+  if(!rel.length){
+    el.innerHTML = `<div class="empty-state"><span class="emoji">📥</span>Sipariş verilmiş kalem yok<br><span style="font-size:12px;color:var(--muted)">Kalemler sekmesinden "📦 Sipariş Ver" denince burada görünür</span></div>`;
+    return;
+  }
+  const groups = {};
+  rel.forEach(i=>{ const k=i.project_name||'—'; (groups[k]=groups[k]||[]).push(i); });
+  el.innerHTML = Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([proj,list])=>{
+    const waiting = list.filter(i=>i.status==='ORDERED');
+    const arrived = list.filter(i=>i.status!=='ORDERED');
+    const open = _rcvActiveProj===proj;
+    const rows = !open ? '' : `<div style="margin-top:10px">` + list
+      .sort((a,b)=>(a.status==='ORDERED'?0:1)-(b.status==='ORDERED'?0:1))
+      .map(i=>{
+        const isWaiting = i.status==='ORDERED';
+        const icon = isWaiting ? '⏳' : '✅';
+        const meta = [
+          Number(i.quantity||1)+' '+(i.unit||'adet'),
+          i.supplier ? '🏢 '+i.supplier : '',
+          i.expected_date ? '📆 '+new Date(i.expected_date).toLocaleDateString('tr-TR') : '',
+          i.status==='IN_WAREHOUSE' ? '🏭 '+(whName(i.warehouse_id)||'Depoda') : (i.status==='RECEIVED'?'📥 Teslim alındı':'')
+        ].filter(Boolean).join(' · ');
+        return `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--border);flex-wrap:wrap">
+          <span style="font-family:var(--font-mono);font-size:11px;min-width:0;flex:1">
+            ${icon} ${i.code?`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
+            <span style="color:var(--muted)"> · ${meta}</span>
+          </span>
+          <span style="display:flex;gap:4px;flex-shrink:0">
+            ${isWaiting?`<button class="btn btn-primary btn-sm" onclick="whTransfer('${i.id}')">✅ Geldi (depoya al)</button>`:''}
+            ${i.status==='RECEIVED'?`<button class="btn btn-ghost btn-sm" onclick="whTransfer('${i.id}')">🏭 Depoya Aktar</button>`:''}
+            ${['ORDERED','RECEIVED'].includes(i.status)?`<button class="btn btn-ghost btn-sm" onclick="printGoodsReceiptPDF(['${i.id}'])" title="QR'lı mal kabul fişi">📄 Fiş</button>`:''}
+          </span>
+        </div>`;
+      }).join('') + `</div>`;
+    return `<div class="pbom-card" style="margin-bottom:12px">
+      <div class="pbom-card-header" onclick="rcvToggle('${ea(proj)}')" style="cursor:pointer">
+        <div>
+          <div class="pbom-card-title">📁 ${proj}</div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
+            ${waiting.length?`⏳ ${waiting.length} bekleyen`:''}${waiting.length&&arrived.length?' · ':''}${arrived.length?`✅ ${arrived.length} gelen`:''}
+          </div>
+        </div>
+        <span style="font-family:var(--font-mono);font-size:14px;color:var(--muted)">${open?'▾':'▸'}</span>
+      </div>
+      ${rows}
+    </div>`;
+  }).join('');
+}
+
+function rcvToggle(proj){
+  _rcvActiveProj = _rcvActiveProj===proj ? null : proj;
+  renderReceiving();
+}
 
 function purFmtMoney(v){ return Number(v).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
@@ -6553,6 +6626,7 @@ async function whDoTransfer(id, warehouseId){
   toast('🏭 '+(whName(warehouseId)||'Depo')+' deposuna aktarıldı!','success');
   renderWarehouseList();
   renderPurchaseList();
+  if(document.getElementById('pur-tab-receiving')?.classList.contains('active')) renderReceiving();
 }
 
 async function whUndo(id){
@@ -6583,6 +6657,7 @@ async function whUndo(id){
   toast('↩ Depodan geri alındı','success');
   renderWarehouseList();
   renderPurchaseList();
+  if(document.getElementById('pur-tab-receiving')?.classList.contains('active')) renderReceiving();
 }
 
 // ═══ İRSALİYE (dahili sevk irsaliyesi + PDF — resmî e-İrsaliye DEĞİL) ═══
