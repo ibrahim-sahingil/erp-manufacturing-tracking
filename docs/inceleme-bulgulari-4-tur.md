@@ -4,6 +4,21 @@
 o günkü HEAD'e (1307f90 sonrası) göredir; düzeltme sırasında kaydırma olabilir.
 Dostane sürüm: Masaüstü\ERP-Inceleme-Raporu-2026-07-07.pdf
 
+## DURUM (2026-07-07): B1-B10 TAMAMI DÜZELTİLDİ ✅
+
+Commit'ler: B1 4565438 · B2 422ebfe · B3 e27f61b · B4 c7391c6 · B5 093910c ·
+B6 7bc708c · B8 47eb5d4 · B9 5762045 · B10 cfb8740 · B7 c5cf927.
+E2E genişletildi (B1/B2/B3/B4/B7 senaryoları) ve tüm kontroller geçiyor.
+Nota değer sapmalar:
+- B4: (b) seçeneği uygulanMADI — whDoTransfer IN_STOCK kökenli kalemlere de
+  received_qty yazdığından sezgi stok kalemlerinin IN_STOCK dönüşünü kapatırdı;
+  (a) uygulandı: UpdateRequest'e receivedAt, bölme yolları damga taşır.
+- B7: kullanıcı seçimi 'Termin + damga' — expected_date + ordered_at (B4
+  deseniyle) taşınır, grup adı notes'a yazılır, grup detayı kod eşleşmeli
+  '🔀 Bölünmüş kalemler' gösterir; purchase_order_id kilit istisnası AÇILMADI.
+Sıradaki: K1-K3 veri güvenliği turu (feature branch + /code-review ultra) →
+E1 XSS → temizlik turu (aşağıdaki yedek liste).
+
 ## DÜZELTİLECEK BULGULAR (öncelik sırasıyla)
 
 ### B1 (CİDDİ) — Yeniden yayınlamada parts.qty yanlış ezilir
