@@ -10904,29 +10904,37 @@ function pbomPublishMsg(r){
 }
 
 // Yayınla
+// (E6) Yayınlama çift tetiklenmesine karşı kilit: openAndPublishPbom ve
+// pbomePublish aynı anda/üst üste koşarsa yarım yayın + gereksiz mükerrer
+// insert denemesi olurdu (parts'ı DB unique korur ama iş boşa gider).
+let _publishing = false;
+
 async function openAndPublishPbom(pbomId) {
   const pb   = projectBoms.find(p=>p.id===pbomId);
   const prod = bomProducts.find(p=>p.id===pb?.bom_product_id);
   if(!pb||!prod){ toast('Bulunamadı!','error'); return; }
 
   if(!confirm(`"${pb.project_name}" projesine "${prod.name}" ürün ağacını yayınlamak istiyor musunuz?\n\nParçalar otomatik üretime çıkarılacak.`)) return;
+  if(_publishing){ toast('Bir yayınlama zaten sürüyor, lütfen bekleyin…','error'); return; }
+  _publishing = true;
+  try {
+    // Direkt DB'den taze parça verisi çek
+    const freshData = await dbGet('project_bom_parts','project_bom_id=eq.'+pbomId+'&order=created_at.asc');
+    const allPbParts = Array.isArray(freshData) ? freshData : [];
 
-  // Direkt DB'den taze parça verisi çek
-  const freshData = await dbGet('project_bom_parts','project_bom_id=eq.'+pbomId+'&order=created_at.asc');
-  const allPbParts = Array.isArray(freshData) ? freshData : [];
+    console.log('Yayınlanacak parça sayısı:', allPbParts.length);
 
-  console.log('Yayınlanacak parça sayısı:', allPbParts.length);
+    // Şablon parçaları: eski satırlarda hiyerarşi bom_parts.parent_id'de (#8)
+    const tplData = await dbGet('bom_parts','product_id=eq.'+prod.id);
+    const r = await pbomPublishParts(pb, allPbParts, Array.isArray(tplData)?tplData:[]);
 
-  // Şablon parçaları: eski satırlarda hiyerarşi bom_parts.parent_id'de (#8)
-  const tplData = await dbGet('bom_parts','product_id=eq.'+prod.id);
-  const r = await pbomPublishParts(pb, allPbParts, Array.isArray(tplData)?tplData:[]);
+    await dbUpdate('project_bom', pbomId, {status:'published', published_at:new Date().toISOString()});
+    pb.status='published'; pb.published_at=new Date().toISOString();
 
-  await dbUpdate('project_bom', pbomId, {status:'published', published_at:new Date().toISOString()});
-  pb.status='published'; pb.published_at=new Date().toISOString();
-
-  renderProjectBomList();
-  toast(pbomPublishMsg(r), r.errors?'error':'success');
-  console.log('Tamamlandı —', r);
+    renderProjectBomList();
+    toast(pbomPublishMsg(r), r.errors?'error':'success');
+    console.log('Tamamlandı —', r);
+  } finally { _publishing = false; }
 }
 
 async function pbomePublish() {
@@ -10934,26 +10942,30 @@ async function pbomePublish() {
   const prod=bomProducts.find(p=>p.id===pb?.bom_product_id);
   if(!pb||!prod){ toast('Bulunamadı!','error'); return; }
   if(!confirm(`"${pb.project_name}" projesine "${prod.name}" ürün ağacını yayınlamak istiyor musunuz?\n\nParçalar otomatik üretime çıkarılacak.`)) return;
-
-  // Taze veri çek
-  const freshData = await dbGet('project_bom_parts','project_bom_id=eq.'+_activePbomId+'&order=created_at.asc');
-  const allPbParts = Array.isArray(freshData) ? freshData : _pbomeParts;
-  
-  console.log('Yayınlanacak parça sayısı:', allPbParts.length);
-
-  // Şablon parçaları: eski satırlarda hiyerarşi bom_parts.parent_id'de (#8)
-  const tplData = await dbGet('bom_parts','product_id=eq.'+prod.id);
-  const r = await pbomPublishParts(pb, allPbParts, Array.isArray(tplData)?tplData:[]);
-
-  await dbUpdate('project_bom',_activePbomId,{status:'published',published_at:new Date().toISOString()});
-  pb.status='published'; pb.published_at=new Date().toISOString();
+  if(_publishing){ toast('Bir yayınlama zaten sürüyor, lütfen bekleyin…','error'); return; }
+  _publishing = true;
   const publishBtn=document.getElementById('pbome-publish-btn');
-  if(publishBtn) publishBtn.style.display='none';
-  const badge=document.getElementById('pbome-status-badge');
-  if(badge) badge.innerHTML='<span class="pbom-status-published">✅ Yayınlandı</span>';
+  if(publishBtn) publishBtn.disabled = true;
+  try {
+    // Taze veri çek
+    const freshData = await dbGet('project_bom_parts','project_bom_id=eq.'+_activePbomId+'&order=created_at.asc');
+    const allPbParts = Array.isArray(freshData) ? freshData : _pbomeParts;
 
-  toast(pbomPublishMsg(r), r.errors?'error':'success');
-  console.log('Yayınlama tamamlandı —', r);
+    console.log('Yayınlanacak parça sayısı:', allPbParts.length);
+
+    // Şablon parçaları: eski satırlarda hiyerarşi bom_parts.parent_id'de (#8)
+    const tplData = await dbGet('bom_parts','product_id=eq.'+prod.id);
+    const r = await pbomPublishParts(pb, allPbParts, Array.isArray(tplData)?tplData:[]);
+
+    await dbUpdate('project_bom',_activePbomId,{status:'published',published_at:new Date().toISOString()});
+    pb.status='published'; pb.published_at=new Date().toISOString();
+    if(publishBtn) publishBtn.style.display='none';
+    const badge=document.getElementById('pbome-status-badge');
+    if(badge) badge.innerHTML='<span class="pbom-status-published">✅ Yayınlandı</span>';
+
+    toast(pbomPublishMsg(r), r.errors?'error':'success');
+    console.log('Yayınlama tamamlandı —', r);
+  } finally { _publishing = false; if(publishBtn) publishBtn.disabled = false; }
 }
 
 // ─── Projeye Özel Parça ───
