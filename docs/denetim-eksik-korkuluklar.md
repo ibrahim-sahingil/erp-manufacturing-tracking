@@ -80,13 +80,11 @@ Republish artık parça adedini BOM toplamına eşitliyor. Üretim 5/5 bitmişke
 tutarsızlaşır.
 **Öneri:** `qty_done+qty_reject > yeni adet` ise güncellemeyi atla + mesajda belirt.
 
-### O8. Eski proje ağaçlarında hiyerarşi bağları kopuk (veri onarımı gerekli)
-Bugfix (f688fc6) yeni kopyalamaları düzeltti; ama daha önce şablondan kopyalanan
-`project_bom_parts` satırlarının `parent_custom_id`'si hiç yazılamadığı için DÜZ
-duruyor. Yayınlama şablon hiyerarşisine düştüğü için çalışıyor; ancak proje ağacı
-editörü bu ağaçları düz liste gösteriyor.
-**Öneri:** Tek seferlik onarım scripti: bom_part_id + şablon parent'ından
-parent_custom_id'yi geri kur.
+### O8. ~~Eski proje ağaçlarında hiyerarşi bağları kopuk~~ → GEÇERSİZ (07.07 doğrulandı)
+DÜZELTME: Backend, project_bom oluşturulurken şablonu `autoPopulateBomParts` ile
+zaten doğru parent bağlarıyla kopyalıyormuş; bozuk olan yalnız frontend'in nadir
+kullanılan YEDEK kopyalama yoluydu (f688fc6'da düzeltildi). Canlı veri SQL ile
+tarandı: **kopuk hiyerarşi kaydı 0** — veri onarımı GEREKMİYOR.
 
 ## 🟡 KÜÇÜK / İYİLEŞTİRME
 
@@ -210,9 +208,12 @@ Denetlenen ve TEMİZ çıkan alanlar:
    Playwright E2E turu önerilir.
 2. Performans/ölçek denetimi yapılmadı (10k satırlık tek dosya frontend, tam
    liste re-render'ları — bugünkü veri hacminde sorun değil).
-3. Yedekten geri dönüş TATBİKATI yapılmadı — yedek alma çalışıyor (her gün
-   21:00 + bugünkü manuel), ama restore hiç denenmedi. Bir kez boş bir DB'ye
-   `pg_restore` denemesi önerilir.
+3. ~~Yedekten geri dönüş TATBİKATI yapılmadı~~ → YAPILDI (07.07): günün yedeği
+   `uretim_takip_restore_test` DB'sine hatasız açıldı; tablo sayıları tutarlı
+   (parts 219, pbp 227, users 8 vb.), kullanıcılar okundu, tatbikat DB'si
+   silindi. Yedekler ÇALIŞIYOR. Not: canlı veri gün içinde hızla büyüyor
+   (öğlen yedeği akşama %50+ geride kalabiliyor) — günlük 21:00 yedeği makul;
+   yoğun veri girişi günlerinde elle ek yedek alınabilir.
 4. `parsePgQuery`/adapter katmanı satır satır doğrulanmadı (üretimde uzun
    süredir çalışıyor, davranışsal kanıt yeterli sayıldı).
 
