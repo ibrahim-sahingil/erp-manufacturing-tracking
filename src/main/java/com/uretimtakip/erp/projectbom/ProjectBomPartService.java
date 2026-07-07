@@ -311,6 +311,7 @@ public class ProjectBomPartService {
      */
     private void applyParentChange(ProjectBomPart pbp, UUID newParentId, Integer requestedLevel) {
         if (newParentId == null) {
+            assertNoSiblingCodeConflict(pbp, null);
             pbp.setParentCustomId(null);
             pbp.setLevel(requestedLevel != null ? requestedLevel : 0);
             return;
@@ -342,10 +343,51 @@ public class ProjectBomPartService {
                     .map(ProjectBomPart::getParentCustomId)
                     .orElse(null);
         }
+        assertNoSiblingCodeConflict(pbp, newParentId);
         pbp.setParentCustomId(newParentId);
         pbp.setLevel(requestedLevel != null
                 ? requestedLevel
                 : (parent.getLevel() != null ? parent.getLevel() : 0) + 1);
+    }
+
+    /**
+     * Hedef parent altinda ayni (ETKIN) kodda kardes varsa tasima reddedilir
+     * (4. tur B3). Etkin kod = custom_code, bossa sablondaki bom_parts.code;
+     * otomatik kopyalanan satirlarda custom_code bos oldugundan repo'daki
+     * custom_code sorgusu yetmez, kardesler bellekte cozumlenerek bakilir.
+     * (pbome suruklemesi de update -> applyParentChange yolundan gecer.)
+     */
+    private void assertNoSiblingCodeConflict(ProjectBomPart pbp, UUID newParentId) {
+        String movingCode = effectiveCode(pbp);
+        if (movingCode == null) {
+            return;
+        }
+        List<ProjectBomPart> siblings = newParentId == null
+                ? projectBomPartRepository
+                        .findByProjectBomIdOrderByLevelAscSortOrderAscIdAsc(pbp.getProjectBomId())
+                        .stream().filter(s -> s.getParentCustomId() == null).toList()
+                : projectBomPartRepository.findByParentCustomIdOrderBySortOrderAscIdAsc(newParentId);
+        for (ProjectBomPart s : siblings) {
+            if (!s.getId().equals(pbp.getId())
+                    && movingCode.equalsIgnoreCase(effectiveCode(s))) {
+                throw new BusinessException(
+                        "Hedef ust parca altinda bu kodda bir parca zaten var: " + movingCode,
+                        "PBOM_PART_CODE_EXISTS");
+            }
+        }
+    }
+
+    /** custom_code override'i, bossa bagli sablon parcasinin kodu. */
+    private String effectiveCode(ProjectBomPart p) {
+        if (p.getCustomCode() != null && !p.getCustomCode().isBlank()) {
+            return p.getCustomCode();
+        }
+        if (p.getBomPartId() != null) {
+            return bomPartRepository.findById(p.getBomPartId())
+                    .map(BomPart::getCode)
+                    .orElse(null);
+        }
+        return null;
     }
 
     // ============ DELETE (defensive - Soru 4 secimi B) ============

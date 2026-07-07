@@ -129,6 +129,16 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     check('farklı dalda aynı kod KABUL', !!dupOk);
     if(dupOk) await dbDelete('bom_parts', dupOk.id); // ağacı bozmadan geri al
 
+    console.log('═══ B3: TAŞIMADA KARDEŞ-KOD KONTROLÜ (bom_parts) ═══');
+    // BRK(sağ dal) → PLT altına taşıma: orada aynı kodlu BRK var → RET
+    const mvFail = await api('PUT','/bom-parts/'+brk2.id,{parent_id:plt.id});
+    check('aynı kodlu kardeşi olan parent\'a taşıma REDDEDİLDİ',
+      mvFail===null && /ust parca/i.test(_lastApiError||''), _lastApiError);
+    const mvOk = await api('PUT','/bom-parts/'+brk2.id,{parent_id:cvt.id});
+    check('çakışmasız taşıma KABUL', !!mvOk && mvOk.parent_id===cvt.id);
+    const mvBack = await api('PUT','/bom-parts/'+brk2.id,{parent_id:plt2.id});
+    check('geri taşındı', !!mvBack && mvBack.parent_id===plt2.id);
+
     const pbm = await api('POST','/project-bom',{project_name:PROJ, bom_product_id:prod.id, status:'draft', created_by:'E2E'});
     check('project_bom bağlantısı oluştu', !!pbm);
 
@@ -141,6 +151,19 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const pbpSacs = pbps.filter(p=>codeOf(p)==='E2E-SAC');
     check('aynı kodlu 2 SAC pbp FARKLI parent altında',
       pbpSacs.length===2 && pbpSacs[0].parent_custom_id!==pbpSacs[1].parent_custom_id && pbpSacs.every(p=>!!p.parent_custom_id));
+
+    console.log('═══ B3: TAŞIMADA KARDEŞ-KOD KONTROLÜ (pbp, etkin kod) ═══');
+    // Otomatik kopyalanan pbp'lerde custom_code boş — kod şablondan çözümlenir;
+    // aynı etkin kodlu kardeşin yanına taşıma yine de reddedilmeli
+    const sacMvFail = await api('PUT','/project-bom-parts/'+pbpSacs[1].id,{parent_custom_id:pbpSacs[0].parent_custom_id});
+    check('pbp: aynı (etkin) kodlu kardeşe taşıma REDDEDİLDİ',
+      sacMvFail===null && /ust parca/i.test(_lastApiError||''), _lastApiError);
+    const sacHome = pbpSacs[1].parent_custom_id;
+    const pbpCvtRef = pbps.find(p=>codeOf(p)==='E2E-CVT');
+    const sacMvOk = await api('PUT','/project-bom-parts/'+pbpSacs[1].id,{parent_custom_id:pbpCvtRef.id});
+    check('pbp: çakışmasız taşıma KABUL', !!sacMvOk && sacMvOk.parent_custom_id===pbpCvtRef.id);
+    const sacMvBack = await api('PUT','/project-bom-parts/'+pbpSacs[1].id,{parent_custom_id:sacHome});
+    check('pbp: geri taşındı', !!sacMvBack && sacMvBack.parent_custom_id===sacHome);
 
     console.log('═══ F+H + 4.TUR: YAYINLA (adet toplama + hiyerarşi) ═══');
     globalThis.parts = await dbGet('parts');

@@ -210,6 +210,16 @@ public class BomPartService {
      * Ayni urun kontrolu + dongu (kendi alt agacina tasima) kontrolu yapar.
      */
     private void applyParentChange(BomPart part, UUID newParentId, Integer requestedLevel) {
+        // Hedef parent altinda ayni kod varsa tasima reddedilir (4. tur B3):
+        // istek yalniz {parent_id} icerdiginde update()'teki kod kontrolu
+        // calismadigindan kardes-kod benzersizligi burada da denetlenir.
+        if (part.getCode() != null && !part.getCode().isBlank()
+                && bomPartRepository.existsSiblingCodeExcept(
+                        part.getProductId(), newParentId, part.getCode(), part.getId())) {
+            throw new BusinessException(
+                    "Hedef ust parca altinda bu kodda bir parca zaten var: " + part.getCode(),
+                    "BOM_PART_CODE_EXISTS");
+        }
         if (newParentId == null) {
             part.setParentId(null);
             part.setLevel(requestedLevel != null ? requestedLevel : 0);
