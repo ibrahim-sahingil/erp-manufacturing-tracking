@@ -134,7 +134,9 @@ birden çok kişinin kullandığı ortamda ciddi.
 **Öneri:** Merkezi `esc()` yardımcı fonksiyonu + innerHTML enterpolasyonlarında
 kullanım. Büyük ama mekanik iş; en azından ad/not alanlarından başlanmalı.
 
-### E2 (🟠 Orta). Ondalık adetler yayınlamada sessizce kesiliyor
+### E2 (🟠 Orta — CANLIDA DOĞRULANDI). Ondalık adetler sessizce kesiliyor
+DOĞRULAMA (07.07, 3. tarama): API'ye `total_qty: 2.5` gönderildi → kayıt `2`
+olarak döndü, hata/uyarı yok.
 BOM adetleri `numeric(15,4)` (2.5 kg, 1.2 m olabilir); üretim tablosu
 `parts.total_qty` ise INTEGER. Yayınlamada 2.5 → 2'ye sessizce yuvarlanır
 (Jackson float→int), birim bilgisi de parts'a hiç taşınmaz. kg/m/m² birimli
@@ -183,3 +185,38 @@ async sırasında disable var; "beni hatırla" şifreyi değil token'ı saklıyo
 modallı onay akışlarında (aktarım/kabul) overlay ilk satırda kaldırıldığı için
 çift tıklama riski düşük; proje↔ürün bağında DB unique kısıtı çift kaydı
 engelliyor.
+
+---
+
+# EK — 3. Tarama (kapanış: şüpheli köşeler denetlendi, yeni bulgu YOK)
+
+Denetlenen ve TEMİZ çıkan alanlar:
+- **Toplu sipariş yaşam döngüsü**: grup ORDERED/geri alma/iptal geçişlerinde
+  üye kalemlerin durumu backend'de transactional senkronlanıyor; gruba yalnız
+  PLANNED + başka gruba bağlı olmayan kalem giriyor; kilit mesajları dostça.
+- **İrsaliye kalemleri**: ekleme/silme yalnız DRAFT irsaliyede (backend
+  `requireDraft`) — sevk edilmiş irsaliyenin kalemi bozulamıyor.
+- **Oturum süresi**: 401/403'te `handleUnauthorized` login ekranına düşürüyor;
+  JWT 24 saat; "beni hatırla" oto-girişi güvenli kurgulanmış.
+- **Hata sızıntısı**: beklenmeyen hatalar istemciye jenerik mesajla dönüyor
+  (iç detay yalnız log'da) — bilgi sızıntısı yok.
+- **PIN sistemi**: kimlik doğrulama değil, dashboard sabitleme — risk yok.
+- **Upload limitleri**: multipart 10MB + Excel 2000 satır sınırı var.
+- E2 (ondalık kesilme) canlı API testiyle DOĞRULANDI (yukarı işlendi).
+
+## Denetimin kapsam SINIRLARI (yapılmayanlar — bilinçli)
+1. Her akışın tarayıcıda uçtan uca tıklanarak testi yapılmadı (statik kod
+   incelemesi + seçili API testleri yapıldı). Kritik düzeltmelerden sonra
+   Playwright E2E turu önerilir.
+2. Performans/ölçek denetimi yapılmadı (10k satırlık tek dosya frontend, tam
+   liste re-render'ları — bugünkü veri hacminde sorun değil).
+3. Yedekten geri dönüş TATBİKATI yapılmadı — yedek alma çalışıyor (her gün
+   21:00 + bugünkü manuel), ama restore hiç denenmedi. Bir kez boş bir DB'ye
+   `pg_restore` denemesi önerilir.
+4. `parsePgQuery`/adapter katmanı satır satır doğrulanmadı (üretimde uzun
+   süredir çalışıyor, davranışsal kanıt yeterli sayıldı).
+
+## SONUÇ
+Üç taramadan sonra tablo: 3 kritik + 9 orta (E2 doğrulanmış) + 12 küçük/bilgi.
+Daha fazla tarama yerine düzeltmelere geçilmesi önerilir — kalan belirsizlik
+kod okumayla değil ancak E2E testi ve restore tatbikatıyla azalır.
