@@ -53,9 +53,18 @@ HİÇBİR DÜZELTME YAPILMADI — önce karar bekleniyor. Önem sırasına göre
 > telafi ediyor'). U5 operasyonel notu: test hesabı (testdev/test1234)
 > tünel gerçek kullanıcılara açılmadan önce güçlendirilmeli/pasife alınmalı.
 >
-> DENETİMDEKİ TÜM MADDELER KAPANDI (K1-3, O1-8, U1-8; O8 geçersizdi,
-> U4/U7 bilinçli ertelendi). Kalan tek büyük iş: E1 tagged-template
-> geçişi (opsiyonel, ayrı refactor turu).
+> DURUM ÖZETİ (DÜZELTME): K/O/U grupları kapandı — K1-3 ✅, O1-6 ✅
+> (O7=B1, O8 geçersiz), U1/U2/U3/U5 ✅ (U6=B7, U8=B8; U4/U7 ertelendi).
+> E SERİSİ HENÜZ TAM DEĞİL: E1 ✅ (XSS), E7 kabul edilebilir; ama
+> E2/E3/E4/E5/E6 HÂLÂ AÇIK:
+>   - E2 (🟠) total_qty INTEGER → ondalık BOM adedi yayınlamada kesiliyor
+>     (canlı doğrulandı). En öncelikli açık madde.
+>   - E3 (🟠) QR fiş linkleri location.origin'e bağlı → tünel adresi
+>     değişince ölü. Operasyonel (kalıcı adres) — kod değil.
+>   - E4 (🟡) parça/kalem kodu değişince kod-eşleşmeli zeka kopuyor.
+>   - E5 (🟡) iptal edilen plakanın kaynak kalemleri havuza dönmüyor.
+>   - E6 (🟡) yayınla çift tetiklenebilir (purchase_items'ta benzersizlik yok).
+> Kalan opsiyonel büyük iş: E1 tagged-template (h`...`) geçişi.
 
 ## 🔴 KRİTİK
 
