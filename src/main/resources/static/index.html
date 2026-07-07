@@ -4460,6 +4460,17 @@ async function saveWorkOrder() {
   if (!startDt){ toast('Başlangıç tarihi zorunlu!', 'error'); return; }
   if (!_woSelectedParts.size) { toast('Parça seçin!', 'error'); return; }
 
+  // (O2) #8 engeli oluşturma yolunda da geçerli: durum "Devam Ediyor" ile
+  // kaydedilirken seçili üst parçaların bitmemiş alt parçası olamaz
+  // (dashboard durum geçişi ve revize zaten kontrol ediyor).
+  if (document.getElementById('wo-status').value === 'inprogress') {
+    const waiting = [];
+    parts.filter(p => _woSelectedParts.has(p.id)).forEach(pd => {
+      partWaitingChildren(pd.id).forEach(c => waiting.push({parent: pd, child: c}));
+    });
+    if (waiting.length) { toast(woStartBlockMsg(waiting), 'error'); return; }
+  }
+
   const dept = depts.find(d => d.id === deptId);
   const wsId = document.getElementById('wo-workspace').value;
   const ws   = workspaces.find(w => w.id === wsId);
