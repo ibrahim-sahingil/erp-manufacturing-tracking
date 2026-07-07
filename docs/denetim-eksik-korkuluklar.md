@@ -20,7 +20,13 @@ HİÇBİR DÜZELTME YAPILMADI — önce karar bekleniyor. Önem sırasına göre
 > O5 66b8dd1 (defterden bağlı hareket silinemez; MANUAL ve
 > WAREHOUSE_TRANSFER serbest, DELIVERY yalnız DRAFT irsaliyede).
 > E2E'ye O1/O4/O5 senaryoları eklendi, tümü geçiyor.
-> Sırada: O6 (irsaliye sevkinde stok kontrolü) → E1 XSS → U'lar.
+>
+> **E1 XSS turu (aynı gün, `xss-esc-e1` dalı, a221caf):** merkezi esc()
+> + 262 innerHTML enterpolasyonu kaçırıldı (codemod + elle tamamlama;
+> toast/confirm/CSV/veri şablonları bilinçli dışarıda). Render
+> fonksiyonları E2E kapsamında olmadığından merge öncesi /code-review
+> ultra önerilir. E7 (localStorage JWT) E1 kapandığında kabul edilebilir.
+> Sırada: O6 (irsaliye sevkinde stok kontrolü) → U'lar.
 
 ## 🔴 KRİTİK
 
