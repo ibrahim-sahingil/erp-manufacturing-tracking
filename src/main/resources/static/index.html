@@ -2932,9 +2932,16 @@ async function addQuickDept(project, name){
 }
 
 async function deleteDept(id){
-  if(!confirm('Bu bölümü silmek istiyor musunuz? Bölümdeki parçalar bölümsüz kalır.')) return;
-  await dbDelete('departments',id);
-  depts = depts.filter(d=>d.id!==id);
+  const d = depts.find(x=>x.id===id);
+  // (U2) Kaç parça bölümsüz kalacağını say — sessiz NULL'a düşürme yerine bildir
+  const affected = parts.filter(p=>p.department_id===id).length;
+  const msg = affected
+    ? `"${d?.name||'Bölüm'}" silinsin mi?\n\n⚠ Bu bölüme atanmış ${affected} parça bölümsüz kalacak (parçalar silinmez, yalnız bölüm bağı kalkar).`
+    : `"${d?.name||'Bu bölüm'}" silinsin mi?`;
+  if(!confirm(msg)) return;
+  const ok = await dbDelete('departments',id);
+  if(!ok) return; // hata backend mesajıyla gösterildi; yerel state bozulmasın
+  depts = depts.filter(x=>x.id!==id);
   renderDeptList(); updateDeptSelect(); renderDashboard();
   toast('Bölüm silindi.','success');
 }
@@ -4975,8 +4982,16 @@ function printWorkOrders() {
   setTimeout(() => { printWin.print(); }, 600);
 }
 async function deleteWorkOrder(id) {
-  if (!confirm('Bu iş emrini silmek istiyor musunuz?')) return;
-  await dbDelete('work_orders', id);
+  const w = workOrders.find(x=>x.id===id);
+  // (U3) Devam eden/biten iş emrini silmek üretim akışını etkiler — durumu bildir
+  const active = w && (w.status==='inprogress' || w.status==='done');
+  const st = w ? (WO_STATUS[w.status]?.lbl || w.status) : '';
+  const msg = active
+    ? `Bu iş emri "${st}" durumunda. Yine de silinsin mi?\n\n⚠ İş emri ve parça bağlantıları kaldırılacak (üretim kayıtları ve parçalar etkilenmez).`
+    : 'Bu iş emrini silmek istiyor musunuz?';
+  if (!confirm(msg)) return;
+  const ok = await dbDelete('work_orders', id);
+  if(!ok) return; // hata backend mesajıyla gösterildi; yerel state bozulmasın
   workOrders = workOrders.filter(w => w.id !== id);
   renderWorkOrders();
   toast('İş emri silindi.','success');
