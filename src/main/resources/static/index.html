@@ -2985,17 +2985,17 @@ function renderDeptList(){
 
   const byProject = {};
   depts.forEach(d=>{ if(!byProject[d.project]) byProject[d.project]=[]; byProject[d.project].push(d); });
-  el.innerHTML = Object.entries(byProject).map(([proj,list])=>`
+  el.innerHTML = h`${Object.entries(byProject).map(([proj,list])=>h`
     <div style="margin-bottom:16px">
-      <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--accent);letter-spacing:1px;margin-bottom:8px">📁 ${esc(proj)}</div>
+      <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--accent);letter-spacing:1px;margin-bottom:8px">📁 ${proj}</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
-        ${list.map(d=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 14px;display:flex;align-items:center;gap:10px">
-          <span style="font-family:var(--font-mono);font-size:12px">${esc(d.name)}</span>
+        ${list.map(d=>h`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 14px;display:flex;align-items:center;gap:10px">
+          <span style="font-family:var(--font-mono);font-size:12px">${d.name}</span>
           <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${parts.filter(p=>p.department_id===d.id).length} parça</span>
           <button class="icon-btn" style="width:22px;height:22px;font-size:11px" onclick="deleteDept('${d.id}')">✕</button>
-        </div>`).join('')}
+        </div>`)}
       </div>
-    </div>`).join('');
+    </div>`)}`;
 }
 
 // ═══ USERS ═══
@@ -5729,19 +5729,20 @@ function renderSuppliersModalList(){
     el.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:16px;text-align:center">Henüz tedarikçi yok — kayıtlarda yazılan adlar otomatik buraya düşer.</div>`;
     return;
   }
-  el.innerHTML = suppliers.map(s=>{
+  el.innerHTML = h`${suppliers.map(s=>{
     const passive = s.is_active===false;
+    // meta HAM değerlerle kurulur; h`${meta}` tek seferde esc'ler (çift değil)
     const meta = [
-      s.contact_person ? '👤 '+esc(s.contact_person) : '',
-      s.phone ? '☎ '+esc(s.phone) : '',
-      s.email ? '✉ '+esc(s.email) : '',
-      s.tax_number ? 'VKN: '+esc(s.tax_number)+(s.tax_office?' / '+esc(s.tax_office):'') : esc(s.tax_office||''),
-      s.notes ? '🗒 '+esc(s.notes) : ''
+      s.contact_person ? '👤 '+s.contact_person : '',
+      s.phone ? '☎ '+s.phone : '',
+      s.email ? '✉ '+s.email : '',
+      s.tax_number ? 'VKN: '+s.tax_number+(s.tax_office?' / '+s.tax_office:'') : (s.tax_office||''),
+      s.notes ? '🗒 '+s.notes : ''
     ].filter(Boolean).join(' · ');
-    return `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px dashed var(--border);${passive?'opacity:.45':''}">
+    return h`<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px dashed var(--border);${passive?raw('opacity:.45'):''}">
       <div style="min-width:0">
-        <div style="font-family:var(--font-mono);font-size:12px"><b>${esc(s.name)}</b>${passive?' <span style="font-size:10px;color:var(--muted)">(pasif)</span>':''}</div>
-        ${meta?`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">${meta}</div>`:''}
+        <div style="font-family:var(--font-mono);font-size:12px"><b>${s.name}</b>${passive?raw(' <span style="font-size:10px;color:var(--muted)">(pasif)</span>'):''}</div>
+        ${meta?h`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">${meta}</div>`:''}
       </div>
       <div style="display:flex;gap:4px;flex-shrink:0">
         <button class="btn btn-ghost btn-sm" onclick="supEdit('${s.id}')">✏️</button>
@@ -5749,7 +5750,7 @@ function renderSuppliersModalList(){
         <button class="btn btn-ghost btn-sm" onclick="supDelete('${s.id}')" style="color:var(--red,#e74c3c)">🗑</button>
       </div>
     </div>`;
-  }).join('');
+  })}`;
 }
 
 function supEdit(id){
