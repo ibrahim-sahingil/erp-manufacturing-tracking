@@ -2742,7 +2742,7 @@ function partRowHTML(p, i, showDelete){
     <div class="part-num">${String(i+1).padStart(2,'0')}</div>
     <div>
       <div class="part-name">${esc(p.name)}</div>
-      <div class="part-code">${esc(p.code)}${p.drawing?' · '+p.drawing:''}</div>
+      <div class="part-code">${esc(p.code)}${p.drawing?' · '+esc(p.drawing):''}</div>
       <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:3px">📅 ${createdAt}</div>
       ${(()=>{ // (#8) bitmemiş alt parçalar
         if(p.status==='done') return '';
@@ -3025,7 +3025,7 @@ async function renderScan(id){
   const content=document.getElementById('scan-content');
   if(!p){ content.innerHTML=`<div class="not-found"><div class="icon">⚠️</div><h2>Parça Bulunamadı</h2><p>Bu QR koda ait kayıt mevcut değil.</p></div>`; return; }
 
-  const userOptions=ux.map(u=>`<option value="${esc(u.name)}">${esc(u.name)}${u.dept?' ('+u.dept+')':''}</option>`).join('');
+  const userOptions=ux.map(u=>`<option value="${esc(u.name)}">${esc(u.name)}${u.dept?' ('+esc(u.dept)+')':''}</option>`).join('');
   const totalDone   = logs.reduce((s,l)=>s+(parseInt(l.qty_done)||0),0);
   const totalReject = logs.reduce((s,l)=>s+(parseInt(l.qty_reject)||0),0);
   // Bekliyor = toplam adet - yapılan - reddedilen
@@ -3051,11 +3051,11 @@ async function renderScan(id){
     <div class="scan-card">
       <div class="scan-part-name">${esc(p.name)}</div>
       <div class="scan-drawing">📐 ${esc(p.drawing||'Teknik Resim')} · ${esc(p.code)}</div>
-      ${p.department?`<div class="scan-dept-tag">🏭 ${p.department}</div>`:''}
+      ${p.department?`<div class="scan-dept-tag">🏭 ${esc(p.department)}</div>`:''}
       <div class="scan-meta">
         <div class="scan-meta-item"><label>Malzeme</label><span>${esc(p.material||'—')}</span></div>
         <div class="scan-meta-item"><label>Toplam Adet</label><span>${p.qty||'—'}</span></div>
-        <div class="scan-meta-item"><label>Proje</label><span>${p.project||'—'}</span></div>
+        <div class="scan-meta-item"><label>Proje</label><span>${esc(p.project||'—')}</span></div>
         <div class="scan-meta-item"><label>Durum</label><span>${p.status==='done'?'✅ Yapıldı':p.status==='reject'?'❌ Red':'⏳ Bekliyor'}</span></div>
         <div class="scan-meta-item" style="grid-column:span 2"><label>📅 Kayıt Tarihi</label><span style="font-size:12px">${p.created_at ? new Date(p.created_at).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'}</span></div>
       </div>
@@ -3499,7 +3499,7 @@ async function renderOrders() {
   if(sel) {
     const cur = sel.value;
     sel.innerHTML = '<option value="">— Seçin —</option>' +
-      users.map(u=>`<option value="${esc(u.name)}"${u.name===cur?' selected':''}>${esc(u.name)}${u.dept?' ('+u.dept+')':''}</option>`).join('');
+      users.map(u=>`<option value="${esc(u.name)}"${u.name===cur?' selected':''}>${esc(u.name)}${u.dept?' ('+esc(u.dept)+')':''}</option>`).join('');
   }
 
   if(!orders.length) await loadOrders();
@@ -3540,7 +3540,7 @@ async function renderOrders() {
     const itemsHTML = items.length ? `
       <table class="order-items-table">
         <tr><th>Parça / Makine</th><th>Açıklama</th><th style="text-align:right">Adet</th></tr>
-        ${items.map(it=>`<tr><td><b>${esc(it.name||'—')}</b></td><td style="color:var(--muted)">${it.desc||'—'}</td><td style="text-align:right">${it.qty||'—'}</td></tr>`).join('')}
+        ${items.map(it=>`<tr><td><b>${esc(it.name||'—')}</b></td><td style="color:var(--muted)">${esc(it.desc||'—')}</td><td style="text-align:right">${esc(it.qty||'—')}</td></tr>`).join('')}
       </table>` : `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-bottom:10px">Kalem girilmemiş</div>`;
 
     const pinned = isPinned('order', o.id);
@@ -3558,7 +3558,7 @@ async function renderOrders() {
       <div class="order-card-header" style="padding-right:32px">
         <div>
           <div class="order-card-title">${esc(o.project_name||'—')}</div>
-          <div class="order-card-customer">👤 ${esc(o.customer_name||'—')} ${o.customer_email?'· '+o.customer_email:''} ${o.customer_phone?'· '+o.customer_phone:''}</div>
+          <div class="order-card-customer">👤 ${esc(o.customer_name||'—')} ${o.customer_email?'· '+esc(o.customer_email):''} ${o.customer_phone?'· '+esc(o.customer_phone):''}</div>
         </div>
         <span class="order-status-badge ${st.cls}"><span class="dot" style="background:currentColor"></span>${st.lbl}</span>
       </div>
@@ -3595,7 +3595,7 @@ function addOrderItem(name='', desc='', qty='') {
   row.id = id;
   row.innerHTML = `
     <input type="text" placeholder="Parça / Makine adı" value="${esc(name)}" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 12px;outline:none;width:100%">
-    <input type="text" placeholder="Açıklama / model" value="${desc}" class="oir-hide" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 12px;outline:none;width:100%">
+    <input type="text" placeholder="Açıklama / model" value="${esc(desc)}" class="oir-hide" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 12px;outline:none;width:100%">
     <input type="number" placeholder="Adet" value="${qty}" min="1" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 8px;outline:none;width:100%;text-align:center">
     <button onclick="document.getElementById('${id}').remove()" style="width:32px;height:38px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--red);cursor:pointer;font-size:14px">✕</button>`;
   container.appendChild(row);
@@ -3879,7 +3879,7 @@ async function renderPdList() {
           <span style="color:var(--muted)">→</span>
           <span style="color:var(--green)">${r.new_start} → ${r.new_end}</span>
           ${r.revised_by?`<span style="color:var(--accent)">${esc(r.revised_by)}</span>`:''}
-          <span style="color:var(--text);flex:1">📝 ${r.reason}</span>
+          <span style="color:var(--text);flex:1">📝 ${esc(r.reason)}</span>
         </div>`).join('')}
       </div>` : '';
 
@@ -4274,7 +4274,7 @@ async function initWorkOrders() {
   const u = document.getElementById('wo-user');
   if (u) {
     u.innerHTML = '<option value="">— Seçin —</option>' +
-      users.map(u=>`<option value="${esc(u.name)}">${esc(u.name)}${u.dept?' ('+u.dept+')':''}</option>`).join('');
+      users.map(u=>`<option value="${esc(u.name)}">${esc(u.name)}${u.dept?' ('+esc(u.dept)+')':''}</option>`).join('');
   }
   // Varsayılan datetime
   const dt = document.getElementById('wo-start-dt');
@@ -4385,7 +4385,7 @@ async function woLoadParts() {
         ${depth>0?`<span style="color:var(--muted);font-size:10px">└─</span>`:''}
         <div style="min-width:0;flex:1">
           <div class="wo-part-item-name" style="display:inline">${esc(p.name)}</div>
-          <span class="wo-part-item-code" style="margin-left:8px">${esc(p.code)}${p.drawing?' · '+p.drawing:''}</span>
+          <span class="wo-part-item-code" style="margin-left:8px">${esc(p.code)}${p.drawing?' · '+esc(p.drawing):''}</span>
           <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">
             ${esc(p.material||'')} ${p.qty?'· '+p.qty+' adet':''}
             ${dept?`· 🏭 ${esc(dept.name)}`:''}
@@ -4637,11 +4637,11 @@ async function renderWorkOrders() {
           <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:6px">🔄 Revize Geçmişi (${revs.length})</div>
           ${revs.map(r=>`<div class="wo-rev-item">
             <span style="color:var(--muted);min-width:90px">${new Date(r.created_at).toLocaleDateString('tr-TR')}</span>
-            <span style="color:var(--accent)">${r.field_changed}</span>
+            <span style="color:var(--accent)">${esc(r.field_changed)}</span>
             <span style="color:var(--muted)">→</span>
-            <span style="color:var(--green)">${r.new_value}</span>
+            <span style="color:var(--green)">${esc(r.new_value)}</span>
             ${r.revised_by?`<span style="color:var(--accent)">${esc(r.revised_by)}</span>`:''}
-            <span style="color:var(--text);flex:1">📝 ${r.reason}</span>
+            <span style="color:var(--text);flex:1">📝 ${esc(r.reason)}</span>
           </div>`).join('')}
         </div>` : '';
 
@@ -4708,7 +4708,7 @@ function openWoReviseModal(id, proj, status, user, workspace, startDt) {
     <div class="form-group" style="margin-bottom:12px"><label>Atanan Personel</label>
       <select id="wor-user" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
         <option value="">— Seçin —</option>
-        ${users.map(u=>`<option value="${esc(u.name)}"${u.name===user?' selected':''}>${esc(u.name)}${u.dept?' ('+u.dept+')':''}</option>`).join('')}
+        ${users.map(u=>`<option value="${esc(u.name)}"${u.name===user?' selected':''}>${esc(u.name)}${u.dept?' ('+esc(u.dept)+')':''}</option>`).join('')}
       </select>
     </div>
     <div class="form-group" style="margin-bottom:12px"><label>Çalışma Alanı</label>
@@ -5314,7 +5314,7 @@ function openWsMemberModal(wsId, wsName) {
   const sel = document.getElementById('ws-member-select');
   const existingNames = wsMembers.filter(m => m.workspace_id === wsId).map(m => m.user_name);
   sel.innerHTML = '<option value="">— Listeden seçin —</option>' +
-    users.map(u => `<option value="${esc(u.name)}"${existingNames.includes(u.name)?' disabled style="color:var(--muted)"':''}>${esc(u.name)}${u.dept?' ('+u.dept+')':''}${existingNames.includes(u.name)?' ✓':''}</option>`).join('');
+    users.map(u => `<option value="${esc(u.name)}"${existingNames.includes(u.name)?' disabled style="color:var(--muted)"':''}>${esc(u.name)}${u.dept?' ('+esc(u.dept)+')':''}${existingNames.includes(u.name)?' ✓':''}</option>`).join('');
 
   // Mevcut üyeler
   renderWsCurrentMembers(wsId);
@@ -5693,7 +5693,8 @@ function supEdit(id){
   if(id && !s) return;
   document.getElementById('sup-edit-overlay')?.remove();
   const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 11px;outline:none';
-  const esc = v => (v||'').replace(/"/g,'&quot;');
+  // (E1) Global esc() kullanılır — eski yerel "yalnız tırnak" sürümü kaldırıldı
+  // (aynı isimde iki farklı davranış = gölgeleme/bakım tuzağıydı).
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.id = 'sup-edit-overlay';
