@@ -2086,6 +2086,12 @@ function dimLabel(w,h,t){
 async function init(){
   // Beni hatırla — kayıtlı bilgileri yükle
   loadRemembered();
+  // (E3) QR fiş linkleri için kalıcı temel adres (app.base-url); boşsa
+  // QR_BASE location fallback'inde kalır. Token gerektirmez (permitAll).
+  try {
+    const cfg = await fetch('/api/config').then(r=>r.json());
+    if(cfg && cfg.data && cfg.data.base_url) QR_BASE = cfg.data.base_url;
+  } catch(e){ /* config yoksa location fallback */ }
   const pid = new URLSearchParams(location.search).get('part');
   const rid = new URLSearchParams(location.search).get('receive');
   if(pid){
@@ -3046,7 +3052,11 @@ function renderUsers(){
 }
 
 // ═══ QR ═══
-function getScanURL(id){ return location.origin+location.pathname+'?part='+id; }
+// (E3) QR fiş linklerinin temel adresi. init'te /api/config'ten KALICI adres
+// çekilir (app.base-url); boşsa location'a düşer (tünel adresi değişince eski
+// QR'lar ölür — sabit adres için app.base-url doldurulmalı).
+let QR_BASE = location.origin + location.pathname;
+function getScanURL(id){ return QR_BASE+'?part='+id; }
 function showQR(id,name,code,drawing){
   document.getElementById('qr-part-name').textContent=name;
   document.getElementById('qr-part-code').textContent=code+(drawing?' · '+drawing:'');
@@ -8416,7 +8426,7 @@ function dnPrint(id){
 
 // ═══ QR MAL KABUL (arkadaş notu #4: sipariş verilen her kaleme QR'lı PDF,
 // depocu QR'ı okutup malı depoya alır) ═══
-function purReceiveURL(id){ return location.origin+location.pathname+'?receive='+id; }
+function purReceiveURL(id){ return QR_BASE+'?receive='+id; }
 
 async function renderReceive(id){
   const content=document.getElementById('scan-content');

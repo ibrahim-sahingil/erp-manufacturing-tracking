@@ -54,6 +54,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoint'ler (token gerektirmez)
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/config").permitAll() // (E3) QR base-url; hassas veri yok
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
 
