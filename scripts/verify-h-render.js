@@ -459,6 +459,24 @@ console.log('\nviewPublishedBom (yayınlanan ağaç):');
 chk('viewPbom: proje/ürün adı kaçırıldı', _ovl.includes('PBP&lt;b&gt;') && _ovl.includes('Ürün&lt;img'));
 chk('viewPbom: parça kod/ad kaçırıldı', _ovl.includes('VC&lt;b&gt;') && _ovl.includes('VN&lt;img'));
 
+// ── searchSelect / ssRenderList (aranabilir combobox — arkadaş isteği #8) ──
+global.document.addEventListener=()=>{};
+els['xs-ss']={ value:'', dataset:{}, style:{}, contains:()=>false,
+  set innerHTML(v){store['xs-ss']=String(v);}, get innerHTML(){return store['xs-ss']||'';} };
+global._ss={}; // index.html'de searchSelect'in üstünde const olarak tanımlı
+eval(grab('searchSelect'));
+eval(grab('ssSet'));
+eval(grab('ssClose'));
+eval(grab('ssRenderList'));
+searchSelect('xs', {items:[{value:'v1', label:'LB'+EVIL},{value:'v2', label:"L2'\"<b>"}], emptyLabel:'— Boş<b> —'});
+ssRenderList('xs','');
+const ssl=store['xs-list']||'', ssh=store['xs-ss']||'';
+console.log('\nsearchSelect (aranabilir combobox):');
+chk('ss: host şablonu hidden+text input kurdu (raw id korundu)', ssh.includes('id="xs"') && ssh.includes('id="xs-txt"') && ssh.includes("ssFilter('xs')"));
+chk('ss: seçenek etiketi onerror kaçırıldı', ssl.includes('LB&lt;img') && !ssl.includes('LB'+EVIL));
+chk('ss: tırnaklı etiket kaçırıldı', ssl.includes('L2&#39;&quot;&lt;b&gt;'));
+chk('ss: emptyLabel kaçırıldı + ssPick onmousedown (raw) korundu', ssl.includes('— Boş&lt;b&gt; —') && ssl.includes("ssPick('xs',0)"));
+
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);
 }

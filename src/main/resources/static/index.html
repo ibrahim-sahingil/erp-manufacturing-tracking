@@ -255,6 +255,12 @@
   .bom-op-tag{display:inline-flex;align-items:center;gap:4px;background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:2px 7px;font-family:var(--font-mono);font-size:9px;color:#2980b9;}
   .bom-ops{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;}
   .bom-level-line{border-left:2px solid var(--border);margin-left:8px;padding-left:10px;}
+  /* Aranabilir combobox (searchSelect) */
+  .ss-list{position:absolute;top:100%;left:0;right:0;z-index:300;max-height:260px;overflow:auto;background:var(--surface2);border:1px solid var(--border);border-radius:0 0 6px 6px;box-shadow:0 8px 24px rgba(0,0,0,.45);}
+  .ss-item{padding:8px 12px;font-family:var(--font-mono);font-size:12px;cursor:pointer;white-space:pre;overflow:hidden;text-overflow:ellipsis;}
+  .ss-item:hover,.ss-item.hi{background:rgba(245,166,35,.12);color:var(--accent);}
+  .ss-empty{color:var(--muted);font-style:italic;}
+  .ss-more{padding:6px 12px;font-family:var(--font-mono);font-size:10px;color:var(--muted);}
   /* BOM Tree */
   .bom-tree-node{margin:4px 0;}
   .bom-tree-item{display:inline-flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 14px;font-family:var(--font-mono);font-size:12px;white-space:nowrap;}
@@ -1257,7 +1263,7 @@
           <div class="form-group"><label>Parça Kodu *</label><input type="text" id="bom-part-code" placeholder="Örn: GP-001"></div>
         </div>
         <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
-          <div class="form-group"><label>Miktar</label><input type="number" id="bom-part-qty" placeholder="1" min="0.001" step="0.001" value="1"></div>
+          <div class="form-group"><label>Miktar</label><input type="number" id="bom-part-qty" placeholder="1" min="0.001" step="any" value="1"></div>
           <div class="form-group"><label>Birim</label>
             <select id="bom-part-unit" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
               <option>adet</option><option>kg</option><option>m</option><option>m²</option><option>m³</option><option>lt</option><option>takım</option>
@@ -1275,9 +1281,7 @@
             </select>
           </div>
           <div class="form-group"><label>Üst Parça</label>
-            <select id="bom-part-parent" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
-              <option value="">— Ana ürün altına ekle —</option>
-            </select>
+            <div id="bom-part-parent-ss"></div>
           </div>
         </div>
         <div style="margin-top:14px;display:flex;gap:10px">
@@ -1293,15 +1297,11 @@
           <button class="btn btn-ghost btn-sm" onclick="openBomOpDefs()">⚙️ İşlem Tanımları</button>
         </div>
         <div class="form-group" style="margin-bottom:10px"><label>Parça Seç</label>
-          <select id="bom-op-part" onchange="calcOpTotalTime()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
-            <option value="">— Parça seçin —</option>
-          </select>
+          <div id="bom-op-part-ss"></div>
         </div>
         <div class="form-group" style="margin-bottom:10px">
           <label>İşlem Seç *</label>
-          <select id="bom-op-def-select" onchange="onBomOpDefChange()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
-            <option value="">— İşlem seçin —</option>
-          </select>
+          <div id="bom-op-def-select-ss"></div>
         </div>
         <!-- Seçilen işlem özeti -->
         <div id="bom-op-selected-info" style="display:none;background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.2);border-radius:6px;padding:10px 14px;font-family:var(--font-mono);font-size:12px;margin-bottom:10px">
@@ -1409,7 +1409,7 @@
         <div class="form-group"><label>Parça Kodu *</label><input type="text" id="pbome-part-code" placeholder="Örn: GP-001"></div>
       </div>
       <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
-        <div class="form-group"><label>Miktar</label><input type="number" id="pbome-part-qty" value="1" min="0.001" step="0.001"></div>
+        <div class="form-group"><label>Miktar</label><input type="number" id="pbome-part-qty" value="1" min="0.001" step="any"></div>
         <div class="form-group"><label>Birim</label>
           <select id="pbome-part-unit" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
             <option>adet</option><option>kg</option><option>m</option><option>m²</option><option>m³</option><option>lt</option><option>takım</option>
@@ -1427,9 +1427,7 @@
           </select>
         </div>
         <div class="form-group"><label>Üst Parça</label>
-          <select id="pbome-part-parent" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
-            <option value="">— Ana seviye —</option>
-          </select>
+          <div id="pbome-part-parent-ss"></div>
         </div>
       </div>
       <div style="margin-top:14px">
@@ -1445,14 +1443,10 @@
         <button class="btn btn-ghost btn-sm" onclick="openBomOpDefs()">⚙️ İşlem Tanımları</button>
       </div>
       <div class="form-group" style="margin-bottom:10px"><label>Parça Seç</label>
-        <select id="pbome-op-part" onchange="pbomeCalcTime()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
-          <option value="">— Parça seçin —</option>
-        </select>
+        <div id="pbome-op-part-ss"></div>
       </div>
       <div class="form-group" style="margin-bottom:10px"><label>İşlem Seç *</label>
-        <select id="pbome-op-def" onchange="pbomeOnOpDefChange()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
-          <option value="">— İşlem seçin —</option>
-        </select>
+        <div id="pbome-op-def-ss"></div>
       </div>
       <div id="pbome-op-info" style="display:none;background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:12px;margin-bottom:10px">
         Ad: <b id="pbome-op-info-name" style="color:var(--accent)">—</b> &nbsp;·&nbsp; Kod: <b id="pbome-op-info-code" style="color:var(--accent)">—</b>
@@ -2199,6 +2193,92 @@ function dimLabel(w,h,t){
   const f=v=>{ const n=parseFloat(v); return (isFinite(n)&&n>0)?(+n.toFixed(2)):null; };
   const arr=[f(w),f(h),f(t)].filter(v=>v!=null);
   return arr.length?arr.join('×')+' mm':'';
+}
+
+// ─── Aranabilir combobox (arkadaş isteği #8: yazınca liste daralsın) ───
+// Uzun listelerde (ürün ağacında 500-1000 parça) <select> yerine yazarak
+// filtrelenen liste. Kullanım: HTML'de <div id="X-ss"></div> host'u durur;
+// searchSelect('X', {items:[{value,label}], ...}) çağrısı host içine gizli
+// <input id="X"> kurar — mevcut kod getElementById('X').value okumaya devam
+// eder. Tekrar çağrılınca liste tazelenir, seçim (değer hâlâ listedeyse)
+// korunur. Değer atamak/temizlemek için ssSet(id, value) kullanılır
+// (el.value='' YETMEZ — görünen metin de senkron kalmalı).
+const _ss = {}; // id → {items, onChange, emptyLabel, view, hi}
+function searchSelect(id, {items, placeholder='Yazarak arayın...', onChange=null, emptyLabel=null}){
+  const host = document.getElementById(id+'-ss');
+  if(!host) return;
+  _ss[id] = {items, onChange, emptyLabel, view:[], hi:-1};
+  let prev = document.getElementById(id)?.value || '';
+  if(prev && !items.some(i=>i.value===prev)) prev='';
+  if(!host.dataset.ssInit){
+    host.dataset.ssInit='1';
+    host.style.position='relative';
+    host.innerHTML = h`<input type="hidden" id="${raw(id)}"><input type="text" id="${raw(id)}-txt" placeholder="${placeholder}" autocomplete="off" style="${raw(INP())}" oninput="ssFilter('${raw(id)}')" onfocus="ssOpen('${raw(id)}')" onkeydown="ssKey('${raw(id)}',event)"><div id="${raw(id)}-list" class="ss-list" style="display:none"></div>`;
+    document.addEventListener('mousedown', e=>{ if(!host.contains(e.target)) ssClose(id); });
+  }
+  ssSet(id, prev, {silent:true});
+}
+function ssSet(id, value, {silent=false}={}){
+  const st=_ss[id], hid=document.getElementById(id), txt=document.getElementById(id+'-txt');
+  if(!st||!hid){ if(hid) hid.value=value; return; }
+  const item = st.items.find(i=>i.value===value);
+  hid.value = item?value:'';
+  if(txt) txt.value = item?item.label:'';
+  const list=document.getElementById(id+'-list'); if(list) list.style.display='none';
+  if(!silent && st.onChange) st.onChange();
+}
+function ssOpen(id){
+  const txt=document.getElementById(id+'-txt');
+  if(txt) txt.select();
+  ssRenderList(id, ''); // odaklanınca tam liste (mevcut etiketle filtrelenmesin)
+}
+function ssClose(id){
+  const list=document.getElementById(id+'-list');
+  if(!list||list.style.display==='none') return;
+  list.style.display='none';
+  // Seçim yapılmadan kapandıysa görünen metni gerçek seçimle senkronla
+  const st=_ss[id], hid=document.getElementById(id), txt=document.getElementById(id+'-txt');
+  if(st&&hid&&txt){ const it=st.items.find(i=>i.value===hid.value); txt.value=it?it.label:''; }
+}
+function ssFilter(id){
+  const st=_ss[id], hid=document.getElementById(id), txt=document.getElementById(id+'-txt');
+  if(!st) return;
+  // Yazı değişti → önceki seçim geçersiz (yeniden seçilene dek boş)
+  if(hid.value){ hid.value=''; if(st.onChange) st.onChange(); }
+  ssRenderList(id, txt.value);
+}
+function ssRenderList(id, q){
+  const st=_ss[id], list=document.getElementById(id+'-list');
+  if(!st||!list) return;
+  const ql=(q||'').toLowerCase();
+  const hits = ql ? st.items.filter(i=>i.label.toLowerCase().includes(ql)) : st.items;
+  st.view = hits.slice(0,80); st.hi=-1;
+  list.innerHTML = h`${st.emptyLabel!=null?h`<div class="ss-item ss-empty" onmousedown="event.preventDefault();ssPick('${raw(id)}',-1)">${st.emptyLabel}</div>`:''}${
+    st.view.map((i,ix)=>h`<div class="ss-item" data-ix="${ix}" onmousedown="event.preventDefault();ssPick('${raw(id)}',${ix})">${i.label}</div>`)}${
+    hits.length>st.view.length?h`<div class="ss-more">… ${hits.length-st.view.length} sonuç daha — yazarak daraltın</div>`:''}${
+    !hits.length?h`<div class="ss-more">Sonuç yok</div>`:''}`;
+  list.style.display='block';
+}
+function ssPick(id, ix){
+  const st=_ss[id]; if(!st) return;
+  ssSet(id, ix<0?'':(st.view[ix]?st.view[ix].value:''));
+}
+function ssKey(id, e){
+  const st=_ss[id], list=document.getElementById(id+'-list');
+  if(!st||!list) return;
+  if(e.key==='Escape'){ ssClose(id); return; }
+  if(list.style.display==='none'){ if(e.key==='ArrowDown'||e.key==='Enter'){ e.preventDefault(); ssRenderList(id,''); } return; }
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    e.preventDefault();
+    const n=st.view.length; if(!n) return;
+    st.hi = e.key==='ArrowDown' ? (st.hi+1)%n : (st.hi-1+n)%n;
+    list.querySelectorAll('.ss-item[data-ix]').forEach(el=>el.classList.toggle('hi', +el.dataset.ix===st.hi));
+    const cur=list.querySelector('.ss-item.hi'); if(cur) cur.scrollIntoView({block:'nearest'});
+  } else if(e.key==='Enter'){
+    e.preventDefault();
+    if(st.hi>=0) ssPick(id, st.hi);
+    else if(st.view.length===1) ssPick(id, 0);
+  }
 }
 
 // ═══ INIT ═══
@@ -9259,10 +9339,10 @@ function renderBomProductSelect() {
 }
 
 function renderBomOpDefSelect() {
-  const sel = document.getElementById('bom-op-def-select');
-  if(!sel) return;
-  sel.innerHTML = '<option value="">— İşlem seçin —</option>' +
-    bomOpDefs.map(op=>`<option value="${op.id}">${esc(op.name)} (${esc(op.code)})</option>`).join('');
+  searchSelect('bom-op-def-select', {
+    items: bomOpDefs.map(op=>({value:op.id, label:op.name+' ('+op.code+')'})),
+    placeholder:'— İşlem seçin (yazarak arayın) —', onChange:onBomOpDefChange
+  });
 }
 
 function onBomOpDefChange() {
@@ -9478,17 +9558,17 @@ function renderBomContent() {
 }
 
 function renderParentSelect() {
-  const sel = document.getElementById('bom-part-parent');
-  if(!sel) return;
-  sel.innerHTML = '<option value="">— Ana ürün altına ekle —</option>' +
-    bomParts.map(p=>`<option value="${p.id}">${'  '.repeat(p.level||0)}${esc(p.code)} — ${esc(p.name)}</option>`).join('');
+  searchSelect('bom-part-parent', {
+    items: bomParts.map(p=>({value:p.id, label:' '.repeat((p.level||0)*2)+p.code+' — '+p.name})),
+    placeholder:'— Ana ürün altına ekle (yazarak arayın) —', emptyLabel:'— Ana ürün altına ekle —'
+  });
 }
 
 function renderOpPartSelect() {
-  const sel = document.getElementById('bom-op-part');
-  if(!sel) return;
-  sel.innerHTML = '<option value="">— Parça seçin —</option>' +
-    bomParts.map(p=>`<option value="${p.id}">${esc(p.code)} — ${esc(p.name)}</option>`).join('');
+  searchSelect('bom-op-part', {
+    items: bomParts.map(p=>({value:p.id, label:p.code+' — '+p.name})),
+    placeholder:'— Parça seçin (yazarak arayın) —', onChange:calcOpTotalTime
+  });
 }
 
 // ─── Malzeme türü (#7 arkadaş isteği) ───
@@ -9601,8 +9681,7 @@ async function addBomOperation() {
   ['bom-op-name','bom-op-code','bom-op-desc','bom-op-duration'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
-  const defSel = document.getElementById('bom-op-def-select');
-  if(defSel) defSel.value='';
+  ssSet('bom-op-def-select','',{silent:true});
   const info = document.getElementById('bom-op-selected-info');
   if(info) info.style.display='none';
   const td = document.getElementById('bom-op-total-time');
@@ -9796,7 +9875,7 @@ function editBomQty(partId) {
     <div class="form-row" style="grid-template-columns:2fr 1fr;margin-bottom:18px">
       <div class="form-group">
         <label>Miktar</label>
-        <input type="number" id="bom-qty-in" value="${part.quantity||1}" min="0.001" step="0.001"
+        <input type="number" id="bom-qty-in" value="${part.quantity||1}" min="0.001" step="any"
           style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:20px;padding:10px 12px;outline:none"
           onkeydown="if(event.key==='Enter')saveBomQty('${partId}')">
       </div>
@@ -10278,24 +10357,24 @@ function pbomeRenderContent() {
 }
 
 function pbomeRenderParentSelect() {
-  const sel = document.getElementById('pbome-part-parent');
-  if(!sel) return;
-  sel.innerHTML = '<option value="">— Ana seviye —</option>' +
-    _pbomeParts.map(p=>`<option value="${p.id}">${'  '.repeat(p.level||0)}${esc(p.custom_code)} — ${esc(p.custom_name)}</option>`).join('');
+  searchSelect('pbome-part-parent', {
+    items: _pbomeParts.map(p=>({value:p.id, label:' '.repeat((p.level||0)*2)+(p.custom_code||'')+' — '+(p.custom_name||'')})),
+    placeholder:'— Ana seviye (yazarak arayın) —', emptyLabel:'— Ana seviye —'
+  });
 }
 
 function pbomeRenderOpPartSelect() {
-  const sel = document.getElementById('pbome-op-part');
-  if(!sel) return;
-  sel.innerHTML = '<option value="">— Parça seçin —</option>' +
-    _pbomeParts.map(p=>`<option value="${p.id}">${esc(p.custom_code)} — ${esc(p.custom_name)}</option>`).join('');
+  searchSelect('pbome-op-part', {
+    items: _pbomeParts.map(p=>({value:p.id, label:(p.custom_code||'')+' — '+(p.custom_name||'')})),
+    placeholder:'— Parça seçin (yazarak arayın) —', onChange:pbomeCalcTime
+  });
 }
 
 function pbomeRenderOpDefSelect() {
-  const sel = document.getElementById('pbome-op-def');
-  if(!sel) return;
-  sel.innerHTML = '<option value="">— İşlem seçin —</option>' +
-    bomOpDefs.map(op=>`<option value="${op.id}">${esc(op.name)} (${esc(op.code)})</option>`).join('');
+  searchSelect('pbome-op-def', {
+    items: bomOpDefs.map(op=>({value:op.id, label:op.name+' ('+op.code+')'})),
+    placeholder:'— İşlem seçin (yazarak arayın) —', onChange:pbomeOnOpDefChange
+  });
 }
 
 function pbomeOnOpDefChange() {
@@ -10404,7 +10483,7 @@ async function pbomeAddOp() {
 
   // Formu temizle
   ['pbome-op-name','pbome-op-code','pbome-op-desc','pbome-op-dur'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  const defSel=document.getElementById('pbome-op-def');if(defSel)defSel.value='';
+  ssSet('pbome-op-def','',{silent:true});
   const info=document.getElementById('pbome-op-info');if(info)info.style.display='none';
   document.getElementById('pbome-op-total').textContent='—';
 
@@ -10487,7 +10566,7 @@ function pbomeEditQty(partId) {
     <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">${esc(p.custom_code)} — ${esc(p.custom_name)}</p>
     <div class="form-row" style="grid-template-columns:2fr 1fr;margin-bottom:16px">
       <div class="form-group"><label>Miktar</label>
-        <input type="number" id="pbome-qty-val" value="${p.custom_qty||1}" min="0.001" step="0.001"
+        <input type="number" id="pbome-qty-val" value="${p.custom_qty||1}" min="0.001" step="any"
           style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:18px;padding:10px 12px;outline:none"
           onkeydown="if(event.key==='Enter')pbomeSaveQty('${partId}')">
       </div>
