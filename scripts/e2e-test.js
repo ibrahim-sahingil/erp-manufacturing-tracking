@@ -328,6 +328,24 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     await api('DELETE','/users/'+u1user.id);
     check('U1 temizlik: log+personel silindi', !(await api('GET','/users')||[]).some(x=>x.id===u1user.id));
 
+    console.log('═══ U4: QR SAYAÇ ATOMİK ARTIŞ (lost-update önlemi) ═══');
+    const u4Before = Number((await dbGet('parts')).find(p=>p.id===partGvd.id)?.qty_done)||0;
+    const u4u = await api('POST','/users',{name:'E2E U4 Personel', role:'Operatör'});
+    check('U4 personeli oluştu', !!u4u, _lastApiError||'');
+    // iki ardışık log: atomik SQL increment doğru toplamalı (Java oku-yaz değil)
+    await api('POST','/part-logs',{part_id:partGvd.id, user_id:u4u.id, qty_done:2});
+    await api('POST','/part-logs',{part_id:partGvd.id, user_id:u4u.id, qty_done:3});
+    const u4After = (await dbGet('parts')).find(p=>p.id===partGvd.id);
+    check('iki log atomik toplandı (qty_done +5)', (Number(u4After.qty_done)||0)-u4Before===5,
+      `${u4Before} → ${u4After.qty_done}`);
+    const _t=Number(u4After.qty)||0,_d=Number(u4After.qty_done)||0,_r=Number(u4After.qty_reject)||0;
+    check('qty_pending türetildi (max(0,total-done-reject))',
+      Number(u4After.qty_pending)===Math.max(0,_t-_d-_r), `pend=${u4After.qty_pending}`);
+    // temizlik: logları sil (U1 guard: logu olan personel silinemez), sonra personel
+    for(const l of (await api('GET','/part-logs?userId='+u4u.id)||[])) await api('DELETE','/part-logs/'+l.id);
+    await api('DELETE','/users/'+u4u.id);
+    check('U4 temizlik tamam', !(await api('GET','/users')||[]).some(x=>x.id===u4u.id));
+
     console.log('═══ 4.TUR #3: KISMİ MAL KABUL (gerçek rcvDoReceive) ═══');
     let whs = await dbGet('warehouses');
     let wh = whs.find(w=>w.is_active!==false);

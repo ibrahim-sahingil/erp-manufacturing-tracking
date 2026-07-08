@@ -95,19 +95,12 @@ public class PartLogService {
             );
         }
 
-        // 4. Part'in mevcut qty'lerini guncelle
-        part.setQtyDone((part.getQtyDone() != null ? part.getQtyDone() : 0) + qtyDoneInc);
-        part.setQtyPending((part.getQtyPending() != null ? part.getQtyPending() : 0) + qtyPendingInc);
-        part.setQtyReject((part.getQtyReject() != null ? part.getQtyReject() : 0) + qtyRejectInc);
-
-        // 5. Eger qty_done >= total_qty oldu ise status'u DONE yap
-        if (part.getTotalQty() != null && part.getQtyDone() >= part.getTotalQty()) {
-            part.setStatus("DONE");
-        } else if (part.getQtyDone() > 0) {
-            part.setStatus("IN_PROGRESS");
-        }
-
-        partRepository.save(part);
+        // 4. (U4) Part sayaclarini ATOMIK artir — Java oku-degistir-yaz yerine
+        // tek SQL UPDATE (es zamanli QR girislerinde lost update olmasin).
+        // qty_pending, yeni done/reject'ten turetilir; status'e DOKUNULMAZ
+        // (frontend autoStatus'u ayri PUT ile yonetir — buradaki eski buyuk-harf
+        // 'DONE'/'IN_PROGRESS' zaten o PUT tarafindan eziliyordu).
+        partRepository.incrementQty(request.getPartId(), qtyDoneInc, qtyRejectInc);
 
         // 6. PartLog'u olustur
         PartLog partLog = PartLog.builder()

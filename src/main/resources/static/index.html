@@ -3199,11 +3199,12 @@ async function submitScan(id){
   btn.disabled=true; btn.textContent='Kaydediliyor...';
   const note=document.getElementById('scan-note').value.trim();
 
-  // ÖNCE log (backend sayaçları artırır), SONRA parts güncellemesi
-  // (frontend'in hesapladığı toplamlar nihai değer olur — çift sayım olmaz)
+  // (U4) Sayaçların tek otoritesi log POST: backend qty_done/reject/pending'i
+  // ATOMİK artırır (eşzamanlı QR girişlerinde lost update olmaz). parts PUT
+  // artık yalnız status yazar — eski MUTLAK qty PUT'u yarışa açıktı.
   await dbInsert('logs',{part_id:id, username:userName, status:autoStatus,
     qty_done:qDoneNew, qty_pending:0, qty_reject:qRejectNew, note});
-  const ok = await dbUpdate('parts',id,{status:autoStatus, qty_done:newDone, qty_pending:qPending, qty_reject:newReject});
+  const ok = await dbUpdate('parts',id,{status:autoStatus});
 
   btn.disabled=false; btn.textContent='✔ KAYDET';
   if(!ok){ toast('Güncelleme hatası!','error'); return; }
