@@ -7610,10 +7610,10 @@ function renderWarehouseList(){
 // ── Proje bazlı görünüm: proje kartları (accordion) ──
 function whvProjectHTML(){
   const rel = purchaseItems.filter(i=>['ORDERED','RECEIVED','IN_STOCK','IN_WAREHOUSE'].includes(i.status));
-  if(!rel.length) return `<div class="empty-state"><span class="emoji">🏭</span>Depoya girmiş veya beklenen malzeme yok</div>`;
+  if(!rel.length) return h`<div class="empty-state"><span class="emoji">🏭</span>Depoya girmiş veya beklenen malzeme yok</div>`;
   const groups = {};
   rel.forEach(i=>{ const k=i.project_name||'—'; (groups[k]=groups[k]||[]).push(i); });
-  return Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([proj,list])=>{
+  return h`${Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([proj,list])=>{
     const inWh = list.filter(i=>i.status==='IN_WAREHOUSE');
     const pending = list.filter(i=>i.status!=='IN_WAREHOUSE');
     const open = _whvActiveProj===proj;
@@ -7622,39 +7622,34 @@ function whvProjectHTML(){
       // Depodakiler DEPO başlığı altında gruplu (depo dağılımı)
       const whGroups = {};
       inWh.forEach(i=>{ const k=whName(i.warehouse_id)||'—'; (whGroups[k]=whGroups[k]||[]).push(i); });
-      body = `<div style="margin-top:12px">`;
-      Object.entries(whGroups).sort(([a],[b])=>a.localeCompare(b,'tr')).forEach(([wn,items])=>{
-        body += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--green,#2ecc71);margin:10px 0 6px">🗄️ ${esc(wn)} · ${items.length} malzeme</div>`
-          + items.map(i=>whRow(i, `<button class="btn btn-ghost btn-sm" onclick="whXferItem('${i.id}')" title="Başka depoya aktar">🔁 Aktar</button>
-              <button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)).join('');
-      });
-      if(pending.length){
-        body += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#2980b9;margin:14px 0 6px">📦 Beklenen Girişler · ${pending.length}</div>`
-          + pending.map(i=>{
+      const whSections = Object.entries(whGroups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([wn,items])=>
+        h`<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--green,#2ecc71);margin:10px 0 6px">🗄️ ${wn} · ${items.length} malzeme</div>${
+          items.map(i=>raw(whRow(i, `<button class="btn btn-ghost btn-sm" onclick="whXferItem('${i.id}')" title="Başka depoya aktar">🔁 Aktar</button>
+              <button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)))}`);
+      body = h`<div style="margin-top:12px">${whSections}${pending.length?h`<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#2980b9;margin:14px 0 6px">📦 Beklenen Girişler · ${pending.length}</div>${
+          pending.map(i=>{
             const btn = (i.status==='RECEIVED'||i.status==='IN_STOCK')
               ? `<button class="btn btn-primary btn-sm" onclick="whTransfer('${i.id}')">🏭 Depoya Aktar</button>`
               : `<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">teslim bekleniyor</span>`;
-            return whRow(i, btn);
-          }).join('');
-      }
-      body += `</div>`;
+            return raw(whRow(i, btn));
+          })}`:''}</div>`;
     }
-    return `<div class="pbom-card" style="margin-bottom:12px">
-      <div class="pbom-card-header" onclick="whvToggleProj('${ea(proj)}')" style="cursor:pointer">
+    return h`<div class="pbom-card" style="margin-bottom:12px">
+      <div class="pbom-card-header" onclick="whvToggleProj('${raw(ea(proj))}')" style="cursor:pointer">
         <div>
-          <div class="pbom-card-title">📁 ${esc(proj)}</div>
+          <div class="pbom-card-title">📁 ${proj}</div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
             ${inWh.length?`🏭 ${inWh.length} depoda`:''}${inWh.length&&pending.length?' · ':''}${pending.length?`📦 ${pending.length} beklenen`:''}
           </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center" onclick="event.stopPropagation()">
-          <button class="btn btn-ghost btn-sm" onclick="whvProjectPDF('${ea(proj)}')" title="Proje depo raporu yazdır">🖨 PDF</button>
-          <span style="font-family:var(--font-mono);font-size:14px;color:var(--muted);cursor:pointer" onclick="whvToggleProj('${ea(proj)}')">${open?'▾':'▸'}</span>
+          <button class="btn btn-ghost btn-sm" onclick="whvProjectPDF('${raw(ea(proj))}')" title="Proje depo raporu yazdır">🖨 PDF</button>
+          <span style="font-family:var(--font-mono);font-size:14px;color:var(--muted);cursor:pointer" onclick="whvToggleProj('${raw(ea(proj))}')">${open?'▾':'▸'}</span>
         </div>
       </div>
       ${body}
     </div>`;
-  }).join('');
+  })}`;
 }
 
 function whvToggleProj(proj){
@@ -7665,7 +7660,7 @@ function whvToggleProj(proj){
 // ── Depo bazlı görünüm: seçilen deponun içi proje gruplu + münferit ──
 function whvWarehouseHTML(){
   const whId = document.getElementById('whv-wh-sel')?.value || '';
-  if(!whId) return `<div class="empty-state"><span class="emoji">🗄️</span>Yukarıdan bir depo seçin</div>`;
+  if(!whId) return h`<div class="empty-state"><span class="emoji">🗄️</span>Yukarıdan bir depo seçin</div>`;
 
   const inWh = purchaseItems.filter(i=>i.status==='IN_WAREHOUSE' && i.warehouse_id===whId);
   const projGroups = {};
@@ -7683,33 +7678,29 @@ function whvWarehouseHTML(){
     .sort((a,b)=>a.name.localeCompare(b.name,'tr'));
 
   if(!inWh.length && !loose.length)
-    return `<div class="empty-state"><span class="emoji">🏭</span>Bu depoda malzeme yok</div>`;
+    return h`<div class="empty-state"><span class="emoji">🏭</span>Bu depoda malzeme yok</div>`;
 
-  let html = '';
-  Object.entries(projGroups).sort(([a],[b])=>a.localeCompare(b,'tr')).forEach(([proj,items])=>{
-    html += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:14px 0 6px">📁 ${esc(proj)} · ${items.length} malzeme</div>`
-      + items.map(i=>whRow(i, `<button class="btn btn-ghost btn-sm" onclick="whXferItem('${i.id}')" title="Başka depoya aktar">🔁 Aktar</button>
-          <button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)).join('');
-  });
-  if(loose.length){
-    html += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:14px 0 6px">📦 Münferit (projesiz) · ${loose.length} kalem</div>`
-      + loose.map(r=>{
+  const projSections = Object.entries(projGroups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([proj,items])=>
+    h`<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:14px 0 6px">📁 ${proj} · ${items.length} malzeme</div>${
+      items.map(i=>raw(whRow(i, `<button class="btn btn-ghost btn-sm" onclick="whXferItem('${i.id}')" title="Başka depoya aktar">🔁 Aktar</button>
+          <button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)))}`);
+  const looseSection = loose.length ? h`<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:14px 0 6px">📦 Münferit (projesiz) · ${loose.length} kalem</div>${
+      loose.map(r=>{
         const c = r.net > 0 ? '#2ecc71' : '#e74c3c';
-        return `<div class="pbom-card" style="border-left:3px solid ${c};padding:8px 14px">
+        return h`<div class="pbom-card" style="border-left:3px solid ${c};padding:8px 14px">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between">
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0">
-              ${r.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${esc(r.code)}</span>`:''}
-              <span>${esc(r.name)}</span>
+              ${r.code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${r.code}</span>`:''}
+              <span>${r.name}</span>
             </div>
             <span style="display:flex;gap:8px;align-items:center">
-              <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${esc(r.unit)}</span>
-              ${r.net>0?`<button class="btn btn-ghost btn-sm" onclick="whXferLoose('${whId}','${ea(r.name)}','${ea(r.code||'')}','${ea(r.unit)}',${r.net})" title="Başka depoya aktar">🔁</button>`:''}
+              <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${r.unit}</span>
+              ${r.net>0?h`<button class="btn btn-ghost btn-sm" onclick="whXferLoose('${raw(whId)}','${raw(ea(r.name))}','${raw(ea(r.code||''))}','${raw(ea(r.unit))}',${r.net})" title="Başka depoya aktar">🔁</button>`:''}
             </span>
           </div>
         </div>`;
-      }).join('');
-  }
-  return html;
+      })}` : '';
+  return h`${projSections}${looseSection}`;
 }
 
 // ── Proje depo raporu PDF (🖨) ──
@@ -8920,41 +8911,41 @@ async function renderAppUsers() {
 
   const nonDev = appUsers.filter(u => u.role !== 'developer');
   if (!nonDev.length) {
-    list.innerHTML = `<div class="empty-state"><span class="emoji">🔑</span>Henüz kullanıcı eklenmedi</div>`;
+    list.innerHTML = h`<div class="empty-state"><span class="emoji">🔑</span>Henüz kullanıcı eklenmedi</div>`;
     return;
   }
 
-  list.innerHTML = nonDev.map(u => {
+  list.innerHTML = h`${nonDev.map(u => {
     const perms = Array.isArray(u.permissions) ? u.permissions : JSON.parse(u.permissions||'[]');
     const permBadges = perms.map(p => {
       const labels = {dashboard:'Dashboard',parts:'Parçalar',users:'Personel',stats:'İstatistik',orders:'Siparişler',orders_view:'Siparişler (Görüntüle)',orders_edit:'Siparişler (Düzenle)',planning:'Planlama',scan:'QR Okutma'};
-      return `<span style="background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:2px 8px;font-family:var(--font-mono);font-size:10px;color:var(--accent)">${labels[p]||p}</span>`;
-    }).join('');
+      return h`<span style="background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:2px 8px;font-family:var(--font-mono);font-size:10px;color:var(--accent)">${labels[p]||p}</span>`;
+    });
 
-    return `<div class="appuser-card">
+    return h`<div class="appuser-card">
       <div class="appuser-avatar">${(u.display_name||u.username).charAt(0).toUpperCase()}</div>
       <div style="flex:1">
         <div style="font-weight:600;font-size:14px;margin-bottom:3px">${u.display_name||u.username}
           <span class="appuser-role-badge" style="margin-left:6px">${u.role==='developer'?'Geliştirici':'Kullanıcı'}</span>
-          ${!u.is_active?'<span style="background:rgba(231,76,60,.15);color:var(--red);border:1px solid rgba(231,76,60,.3);border-radius:10px;padding:2px 8px;font-family:var(--font-mono);font-size:10px;margin-left:6px">Pasif</span>':''}
+          ${!u.is_active?raw('<span style="background:rgba(231,76,60,.15);color:var(--red);border:1px solid rgba(231,76,60,.3);border-radius:10px;padding:2px 8px;font-family:var(--font-mono);font-size:10px;margin-left:6px">Pasif</span>'):''}
         </div>
-        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:4px">@${esc(u.username)}</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:4px">@${u.username}</div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
           <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">Şifre:</span>
           <span style="font-family:var(--font-mono);font-size:12px;letter-spacing:2px" title="Şifreler şifrelenmiş (BCrypt) saklanır, görüntülenemez">•••••••• 🔒</span>
         </div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px">${permBadges||'<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">Yetki yok</span>'}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${perms.length?permBadges:raw('<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">Yetki yok</span>')}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px">
-        <button class="btn btn-ghost btn-sm" onclick="editAppUserPerms('${u.id}')">✏️ Yetki</button>
-        <button class="btn btn-ghost btn-sm" onclick="adminChangePassword('${u.id}','${ea(u.display_name||u.username)}')">🔑 Şifre</button>
-        <button class="btn btn-ghost btn-sm" onclick="toggleAppUserActive('${u.id}',${u.is_active})" style="${u.is_active?'color:var(--yellow)':'color:var(--green)'}">
+        <button class="btn btn-ghost btn-sm" onclick="editAppUserPerms('${raw(u.id)}')">✏️ Yetki</button>
+        <button class="btn btn-ghost btn-sm" onclick="adminChangePassword('${raw(u.id)}','${raw(ea(u.display_name||u.username))}')">🔑 Şifre</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleAppUserActive('${raw(u.id)}',${raw(String(!!u.is_active))})" style="${u.is_active?'color:var(--yellow)':'color:var(--green)'}">
           ${u.is_active?'⏸ Pasif Yap':'▶ Aktif Yap'}
         </button>
-        <button class="btn btn-ghost btn-sm" onclick="deleteAppUser('${u.id}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">🗑️</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteAppUser('${raw(u.id)}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">🗑️</button>
       </div>
     </div>`;
-  }).join('');
+  })}`;
 }
 
 function editAppUserPerms(id) {
@@ -8969,7 +8960,7 @@ function editAppUserPerms(id) {
   overlay.id = 'perm-overlay';
   overlay.innerHTML = `<div class="modal" style="width:460px;text-align:left">
     <h3 style="margin-bottom:4px">Yetki Düzenle</h3>
-    <p style="margin-bottom:16px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${u.display_name||u.username} · @${esc(u.username)}</p>
+    <p style="margin-bottom:16px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${esc(u.display_name||u.username)} · @${esc(u.username)}</p>
     <div class="perm-grid" id="edit-perms">
       ${allPerms.map(p => `
         <div class="perm-item ${perms.includes(p)?'checked':''}" data-perm="${p}" onclick="togglePerm(this)">
@@ -9920,30 +9911,31 @@ function renderBomTreeSvg() {
       .sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
     return children.map(p=>{
       const ops = Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
-      const opBadges = ops.map(o=>{ const t=o.duration_per_unit?` ⏱${(o.total_duration||0).toFixed(1)}dk`:""; return `<span style="background:rgba(41,128,185,.15);border:1px solid rgba(41,128,185,.3);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${esc(o.name)}(${esc(o.code)})${t}</span>`; }).join(" ");
+      // h`` parçaları araya boşluk konarak birleşsin diye join(' ') + raw
+      const opBadges = raw(ops.map(o=>{ const t=o.duration_per_unit?` ⏱${(o.total_duration||0).toFixed(1)}dk`:""; return h`<span style="background:rgba(41,128,185,.15);border:1px solid rgba(41,128,185,.3);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${o.name}(${o.code})${t}</span>`; }).join(" "));
       const childrenHtml = buildNode(p.id, level+1);
-      return `<div class="bom-tree-node">
+      return h`<div class="bom-tree-node">
         <div class="bom-tree-item" style="margin-left:${level*4}px">
-          <span style="color:var(--accent);font-weight:700">${esc(p.code)}</span>
-          <span>${esc(p.name)}</span>
-          <span style="color:var(--muted);font-size:10px">${p.quantity} ${esc(p.unit)}</span>
-          ${p.weight_kg?`<span style="color:var(--muted);font-size:10px">⚖${p.weight_kg}kg</span>`:''}
-          ${p.material?`<span style="color:var(--muted);font-size:10px">🔩${esc(p.material)}</span>`:''}
-          ${dimLabel(p.width_mm,p.height_mm,p.thickness_mm)?`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.width_mm,p.height_mm,p.thickness_mm)}</span>`:''}
+          <span style="color:var(--accent);font-weight:700">${p.code}</span>
+          <span>${p.name}</span>
+          <span style="color:var(--muted);font-size:10px">${p.quantity} ${p.unit}</span>
+          ${p.weight_kg?h`<span style="color:var(--muted);font-size:10px">⚖${p.weight_kg}kg</span>`:''}
+          ${p.material?h`<span style="color:var(--muted);font-size:10px">🔩${p.material}</span>`:''}
+          ${dimLabel(p.width_mm,p.height_mm,p.thickness_mm)?h`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.width_mm,p.height_mm,p.thickness_mm)}</span>`:''}
           ${opBadges}
         </div>
-        ${childrenHtml?`<div class="bom-tree-children">${childrenHtml}</div>`:''}
+        ${childrenHtml.length?h`<div class="bom-tree-children">${childrenHtml}</div>`:''}
       </div>`;
-    }).join('');
+    });
   }
 
   const p = _activeBomProduct;
   const rootChildren = buildNode(null, 0);
-  container.innerHTML = `
+  container.innerHTML = h`
     <div class="bom-tree-node">
       <div class="bom-tree-item root">
-        🏭 <span>${p.code?esc(p.code)+' — ':''}${esc(p.name)}</span>
-        <span style="color:var(--muted);font-size:10px">${esc(p.unit)}</span>
+        🏭 <span>${p.code?p.code+' — ':''}${p.name}</span>
+        <span style="color:var(--muted);font-size:10px">${p.unit}</span>
         <span style="color:var(--muted);font-size:10px">${bomParts.length} parça</span>
       </div>
       <div class="bom-tree-children">${rootChildren}</div>
@@ -10002,8 +9994,8 @@ function renderPbomDropdowns() {
   if(prSel) {
     const cur = prSel.value;
     const projNames = [...new Set(orders.map(o=>o.project_name).filter(Boolean))].sort();
-    prSel.innerHTML = '<option value="">— Proje seçin —</option>' +
-      projNames.map(n=>`<option value="${n}">${n}</option>`).join('');
+    prSel.innerHTML = h`<option value="">— Proje seçin —</option>${
+      projNames.map(n=>h`<option value="${n}">${n}</option>`)}`;
     if(projNames.includes(cur)) prSel.value = cur;
   }
   pbomRenderMachineRows();
@@ -10102,26 +10094,25 @@ function renderProjectBomList() {
   if(!el) return;
   renderPbomDropdowns();
   if(!projectBoms.length){
-    el.innerHTML=`<div class="empty-state"><span class="emoji">🔗</span>Henüz proje bağlantısı oluşturulmadı</div>`;
+    el.innerHTML=h`<div class="empty-state"><span class="emoji">🔗</span>Henüz proje bağlantısı oluşturulmadı</div>`;
     return;
   }
   // Kartlar PROJE başlığı altında gruplanır (#1 arkadaş isteği, görsel 100)
   const groups = {};
   projectBoms.forEach(pb=>{ const k=pb.project_name||'—'; (groups[k]=groups[k]||[]).push(pb); });
-  el.innerHTML = Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([proj,list])=>
-    `<div style="font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:20px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px">
-      📁 ${esc(proj)} <span style="color:var(--muted);text-transform:none">· ${list.length} ürün ağacı</span>
-    </div>` +
-    list.map(pb => {
+  el.innerHTML = h`${Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([proj,list])=>
+    h`<div style="font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:20px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px">
+      📁 ${proj} <span style="color:var(--muted);text-transform:none">· ${list.length} ürün ağacı</span>
+    </div>${list.map(pb => {
     const prod = bomProducts.find(p=>p.id===pb.bom_product_id);
     const isPublished = pb.status==='published';
     const pbParts = projectBomParts.filter(p=>p.project_bom_id===pb.id);
     const excCount = pbParts.filter(p=>p.is_excluded).length;
 
-    return `<div class="pbom-card">
+    return h`<div class="pbom-card">
       <div class="pbom-card-header">
         <div>
-          <div class="pbom-card-title">🌳 ${prod?.name||'—'} ${prod?.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">(${esc(prod.code)})</span>`:''}</div>
+          <div class="pbom-card-title">🌳 ${prod?.name||'—'} ${prod?.code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">(${prod.code})</span>`:''}</div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
             ${excCount>0?excCount+' parça hariç tutuldu · ':''}
             ${isPublished?'Yayınlandı: '+new Date(pb.published_at).toLocaleDateString('tr-TR'):'Taslak'}
@@ -10129,14 +10120,14 @@ function renderProjectBomList() {
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <span class="${isPublished?'pbom-status-published':'pbom-status-draft'}">${isPublished?'✅ Yayınlandı':'📝 Taslak'}</span>
-          <button class="btn btn-primary btn-sm" onclick="openAndPublishPbom('${pb.id}')">${isPublished?'🔄 Yeniden Yayınla':'🚀 Yayınla'}</button>
-          <button class="btn btn-ghost btn-sm" onclick="openPbomEditor('${pb.id}')">✏️ Düzenle</button>
-          ${isPublished?`<button class="btn btn-ghost btn-sm" onclick="viewPublishedBom('${pb.id}')" style="color:var(--green);border-color:rgba(46,204,113,.3)">🌳 Ağacı Gör</button>`:''}
-          <button class="btn btn-ghost btn-sm" onclick="deleteProjectBom('${pb.id}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">🗑️</button>
+          <button class="btn btn-primary btn-sm" onclick="openAndPublishPbom('${raw(pb.id)}')">${isPublished?'🔄 Yeniden Yayınla':'🚀 Yayınla'}</button>
+          <button class="btn btn-ghost btn-sm" onclick="openPbomEditor('${raw(pb.id)}')">✏️ Düzenle</button>
+          ${isPublished?h`<button class="btn btn-ghost btn-sm" onclick="viewPublishedBom('${raw(pb.id)}')" style="color:var(--green);border-color:rgba(46,204,113,.3)">🌳 Ağacı Gör</button>`:''}
+          <button class="btn btn-ghost btn-sm" onclick="deleteProjectBom('${raw(pb.id)}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">🗑️</button>
         </div>
       </div>
     </div>`;
-  }).join('')).join('');
+  })}`)}`;
 }
 
 // ─── Proje Ürün Ağacı Düzenleyici (Tam Ekran View) ───
@@ -10369,7 +10360,7 @@ function pbomeRenderList() {
   const el = document.getElementById('pbome-parts-list');
   if(!el) return;
   if(!_pbomeParts.length){
-    el.innerHTML=`<div class="empty-state"><span class="emoji">📦</span>Henüz parça yok. Yukarıdan ekleyin veya ürün ağacından kopyalansın.</div>`;
+    el.innerHTML=h`<div class="empty-state"><span class="emoji">📦</span>Henüz parça yok. Yukarıdan ekleyin veya ürün ağacından kopyalansın.</div>`;
     return;
   }
   function buildTree(parentId,level) {
@@ -10378,11 +10369,11 @@ function pbomeRenderList() {
       .map(p=>{
         const ops=Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
         const dept=p.dept_id?depts.find(d=>d.id===p.dept_id):null;
-        const opsHTML=ops.length?`<div class="bom-ops">${ops.map((o,oi)=>`<span class="bom-op-tag">⚙${esc(o.name)}(${esc(o.code)})${o.duration_per_unit?` ⏱${(o.total_duration||0).toFixed(0)}dk`:''} <button onclick="pbomeRemoveOp('${p.id}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px">✕</button></span>`).join('')}</div>`:''
+        const opsHTML=ops.length?h`<div class="bom-ops">${ops.map((o,oi)=>h`<span class="bom-op-tag">⚙${o.name}(${o.code})${o.duration_per_unit?` ⏱${(o.total_duration||0).toFixed(0)}dk`:''} <button onclick="pbomeRemoveOp('${raw(p.id)}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px">✕</button></span>`)}</div>`:''
         const isFromBom = !!p.bom_part_id;
         const indent = level*24;
         const children = buildTree(p.id,level+1);
-        return `<div class="bom-part-row${p.is_excluded?' excluded':''}" id="pbomep-${p.id}" data-id="${p.id}"
+        return h`<div class="bom-part-row${p.is_excluded?' excluded':''}" id="pbomep-${p.id}" data-id="${p.id}"
           draggable="true"
           ondragstart="pbomeDragStart(event,this)"
           ondragover="pbomeDragOver(event,this)"
@@ -10391,34 +10382,34 @@ function pbomeRenderList() {
           ondragend="pbomeDragEnd()"
           style="margin-left:${indent}px;${isFromBom?'':'border-left:3px solid var(--green)'}">
           <span class="bom-drag-handle">⠿</span>
-          ${level>0?`<span style="color:var(--muted);font-size:10px;margin-right:2px">└─</span>`:''}
-          <span class="bom-part-code" style="${isFromBom?'':'color:var(--green)'}">${esc(p.custom_code)}</span>
+          ${level>0?raw('<span style="color:var(--muted);font-size:10px;margin-right:2px">└─</span>'):''}
+          <span class="bom-part-code" style="${isFromBom?'':'color:var(--green)'}">${p.custom_code}</span>
           <div style="flex:1">
-            <div class="bom-part-name-cell">${esc(p.custom_name)}${isFromBom?'':' ⭐'} ${kindBadge(p.material_kind||p.resolved_material_kind)}</div>
+            <div class="bom-part-name-cell">${p.custom_name}${isFromBom?'':' ⭐'} ${raw(kindBadge(p.material_kind||p.resolved_material_kind))}</div>
             <div class="bom-part-meta">
-              <span>${p.custom_qty||1} ${esc(p.custom_unit||'adet')}</span>
-              ${p.custom_weight?`<span>⚖${p.custom_weight}kg</span>`:''}
-              ${p.custom_material?`<span>🔩${esc(p.custom_material)}</span>`:''}
-              ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?`<span>📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
-              ${dept?`<span style="color:#2980b9">🏭${esc(dept.name)}</span>`:''}
+              <span>${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
+              ${p.custom_weight?h`<span>⚖${p.custom_weight}kg</span>`:''}
+              ${p.custom_material?h`<span>🔩${p.custom_material}</span>`:''}
+              ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?h`<span>📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
+              ${dept?h`<span style="color:#2980b9">🏭${dept.name}</span>`:''}
             </div>
             ${opsHTML}
           </div>
           <div style="display:flex;gap:4px;align-items:center">
-            <select onchange="pbomeSetDept('${p.id}',this.value)"
+            <select onchange="pbomeSetDept('${raw(p.id)}',this.value)"
               style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:4px 6px;outline:none;max-width:130px">
               <option value="">— Bölüm —</option>
-              ${depts.map(d=>`<option value="${d.id}"${d.id===p.dept_id?' selected':''}>${esc(d.name)}</option>`).join('')}
+              ${depts.map(d=>h`<option value="${d.id}"${d.id===p.dept_id?raw(' selected'):''}>${d.name}</option>`)}
             </select>
-            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditPart('${p.id}')" title="Ad / kod / malzeme düzenle">📝</button>
-            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeCopyBranch('${p.id}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">📋</button>
-            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditQty('${p.id}')" title="Miktar düzenle">✏️</button>
-            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px;color:var(--red)" onclick="pbomeDeletePart('${p.id}')" title="Sil">🗑️</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditPart('${raw(p.id)}')" title="Ad / kod / malzeme düzenle">📝</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeCopyBranch('${raw(p.id)}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">📋</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditQty('${raw(p.id)}')" title="Miktar düzenle">✏️</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px;color:var(--red)" onclick="pbomeDeletePart('${raw(p.id)}')" title="Sil">🗑️</button>
           </div>
         </div>${children}`;
-      }).join('');
+      });
   }
-  el.innerHTML = buildTree(null,0);
+  el.innerHTML = h`${buildTree(null,0)}`;
 }
 
 // Bölüm ata
@@ -10684,19 +10675,19 @@ function xlsImportRenderModal(data){
 
 function xlsImportRenderList(){
   const el=document.getElementById('xls-import-list'); if(!el||!_xlsImport) return;
-  el.innerHTML=_xlsImport.rows.map(r=>{
+  el.innerHTML=h`${_xlsImport.rows.map(r=>{
     const dims=dimLabel(r.width_mm,r.height_mm,r.thickness_mm);
     const checked=_xlsImport.checked.has(r.level_no);
-    return `<div style="display:flex;gap:8px;align-items:center;padding:5px 6px;margin-left:${(r.level||0)*22}px;border-left:2px solid ${r.error?'var(--red)':'var(--border)'};${r.error?'opacity:.8':''}">
-      <input type="checkbox" ${checked?'checked':''} ${r.error?'disabled':''} onchange="xlsImportToggle('${r.level_no}',this.checked)">
+    return h`<div style="display:flex;gap:8px;align-items:center;padding:5px 6px;margin-left:${(r.level||0)*22}px;border-left:2px solid ${r.error?'var(--red)':'var(--border)'};${r.error?'opacity:.8':''}">
+      <input type="checkbox" ${checked?raw('checked'):''} ${r.error?raw('disabled'):''} onchange="xlsImportToggle('${raw(ea(r.level_no))}',this.checked)">
       <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);min-width:44px">${r.level_no}</span>
-      <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">${esc(r.code||'—')}</span>
-      <span style="font-size:12px">${esc(r.name||'—')}</span>
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">${r.code||'—'}</span>
+      <span style="font-size:12px">${r.name||'—'}</span>
       <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${r.quantity||1} adet${r.material?' · 🔩'+r.material:''}${dims?' · 📐'+dims:''}</span>
-      ${kindBadge(r.material_kind)}
-      ${r.error?`<span style="font-family:var(--font-mono);font-size:10px;color:var(--red)">⚠ ${r.error}</span>`:''}
+      ${raw(kindBadge(r.material_kind))}
+      ${r.error?h`<span style="font-family:var(--font-mono);font-size:10px;color:var(--red)">⚠ ${r.error}</span>`:''}
     </div>`;
-  }).join('');
+  })}`;
   const btn=document.getElementById('xls-import-apply-btn');
   if(btn) btn.textContent=`➕ Seçilenleri Ekle (${_xlsImport.checked.size})`;
 }
@@ -10764,23 +10755,23 @@ function pbomeShowTree() {
         const dept=p.dept_id?depts.find(d=>d.id===p.dept_id):null;
         const children=buildNode(p.id,level+1);
         const isCustom=!p.bom_part_id;
-        return `<div class="bom-tree-node">
+        return h`<div class="bom-tree-node">
           <div class="bom-tree-item" style="margin-left:${level*4}px${isCustom?';border-color:var(--green)':''}">
-            <span style="color:${isCustom?'var(--green)':'var(--accent)'};font-weight:700">${esc(p.custom_code)}</span>
-            <span>${esc(p.custom_name)}${isCustom?' ⭐':''}</span>
-            <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${esc(p.custom_unit||'adet')}</span>
-            ${p.custom_weight?`<span style="color:var(--muted);font-size:10px">⚖${p.custom_weight}kg</span>`:''}
-            ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
-            ${dept?`<span style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;font-size:10px;color:#2980b9">🏭${esc(dept.name)}</span>`:''}
-            ${ops.map(o=>`<span style="background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.2);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${esc(o.name)}(${esc(o.code)})</span>`).join('')}
+            <span style="color:${isCustom?'var(--green)':'var(--accent)'};font-weight:700">${p.custom_code}</span>
+            <span>${p.custom_name}${isCustom?' ⭐':''}</span>
+            <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
+            ${p.custom_weight?h`<span style="color:var(--muted);font-size:10px">⚖${p.custom_weight}kg</span>`:''}
+            ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?h`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
+            ${dept?h`<span style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;font-size:10px;color:#2980b9">🏭${dept.name}</span>`:''}
+            ${ops.map(o=>h`<span style="background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.2);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${o.name}(${o.code})</span>`)}
           </div>
-          ${children?`<div class="bom-tree-children">${children}</div>`:''}
+          ${children.length?h`<div class="bom-tree-children">${children}</div>`:''}
         </div>`;
-      }).join('');
+      });
   }
   const pb=projectBoms.find(p=>p.id===_activePbomId);
   const prod=bomProducts.find(p=>p.id===pb?.bom_product_id);
-  container.innerHTML=`<div class="bom-tree-node">
+  container.innerHTML=h`<div class="bom-tree-node">
     <div class="bom-tree-item root">🏭 <span>${prod?.code?prod.code+' — ':''}${prod?.name||''}</span>
       <span style="color:var(--muted);font-size:10px">📁 ${pb?.project_name||''}</span>
       <span style="color:var(--muted);font-size:10px">${_pbomeParts.length} parça</span>
@@ -11081,8 +11072,8 @@ function renderPbomCustomParts(pbomId) {
   const parentSel = document.getElementById('pbom-custom-parent');
   if(parentSel) {
     const cur = parentSel.value;
-    parentSel.innerHTML = '<option value="">— Ana seviye —</option>' +
-      customParts.map(p=>`<option value="${p.id}"${p.id===cur?' selected':''}>${'  '.repeat(p.level||0)}${esc(p.custom_code)} — ${esc(p.custom_name)}</option>`).join('');
+    parentSel.innerHTML = h`<option value="">— Ana seviye —</option>${
+      customParts.map(p=>h`<option value="${p.id}"${p.id===cur?raw(' selected'):''}>${'  '.repeat(p.level||0)}${p.custom_code} — ${p.custom_name}</option>`)}`;
   }
 
   if(!customParts.length){ el.innerHTML=''; return; }
@@ -11095,36 +11086,36 @@ function renderPbomCustomParts(pbomId) {
         const ops  = Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
         const indent = level*20;
         const children = buildCustomTree(p.id, level+1);
-        return `<div id="cprow-${p.id}" class="bom-part-row" style="margin-left:${indent}px;background:rgba(46,204,113,.04);border-left:3px solid var(--green)"
+        return h`<div id="cprow-${p.id}" class="bom-part-row" style="margin-left:${indent}px;background:rgba(46,204,113,.04);border-left:3px solid var(--green)"
           draggable="true"
-          ondragstart="cpDragStart(event,'${p.id}','${pbomId}')"
+          ondragstart="cpDragStart(event,'${raw(p.id)}','${raw(pbomId)}')"
           ondragover="cpDragOver(event,this)"
           ondragleave="cpDragLeave(this)"
-          ondrop="cpDrop(event,this,'${p.id}','${pbomId}')"
+          ondrop="cpDrop(event,this,'${raw(p.id)}','${raw(pbomId)}')"
           ondragend="cpDragEnd()">
           <span class="bom-drag-handle" style="color:var(--green)">⠿</span>
-          ${level>0?`<span style="color:var(--muted);font-size:10px;margin-right:2px">└─</span>`:''}
-          <span class="bom-part-code" style="color:var(--green)">${esc(p.custom_code)}</span>
+          ${level>0?raw('<span style="color:var(--muted);font-size:10px;margin-right:2px">└─</span>'):''}
+          <span class="bom-part-code" style="color:var(--green)">${p.custom_code}</span>
           <div style="flex:1">
-            <div class="bom-part-name-cell">${esc(p.custom_name)}</div>
+            <div class="bom-part-name-cell">${p.custom_name}</div>
             <div class="bom-part-meta">
-              <span>${p.custom_qty||1} ${esc(p.custom_unit||'adet')}</span>
-              ${p.custom_weight?`<span>⚖${p.custom_weight}kg</span>`:''}
-              ${p.custom_material?`<span>🔩${esc(p.custom_material)}</span>`:''}
-              ${dept?`<span style="color:#2980b9">🏭${esc(dept.name)}</span>`:''}
-              ${ops.map(o=>`<span class="bom-op-tag">⚙${esc(o.name)}(${esc(o.code)})</span>`).join('')}
+              <span>${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
+              ${p.custom_weight?h`<span>⚖${p.custom_weight}kg</span>`:''}
+              ${p.custom_material?h`<span>🔩${p.custom_material}</span>`:''}
+              ${dept?h`<span style="color:#2980b9">🏭${dept.name}</span>`:''}
+              ${ops.map(o=>h`<span class="bom-op-tag">⚙${o.name}(${o.code})</span>`)}
             </div>
           </div>
           <div style="display:flex;gap:4px;flex-shrink:0">
-            <button class="btn btn-ghost btn-sm" style="padding:3px 7px;font-size:10px" onclick="openPbomCustomEdit('${p.id}','${pbomId}')">✏️</button>
-            <button class="btn btn-ghost btn-sm" style="padding:3px 7px;font-size:10px" onclick="openPbomCustomOp('${p.id}','${pbomId}')">⚙</button>
-            <button class="icon-btn" style="color:var(--red);font-size:11px" onclick="removePbomCustomPart('${p.id}','${pbomId}')">🗑️</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 7px;font-size:10px" onclick="openPbomCustomEdit('${raw(p.id)}','${raw(pbomId)}')">✏️</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 7px;font-size:10px" onclick="openPbomCustomOp('${raw(p.id)}','${raw(pbomId)}')">⚙</button>
+            <button class="icon-btn" style="color:var(--red);font-size:11px" onclick="removePbomCustomPart('${raw(p.id)}','${raw(pbomId)}')">🗑️</button>
           </div>
         </div>${children}`;
-      }).join('');
+      });
   }
 
-  el.innerHTML = `<div style="background:rgba(46,204,113,.04);border-top:1px dashed rgba(46,204,113,.3);padding:8px 0">
+  el.innerHTML = h`<div style="background:rgba(46,204,113,.04);border-top:1px dashed rgba(46,204,113,.3);padding:8px 0">
     <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;color:var(--green);letter-spacing:1px;padding:4px 16px 8px;display:flex;justify-content:space-between">
       <span>⭐ Projeye Özel Parçalar (${customParts.length})</span>
       <span style="color:var(--muted)">← Sol = Aynı seviye | → Sağ = Alt parça yap</span>
@@ -11397,34 +11388,35 @@ async function viewPublishedBom(pbomId) {
         const dept = p.dept_id ? depts.find(d=>d.id===p.dept_id) : null;
         const ops  = Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
         const projectPart = parts.find(x=>x.project===pb.project_name&&x.code===p.custom_code);
-        const partStatus  = projectPart ? statusBadge(projectPart.status) : '';
+        const partStatus  = projectPart ? raw(statusBadge(projectPart.status)) : '';
         const isCustom = !p.bom_part_id;
         const children = buildTreeNode(p.id, level+1);
-        return `<div class="bom-tree-node">
+        return h`<div class="bom-tree-node">
           <div class="bom-tree-item" style="${isCustom?'border-color:var(--green);':''}">
-            <span style="color:${isCustom?'var(--green)':'var(--accent)'};font-weight:700">${esc(p.custom_code)}</span>
-            <span>${esc(p.custom_name)}${isCustom?' ⭐':''}</span>
-            <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${esc(p.custom_unit||'adet')}</span>
-            ${p.custom_weight?`<span style="color:var(--muted);font-size:10px">⚖${p.custom_weight}kg</span>`:''}
-            ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
-            ${dept?`<span style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;font-size:10px;color:#2980b9">🏭${esc(dept.name)}</span>`:''}
-            ${ops.map(o=>`<span style="background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.2);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${esc(o.name)}(${esc(o.code)})</span>`).join('')}
+            <span style="color:${isCustom?'var(--green)':'var(--accent)'};font-weight:700">${p.custom_code}</span>
+            <span>${p.custom_name}${isCustom?' ⭐':''}</span>
+            <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
+            ${p.custom_weight?h`<span style="color:var(--muted);font-size:10px">⚖${p.custom_weight}kg</span>`:''}
+            ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?h`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
+            ${dept?h`<span style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;font-size:10px;color:#2980b9">🏭${dept.name}</span>`:''}
+            ${ops.map(o=>h`<span style="background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.2);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${o.name}(${o.code})</span>`)}
             ${partStatus}
           </div>
-          ${children?`<div class="bom-tree-children">${children}</div>`:''}
+          ${children.length?h`<div class="bom-tree-children">${children}</div>`:''}
         </div>`;
-      }).join('');
+      });
   }
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.id = 'pbom-view-overlay';
-  overlay.innerHTML = `<div class="modal" style="width:min(860px,96vw);height:90vh;text-align:left;display:flex;flex-direction:column">
+  const treeNodes = buildTreeNode(null,0);
+  overlay.innerHTML = h`<div class="modal" style="width:min(860px,96vw);height:90vh;text-align:left;display:flex;flex-direction:column">
     <div style="flex-shrink:0;margin-bottom:14px;display:flex;align-items:flex-start;justify-content:space-between">
       <div>
-        <h3>🌳 ${esc(pb.project_name)} — Proje Ürün Ağacı</h3>
+        <h3>🌳 ${pb.project_name} — Proje Ürün Ağacı</h3>
         <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:4px">
-          ${esc(prod.name)}${prod.code?' ('+prod.code+')':''} · Yayınlandı: ${new Date(pb.published_at).toLocaleDateString('tr-TR')}
+          ${prod.name}${prod.code?' ('+prod.code+')':''} · Yayınlandı: ${new Date(pb.published_at).toLocaleDateString('tr-TR')}
           · ${pbParts.filter(p=>!p.is_excluded).length} parça
         </p>
       </div>
@@ -11433,10 +11425,10 @@ async function viewPublishedBom(pbomId) {
     <div style="overflow-y:auto;flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;min-height:0">
       <div class="bom-tree-node">
         <div class="bom-tree-item root">
-          🏭 <span>${prod.code?esc(prod.code)+' — ':''}${esc(prod.name)}</span>
-          <span style="color:var(--muted);font-size:10px">${esc(pb.project_name)}</span>
+          🏭 <span>${prod.code?prod.code+' — ':''}${prod.name}</span>
+          <span style="color:var(--muted);font-size:10px">${pb.project_name}</span>
         </div>
-        <div class="bom-tree-children">${buildTreeNode(null,0)||'<div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;padding:10px">Parça yok</div>'}</div>
+        <div class="bom-tree-children">${treeNodes.length?treeNodes:raw('<div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;padding:10px">Parça yok</div>')}</div>
       </div>
     </div>
   </div>`;

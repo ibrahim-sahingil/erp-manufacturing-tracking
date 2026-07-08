@@ -341,6 +341,117 @@ chk('woLoad: parça adı/kod/malzeme kaçırıldı', wog.includes("Pa&#39;&lt;im
 chk('woLoad: woTogglePart onclick ea tırnak kaçışı', wog.includes("woTogglePart('p1','Pa\\'"));
 chk('woLoad: satın alma satırı kaçırıldı', wog.includes('Mal&lt;script&gt;') && wog.includes('ad&lt;i&gt;'));
 
+// ── whvProjectHTML / whvWarehouseHTML (depo görünümleri) ──
+global.PUR_STATUS={IN_WAREHOUSE:{icon:'🏭',label:'Depoda',color:'#2ecc71'}, ORDERED:{icon:'📦',label:'Sipariş',color:'#2980b9'}, PLANNED:{icon:'📝',label:'Pl',color:'#f5a623'}};
+global.whName=()=>'Depo<i>';
+global.purchaseItems=[{id:'x1', project_name:"Pj'"+EVIL, status:'IN_WAREHOUSE', warehouse_id:'w1',
+  code:'C<b>', name:'N'+EVIL, quantity:1, unit:'ad', returned_qty:0}];
+global._whvActiveProj="Pj'"+EVIL;
+global.whMovements=[{warehouse_id:'w1', purchase_item_id:null, item_code:'LC<b>', item_name:"Ln'"+EVIL,
+  unit:'kg<i>', movement_type:'IN', quantity:2}];
+eval(grab('whvProjectHTML'));
+eval(grab('whvWarehouseHTML'));
+const wpv=String(whvProjectHTML());
+document.getElementById('whv-wh-sel').value='w1';
+const wwv=String(whvWarehouseHTML());
+console.log('\nwhvProjectHTML / whvWarehouseHTML (depo görünümleri):');
+chk('whvProj: proje başlığı kaçırıldı', wpv.includes("Pj&#39;&lt;img"));
+chk('whvProj: whvToggleProj/PDF onclick ea tırnak kaçışı', wpv.includes("whvToggleProj('Pj\\'") && wpv.includes("whvProjectPDF('Pj\\'"));
+chk('whvProj: whRow + aksiyonlar (raw) korundu', wpv.includes("whXferItem('x1')") && wpv.includes("whUndo('x1')"));
+chk('whvWh: proje grubu / münferit adı kaçırıldı', wwv.includes("Pj&#39;&lt;img") && wwv.includes("Ln&#39;&lt;img") && wwv.includes('LC&lt;b&gt;'));
+chk('whvWh: whXferLoose onclick ea tırnak kaçışı', wwv.includes("whXferLoose('w1','Ln\\'"));
+
+// ── renderAppUsers (uygulama kullanıcıları) ──
+global.loadAppUsers=async()=>{};
+global.appUsers=[{id:'u1', role:'user', username:'usr<b>', display_name:"Dn'"+EVIL,
+  permissions:['scan'], is_active:true}];
+eval(grab('renderAppUsers'));
+await renderAppUsers();
+const au=store['appusers-list']||'';
+console.log('\nrenderAppUsers (uygulama kullanıcıları):');
+chk('appUsers: görünen ad / kullanıcı adı kaçırıldı', au.includes("Dn&#39;&lt;img") && au.includes('@usr&lt;b&gt;'));
+chk('appUsers: adminChangePassword onclick ea tırnak kaçışı', au.includes("adminChangePassword('u1','Dn\\'"));
+chk('appUsers: aktif/pasif toggle boolean bozulmadı', au.includes("toggleAppUserActive('u1',true)"));
+chk('appUsers: yetki rozeti / butonlar (raw) korundu', au.includes('QR Okutma') && au.includes("deleteAppUser('u1')"));
+
+// ── renderBomTreeSvg (ürün ağacı görünümü) ──
+eval(grab('dimLabel'));
+global.bomParts=[{id:'b1', parent_id:null, name:'BN'+EVIL, code:'BC<b>', quantity:1, unit:'ad<i>',
+  material:'M<script>', operations:[{name:'Op<b>', code:'OC<i>', duration_per_unit:null}], sort_order:1}];
+global._activeBomProduct={name:'Prod<b>', code:'P<i>', unit:'ad'};
+eval(grab('renderBomTreeSvg'));
+renderBomTreeSvg();
+const bts=store['bom-tree-container']||'';
+console.log('\nrenderBomTreeSvg (ürün ağacı):');
+chk('bomTree: parça adı/kodu/malzemesi kaçırıldı', bts.includes('BN&lt;img') && bts.includes('BC&lt;b&gt;') && bts.includes('M&lt;script&gt;'));
+chk('bomTree: operasyon adı kaçırıldı', bts.includes('⚙Op&lt;b&gt;(OC&lt;i&gt;)'));
+chk('bomTree: kök ürün adı kaçırıldı', bts.includes('P&lt;i&gt; — Prod&lt;b&gt;'));
+
+// ── renderProjectBomList (proje BOM bağlantıları) ──
+global.orders=[];
+global.pbomRenderMachineRows=()=>{};
+global.projectBoms=[{id:'pb1', project_name:'PBP<b>', bom_product_id:'bp1', status:'published', published_at:'2026-01-01'}];
+global.bomProducts=[{id:'bp1', name:'Ürün'+EVIL, code:'UC<i>'}];
+global.projectBomParts=[];
+eval(grab('renderPbomDropdowns'));
+eval(grab('renderProjectBomList'));
+renderProjectBomList();
+const pbl=store['project-bom-list']||'';
+console.log('\nrenderProjectBomList (proje BOM bağlantıları):');
+chk('pbomList: proje başlığı / ürün adı kaçırıldı', pbl.includes('PBP&lt;b&gt;') && pbl.includes('Ürün&lt;img') && pbl.includes('(UC&lt;i&gt;)'));
+chk('pbomList: butonlar (raw) korundu', pbl.includes("viewPublishedBom('pb1')") && pbl.includes("openPbomEditor('pb1')") && pbl.includes("deleteProjectBom('pb1')"));
+
+// ── pbomeRenderList + pbomeShowTree (proje BOM editörü) ──
+global.kindBadge=()=>'<span class="KB">k</span>';
+global.depts=[{id:'d1', name:'Dept<img>'}];
+global._pbomeParts=[{id:'q1', parent_custom_id:null, custom_code:'QC<b>', custom_name:'QN'+EVIL,
+  custom_qty:1, custom_unit:'ad<i>', custom_material:'QM<script>',
+  operations:[{name:'On<b>', code:'Oc<i>'}], dept_id:'d1', bom_part_id:'x', sort_order:1}];
+global._activePbomId='pb1';
+eval(grab('pbomeRenderList'));
+eval(grab('pbomeShowTree'));
+pbomeRenderList();
+const pel=store['pbome-parts-list']||'';
+console.log('\npbomeRenderList / pbomeShowTree (proje BOM editörü):');
+chk('pbomeList: kod/ad/malzeme/operasyon kaçırıldı', pel.includes('QC&lt;b&gt;') && pel.includes('QN&lt;img') && pel.includes('QM&lt;script&gt;') && pel.includes('⚙On&lt;b&gt;(Oc&lt;i&gt;)'));
+chk('pbomeList: bölüm dropdown/rozeti kaçırıldı', pel.includes('Dept&lt;img&gt;'));
+chk('pbomeList: kindBadge + butonlar (raw) korundu', pel.includes('<span class="KB">k</span>') && pel.includes("pbomeEditQty('q1')") && pel.includes("pbomeSetDept('q1'"));
+pbomeShowTree();
+const pst=store['pbome-tree-container']||'';
+chk('pbomeTree: kod/ad ve proje adı kaçırıldı', pst.includes('QC&lt;b&gt;') && pst.includes('QN&lt;img') && pst.includes('PBP&lt;b&gt;'));
+
+// ── renderPbomCustomParts (projeye özel parçalar) ──
+global.projectBomParts=[{id:'cp1', project_bom_id:'pb1', bom_part_id:null, parent_custom_id:null,
+  custom_code:'CC<b>', custom_name:'CN'+EVIL, custom_qty:1, operations:[], dept_id:null, level:0, sort_order:1}];
+eval(grab('renderPbomCustomParts'));
+renderPbomCustomParts('pb1');
+const cpl=store['pbom-custom-parts-pb1']||'', cps=store['pbom-custom-parent']||'';
+console.log('\nrenderPbomCustomParts (projeye özel parçalar):');
+chk('customParts: kod/ad kaçırıldı (satır + üst parça seçimi)', cpl.includes('CC&lt;b&gt;') && cpl.includes('CN&lt;img') && cps.includes('CC&lt;b&gt; — CN&lt;img'));
+chk('customParts: düzenle/sil butonları (raw) korundu', cpl.includes("openPbomCustomEdit('cp1','pb1')") && cpl.includes("removePbomCustomPart('cp1','pb1')"));
+
+// ── xlsImportRenderList (Excel içe aktarma önizleme) ──
+global._xlsImport={rows:[{level_no:"1.1'", code:'XC<b>', name:'XN'+EVIL, quantity:2,
+  material:'XM<i>', material_kind:null, level:1, error:null}], checked:new Set(["1.1'"])};
+eval(grab('xlsImportRenderList'));
+xlsImportRenderList();
+const xl=store['xls-import-list']||'';
+console.log('\nxlsImportRenderList (Excel önizleme):');
+chk('xlsImport: kod/ad/malzeme kaçırıldı', xl.includes('XC&lt;b&gt;') && xl.includes('XN&lt;img') && xl.includes('XM&lt;i&gt;'));
+chk('xlsImport: onchange ea tırnak kaçışı', xl.includes("xlsImportToggle('1.1\\'"));
+
+// ── viewPublishedBom (yayınlanan ağaç modalı) ──
+global.parts=[];
+global.dbGet=async(t)=> t==='project_bom_parts'
+  ? [{id:'vp1', project_bom_id:'pb1', parent_custom_id:null, is_excluded:false, bom_part_id:'x',
+     custom_code:'VC<b>', custom_name:'VN'+EVIL, custom_qty:1, operations:[], dept_id:null, sort_order:1}] : [];
+_ovl='';
+eval(grab('viewPublishedBom'));
+await viewPublishedBom('pb1');
+console.log('\nviewPublishedBom (yayınlanan ağaç):');
+chk('viewPbom: proje/ürün adı kaçırıldı', _ovl.includes('PBP&lt;b&gt;') && _ovl.includes('Ürün&lt;img'));
+chk('viewPbom: parça kod/ad kaçırıldı', _ovl.includes('VC&lt;b&gt;') && _ovl.includes('VN&lt;img'));
+
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);
 }
