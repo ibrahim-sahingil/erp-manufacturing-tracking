@@ -510,6 +510,7 @@
     <button class="nav-tab" data-tab="delivery" onclick="switchTab('delivery')">🚚 İrsaliye</button>
     <button class="nav-tab" data-tab="planning" onclick="switchTab('planning')">📅 Planlama</button>
     <button class="nav-tab" data-tab="bom" onclick="switchTab('bom')">🌳 Ürün Ağacı</button>
+    <button class="nav-tab" data-tab="docs" onclick="switchTab('docs')">📁 Teknik Resimler</button>
   </div>
   <div style="display:flex;align-items:center;gap:8px">
     <div class="user-badge" id="user-badge" style="display:none">
@@ -1547,6 +1548,35 @@
   </div>
 </div>
 
+<!-- TEKNİK RESİMLER (5. tur #7) -->
+<div class="view" id="view-docs">
+  <div class="section-title">TEKNİK RESİMLER</div>
+  <div class="section-sub">DWG / resim / PDF yükle · Üretim ve Ar-Ge resimleri · Parça kapsamı takibi</div>
+
+  <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap">
+    <div class="form-group" style="margin-bottom:0;min-width:320px"><label>Ürün</label>
+      <div id="docs-product-ss"></div>
+    </div>
+    <button class="btn btn-primary" onclick="docsUpload('URETIM')">⬆ Üretim Resmi Yükle</button>
+    <button class="btn btn-primary" onclick="docsUpload('ARGE')">⬆ Ar-Ge Resmi Yükle</button>
+  </div>
+
+  <div id="docs-content" style="display:none">
+    <div id="docs-coverage" style="margin-bottom:20px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div>
+        <div style="font-family:var(--font-display);font-size:16px;letter-spacing:2px;color:var(--accent);margin-bottom:12px">🏭 ÜRETİM RESİMLERİ</div>
+        <div id="docs-list-URETIM"></div>
+      </div>
+      <div>
+        <div style="font-family:var(--font-display);font-size:16px;letter-spacing:2px;color:var(--accent);margin-bottom:12px">🔬 AR-GE RESİMLERİ</div>
+        <div id="docs-list-ARGE"></div>
+      </div>
+    </div>
+  </div>
+  <div id="docs-empty" class="empty-state"><span class="emoji">📁</span>Ürün seçin — dosyalar ürün ağacına bağlı saklanır.</div>
+</div>
+
 <!-- SCAN -->
 <div class="view" id="view-scan">
   <div id="scan-view"><div id="scan-content"></div></div>
@@ -1616,6 +1646,7 @@ const TABLE_ENDPOINTS = {
   delivery_note_items: 'delivery-note-items',
   suppliers: 'suppliers',
   materials: 'materials',
+  bom_documents: 'bom-documents',
   stock_sheets: 'stock-sheets'
 };
 
@@ -5928,6 +5959,7 @@ async function switchTab(tab) {
   if(tab==='delivery')  renderDelivery();
   if(tab==='planning')  renderPlanning();
   if(tab==='bom')       initBom();
+  if(tab==='docs')      initDocs();
   if(tab==='appusers')  renderAppUsers();
 }
 
@@ -9484,6 +9516,261 @@ async function matDelete(id){
   toast('Malzeme silindi.','success');
 }
 
+// ═══ TEKNİK RESİMLER (5. tur arkadaş isteği #7 — EN KRİTİK ÖZELLİK) ═══
+// Ürün ağacına dosya (DWG/resim/PDF, 50MB'a kadar) bağlanır; içerik DB'de
+// bytea (günlük pg_dump yedeğine otomatik girer). İki kategori: ÜRETİM /
+// AR-GE. Her dosyaya kapsadığı parçalar bağlanır; ağaçta bağlı parçaların
+// adı YEŞİL görünür. Kural: her yarı mamul + mamulün en az bir ÜRETİM
+// resmi olmalı — eksikler kapsam panelinde listelenir.
+let _docsProduct = null;   // Teknik Resimler sekmesinde seçili ürün
+let bomDocs      = [];     // seçili ürünün doküman meta'ları (data YOK)
+let _docsParts   = [];     // seçili ürünün parçaları (bağ listesi + kapsam)
+let _docPartIds  = new Set(); // AKTİF BOM ürününde dokümana bağlı parçalar (yeşil ad)
+
+async function initDocs(){
+  if(!bomProducts.length){
+    const d = await dbGet('bom_products','order=created_at.desc');
+    bomProducts = Array.isArray(d)?d:[];
+  }
+  searchSelect('docs-product', {
+    items: bomProducts.map(p=>({value:p.id, label:p.name+(p.code?' ('+p.code+')':'')})),
+    placeholder:'— Ürün seçin (yazarak arayın) —', onChange: docsProductChanged
+  });
+  if(_docsProduct) ssSet('docs-product', _docsProduct, {silent:true});
+  await docsProductChanged();
+}
+
+async function docsProductChanged(){
+  _docsProduct = document.getElementById('docs-product')?.value||null;
+  const content = document.getElementById('docs-content');
+  const empty   = document.getElementById('docs-empty');
+  if(!_docsProduct){ if(content) content.style.display='none'; if(empty) empty.style.display=''; return; }
+  if(content) content.style.display='block';
+  if(empty) empty.style.display='none';
+  await docsLoad();
+}
+
+async function docsLoad(){
+  let docs=[], parts=[];
+  try{
+    [docs, parts] = await Promise.all([
+      apiFetch('/bom-documents?product_id='+_docsProduct),
+      apiFetch('/bom-parts/by-product/'+_docsProduct)
+    ]);
+  }catch(e){ toast('Dosyalar yüklenemedi: '+e.message,'error'); }
+  bomDocs    = Array.isArray(docs)?docs:[];
+  _docsParts = Array.isArray(parts)?parts:[];
+  renderDocs();
+}
+
+function fmtBytes(n){
+  n = +n||0;
+  if(n>=1048576) return (n/1048576).toFixed(1)+' MB';
+  if(n>=1024) return (n/1024).toFixed(0)+' KB';
+  return n+' B';
+}
+
+function renderDocs(){
+  const partById = new Map(_docsParts.map(p=>[p.id,p]));
+  ['URETIM','ARGE'].forEach(cat=>{
+    const el = document.getElementById('docs-list-'+cat);
+    if(!el) return;
+    const list = bomDocs.filter(d=>d.category===cat);
+    if(!list.length){
+      el.innerHTML = h`<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:20px;text-align:center;border:1px dashed var(--border);border-radius:8px">Henüz dosya yok — yukarıdan yükleyin.</div>`;
+      return;
+    }
+    el.innerHTML = h`${list.map(d=>{
+      const linked = (d.part_ids||[]).map(pid=>partById.get(pid)).filter(Boolean);
+      return h`<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="min-width:0">
+            <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;word-break:break-all">📄 ${d.filename}</div>
+            <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">
+              ${fmtBytes(d.size_bytes)} · ${(d.created_at||'').slice(0,10)}${d.uploaded_by?' · '+d.uploaded_by:''}
+            </div>
+          </div>
+          <div style="display:flex;gap:4px;flex-shrink:0">
+            <button class="btn btn-ghost btn-sm" onclick="docsDownload('${raw(d.id)}')" title="İndir">📥</button>
+            <button class="btn btn-ghost btn-sm" onclick="docsEditParts('${raw(d.id)}')" title="Kapsadığı parçaları / kategoriyi düzenle">🧩 Parçalar</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="docsDelete('${raw(d.id)}')" title="Sil">🗑</button>
+          </div>
+        </div>
+        ${linked.length?h`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px">${linked.map(p=>h`
+          <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:8px;border:1px solid rgba(46,204,113,.35);color:var(--green);background:rgba(46,204,113,.08)">${p.code} — ${p.name}</span>`)}</div>`
+        :h`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:8px">Parça bağlanmamış — 🧩 Parçalar ile bağlayın.</div>`}
+      </div>`;
+    })}`;
+  });
+  renderDocsCoverage();
+}
+
+// Kapsam paneli: her YARI_MAMUL + MAMUL parçanın en az bir ÜRETİM resmi olmalı
+function renderDocsCoverage(){
+  const el = document.getElementById('docs-coverage');
+  if(!el) return;
+  const covered = new Set();
+  bomDocs.filter(d=>d.category==='URETIM').forEach(d=>(d.part_ids||[]).forEach(id=>covered.add(id)));
+  const need = _docsParts.filter(p=>p.material_kind==='YARI_MAMUL'||p.material_kind==='MAMUL');
+  if(!need.length){ el.innerHTML=''; return; }
+  const missing = need.filter(p=>!covered.has(p.id));
+  el.innerHTML = missing.length
+    ? h`<div style="background:rgba(231,76,60,.07);border:1px solid rgba(231,76,60,.3);border-radius:8px;padding:12px 16px;font-family:var(--font-mono);font-size:12px">
+        <div style="color:var(--red);font-weight:700;margin-bottom:6px">⚠ Üretim resmi OLMAYAN yarı mamul / mamul parçalar: ${missing.length} / ${need.length}</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">${missing.map(p=>h`
+          <span style="font-size:10px;padding:2px 8px;border-radius:8px;border:1px solid rgba(231,76,60,.35);color:var(--red);background:rgba(231,76,60,.06)">${p.code} — ${p.name}</span>`)}</div>
+      </div>`
+    : h`<div style="background:rgba(46,204,113,.07);border:1px solid rgba(46,204,113,.3);border-radius:8px;padding:12px 16px;font-family:var(--font-mono);font-size:12px;color:var(--green)">✅ Tüm yarı mamul ve mamul parçaların (${need.length}) üretim resmi bağlı.</div>`;
+}
+
+// ─── Parça seçim listesi (yükleme + düzenleme modallarında ortak) ───
+function docsPartRowsHTML(selectedIds){
+  const sel = selectedIds||new Set();
+  const kids = pid=>_docsParts.filter(p=>(p.parent_id||null)===(pid||null)).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+  const out=[];
+  const walk=(pid,lv)=>kids(pid).forEach(p=>{ out.push({p,lv}); walk(p.id,lv+1); });
+  walk(null,0);
+  return h`<input type="text" placeholder="Parça ara..." oninput="docsPartFilter(this.value)" style="${raw(INP('8px 10px','12px'))};margin-bottom:8px">
+    <div style="max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:6px;padding:6px">
+    ${out.map(({p,lv})=>h`<label class="docs-part-row" data-search="${(p.code+' '+p.name).toLowerCase()}" style="display:flex;gap:8px;align-items:center;cursor:pointer;padding:3px 4px;margin-left:${lv*18}px;font-family:var(--font-mono);font-size:11px">
+      <input type="checkbox" class="docs-part-chk" data-id="${raw(p.id)}" ${sel.has(p.id)?raw('checked'):''}>
+      <span style="color:var(--accent)">${p.code}</span><span>${p.name}</span>${raw(kindBadge(p.material_kind))}
+    </label>`)}
+    ${!out.length?h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:10px">Bu üründe parça yok.</div>`:''}
+  </div>`;
+}
+function docsPartFilter(q){
+  const ql=(q||'').toLowerCase();
+  document.querySelectorAll('.docs-part-row').forEach(r=>{
+    r.style.display = !ql||r.dataset.search.includes(ql) ? 'flex' : 'none';
+  });
+}
+
+// ─── Yükleme ───
+function docsUpload(cat){
+  if(!_docsProduct){ toast('Önce ürün seçin!','error'); return; }
+  document.getElementById('docs-upload-overlay')?.remove();
+  const ov=document.createElement('div');
+  ov.className='modal-overlay open'; ov.id='docs-upload-overlay';
+  ov.innerHTML = h`<div class="modal" style="width:560px;max-width:95vw;text-align:left;max-height:90vh;display:flex;flex-direction:column">
+    <h3 style="margin-bottom:4px">⬆ ${cat==='URETIM'?'Üretim':'Ar-Ge'} Resmi Yükle</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px">DWG, resim, PDF... (en fazla 50MB). Birden çok dosya seçilebilir; seçilen parçalar hepsine bağlanır.</p>
+    <input type="file" id="docs-file" multiple style="margin-bottom:12px;font-family:var(--font-mono);font-size:12px">
+    <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:6px">Kapsadığı Parçalar</div>
+    <div style="overflow:auto;flex:1">${raw(docsPartRowsHTML())}</div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost" onclick="document.getElementById('docs-upload-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" id="docs-upload-btn" onclick="docsUploadDo('${raw(cat)}')">⬆ Yükle</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+async function docsUploadDo(cat){
+  const inp=document.getElementById('docs-file');
+  const files=[...(inp?.files||[])];
+  if(!files.length){ toast('Dosya seçin!','error'); return; }
+  const ids=[...document.querySelectorAll('#docs-upload-overlay .docs-part-chk:checked')].map(c=>c.dataset.id);
+  const btn=document.getElementById('docs-upload-btn');
+  btn.disabled=true;
+  let ok=0, fail=0, failMsg='';
+  for(let i=0;i<files.length;i++){
+    btn.textContent=`Yükleniyor... (${i+1}/${files.length})`;
+    const fd=new FormData();
+    fd.append('file', files[i]);
+    fd.append('product_id', _docsProduct);
+    fd.append('category', cat);
+    if(ids.length) fd.append('part_ids', ids.join(','));
+    fd.append('uploaded_by', currentUser?.display_name||currentUser?.username||'');
+    try{
+      // apiFetch kullanılamaz: multipart boundary'yi tarayıcı kendisi koymalı
+      const r=await fetch(API_BASE_URL+'/bom-documents',{method:'POST',headers:authToken?{Authorization:'Bearer '+authToken}:{},body:fd});
+      if(r.status===401||r.status===403){ if(authToken) handleUnauthorized(); return; }
+      const body=await r.json().catch(()=>null);
+      if(!r.ok||(body&&body.success===false)){ fail++; failMsg=(body&&body.message)||('HTTP '+r.status); continue; }
+      ok++;
+    }catch(e){ fail++; failMsg=e.message; }
+  }
+  document.getElementById('docs-upload-overlay')?.remove();
+  await docsLoad();
+  if(_activeBomProduct && _activeBomProduct.id===_docsProduct) await refreshDocPartIds(); // ağaçtaki yeşil adlar tazelensin
+  toast(fail?`⚠ ${ok} dosya yüklendi, ${fail} başarısız: ${failMsg}`:`✅ ${ok} dosya yüklendi`, fail?'error':'success');
+}
+
+// ─── İndir (JWT header gerektiğinden <a href> yerine blob) ───
+async function docsDownload(docId){
+  const d=bomDocs.find(x=>x.id===docId);
+  try{
+    const r=await fetch(API_BASE_URL+'/bom-documents/'+docId+'/download',{headers:authToken?{Authorization:'Bearer '+authToken}:{}});
+    if(r.status===401||r.status===403){ if(authToken) handleUnauthorized(); return; }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const blob=await r.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=(d&&d.filename)||'dosya'; a.click();
+    URL.revokeObjectURL(url);
+  }catch(e){ toast('İndirilemedi: '+e.message,'error'); }
+}
+
+// ─── Parça bağları + kategori düzenleme ───
+function docsEditParts(docId){
+  const d=bomDocs.find(x=>x.id===docId);
+  if(!d) return;
+  document.getElementById('docs-edit-overlay')?.remove();
+  const ov=document.createElement('div');
+  ov.className='modal-overlay open'; ov.id='docs-edit-overlay';
+  ov.innerHTML = h`<div class="modal" style="width:560px;max-width:95vw;text-align:left;max-height:90vh;display:flex;flex-direction:column">
+    <h3 style="margin-bottom:4px">🧩 ${d.filename}</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px">Dosyanın kapsadığı parçaları işaretleyin.</p>
+    <div class="form-group" style="margin-bottom:12px"><label>Kategori</label>
+      <select id="docs-edit-cat" style="${raw(INP())}">
+        <option value="URETIM" ${d.category==='URETIM'?raw('selected'):''}>Üretim Resmi</option>
+        <option value="ARGE" ${d.category==='ARGE'?raw('selected'):''}>Ar-Ge Resmi</option>
+      </select>
+    </div>
+    <div style="overflow:auto;flex:1">${raw(docsPartRowsHTML(new Set(d.part_ids||[])))}</div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost" onclick="document.getElementById('docs-edit-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" onclick="docsSaveParts('${raw(docId)}')">💾 Kaydet</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+async function docsSaveParts(docId){
+  const ids=[...document.querySelectorAll('#docs-edit-overlay .docs-part-chk:checked')].map(c=>c.dataset.id);
+  const cat=document.getElementById('docs-edit-cat').value;
+  const ok=await dbUpdate('bom_documents', docId, {part_ids:ids, category:cat});
+  if(!ok) return;
+  const d=bomDocs.find(x=>x.id===docId);
+  if(d){ d.part_ids=ids; d.category=cat; }
+  document.getElementById('docs-edit-overlay')?.remove();
+  renderDocs();
+  if(_activeBomProduct && _activeBomProduct.id===_docsProduct) await refreshDocPartIds();
+  toast('Parça bağları güncellendi.','success');
+}
+
+async function docsDelete(docId){
+  const d=bomDocs.find(x=>x.id===docId);
+  if(!d) return;
+  if(!confirm(`"${d.filename}" silinsin mi?\n\nDosya içeriği veritabanından kalıcı olarak silinir.`)) return;
+  await dbDelete('bom_documents', docId);
+  bomDocs=bomDocs.filter(x=>x.id!==docId);
+  renderDocs();
+  if(_activeBomProduct && _activeBomProduct.id===_docsProduct) await refreshDocPartIds();
+  toast('Dosya silindi.','success');
+}
+
+// Aktif BOM ürününün dokümana bağlı parça id'leri — ağaç/listede yeşil ad (madde #7)
+async function refreshDocPartIds(){
+  _docPartIds = new Set();
+  if(!_activeBomProduct) return;
+  try{
+    const docs = await apiFetch('/bom-documents?product_id='+_activeBomProduct.id) || [];
+    docs.forEach(d=>(d.part_ids||[]).forEach(id=>_docPartIds.add(id)));
+  }catch(e){ /* meta çekilemezse yeşil vurgusuz devam */ }
+}
+
 // ═══ ÜRÜN AĞACI (BOM) ═══
 let bomProducts = [];
 let bomParts    = [];
@@ -9706,6 +9993,7 @@ async function loadBomParts() {
   if(!_activeBomProduct) return;
   const data = await dbGet('bom_parts','product_id=eq.'+_activeBomProduct.id+'&order=sort_order.asc,created_at.asc');
   bomParts = Array.isArray(data) ? data : [];
+  await refreshDocPartIds(); // teknik resmi olan parçalar yeşil gösterilsin (5. tur #7)
 }
 
 // ─── Ürün Ekle ───
@@ -10191,7 +10479,7 @@ function renderBomList() {
       ${level>0?raw(`<span style="color:var(--muted);font-size:10px;margin-right:4px">${'└─'.repeat(1)}</span>`):''}
       <span class="bom-part-code">${part.code}</span>
       <div style="flex:1">
-        <div class="bom-part-name-cell">${part.name} ${raw(kindBadge(part.material_kind))}</div>
+        <div class="bom-part-name-cell"${_docPartIds.has(part.id)?raw(' style="color:var(--green)" title="Teknik resmi var"'):''}>${part.name} ${_docPartIds.has(part.id)?raw('📎 '):''}${raw(kindBadge(part.material_kind))}</div>
         <div class="bom-part-meta">
           <span id="bom-qty-display-${raw(part.id)}" style="cursor:pointer;border-bottom:1px dashed var(--muted)" onclick="editBomQty('${raw(part.id)}')" title="Miktarı düzenle">${part.quantity} ${part.unit}</span>
           ${isCollapsed&&kids?h`<span style="color:var(--accent);cursor:pointer" onclick="bomToggle('${raw(part.id)}')">▸ ${kids} alt parça gizli</span>`:''}
@@ -10525,7 +10813,7 @@ function renderBomTreeSvg() {
         <div class="bom-tree-item" style="margin-left:${level*4}px">
           ${hasKids?h`<span onclick="bomToggle('${raw(p.id)}')" title="${isCollapsed?'Dalı aç':'Dalı kapat'}" style="cursor:pointer;color:var(--accent)">${isCollapsed?'▸':'▾'}</span>`:''}
           <span style="color:var(--accent);font-weight:700">${p.code}</span>
-          <span>${p.name}</span>
+          <span${_docPartIds.has(p.id)?raw(' style="color:var(--green)" title="Teknik resmi var"'):''}>${p.name}${_docPartIds.has(p.id)?' 📎':''}</span>
           ${isCollapsed&&hasKids?h`<span style="color:var(--muted);font-size:10px;cursor:pointer" onclick="bomToggle('${raw(p.id)}')">(gizli dal)</span>`:''}
           <span style="color:var(--muted);font-size:10px">${p.quantity} ${p.unit}</span>
           ${p.weight_kg?h`<span style="color:var(--muted);font-size:10px">⚖${p.weight_kg}kg</span>`:''}

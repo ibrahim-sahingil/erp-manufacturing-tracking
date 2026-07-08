@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 4af97ih5bTroTBdN2zOkknyj0W1md1MXhzfxKRs8uobIwmo5iLG1hzwSKZbvHq5
+\restrict y5vvU6bapOoyhpA571YGQBnrnKElaisQMliQmmWznH66mARuFWBkBOlA9fcaZsS
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -36,6 +36,34 @@ COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UU
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: bom_document_parts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.bom_document_parts (
+    document_id uuid NOT NULL,
+    bom_part_id uuid NOT NULL
+);
+
+
+--
+-- Name: bom_documents; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.bom_documents (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    product_id uuid NOT NULL,
+    category character varying(20) NOT NULL,
+    filename character varying(255) NOT NULL,
+    content_type character varying(100),
+    size_bytes bigint NOT NULL,
+    data bytea NOT NULL,
+    uploaded_by character varying(150),
+    created_at timestamp without time zone DEFAULT now(),
+    CONSTRAINT bom_documents_category_chk CHECK (((category)::text = ANY ((ARRAY['URETIM'::character varying, 'ARGE'::character varying])::text[])))
+);
+
 
 --
 -- Name: bom_operations; Type: TABLE; Schema: public; Owner: -
@@ -574,6 +602,22 @@ CREATE TABLE public.workspaces (
 
 
 --
+-- Name: bom_document_parts bom_document_parts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bom_document_parts
+    ADD CONSTRAINT bom_document_parts_pkey PRIMARY KEY (document_id, bom_part_id);
+
+
+--
+-- Name: bom_documents bom_documents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bom_documents
+    ADD CONSTRAINT bom_documents_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: bom_operations bom_operations_code_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -862,6 +906,20 @@ ALTER TABLE ONLY public.workspaces
 
 
 --
+-- Name: idx_bom_document_parts_part; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_bom_document_parts_part ON public.bom_document_parts USING btree (bom_part_id);
+
+
+--
+-- Name: idx_bom_documents_product; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_bom_documents_product ON public.bom_documents USING btree (product_id);
+
+
+--
 -- Name: idx_bom_parts_parent_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1083,6 +1141,30 @@ CREATE UNIQUE INDEX parts_order_code_ci_key ON public.parts USING btree (order_i
 --
 
 CREATE UNIQUE INDEX suppliers_name_lower_uq ON public.suppliers USING btree (lower((name)::text));
+
+
+--
+-- Name: bom_document_parts bom_document_parts_doc_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bom_document_parts
+    ADD CONSTRAINT bom_document_parts_doc_fk FOREIGN KEY (document_id) REFERENCES public.bom_documents(id) ON DELETE CASCADE;
+
+
+--
+-- Name: bom_document_parts bom_document_parts_part_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bom_document_parts
+    ADD CONSTRAINT bom_document_parts_part_fk FOREIGN KEY (bom_part_id) REFERENCES public.bom_parts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: bom_documents bom_documents_product_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bom_documents
+    ADD CONSTRAINT bom_documents_product_fk FOREIGN KEY (product_id) REFERENCES public.bom_products(id) ON DELETE CASCADE;
 
 
 --
@@ -1425,5 +1507,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4af97ih5bTroTBdN2zOkknyj0W1md1MXhzfxKRs8uobIwmo5iLG1hzwSKZbvHq5
+\unrestrict y5vvU6bapOoyhpA571YGQBnrnKElaisQMliQmmWznH66mARuFWBkBOlA9fcaZsS
 

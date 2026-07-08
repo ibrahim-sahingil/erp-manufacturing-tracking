@@ -391,6 +391,8 @@ eval(grab('pbomeDimLabel'));
 // 5. tur #6: dal aç/kapa set'leri (index.html'de const olarak tanımlı)
 global._bomCollapsed=new Set();
 global._pbomeCollapsed=new Set();
+// 5. tur #7: teknik resmi olan parçalar (ağaçta yeşil ad)
+global._docPartIds=new Set();
 global.bomParts=[{id:'b1', parent_id:null, name:'BN'+EVIL, code:'BC<b>', quantity:1, unit:'ad<i>',
   material:'M<script>', operations:[{name:'Op<b>', code:'OC<i>', duration_per_unit:null}], sort_order:1}];
 global._activeBomProduct={name:'Prod<b>', code:'P<i>', unit:'ad'};
@@ -467,6 +469,25 @@ await viewPublishedBom('pb1');
 console.log('\nviewPublishedBom (yayınlanan ağaç):');
 chk('viewPbom: proje/ürün adı kaçırıldı', _ovl.includes('PBP&lt;b&gt;') && _ovl.includes('Ürün&lt;img'));
 chk('viewPbom: parça kod/ad kaçırıldı', _ovl.includes('VC&lt;b&gt;') && _ovl.includes('VN&lt;img'));
+
+// ── renderDocs + docsPartRowsHTML (teknik resimler — 5. tur #7) ──
+global._docsParts=[{id:'p1', parent_id:null, code:'DC<b>', name:'Parça'+EVIL, material_kind:'YARI_MAMUL', sort_order:1},
+                   {id:'p2', parent_id:null, code:'DK<i>', name:'Eksik<b>', material_kind:'MAMUL', sort_order:2}];
+global.bomDocs=[{id:'d1', category:'URETIM', filename:'çizim'+EVIL+'.dwg', size_bytes:1048576,
+                 created_at:'2026-07-08T10:00', uploaded_by:'Yükleyen<b>', part_ids:['p1']}];
+eval(grab('fmtBytes'));
+eval(grab('renderDocsCoverage'));
+eval(grab('renderDocs'));
+renderDocs();
+const dcl=store['docs-list-URETIM']||'', dcv=store['docs-coverage']||'';
+console.log('\nrenderDocs (teknik resimler):');
+chk('docs: dosya adı onerror kaçırıldı', dcl.includes('çizim&lt;img') && !dcl.includes('çizim'+EVIL));
+chk('docs: yükleyen + bağlı parça kaçırıldı', dcl.includes('Yükleyen&lt;b&gt;') && dcl.includes('Parça&lt;img'));
+chk('docs: butonlar (raw) korundu', dcl.includes("docsDownload('d1')") && dcl.includes("docsDelete('d1')"));
+chk('docs: kapsam paneli eksik parçayı kaçırarak listeledi', dcv.includes('Eksik&lt;b&gt;') && dcv.includes('1 / 2'));
+eval(grab('docsPartRowsHTML'));
+const dpr=String(docsPartRowsHTML(new Set(['p1'])));
+chk('docs: parça seçim listesi kaçırıldı + checkbox (raw) korundu', dpr.includes('Parça&lt;img') && dpr.includes('data-id="p1" checked'));
 
 // ── bomCodeLookup klon paneli (5. tur #3: kod akıllı doldurma) ──
 global._codeMatch={bom:null,pbome:null};

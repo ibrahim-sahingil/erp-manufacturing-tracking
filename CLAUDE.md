@@ -40,6 +40,9 @@ ikinci kişi fikir/test notu sağlar, geliştirme yapmaz.
   yerine `Unregister`+`Register` ile temiz kur.
 - DBeaver'da toplu DELETE/TRUNCATE öncesi mutlaka yedek al (WAL wal_level=replica,
   arşiv yok — kurtarma zor).
+- NOT (2026-07-08): Teknik resimler (bom_documents.data bytea, 50MB/dosya)
+  DB'de saklanır — dump boyutu dosyalarla birlikte büyür; pg_dump -Fc
+  sıkıştırması var ama disk alanını ara ara kontrol et.
 
 ## Mimari
 
