@@ -22,7 +22,10 @@ global._hval = v => (v==null||v===false||v===true)?'':(v&&v.__html)?v.toString()
 global.h = (strings,...vals)=>{ let out=strings[0]; for(let i=0;i<vals.length;i++) out+=_hval(vals[i])+strings[i+1]; return raw(out); };
 
 const store={};
-global.document={ getElementById:id=>({ set innerHTML(v){store[id]=String(v);}, get innerHTML(){return store[id]||'';}, value:'', addEventListener(){}, style:{} }) };
+// Elementler id başına önbelleklenir ki test .value atayabilsin (stat-start vb.)
+const els={};
+global.window = global;
+global.document={ getElementById:id=> els[id] || (els[id]={ value:'', addEventListener(){}, style:{}, textContent:'', scrollIntoView(){}, classList:{add(){},remove(){}}, set innerHTML(v){store[id]=String(v);}, get innerHTML(){return store[id]||'';} }) };
 global.parts=[];
 const EVIL='<img src=x onerror=alert(1)>';
 
@@ -211,6 +214,132 @@ renderDnDetail();
 const dd=store['dn-detail']||'';
 chk('dn-detail: kalem kod/ad/not kaçırıldı', dd.includes('K&lt;img') && dd.includes('Ad&lt;img') && dd.includes('Not&lt;img'));
 chk('dn-detail: kalem sil butonu (raw) korundu', dd.includes("dnDeleteItem('di1')"));
+
+// ── deptWoStripHTML (bölüm dashboard'ı iş emri şeridi) ──
+global.WO_COLORS={planned:'#f5a623', inprogress:'#2980b9'};
+global.WO_STATUS={planned:{lbl:'Planlı'}, inprogress:{lbl:'Devam'}};
+global._activeProject='Prj<b>';
+global.workOrders=[{id:'w1', project_name:'Prj<b>', department_id:'d1', status:'planned',
+  assigned_user:'Kişi'+EVIL, workspace_name:'WS<script>', notes:'WNot'+EVIL, start_datetime:null}];
+global.workOrderParts=[{work_order_id:'w1', part_id:'p1'}];
+global.parts=[{id:'p1', name:'PAd'+EVIL, code:'PK<b>', drawing:"Çiz'im", status:'pending', qty:5, qty_done:1, qty_reject:0}];
+global.partWaitingChildren=()=>[];
+global.statusBadge=()=>'<span class="badge">x</span>';
+global._dashWoOpen=new Set(['w1']);
+eval(grab('woWaitingChildren'));
+eval(grab('woStartBlockMsg'));
+eval(grab('deptWoStripHTML'));
+const dws=String(deptWoStripHTML('d1'));
+console.log('\ndeptWoStripHTML (bölüm iş emri şeridi):');
+chk('deptWo: personel/alan/not kaçırıldı', dws.includes('Kişi&lt;img') && dws.includes('WS&lt;script&gt;') && dws.includes('WNot&lt;img'));
+chk('deptWo: parça adı (başlık + tablo) kaçırıldı', dws.includes('PAd&lt;img') && dws.includes('PK&lt;b&gt;'));
+chk('deptWo: showQR onclick ea tırnak kaçışı bozulmadı', dws.includes("showQR('p1'") && dws.includes("Çiz\\'im"));
+chk('deptWo: durum butonu / statusBadge (raw) korundu', dws.includes("dashWoSetStatus('w1','inprogress')") && dws.includes('<span class="badge">x</span>'));
+
+// ── renderProjectCards (proje kartları) ──
+global.parts=[{project:"Prj'"+EVIL, status:'pending', qty:2, qty_done:0, qty_reject:0, created_at:'2026-01-01'}];
+global.isPartAwaitingPlanning=()=>false;
+global.isPinned=()=>false;
+eval(grab('woBadgeCounts'));
+eval(grab('renderProjectCards'));
+renderProjectCards();
+const pc=store['layer-projects']||'';
+console.log('\nrenderProjectCards (proje kartları):');
+chk('projectCards: proje adı kaçırıldı', pc.includes("Prj&#39;&lt;img") && !pc.includes('class="project-card-name">Prj\''));
+chk('projectCards: openProject onclick ea tırnak kaçışı', pc.includes("openProject('Prj\\'"));
+chk('projectCards: kart yapısı (raw) korundu', pc.includes('project-mini-bars') && pc.includes('togglePin('));
+
+// ── renderParts / updatePartsFilters / renderPartsFiltered (parça listesi) ──
+global.orders=[{project_name:'OP<b>&'}];
+global.depts=[{id:'d1', project:'OP<b>&', name:'Kaynak<img>'}];
+global.parts=[{name:'PN<b>', code:'pc1', project:'Pr<j>', department:'Dep<t>', department_id:'d1'}];
+global.partRowHTML=(p)=>'<div class="PRH">'+esc(p.name)+'</div>';
+eval(grab('renderParts'));
+eval(grab('updatePartsFilters'));
+eval(grab('renderPartsFiltered'));
+renderParts();
+console.log('\nrenderParts / renderPartsFiltered (parça listesi):');
+chk('parts: sipariş dropdown option kaçırıldı', (store['f-project']||'').includes('<option value="OP&lt;b&gt;&amp;"') && (store['d-project']||'').includes('OP&lt;b&gt;&amp;'));
+chk('parts: bölüm filtre option kaçırıldı', (store['parts-dept-filter']||'').includes('Kaynak&lt;img&gt;'));
+renderPartsFiltered();
+const pfl=store['parts-list']||'';
+chk('partsFiltered: proje/bölüm başlıkları kaçırıldı', pfl.includes('📁 Pr&lt;j&gt;') && pfl.includes('🏭 Dep&lt;t&gt;'));
+chk('partsFiltered: partRowHTML (raw) korundu', pfl.includes('<div class="PRH">'));
+
+// ── showLog (işlem geçmişi modalı) ──
+global.loadLogs=async()=>[{created_at:'2026-01-01T10:00:00', username:'U<b>', qty_done:2, note:'LNot'+EVIL}];
+let _ovl='';
+global.document.createElement=()=>({ className:'', set innerHTML(v){_ovl=String(v);}, get innerHTML(){return _ovl;} });
+global.document.body={appendChild(){}};
+eval(grab('showLog'));
+await showLog('p1','Ad<script>');
+console.log('\nshowLog (işlem geçmişi modalı):');
+chk('showLog: parça adı <script> kaçırıldı', _ovl.includes('Ad&lt;script&gt;') && !_ovl.includes('Ad<script>'));
+chk('showLog: kullanıcı/not kaçırıldı', _ovl.includes('U&lt;b&gt;') && _ovl.includes('LNot&lt;img'));
+chk('showLog: adet rozeti (raw) korundu', _ovl.includes('log-qty-done">✅ 2'));
+
+// ── renderStatsView + loadStats + renderDetailTable (istatistik) ──
+global.users=[{name:'Onay<b>', dept:'D<i>', role:'usta'}];
+global.parts=[{project:'Pr<j>'}];
+eval(grab('renderStatsView'));
+renderStatsView();
+const sv=store['stats-content']||'';
+console.log('\nrenderStatsView / loadStats / renderDetailTable (istatistik):');
+chk('statsView: proje/personel option kaçırıldı', sv.includes('<option value="Pr&lt;j&gt;">') && sv.includes('<option value="Onay&lt;b&gt;">Onay&lt;b&gt;</option>'));
+global.dbGet=async(t)=> t==='logs'
+  ? [{part_id:'p1', username:"Usr'"+EVIL, qty_done:1, qty_pending:0, qty_reject:0, status:'done', created_at:'2026-01-01T10:00:00', note:'DNot<b>'}]
+  : t==='parts' ? [{id:'p1', name:'SPN<b>', code:'SPC<i>', project:'SPP<script>'}] : [];
+document.getElementById('stat-start').value='2026-01-01';
+document.getElementById('stat-end').value='2026-01-31';
+document.getElementById('stat-project').value='';
+document.getElementById('stat-user').value='';
+eval(grab('renderDetailTable'));
+eval(grab('loadStats'));
+await loadStats();
+const sr=store['stats-result']||'', dtw=store['detail-table-wrap']||'';
+chk('loadStats: personel kartı adı kaçırıldı', sr.includes("Usr&#39;&lt;img"));
+chk('loadStats: filterTableByUser onclick ea tırnak kaçışı', sr.includes("filterTableByUser('Usr\\'"));
+chk('detailTable: parça/proje/not kaçırıldı', dtw.includes('SPN&lt;b&gt;') && dtw.includes('SPP&lt;script&gt;') && dtw.includes('DNot&lt;b&gt;'));
+chk('detailTable: statusBadge (raw) korundu', dtw.includes('<span class="badge">x</span>'));
+
+// ── renderPdForm + renderPdList (proje tarihleri) ──
+global.orders=[{project_name:'PD<b>'}];
+global.projectDates=[{id:'pd1', project_name:'PD<b>', start_date:'2026-01-01', end_date:'2026-02-01'}];
+global.dbGet=async(t)=> t==='project_date_revisions'
+  ? [{id:'rv1', project_date_id:'pd1', old_start:'2026-01-01', old_end:'2026-02-01', new_start:'2026-01-05',
+     new_end:'2026-02-05', revised_by:'Rev<img>', reason:'Sebep'+EVIL, created_at:'2026-01-03'}] : [];
+eval(grab('renderPdForm'));
+eval(grab('renderPdList'));
+renderPdForm();
+await renderPdList();
+const pdf=store['pd-project']||'', pdl=store['pd-list']||'';
+console.log('\nrenderPdForm / renderPdList (proje tarihleri):');
+chk('pdForm: proje option kaçırıldı', pdf.includes('<option value="PD&lt;b&gt;"'));
+chk('pdList: proje adı / revize alanları kaçırıldı', pdl.includes('PD&lt;b&gt;') && pdl.includes('Rev&lt;img&gt;') && pdl.includes('Sebep&lt;img'));
+chk('pdList: revize/sil butonları (raw) korundu', pdl.includes("openReviseModal('pd1')") && pdl.includes("deletePd('pd1')"));
+
+// ── woLoadParts (iş emri sihirbazı parça ağacı) ──
+global.PUR_STATUS={PLANNED:{icon:'📝',label:'Planlandı',color:'#f5a623'}, IN_WAREHOUSE:{icon:'🏭',label:'Depoda',color:'#2ecc71'}};
+global.parts=[{id:'p1', project:'PRJ', name:"Pa'"+EVIL, code:'PC<b>', material:'M<i>', qty:2, department_id:null, parent_part_id:null, drawing:''}];
+global.depts=[];
+global.projectBoms=[]; global.projectBomParts=[];
+global.purchaseItems=[];
+global.loadProjectBoms=async()=>{};
+global.whName=()=>'';
+global.toast=()=>{};
+global._woSelectedParts=new Set();
+global.dbGet=async(t)=> t==='purchase_items'
+  ? [{id:'pu1', project_name:'PRJ', code:'ZZ', name:'Mal<script>', quantity:1, unit:'ad<i>', status:'PLANNED', project_bom_part_id:null}] : [];
+document.getElementById('wo-project').value='PRJ';
+document.getElementById('wo-dept').value='';
+eval(grab('woMatChip'));
+eval(grab('woLoadParts'));
+await woLoadParts();
+const wog=store['wo-parts-grid']||'';
+console.log('\nwoLoadParts (iş emri sihirbazı):');
+chk('woLoad: parça adı/kod/malzeme kaçırıldı', wog.includes("Pa&#39;&lt;img") && wog.includes('PC&lt;b&gt;') && wog.includes('M&lt;i&gt;'));
+chk('woLoad: woTogglePart onclick ea tırnak kaçışı', wog.includes("woTogglePart('p1','Pa\\'"));
+chk('woLoad: satın alma satırı kaçırıldı', wog.includes('Mal&lt;script&gt;') && wog.includes('ad&lt;i&gt;'));
 
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);
