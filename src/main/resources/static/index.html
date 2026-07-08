@@ -1341,8 +1341,16 @@
             </div>
           </div>
         </div>
-        <div style="background:rgba(41,128,185,.08);border:1px solid rgba(41,128,185,.2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:10px">
-          💡 İşlem kodu parça kodunun sonuna otomatik eklenir.<br>Örn: GP-001 + -K → <b style="color:var(--accent)">GP-001-K</b>
+        <div class="form-group" style="margin-bottom:10px">
+          <label>Nereye Eklensin?</label>
+          <div style="display:flex;flex-direction:column;gap:4px;font-family:var(--font-mono);font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:8px 12px">
+            <label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="bom-op-mode" value="parent" checked onchange="bomOpModeHint()"> Üste yeni işlemli parça oluştur</label>
+            <label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="bom-op-mode" value="self" onchange="bomOpModeHint()"> İşlemi doğrudan parçaya ekle</label>
+            <label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="bom-op-mode" value="child" onchange="bomOpModeHint()"> Altına yeni işlemli parça ekle</label>
+          </div>
+        </div>
+        <div id="bom-op-hint" style="background:rgba(41,128,185,.08);border:1px solid rgba(41,128,185,.2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:10px">
+          💡 İşlem kodu parça kodunun sonuna eklenir (GP-001 + -K → <b style="color:var(--accent)">GP-001-K</b>); yeni parça ÜSTE oluşur, seçilen parça onun altına iner.
         </div>
         <button class="btn btn-primary btn-sm" onclick="addBomOperation()">⚙ İşlem Ekle</button>
       </div>
@@ -1492,8 +1500,16 @@
           <div id="pbome-op-total" style="background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.2);border-radius:4px;padding:10px 12px;font-family:var(--font-mono);font-size:12px;color:var(--accent);min-height:42px;display:flex;align-items:center">—</div>
         </div>
       </div>
-      <div style="background:rgba(41,128,185,.08);border:1px solid rgba(41,128,185,.2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:10px">
-        💡 İşlem kodu parça kodunun sonuna eklenir — üst parça olarak yeni parça oluşur
+      <div class="form-group" style="margin-bottom:10px">
+        <label>Nereye Eklensin?</label>
+        <div style="display:flex;flex-direction:column;gap:4px;font-family:var(--font-mono);font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:8px 12px">
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="pbome-op-mode" value="parent" checked onchange="bomOpModeHint('pbome')"> Üste yeni işlemli parça oluştur</label>
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="pbome-op-mode" value="self" onchange="bomOpModeHint('pbome')"> İşlemi doğrudan parçaya ekle</label>
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="pbome-op-mode" value="child" onchange="bomOpModeHint('pbome')"> Altına yeni işlemli parça ekle</label>
+        </div>
+      </div>
+      <div id="pbome-op-hint" style="background:rgba(41,128,185,.08);border:1px solid rgba(41,128,185,.2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:10px">
+        💡 İşlem kodu parça kodunun sonuna eklenir (GP-001 + -K → <b style="color:var(--accent)">GP-001-K</b>); yeni parça ÜSTE oluşur, seçilen parça onun altına iner.
       </div>
       <button class="btn btn-primary btn-sm" onclick="pbomeAddOp()">⚙ İşlem Ekle</button>
     </div>
@@ -9867,12 +9883,28 @@ function calcOpTotalTime() {
   el.innerHTML = `<span style="font-size:13px;font-weight:700">${total.toFixed(1)} dk</span><span style="color:var(--muted);margin-left:8px">${hrs>0?hrs+'s ':''} ${mins}dk · ${qty} adet × ${duration} dk</span>`;
 }
 
-// ─── İşlem Ekle ───
+// ─── İşlem Ekle (5. tur #2: üste / kendine / alta — üç mod) ───
+// parent (eski davranış): işlemli YENİ parça üste oluşur, seçilen altına iner.
+// self: işlem parçanın kendisine yazılır; kod soneki eklenir (GP-001→GP-001-K)
+//       — removeBomOp soneki geri aldığından ekle/kaldır simetriktir.
+// child: işlemli YENİ parça seçilenin ALTINA eklenir.
+function bomOpModeHint(prefix='bom'){
+  const mode = document.querySelector(`input[name="${prefix}-op-mode"]:checked`)?.value||'parent';
+  const el = document.getElementById(prefix==='bom'?'bom-op-hint':'pbome-op-hint');
+  if(!el) return;
+  el.innerHTML = {
+    parent: '💡 İşlem kodu parça kodunun sonuna eklenir (GP-001 + -K → <b style="color:var(--accent)">GP-001-K</b>); yeni parça ÜSTE oluşur, seçilen parça onun altına iner.',
+    self:   '💡 İşlem parçanın KENDİSİNE yazılır; kodun sonuna eklenir: GP-001 → <b style="color:var(--accent)">GP-001-K</b>. İşlem silinirse sonek geri alınır.',
+    child:  '💡 Seçilen parçanın ALTINA işlemli yeni parça eklenir (GP-001 altına <b style="color:var(--accent)">GP-001-K</b>).'
+  }[mode];
+}
+
 async function addBomOperation() {
   const partId   = document.getElementById('bom-op-part').value;
   const opName   = document.getElementById('bom-op-name').value.trim();
   const opCode   = document.getElementById('bom-op-code').value.trim().toUpperCase();
   const duration = parseFloat(document.getElementById('bom-op-duration').value) || 0;
+  const mode     = document.querySelector('input[name="bom-op-mode"]:checked')?.value||'parent';
   if(!partId){ toast('Parça seçin!','error'); return; }
   if(!opName||!opCode){ toast('İşlem adı ve kodu zorunlu!','error'); return; }
 
@@ -9884,26 +9916,57 @@ async function addBomOperation() {
   const opDesc    = document.getElementById('bom-op-desc').value.trim();
   const qty       = parseFloat(part.quantity) || 1;
   const totalTime = duration * qty;
+  const newOp     = {name:opName, code:opCode, desc:opDesc, duration_per_unit:duration, total_duration:totalTime};
+  let doneMsg;
 
-  if(findSiblingDup(bomParts, {code:newCode, parentId:part.parent_id, where:p=>p.product_id===_activeBomProduct.id})){
-    toast(`"${newCode}" kodu aynı üst altında zaten mevcut!`,'error'); return;
+  if(mode==='self'){
+    // Kod soneki parçanın kendisine eklenir — kardeşler arasında çakışmasın
+    if(findSiblingDup(bomParts, {code:newCode, parentId:part.parent_id, selfId:part.id, where:p=>p.product_id===_activeBomProduct.id})){
+      toast(`"${newCode}" kodu aynı üst altında zaten mevcut!`,'error'); return;
+    }
+    const ops = Array.isArray(part.operations)?[...part.operations]:JSON.parse(part.operations||'[]');
+    ops.push(newOp);
+    const ok = await dbUpdate('bom_parts', partId, {operations:ops, code:newCode});
+    if(!ok) return;
+    part.operations=ops; part.code=newCode;
+    doneMsg = `⚙ İşlem parçaya eklendi → kod "${newCode}" oldu`;
+  } else if(mode==='child'){
+    if(findSiblingDup(bomParts, {code:newCode, parentId:part.id, where:p=>p.product_id===_activeBomProduct.id})){
+      toast(`"${newCode}" kodu bu parçanın altında zaten mevcut!`,'error'); return;
+    }
+    const childData = await dbInsert('bom_parts',{
+      id: genId(), product_id: _activeBomProduct.id,
+      parent_id: part.id, name: newName, code: newCode,
+      quantity: qty, unit: part.unit||'adet',
+      weight_kg: part.weight_kg||null, material: part.material||null,
+      operations: [newOp],
+      level: (part.level||0)+1,
+      sort_order: bomParts.filter(p=>p.parent_id===part.id).length
+    });
+    if(!Array.isArray(childData)||!childData[0]){ toast('Kayıt hatası!','error'); return; }
+    bomParts.push(childData[0]);
+    doneMsg = `✅ "${newCode}" oluşturuldu → "${part.code}" altına eklendi`;
+  } else { // parent — eski davranış
+    if(findSiblingDup(bomParts, {code:newCode, parentId:part.parent_id, where:p=>p.product_id===_activeBomProduct.id})){
+      toast(`"${newCode}" kodu aynı üst altında zaten mevcut!`,'error'); return;
+    }
+    const newParentData = await dbInsert('bom_parts',{
+      id: genId(), product_id: _activeBomProduct.id,
+      parent_id: part.parent_id||null, name: newName, code: newCode,
+      quantity: qty, unit: part.unit||'adet',
+      weight_kg: part.weight_kg||null, material: part.material||null,
+      operations: [newOp],
+      level: part.level||0, sort_order: part.sort_order||0
+    });
+    if(!Array.isArray(newParentData)||!newParentData[0]){ toast('Kayıt hatası!','error'); return; }
+    const newParent = newParentData[0];
+    bomParts.push(newParent);
+
+    part.parent_id = newParent.id;
+    part.level = (newParent.level||0)+1;
+    await dbUpdate('bom_parts', partId, {parent_id: newParent.id, level: part.level});
+    doneMsg = `✅ "${newCode}" oluşturuldu → "${part.code}" alt parçası yapıldı`;
   }
-
-  const newParentData = await dbInsert('bom_parts',{
-    id: genId(), product_id: _activeBomProduct.id,
-    parent_id: part.parent_id||null, name: newName, code: newCode,
-    quantity: qty, unit: part.unit||'adet',
-    weight_kg: part.weight_kg||null, material: part.material||null,
-    operations: [{name:opName, code:opCode, desc:opDesc, duration_per_unit:duration, total_duration:totalTime}],
-    level: part.level||0, sort_order: part.sort_order||0
-  });
-  if(!Array.isArray(newParentData)||!newParentData[0]){ toast('Kayıt hatası!','error'); return; }
-  const newParent = newParentData[0];
-  bomParts.push(newParent);
-
-  part.parent_id = newParent.id;
-  part.level = (newParent.level||0)+1;
-  await dbUpdate('bom_parts', partId, {parent_id: newParent.id, level: part.level});
 
   ['bom-op-name','bom-op-code','bom-op-desc','bom-op-duration'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
@@ -9916,7 +9979,7 @@ async function addBomOperation() {
 
   renderBomContent();
   const timeStr = duration ? ` · ⏱ ${totalTime.toFixed(1)} dk toplam (${qty} adet × ${duration} dk)` : '';
-  toast(`✅ "${newCode}" oluşturuldu → "${part.code}" alt parçası yapıldı${timeStr}`, 'success');
+  toast(doneMsg + timeStr, 'success');
 }
 
 
@@ -10685,7 +10748,7 @@ function pbomeClearPartForm() {
   renderFormDims('pbome-part','');
 }
 
-// ─── İşlem Ekle ───
+// ─── İşlem Ekle (5. tur #2: üste / kendine / alta — addBomOperation ikizi) ───
 async function pbomeAddOp() {
   if(!_activePbomId){ toast('Düzenleyici aktif değil!','error'); return; }
   const partId  = document.getElementById('pbome-op-part').value;
@@ -10693,6 +10756,7 @@ async function pbomeAddOp() {
   const opCode  = document.getElementById('pbome-op-code').value.trim().toUpperCase();
   const dur     = parseFloat(document.getElementById('pbome-op-dur').value)||0;
   const desc    = document.getElementById('pbome-op-desc').value.trim();
+  const mode    = document.querySelector('input[name="pbome-op-mode"]:checked')?.value||'parent';
   if(!partId){ toast('Parça seçin!','error'); return; }
   if(!opName||!opCode){ toast('İşlem seçin!','error'); return; }
 
@@ -10702,30 +10766,55 @@ async function pbomeAddOp() {
   const newCode = (part.custom_code||'')+opCode;
   const newName = part.custom_name+' ('+opName+')';
   const qty     = parseFloat(part.custom_qty)||1;
-  const ops     = [{name:opName,code:opCode,desc,duration_per_unit:dur||null,total_duration:dur?dur*qty:null}];
+  const newOp   = {name:opName,code:opCode,desc,duration_per_unit:dur||null,total_duration:dur?dur*qty:null};
+  let doneMsg;
 
-  if(findSiblingDup(_pbomeParts, {code:newCode, codeKey:'custom_code', parentKey:'parent_custom_id', parentId:part.parent_custom_id})){
-    toast(`"${newCode}" kodu aynı üst altında zaten mevcut!`,'error'); return;
-  }
-
-  // Yeni üst parça oluştur (aynı seviyede)
-  const newParentData = await dbInsert('project_bom_parts',{
+  // Yeni işlemli parça gövdesi (parent/child modları) — bağ alanları modda atanır
+  const newPartBody = (parentCustomId, level, sortOrder)=>({
     id:genId(), project_bom_id:_activePbomId, bom_part_id:null, is_excluded:false,
     custom_name:newName, custom_code:newCode,
     custom_qty:qty, custom_unit:part.custom_unit||'adet',
     custom_weight:part.custom_weight||null, custom_material:part.custom_material||null,
-    dept_id:part.dept_id||null, parent_custom_id:part.parent_custom_id||null,
-    operations:ops, level:part.level||0, sort_order:part.sort_order||0
+    dept_id:part.dept_id||null, parent_custom_id:parentCustomId,
+    operations:[newOp], level, sort_order:sortOrder
   });
-  if(!Array.isArray(newParentData)||!newParentData[0]){ toast('Kayıt hatası!','error'); return; }
-  const newParent=newParentData[0];
-  _pbomeParts.push(newParent);
-  projectBomParts.push(newParent);
 
-  // Orijinal parçayı yeni üstün altına taşı
-  part.parent_custom_id=newParent.id;
-  part.level=(newParent.level||0)+1;
-  await dbUpdate('project_bom_parts',partId,{parent_custom_id:newParent.id,level:part.level});
+  if(mode==='self'){
+    if(findSiblingDup(_pbomeParts, {code:newCode, codeKey:'custom_code', parentKey:'parent_custom_id', parentId:part.parent_custom_id, selfId:part.id})){
+      toast(`"${newCode}" kodu aynı üst altında zaten mevcut!`,'error'); return;
+    }
+    const ops = Array.isArray(part.operations)?[...part.operations]:JSON.parse(part.operations||'[]');
+    ops.push(newOp);
+    const ok = await dbUpdate('project_bom_parts', partId, {operations:ops, custom_code:newCode});
+    if(!ok) return;
+    part.operations=ops; part.custom_code=newCode;
+    doneMsg = `⚙ İşlem parçaya eklendi → kod "${newCode}" oldu`;
+  } else if(mode==='child'){
+    if(findSiblingDup(_pbomeParts, {code:newCode, codeKey:'custom_code', parentKey:'parent_custom_id', parentId:part.id})){
+      toast(`"${newCode}" kodu bu parçanın altında zaten mevcut!`,'error'); return;
+    }
+    const d = await dbInsert('project_bom_parts',
+      newPartBody(part.id, (part.level||0)+1, _pbomeParts.filter(p=>p.parent_custom_id===part.id).length));
+    if(!Array.isArray(d)||!d[0]){ toast('Kayıt hatası!','error'); return; }
+    _pbomeParts.push(d[0]); projectBomParts.push(d[0]);
+    doneMsg = `✅ "${newCode}" oluşturuldu → "${part.custom_code}" altına eklendi`;
+  } else { // parent — eski davranış: yeni üst parça oluştur (aynı seviyede)
+    if(findSiblingDup(_pbomeParts, {code:newCode, codeKey:'custom_code', parentKey:'parent_custom_id', parentId:part.parent_custom_id})){
+      toast(`"${newCode}" kodu aynı üst altında zaten mevcut!`,'error'); return;
+    }
+    const newParentData = await dbInsert('project_bom_parts',
+      newPartBody(part.parent_custom_id||null, part.level||0, part.sort_order||0));
+    if(!Array.isArray(newParentData)||!newParentData[0]){ toast('Kayıt hatası!','error'); return; }
+    const newParent=newParentData[0];
+    _pbomeParts.push(newParent);
+    projectBomParts.push(newParent);
+
+    // Orijinal parçayı yeni üstün altına taşı
+    part.parent_custom_id=newParent.id;
+    part.level=(newParent.level||0)+1;
+    await dbUpdate('project_bom_parts',partId,{parent_custom_id:newParent.id,level:part.level});
+    doneMsg = `✅ "${newCode}" oluşturuldu → "${part.custom_code}" alt parçası yapıldı`;
+  }
 
   // Formu temizle
   ['pbome-op-name','pbome-op-code','pbome-op-desc','pbome-op-dur'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -10734,7 +10823,7 @@ async function pbomeAddOp() {
   document.getElementById('pbome-op-total').textContent='—';
 
   pbomeRenderContent();
-  toast(`✅ "${newCode}" oluşturuldu → "${part.custom_code}" alt parçası yapıldı`,'success');
+  toast(doneMsg,'success');
 }
 
 // ─── Parça Listesi + Sürükle-Bırak ───
