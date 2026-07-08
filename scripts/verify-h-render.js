@@ -191,6 +191,27 @@ chk('wo: revize alanları <script> kaçırıldı', wo.includes('Alan&lt;b&gt;') 
 chk('wo: statusBadge/butonlar (raw) korundu', wo.includes('<span class="badge">x</span>') && wo.includes("deleteWorkOrder('w1')"));
 chk('wo: openWoReviseModal ea onclick (tırnak kaçışlı) bozulmadı', wo.includes('openWoReviseModal(') && wo.includes("'w1'"));
 
+// ── renderDnList + renderDnDetail (irsaliye) ──
+global.DN_STATUS={DRAFT:{icon:'📝',label:'Taslak',color:'#f5a623'}, SHIPPED:{icon:'🚚',label:'Sevk',color:'#2ecc71'}};
+global.deliveryNotes=[{id:'d1', status:'DRAFT', note_no:'IRS-1', recipient_name:'Alıcı'+EVIL, order_id:null,
+  city:'İst<b>', district:'Kad<i>', created_by:'Yap<script>', created_at:'2026-01-01', ship_date:null}];
+global.deliveryItems=[{id:'di1', delivery_note_id:'d1', item_code:'K'+EVIL, item_name:'Ad'+EVIL, unit:'ad<i>',
+  quantity:2, warehouse_id:null, notes:'Not<img>'}];
+global.orders=[];
+global._dnActive='d1';
+eval(grab('renderDnList'));
+renderDnList();
+const dl=store['dn-list']||'';
+console.log('\nrenderDnList / renderDnDetail (irsaliye):');
+chk('dn-list: alıcı adı onerror kaçırıldı', dl.includes('Alıcı&lt;img') && !dl.includes('Alıcı'+EVIL));
+chk('dn-list: şehir/oluşturan <script> kaçırıldı', dl.includes('İst&lt;b&gt;') && dl.includes('Yap&lt;script&gt;'));
+chk('dn-list: actions (raw) korundu', dl.includes("dnShip('d1')") && dl.includes("dnDelete('d1')"));
+eval(grab('renderDnDetail'));
+renderDnDetail();
+const dd=store['dn-detail']||'';
+chk('dn-detail: kalem kod/ad/not kaçırıldı', dd.includes('K&lt;img') && dd.includes('Ad&lt;img') && dd.includes('Not&lt;img'));
+chk('dn-detail: kalem sil butonu (raw) korundu', dd.includes("dnDeleteItem('di1')"));
+
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);
 }
