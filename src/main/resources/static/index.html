@@ -1285,6 +1285,19 @@
             <div id="bom-part-parent-ss"></div>
           </div>
         </div>
+        <div class="form-row" style="grid-template-columns:1fr 2fr;margin-top:12px;margin-bottom:0">
+          <div class="form-group"><label>Malzeme Formu</label>
+            <select id="bom-part-form" onchange="renderFormDims('bom-part', this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+              <option value="">— Form yok —</option>
+              <option value="SAC">Sac</option><option value="PROFIL">Profil</option>
+              <option value="MIL">Mil</option><option value="BORU">Boru</option>
+              <option value="DELRIN">Delrin</option><option value="COK_KOMPONENTLI">Çok Komponentli</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Ölçüler (mm) — opsiyonel</label>
+            <div id="bom-part-dims" style="display:grid;gap:8px"></div>
+          </div>
+        </div>
         <div style="margin-top:14px;display:flex;gap:10px">
           <button class="btn btn-primary btn-sm" id="bom-add-part-btn" onclick="addBomPart()">+ Parça Ekle</button>
           <button class="btn btn-ghost btn-sm" onclick="clearBomPartForm()">Temizle</button>
@@ -1429,6 +1442,19 @@
         </div>
         <div class="form-group"><label>Üst Parça</label>
           <div id="pbome-part-parent-ss"></div>
+        </div>
+      </div>
+      <div class="form-row" style="grid-template-columns:1fr 2fr;margin-top:12px;margin-bottom:0">
+        <div class="form-group"><label>Malzeme Formu</label>
+          <select id="pbome-part-form" onchange="renderFormDims('pbome-part', this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+            <option value="">— Form yok —</option>
+            <option value="SAC">Sac</option><option value="PROFIL">Profil</option>
+            <option value="MIL">Mil</option><option value="BORU">Boru</option>
+            <option value="DELRIN">Delrin</option><option value="COK_KOMPONENTLI">Çok Komponentli</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Ölçüler (mm) — opsiyonel</label>
+          <div id="pbome-part-dims" style="display:grid;gap:8px"></div>
         </div>
       </div>
       <div style="margin-top:14px">
@@ -9688,6 +9714,9 @@ function renderBomContent() {
   renderParentSelect();
   renderOpPartSelect();
   renderBomOpDefSelect();
+  // Ölçü inputları bir kez kurulur (her render'da kurulsa yazılmakta olan değerler uçar)
+  if(!document.getElementById('bom-part-dims').innerHTML)
+    renderFormDims('bom-part', document.getElementById('bom-part-form').value);
   renderBomList();
 }
 
@@ -9721,6 +9750,63 @@ function kindBadge(k){
   return `<span style="font-family:var(--font-mono);font-size:9px;padding:1px 6px;border-radius:8px;border:1px solid ${c}44;color:${c};background:${c}11;white-space:nowrap">${purch?'🛒':'🏭'} ${MATERIAL_KINDS[k]}</span>`;
 }
 
+// ─── Malzeme formu (5. tur arkadaş isteği #4-5) ───
+// Parçanın üretildiği malzeme formu; seçime göre farklı ölçüler sorulur.
+// Ölçüler 5 kolonda tutulur (width/height/thickness/length/diameter_mm);
+// hangi formda hangisinin sorulduğu ve etiketi FORM_DIMS'te. '' = form yok
+// (eski davranış: En×Boy×Kalınlık).
+const MATERIAL_FORMS = { SAC:'Sac', PROFIL:'Profil', MIL:'Mil', BORU:'Boru', DELRIN:'Delrin', COK_KOMPONENTLI:'Çok Komponentli' };
+const DIM_FIELDS = ['width_mm','height_mm','thickness_mm','length_mm','diameter_mm'];
+const FORM_DIMS = {
+  '':              [['width_mm','En'],['height_mm','Boy'],['thickness_mm','Kalınlık']],
+  SAC:             [['width_mm','En'],['height_mm','Boy'],['thickness_mm','Kalınlık']],
+  PROFIL:          [['width_mm','En'],['height_mm','Boy'],['thickness_mm','Kalınlık'],['length_mm','Uzunluk']],
+  MIL:             [['diameter_mm','Çap'],['length_mm','Uzunluk']],
+  BORU:            [['diameter_mm','Dış Çap'],['thickness_mm','Et Kalınlığı'],['length_mm','Boy']],
+  DELRIN:          [['width_mm','En'],['height_mm','Boy'],['thickness_mm','Yükseklik']],
+  COK_KOMPONENTLI: [['width_mm','En'],['height_mm','Boy'],['thickness_mm','Yükseklik']]
+};
+function formOptions(sel){
+  return '<option value="">— Form yok —</option>' + Object.entries(MATERIAL_FORMS)
+    .map(([k,l])=>`<option value="${k}" ${sel===k?'selected':''}>${l}</option>`).join('');
+}
+// Forma göre ölçü inputlarını (yeniden) kurar. Id deseni: <prefix>-dim-<alan>.
+// values: alan → mevcut değer (base alan adlarıyla, custom_ öneksiz).
+function renderFormDims(prefix, form, values={}){
+  const el = document.getElementById(prefix+'-dims');
+  if(!el) return;
+  const dims = FORM_DIMS[form]||FORM_DIMS[''];
+  el.style.gridTemplateColumns = 'repeat('+dims.length+',1fr)';
+  el.innerHTML = dims.map(([f,label])=>
+    `<input type="number" id="${prefix}-dim-${f}" min="0" step="any" placeholder="${label}" title="${label} (mm)" value="${dimVal(values[f])}" style="${INP()}">`).join('');
+}
+// 5 ölçüyü target'a yazar: formda sorulmayan alanlar 0 (=update'te temizle —
+// form değişince bayat ölçü kalmasın). Create'te çağıran 0'ları null'a çevirir.
+function collectFormDims(prefix, form, target={}, fieldPrefix=''){
+  const dims = FORM_DIMS[form]||FORM_DIMS[''];
+  DIM_FIELDS.forEach(f=>{
+    target[fieldPrefix+f] = dims.some(([df])=>df===f) ? dimNum(prefix+'-dim-'+f) : 0;
+  });
+  return target;
+}
+// Form-farkında ölçü etiketi: MIL → Ø30 L200, BORU → Ø60×3 L2000,
+// PROFIL → 40×40×2 L6000, diğerleri → eski En×Boy×Kalınlık. get: alan→değer.
+function dimLabel2(form, get){
+  const f=v=>{ const n=parseFloat(v); return (isFinite(n)&&n>0)?(+n.toFixed(2)):null; };
+  const t=f(get('thickness_mm')), l=f(get('length_mm')), d=f(get('diameter_mm'));
+  let s;
+  if(form==='MIL'||form==='BORU'){
+    s = d!=null ? 'Ø'+d : '';
+    if(form==='BORU' && t!=null) s += (s?'×':'')+t;
+  } else {
+    s = [f(get('width_mm')),f(get('height_mm')),t].filter(v=>v!=null).join('×');
+  }
+  if((form==='MIL'||form==='BORU'||form==='PROFIL') && l!=null) s += (s?' ':'')+'L'+l;
+  return s ? s+' mm' : '';
+}
+function partDimLabel(p){ return dimLabel2(p.material_form, f=>p[f]); }
+function pbomeDimLabel(p){ return dimLabel2(p.material_form ?? p.resolved_material_form, f=>p['custom_'+f] ?? p['resolved_'+f]); }
+
 // ─── Parça Ekle ───
 async function addBomPart() {
   const name = document.getElementById('bom-part-name').value.trim();
@@ -9736,6 +9822,9 @@ async function addBomPart() {
   const level = parentPart ? (parentPart.level||0)+1 : 0;
   const btn = document.getElementById('bom-add-part-btn');
   btn.disabled=true; btn.textContent='Kaydediliyor...';
+  const materialForm = document.getElementById('bom-part-form').value||null;
+  const dims = collectFormDims('bom-part', materialForm||'');
+  DIM_FIELDS.forEach(f=>{ if(!dims[f]) dims[f]=null; }); // create'te 0 yerine null
   const data = await dbInsert('bom_parts',{
     id:genId(), product_id:_activeBomProduct.id,
     parent_id:parentId, name, code,
@@ -9744,6 +9833,7 @@ async function addBomPart() {
     weight_kg: parseFloat(document.getElementById('bom-part-weight').value)||null,
     material: document.getElementById('bom-part-material').value.trim()||null,
     material_kind: document.getElementById('bom-part-kind').value||null,
+    material_form: materialForm, ...dims,
     operations: [], level, sort_order: bomParts.length
   });
   btn.disabled=false; btn.textContent='+ Parça Ekle';
@@ -9755,10 +9845,11 @@ async function addBomPart() {
 }
 
 function clearBomPartForm() {
-  ['bom-part-name','bom-part-code','bom-part-material','bom-part-kind'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['bom-part-name','bom-part-code','bom-part-material','bom-part-kind','bom-part-form'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const q=document.getElementById('bom-part-qty'); if(q) q.value='1';
   const u=document.getElementById('bom-part-unit'); if(u) u.value='adet';
   const w=document.getElementById('bom-part-weight'); if(w) w.value='';
+  renderFormDims('bom-part','');
 }
 
 function calcOpTotalTime() {
@@ -9863,7 +9954,7 @@ function renderBomList() {
           <span id="bom-qty-display-${raw(part.id)}" style="cursor:pointer;border-bottom:1px dashed var(--muted)" onclick="editBomQty('${raw(part.id)}')" title="Miktarı düzenle">${part.quantity} ${part.unit}</span>
           ${part.weight_kg?h`<span>⚖ ${part.weight_kg} kg</span>`:''}
           ${part.material?h`<span>🔩 ${part.material}</span>`:''}
-          ${dimLabel(part.width_mm,part.height_mm,part.thickness_mm)?h`<span>📐 ${dimLabel(part.width_mm,part.height_mm,part.thickness_mm)}</span>`:''}
+          ${partDimLabel(part)?h`<span>📐 ${partDimLabel(part)}${part.material_form?' · '+MATERIAL_FORMS[part.material_form]:''}</span>`:(part.material_form?h`<span>📐 ${MATERIAL_FORMS[part.material_form]}</span>`:'')}
         </div>
         ${opsHTML}
       </div>
@@ -9901,8 +9992,9 @@ async function bomCopyBranch(partId){
       name:p.name, code:isRoot?rootCode:p.code,
       quantity:p.quantity||1, unit:p.unit||'adet',
       weight_kg:p.weight_kg||null, material:p.material||null,
-      material_kind:p.material_kind||null,
+      material_kind:p.material_kind||null, material_form:p.material_form||null,
       width_mm:p.width_mm||null, height_mm:p.height_mm||null, thickness_mm:p.thickness_mm||null,
+      length_mm:p.length_mm||null, diameter_mm:p.diameter_mm||null,
       operations:Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]'),
       level:p.level||0, sort_order:(p.sort_order||0)+1
     }),
@@ -10081,12 +10173,12 @@ function editBomPart(partId) {
       <label>Tür</label>
       <select id="bom-edit-kind" style="${inStyle}">${kindOptions(part.material_kind)}</select>
     </div>
-    <div class="form-group" style="margin-bottom:18px">
-      <label>Ölçü (mm) — opsiyonel, sac/profil için</label>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-        <input type="number" id="bom-edit-width" min="0" step="any" placeholder="En" value="${dimVal(part.width_mm)}" style="${inStyle}">
-        <input type="number" id="bom-edit-height" min="0" step="any" placeholder="Boy" value="${dimVal(part.height_mm)}" style="${inStyle}">
-        <input type="number" id="bom-edit-thickness" min="0" step="any" placeholder="Kalınlık" value="${dimVal(part.thickness_mm)}" style="${inStyle}">
+    <div class="form-row" style="grid-template-columns:1fr 2fr;margin-bottom:18px">
+      <div class="form-group"><label>Malzeme Formu</label>
+        <select id="bom-edit-form" onchange="renderFormDims('bom-edit', this.value, _dimEditVals)" style="${inStyle}">${formOptions(part.material_form)}</select>
+      </div>
+      <div class="form-group"><label>Ölçüler (mm) — ops.</label>
+        <div id="bom-edit-dims" style="display:grid;gap:8px"></div>
       </div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
@@ -10095,8 +10187,12 @@ function editBomPart(partId) {
     </div>
   </div>`;
   document.body.appendChild(overlay);
+  _dimEditVals = {}; DIM_FIELDS.forEach(f=>_dimEditVals[f]=part[f]);
+  renderFormDims('bom-edit', part.material_form||'', _dimEditVals);
   setTimeout(()=>{ const el=document.getElementById('bom-edit-name'); if(el){el.focus();el.select();} },100);
 }
+// Düzenleme modallarında form değişince ölçü inputlarına taşınan mevcut değerler
+let _dimEditVals = {};
 
 async function saveBomPartEdit(partId) {
   const part = bomParts.find(p=>p.id===partId);
@@ -10109,15 +10205,18 @@ async function saveBomPartEdit(partId) {
   if(dup){ toast(`Aynı üst altında "${dup.code}" kodlu bir parça zaten var: ${dup.name}`,'error'); return; }
   if(!materialOk(material, part.material)){ materialWarn(material); return; }
   // Olcu: bos birakmak = 0 gonderilir (backend'de null "dokunma" demek oldugu icin
-  // temizleme 0 ile yapilir; 0 ekranda "olcu yok" sayilir)
-  const width_mm = dimNum('bom-edit-width'), height_mm = dimNum('bom-edit-height'), thickness_mm = dimNum('bom-edit-thickness');
+  // temizleme 0 ile yapilir; 0 ekranda "olcu yok" sayilir). Formda sorulmayan
+  // alanlar da 0 gider — form degisince bayat olcu kalmasin.
+  const material_form = document.getElementById('bom-edit-form').value; // ''=formu temizle
+  const dims = collectFormDims('bom-edit', material_form);
   const material_kind = document.getElementById('bom-edit-kind').value; // ''=türü temizle
   // PARTIAL update'te null "dokunma" demek — malzemeyi temizlemek icin bos string gonderilir
-  const ok = await dbUpdate('bom_parts', partId, { name, code, material, width_mm, height_mm, thickness_mm, material_kind });
+  const ok = await dbUpdate('bom_parts', partId, { name, code, material, material_kind, material_form, ...dims });
   if(!ok) return;
   part.name=name; part.code=code; part.material=material;
   part.material_kind=material_kind||null;
-  part.width_mm=width_mm; part.height_mm=height_mm; part.thickness_mm=thickness_mm;
+  part.material_form=material_form||null;
+  DIM_FIELDS.forEach(f=>part[f]=dims[f]);
   document.getElementById('bom-edit-overlay')?.remove();
   renderBomContent();
   toast('Parça güncellendi.','success');
@@ -10177,7 +10276,7 @@ function renderBomTreeSvg() {
           <span style="color:var(--muted);font-size:10px">${p.quantity} ${p.unit}</span>
           ${p.weight_kg?h`<span style="color:var(--muted);font-size:10px">⚖${p.weight_kg}kg</span>`:''}
           ${p.material?h`<span style="color:var(--muted);font-size:10px">🔩${p.material}</span>`:''}
-          ${dimLabel(p.width_mm,p.height_mm,p.thickness_mm)?h`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.width_mm,p.height_mm,p.thickness_mm)}</span>`:''}
+          ${partDimLabel(p)?h`<span style="color:var(--muted);font-size:10px">📐${partDimLabel(p)}</span>`:''}
           ${opBadges}
         </div>
         ${childrenHtml.length?h`<div class="bom-tree-children">${childrenHtml}</div>`:''}
@@ -10490,6 +10589,9 @@ function pbomeRenderContent() {
   pbomeRenderParentSelect();
   pbomeRenderOpPartSelect();
   pbomeRenderOpDefSelect();
+  // Ölçü inputları bir kez kurulur (her render'da kurulsa yazılan değerler uçar)
+  if(!document.getElementById('pbome-part-dims').innerHTML)
+    renderFormDims('pbome-part', document.getElementById('pbome-part-form').value);
   pbomeRenderList();
 }
 
@@ -10554,6 +10656,9 @@ async function pbomeAddPart() {
   const parent   = parentId ? _pbomeParts.find(p=>p.id===parentId) : null;
   const level    = parent ? (parent.level||0)+1 : 0;
 
+  const materialForm = document.getElementById('pbome-part-form').value||null;
+  const dims = collectFormDims('pbome-part', materialForm||'', {}, 'custom_');
+  DIM_FIELDS.forEach(f=>{ if(!dims['custom_'+f]) dims['custom_'+f]=null; }); // create'te 0 yerine null
   const data = await dbInsert('project_bom_parts',{
     id:genId(), project_bom_id:_activePbomId, bom_part_id:null, is_excluded:false,
     custom_name:name, custom_code:code,
@@ -10562,6 +10667,7 @@ async function pbomeAddPart() {
     custom_weight:parseFloat(document.getElementById('pbome-part-weight').value)||null,
     custom_material:document.getElementById('pbome-part-material').value.trim()||null,
     material_kind:document.getElementById('pbome-part-kind').value||null,
+    material_form:materialForm, ...dims,
     dept_id:null, parent_custom_id:parentId, operations:[], level, sort_order:_pbomeParts.length
   });
   if(!Array.isArray(data)||!data[0]){ toast('Kayıt hatası!','error'); return; }
@@ -10573,9 +10679,10 @@ async function pbomeAddPart() {
 }
 
 function pbomeClearPartForm() {
-  ['pbome-part-name','pbome-part-code','pbome-part-material','pbome-part-weight','pbome-part-kind'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['pbome-part-name','pbome-part-code','pbome-part-material','pbome-part-weight','pbome-part-kind','pbome-part-form'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const q=document.getElementById('pbome-part-qty');if(q)q.value='1';
   const u=document.getElementById('pbome-part-unit');if(u)u.value='adet';
+  renderFormDims('pbome-part','');
 }
 
 // ─── İşlem Ekle ───
@@ -10665,7 +10772,7 @@ function pbomeRenderList() {
               <span>${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
               ${p.custom_weight?h`<span>⚖${p.custom_weight}kg</span>`:''}
               ${p.custom_material?h`<span>🔩${p.custom_material}</span>`:''}
-              ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?h`<span>📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
+              ${pbomeDimLabel(p)?h`<span>📐${pbomeDimLabel(p)}</span>`:''}
               ${dept?h`<span style="color:#2980b9">🏭${dept.name}</span>`:''}
             </div>
             ${opsHTML}
@@ -10763,12 +10870,12 @@ function pbomeEditPart(partId) {
       <label>Tür ${p.resolved_material_kind&&!p.material_kind?`<span style="text-transform:none;color:var(--muted)">(şablondan: ${MATERIAL_KINDS[p.resolved_material_kind]||''})</span>`:''}</label>
       <select id="pbome-edit-kind" style="${inStyle}">${kindOptions(p.material_kind)}</select>
     </div>
-    <div class="form-group" style="margin-bottom:18px">
-      <label>Ölçü (mm) — opsiyonel, sac/profil için</label>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-        <input type="number" id="pbome-edit-width" min="0" step="any" placeholder="En" value="${dimVal(p.custom_width_mm ?? p.resolved_width_mm)}" style="${inStyle}">
-        <input type="number" id="pbome-edit-height" min="0" step="any" placeholder="Boy" value="${dimVal(p.custom_height_mm ?? p.resolved_height_mm)}" style="${inStyle}">
-        <input type="number" id="pbome-edit-thickness" min="0" step="any" placeholder="Kalınlık" value="${dimVal(p.custom_thickness_mm ?? p.resolved_thickness_mm)}" style="${inStyle}">
+    <div class="form-row" style="grid-template-columns:1fr 2fr;margin-bottom:18px">
+      <div class="form-group"><label>Malzeme Formu</label>
+        <select id="pbome-edit-form" onchange="renderFormDims('pbome-edit', this.value, _dimEditVals)" style="${inStyle}">${formOptions(p.material_form ?? p.resolved_material_form)}</select>
+      </div>
+      <div class="form-group"><label>Ölçüler (mm) — ops.</label>
+        <div id="pbome-edit-dims" style="display:grid;gap:8px"></div>
       </div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
@@ -10777,6 +10884,8 @@ function pbomeEditPart(partId) {
     </div>
   </div>`;
   document.body.appendChild(overlay);
+  _dimEditVals = {}; DIM_FIELDS.forEach(f=>_dimEditVals[f]=p['custom_'+f] ?? p['resolved_'+f]);
+  renderFormDims('pbome-edit', (p.material_form ?? p.resolved_material_form)||'', _dimEditVals);
   setTimeout(()=>{const el=document.getElementById('pbome-edit-name');if(el){el.focus();el.select();}},100);
 }
 
@@ -10790,15 +10899,17 @@ async function pbomeSavePartEdit(partId) {
   const dup=findSiblingDup(_pbomeParts, {code, codeKey:'custom_code', parentKey:'parent_custom_id', parentId:p.parent_custom_id, selfId:partId});
   if(dup){ toast(`Aynı üst altında "${dup.custom_code}" kodlu bir parça zaten var: ${dup.custom_name}`,'error'); return; }
   if(!materialOk(material, p.custom_material)){ materialWarn(material); return; }
-  const custom_width_mm=dimNum('pbome-edit-width'), custom_height_mm=dimNum('pbome-edit-height'), custom_thickness_mm=dimNum('pbome-edit-thickness');
+  const material_form=document.getElementById('pbome-edit-form').value; // ''=override'i temizle
+  const dims=collectFormDims('pbome-edit', material_form, {}, 'custom_'); // 0=temizle (formda olmayanlar dahil)
   const material_kind=document.getElementById('pbome-edit-kind').value; // ''=override'i temizle
   // PARTIAL update'te null "dokunma" demek — malzemeyi temizlemek icin bos string gonderilir
-  const ok=await dbUpdate('project_bom_parts',partId,{custom_name:name,custom_code:code,custom_material:material,custom_width_mm,custom_height_mm,custom_thickness_mm,material_kind});
+  const ok=await dbUpdate('project_bom_parts',partId,{custom_name:name,custom_code:code,custom_material:material,material_kind,material_form,...dims});
   if(!ok) return;
   p.custom_name=name; p.custom_code=code; p.custom_material=material;
   p.material_kind=material_kind||null;
-  p.custom_width_mm=custom_width_mm; p.custom_height_mm=custom_height_mm; p.custom_thickness_mm=custom_thickness_mm;
-  p.resolved_width_mm=custom_width_mm; p.resolved_height_mm=custom_height_mm; p.resolved_thickness_mm=custom_thickness_mm;
+  p.material_form=material_form||null;
+  DIM_FIELDS.forEach(f=>{ p['custom_'+f]=dims['custom_'+f]; p['resolved_'+f]=dims['custom_'+f]; });
+  p.resolved_material_form=material_form||null;
   document.getElementById('pbome-edit-overlay')?.remove();
   pbomeRenderContent();
   toast('Parça güncellendi.','success');
@@ -10826,7 +10937,10 @@ async function pbomeCopyBranch(partId){
       custom_width_mm:p.custom_width_mm??p.resolved_width_mm??null,
       custom_height_mm:p.custom_height_mm??p.resolved_height_mm??null,
       custom_thickness_mm:p.custom_thickness_mm??p.resolved_thickness_mm??null,
+      custom_length_mm:p.custom_length_mm??p.resolved_length_mm??null,
+      custom_diameter_mm:p.custom_diameter_mm??p.resolved_diameter_mm??null,
       material_kind:p.material_kind??p.resolved_material_kind??null,
+      material_form:p.material_form??p.resolved_material_form??null,
       dept_id:p.dept_id||null,
       parent_custom_id:isRoot?(src.parent_custom_id||null):idMap[p.parent_custom_id],
       operations:Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]'),
@@ -11024,7 +11138,7 @@ function pbomeShowTree() {
             <span>${p.custom_name}${isCustom?' ⭐':''}</span>
             <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
             ${p.custom_weight?h`<span style="color:var(--muted);font-size:10px">⚖${p.custom_weight}kg</span>`:''}
-            ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?h`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
+            ${pbomeDimLabel(p)?h`<span style="color:var(--muted);font-size:10px">📐${pbomeDimLabel(p)}</span>`:''}
             ${dept?h`<span style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;font-size:10px;color:#2980b9">🏭${dept.name}</span>`:''}
             ${ops.map(o=>h`<span style="background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.2);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${o.name}(${o.code})</span>`)}
           </div>
@@ -11660,7 +11774,7 @@ async function viewPublishedBom(pbomId) {
             <span>${p.custom_name}${isCustom?' ⭐':''}</span>
             <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
             ${p.custom_weight?h`<span style="color:var(--muted);font-size:10px">⚖${p.custom_weight}kg</span>`:''}
-            ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?h`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
+            ${pbomeDimLabel(p)?h`<span style="color:var(--muted);font-size:10px">📐${pbomeDimLabel(p)}</span>`:''}
             ${dept?h`<span style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;font-size:10px;color:#2980b9">🏭${dept.name}</span>`:''}
             ${ops.map(o=>h`<span style="background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.2);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${o.name}(${o.code})</span>`)}
             ${partStatus}

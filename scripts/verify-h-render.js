@@ -383,6 +383,11 @@ chk('appUsers: yetki rozeti / butonlar (raw) korundu', au.includes('QR Okutma') 
 
 // ── renderBomTreeSvg (ürün ağacı görünümü) ──
 eval(grab('dimLabel'));
+// 5. tur #4: malzeme formu — form-farkında ölçü etiketleri
+global.MATERIAL_FORMS={SAC:'Sac',PROFIL:'Profil',MIL:'Mil',BORU:'Boru',DELRIN:'Delrin',COK_KOMPONENTLI:'Çok Komponentli'};
+eval(grab('dimLabel2'));
+eval(grab('partDimLabel'));
+eval(grab('pbomeDimLabel'));
 global.bomParts=[{id:'b1', parent_id:null, name:'BN'+EVIL, code:'BC<b>', quantity:1, unit:'ad<i>',
   material:'M<script>', operations:[{name:'Op<b>', code:'OC<i>', duration_per_unit:null}], sort_order:1}];
 global._activeBomProduct={name:'Prod<b>', code:'P<i>', unit:'ad'};

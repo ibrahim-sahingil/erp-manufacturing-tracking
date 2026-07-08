@@ -118,8 +118,12 @@ public class BomPartService {
                 .widthMm(request.getWidthMm())
                 .heightMm(request.getHeightMm())
                 .thicknessMm(request.getThicknessMm())
+                .lengthMm(request.getLengthMm())
+                .diameterMm(request.getDiameterMm())
                 .materialKind(request.getMaterialKind() != null && !request.getMaterialKind().isBlank()
                         ? request.getMaterialKind() : null)
+                .materialForm(request.getMaterialForm() != null && !request.getMaterialForm().isBlank()
+                        ? request.getMaterialForm() : null)
                 .operations(request.getOperations() != null
                         ? request.getOperations() : new ArrayList<>())
                 .level(level)
@@ -179,9 +183,19 @@ public class BomPartService {
         if (request.getThicknessMm() != null) {
             part.setThicknessMm(request.getThicknessMm());
         }
+        if (request.getLengthMm() != null) {
+            part.setLengthMm(request.getLengthMm());
+        }
+        if (request.getDiameterMm() != null) {
+            part.setDiameterMm(request.getDiameterMm());
+        }
         if (request.getMaterialKind() != null) {
             // Bos string = turu temizle (null'a dondur)
             part.setMaterialKind(request.getMaterialKind().isBlank() ? null : request.getMaterialKind());
+        }
+        if (request.getMaterialForm() != null) {
+            // Bos string = formu temizle (null'a dondur)
+            part.setMaterialForm(request.getMaterialForm().isBlank() ? null : request.getMaterialForm());
         }
         if (request.getOperations() != null) {
             part.setOperations(request.getOperations());

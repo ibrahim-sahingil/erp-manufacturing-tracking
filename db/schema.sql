@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fjLdFjo8cnjmJV4d5IbyjVB0ipuMPgv8vdDhW0WYGitkPAWeKUv54RmvukFKabJ
+\restrict 4af97ih5bTroTBdN2zOkknyj0W1md1MXhzfxKRs8uobIwmo5iLG1hzwSKZbvHq5
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -73,6 +73,10 @@ CREATE TABLE public.bom_parts (
     height_mm numeric(15,4),
     thickness_mm numeric(15,4),
     material_kind character varying(20),
+    length_mm numeric(15,4),
+    diameter_mm numeric(15,4),
+    material_form character varying(20),
+    CONSTRAINT bom_parts_material_form_chk CHECK (((material_form IS NULL) OR ((material_form)::text = ANY ((ARRAY['SAC'::character varying, 'PROFIL'::character varying, 'MIL'::character varying, 'BORU'::character varying, 'DELRIN'::character varying, 'COK_KOMPONENTLI'::character varying])::text[])))),
     CONSTRAINT bom_parts_material_kind_chk CHECK (((material_kind IS NULL) OR ((material_kind)::text = ANY ((ARRAY['TEDARIK'::character varying, 'HAMMADDE'::character varying, 'YARI_MAMUL'::character varying, 'MAMUL'::character varying, 'SARF'::character varying])::text[]))))
 );
 
@@ -278,6 +282,10 @@ CREATE TABLE public.project_bom_parts (
     custom_height_mm numeric(15,4),
     custom_thickness_mm numeric(15,4),
     material_kind character varying(20),
+    custom_length_mm numeric(15,4),
+    custom_diameter_mm numeric(15,4),
+    material_form character varying(20),
+    CONSTRAINT project_bom_parts_material_form_chk CHECK (((material_form IS NULL) OR ((material_form)::text = ANY ((ARRAY['SAC'::character varying, 'PROFIL'::character varying, 'MIL'::character varying, 'BORU'::character varying, 'DELRIN'::character varying, 'COK_KOMPONENTLI'::character varying])::text[])))),
     CONSTRAINT project_bom_parts_material_kind_chk CHECK (((material_kind IS NULL) OR ((material_kind)::text = ANY ((ARRAY['TEDARIK'::character varying, 'HAMMADDE'::character varying, 'YARI_MAMUL'::character varying, 'MAMUL'::character varying, 'SARF'::character varying])::text[]))))
 );
 
@@ -1417,5 +1425,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fjLdFjo8cnjmJV4d5IbyjVB0ipuMPgv8vdDhW0WYGitkPAWeKUv54RmvukFKabJ
+\unrestrict 4af97ih5bTroTBdN2zOkknyj0W1md1MXhzfxKRs8uobIwmo5iLG1hzwSKZbvHq5
 

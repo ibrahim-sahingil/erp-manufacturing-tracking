@@ -49,7 +49,10 @@ public class ProjectBomPartResponse {
     private BigDecimal customWidthMm;
     private BigDecimal customHeightMm;
     private BigDecimal customThicknessMm;
+    private BigDecimal customLengthMm;
+    private BigDecimal customDiameterMm;
     private String materialKind;
+    private String materialForm;
 
     private UUID deptId;
     private UUID parentCustomId;
@@ -68,7 +71,10 @@ public class ProjectBomPartResponse {
     private BigDecimal resolvedWidthMm;
     private BigDecimal resolvedHeightMm;
     private BigDecimal resolvedThicknessMm;
+    private BigDecimal resolvedLengthMm;
+    private BigDecimal resolvedDiameterMm;
     private String resolvedMaterialKind;
+    private String resolvedMaterialForm;
 
     /**
      * BomPart referansi YOK - sadece custom_X'lerden olusturulur.
@@ -99,7 +105,10 @@ public class ProjectBomPartResponse {
                 .customWidthMm(e.getCustomWidthMm())
                 .customHeightMm(e.getCustomHeightMm())
                 .customThicknessMm(e.getCustomThicknessMm())
+                .customLengthMm(e.getCustomLengthMm())
+                .customDiameterMm(e.getCustomDiameterMm())
                 .materialKind(e.getMaterialKind())
+                .materialForm(e.getMaterialForm())
                 .deptId(e.getDeptId())
                 .parentCustomId(e.getParentCustomId())
                 .operations(e.getOperations())
@@ -127,8 +136,14 @@ public class ProjectBomPartResponse {
                 bomPart != null ? bomPart.getHeightMm() : null));
         r.setResolvedThicknessMm(coalesceBigDecimal(e.getCustomThicknessMm(),
                 bomPart != null ? bomPart.getThicknessMm() : null));
+        r.setResolvedLengthMm(coalesceBigDecimal(e.getCustomLengthMm(),
+                bomPart != null ? bomPart.getLengthMm() : null));
+        r.setResolvedDiameterMm(coalesceBigDecimal(e.getCustomDiameterMm(),
+                bomPart != null ? bomPart.getDiameterMm() : null));
         r.setResolvedMaterialKind(coalesceString(e.getMaterialKind(),
                 bomPart != null ? bomPart.getMaterialKind() : null));
+        r.setResolvedMaterialForm(coalesceString(e.getMaterialForm(),
+                bomPart != null ? bomPart.getMaterialForm() : null));
 
         return r;
     }

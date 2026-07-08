@@ -189,6 +189,10 @@ public class ProjectBomPartService {
                 .customWidthMm(request.getCustomWidthMm())
                 .customHeightMm(request.getCustomHeightMm())
                 .customThicknessMm(request.getCustomThicknessMm())
+                .customLengthMm(request.getCustomLengthMm())
+                .customDiameterMm(request.getCustomDiameterMm())
+                .materialForm(request.getMaterialForm() != null && !request.getMaterialForm().isBlank()
+                        ? request.getMaterialForm() : null)
                 .materialKind(request.getMaterialKind() != null && !request.getMaterialKind().isBlank()
                         ? request.getMaterialKind() : null)
                 .deptId(request.getDeptId())
@@ -264,9 +268,19 @@ public class ProjectBomPartService {
         if (request.getCustomThicknessMm() != null) {
             pbp.setCustomThicknessMm(request.getCustomThicknessMm());
         }
+        if (request.getCustomLengthMm() != null) {
+            pbp.setCustomLengthMm(request.getCustomLengthMm());
+        }
+        if (request.getCustomDiameterMm() != null) {
+            pbp.setCustomDiameterMm(request.getCustomDiameterMm());
+        }
         if (request.getMaterialKind() != null) {
             // Bos string = override'i temizle (sablon turu gecerli olur)
             pbp.setMaterialKind(request.getMaterialKind().isBlank() ? null : request.getMaterialKind());
+        }
+        if (request.getMaterialForm() != null) {
+            // Bos string = override'i temizle (sablon formu gecerli olur)
+            pbp.setMaterialForm(request.getMaterialForm().isBlank() ? null : request.getMaterialForm());
         }
         if (request.getOperations() != null) {
             pbp.setOperations(request.getOperations());

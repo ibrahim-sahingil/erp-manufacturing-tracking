@@ -87,10 +87,21 @@ public class ProjectBomPartRequest {
     @PositiveOrZero(message = "Kalinlik 0 veya pozitif olmali")
     private BigDecimal customThicknessMm;
 
+    @PositiveOrZero(message = "Uzunluk 0 veya pozitif olmali")
+    private BigDecimal customLengthMm;
+
+    @PositiveOrZero(message = "Cap 0 veya pozitif olmali")
+    private BigDecimal customDiameterMm;
+
     @jakarta.validation.constraints.Pattern(
             regexp = "^(TEDARIK|HAMMADDE|YARI_MAMUL|MAMUL|SARF)?$",
             message = "Malzeme turu TEDARIK/HAMMADDE/YARI_MAMUL/MAMUL/SARF olmali")
     private String materialKind;
+
+    @jakarta.validation.constraints.Pattern(
+            regexp = "^(SAC|PROFIL|MIL|BORU|DELRIN|COK_KOMPONENTLI)?$",
+            message = "Malzeme formu SAC/PROFIL/MIL/BORU/DELRIN/COK_KOMPONENTLI olmali")
+    private String materialForm;
 
     /**
      * Bu parcayi hangi departman uretecek.

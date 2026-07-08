@@ -45,10 +45,13 @@ import java.util.UUID;
  *   unit        varchar(20)   DEFAULT 'adet'
  *   weight_kg   numeric(15,4) NULL
  *   material    varchar(150)  NULL
- *   width_mm     numeric(15,4) NULL (sac/profil olcusu - opsiyonel)
+ *   width_mm     numeric(15,4) NULL (olcu - opsiyonel; anlami material_form'a gore degisir)
  *   height_mm    numeric(15,4) NULL
- *   thickness_mm numeric(15,4) NULL
+ *   thickness_mm numeric(15,4) NULL (BORU'da et kalinligi, DELRIN'de yukseklik)
+ *   length_mm    numeric(15,4) NULL (PROFIL uzunluk / MIL uzunluk / BORU boy — 5. tur #4)
+ *   diameter_mm  numeric(15,4) NULL (MIL cap / BORU dis cap — 5. tur #4)
  *   material_kind varchar(20)  NULL (CHECK: TEDARIK/HAMMADDE/YARI_MAMUL/MAMUL/SARF)
+ *   material_form varchar(20)  NULL (CHECK: SAC/PROFIL/MIL/BORU/DELRIN/COK_KOMPONENTLI — 5. tur #4)
  *   operations  jsonb         DEFAULT '[]'
  *   level       int4          DEFAULT 0
  *   sort_order  int4          DEFAULT 0
@@ -99,6 +102,14 @@ public class BomPart extends BaseEntity {
     @Column(name = "thickness_mm", precision = 15, scale = 4)
     private BigDecimal thicknessMm;
 
+    /** Uzunluk/boy (mm) — PROFIL/MIL/BORU formlarinda sorulur (5. tur #4). */
+    @Column(name = "length_mm", precision = 15, scale = 4)
+    private BigDecimal lengthMm;
+
+    /** Cap / dis cap (mm) — MIL/BORU formlarinda sorulur (5. tur #4). */
+    @Column(name = "diameter_mm", precision = 15, scale = 4)
+    private BigDecimal diameterMm;
+
     /**
      * Malzeme turu (#7 arkadas istegi): TEDARIK / HAMMADDE / YARI_MAMUL /
      * MAMUL / SARF. NULL = belirtilmedi (eski kayitlar). Yayinla/satin alma
@@ -106,6 +117,14 @@ public class BomPart extends BaseEntity {
      */
     @Column(name = "material_kind", length = 20)
     private String materialKind;
+
+    /**
+     * Malzeme formu (5. tur #4): SAC / PROFIL / MIL / BORU / DELRIN /
+     * COK_KOMPONENTLI. NULL = belirtilmedi. Frontend forma gore farkli olcu
+     * alanlari sorar (FORM_DIMS haritasi); olculerin anlami forma baglidir.
+     */
+    @Column(name = "material_form", length = 20)
+    private String materialForm;
 
     /**
      * Operasyonlar listesi (PostgreSQL jsonb -> Java List<Map<String, Object>>).

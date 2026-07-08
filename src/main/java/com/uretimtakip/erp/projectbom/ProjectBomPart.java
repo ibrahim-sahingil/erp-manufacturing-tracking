@@ -106,6 +106,14 @@ public class ProjectBomPart extends BaseEntity {
     @Column(name = "custom_thickness_mm", precision = 15, scale = 4)
     private BigDecimal customThicknessMm;
 
+    /** Uzunluk/boy override'i (mm) — PROFIL/MIL/BORU (5. tur #4). NULL = sablon. */
+    @Column(name = "custom_length_mm", precision = 15, scale = 4)
+    private BigDecimal customLengthMm;
+
+    /** Cap / dis cap override'i (mm) — MIL/BORU (5. tur #4). NULL = sablon. */
+    @Column(name = "custom_diameter_mm", precision = 15, scale = 4)
+    private BigDecimal customDiameterMm;
+
     /**
      * Malzeme turu override'i (#7): TEDARIK/HAMMADDE/YARI_MAMUL/MAMUL/SARF.
      * NULL ise sablondaki (bom_parts.material_kind) tur gecerli
@@ -113,6 +121,14 @@ public class ProjectBomPart extends BaseEntity {
      */
     @Column(name = "material_kind", length = 20)
     private String materialKind;
+
+    /**
+     * Malzeme formu override'i (5. tur #4): SAC/PROFIL/MIL/BORU/DELRIN/
+     * COK_KOMPONENTLI. NULL ise sablondaki (bom_parts.material_form) form
+     * gecerli (resolved_material_form response'ta hesaplanir).
+     */
+    @Column(name = "material_form", length = 20)
+    private String materialForm;
 
     @Column(name = "dept_id")
     private UUID deptId;
