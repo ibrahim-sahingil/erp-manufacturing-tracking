@@ -1,0 +1,14 @@
+{
+  "name": "uretim-takip-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Üretim Takip ERP — Playwright uçtan uca tarayıcı testleri (kritik akışlar).",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:node": "node scripts/e2e-test.js",
+    "test:render": "node scripts/verify-h-render.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
