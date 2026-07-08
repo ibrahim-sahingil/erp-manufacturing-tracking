@@ -9,7 +9,11 @@ const html = fs.readFileSync(path.join(__dirname,'..','src','main','resources','
 function grab(name){
   const marker='function '+name; const start=html.indexOf(marker);
   if(start<0) throw new Error(name+' bulunamadı');
-  let i=html.indexOf('{',start),d=1;i++;
+  // Parametre parantezini atla — destructuring parametrenin '{'sı gövde sanılmasın
+  let i=html.indexOf('(',start),pd=1;i++;
+  while(pd>0){const c=html[i];if(c==='(')pd++;if(c===')')pd--;i++;}
+  i=html.indexOf('{',i);
+  let d=1;i++;
   while(d>0){const c=html[i];if(c==='{')d++;if(c==='}')d--;i++;}
   const asyncPrefix = html.slice(Math.max(0,start-6),start)==='async ' ? 'async ' : '';
   return asyncPrefix + html.slice(start,i);
@@ -20,6 +24,8 @@ global.esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'
 global.raw = s => { const r=new String(s==null?'':String(s)); r.__html=true; return r; };
 global._hval = v => (v==null||v===false||v===true)?'':(v&&v.__html)?v.toString():Array.isArray(v)?v.map(_hval).join(''):esc(v);
 global.h = (strings,...vals)=>{ let out=strings[0]; for(let i=0;i<vals.length;i++) out+=_hval(vals[i])+strings[i+1]; return raw(out); };
+// Temizlik turu helper'ları — render fonksiyonları içinden çağrılıyor
+eval(grab('INP'));
 
 const store={};
 // Elementler id başına önbelleklenir ki test .value atayabilsin (stat-start vb.)
@@ -77,6 +83,7 @@ global.PUR_STATUS={PLANNED:{icon:'📝',label:'Planlandı'}, IN_WAREHOUSE:{icon:
 global.dbGet = async (t)=> t==='purchase_items'
   ? [{id:'i1', name:'Kalem'+EVIL, project_name:'Prj<b>', code:'K&<D>', quantity:3, unit:'ad<i>', material:'Mat<script>', supplier:'Ted'+EVIL, status:'PLANNED'}]
   : t==='warehouses' ? [{id:'w1', name:'Depo<b>', location:'Kat<i>', is_active:true}] : [];
+eval(grab('whOptionsHTML')); // temizlik turu: depo option helper'ı (renderReceive kullanır)
 eval(grab('renderReceive'));
 await renderReceive('i1');
 const rcv=store['scan-content']||'';
