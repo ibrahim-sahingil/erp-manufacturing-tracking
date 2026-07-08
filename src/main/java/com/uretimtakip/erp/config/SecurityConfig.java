@@ -119,10 +119,13 @@ public class SecurityConfig {
                 "http://localhost:8080"
         ));
 
-        // Desen bazli izinler: Cloudflare Tunnel (demo) ve yerel ag erisimi
+        // Desen bazli izinler: Cloudflare Tunnel (demo), Tailscale (kalici
+        // test erisimi — tailscale serve, 2026-07-09) ve yerel ag erisimi
         configuration.setAllowedOriginPatterns(List.of(
                 "https://*.trycloudflare.com",
-                "http://192.168.*.*:8080"
+                "https://*.ts.net",
+                "http://192.168.*.*:8080",
+                "http://100.*:8080"
         ));
 
         configuration.setAllowedMethods(Arrays.asList(
