@@ -388,6 +388,9 @@ global.MATERIAL_FORMS={SAC:'Sac',PROFIL:'Profil',MIL:'Mil',BORU:'Boru',DELRIN:'D
 eval(grab('dimLabel2'));
 eval(grab('partDimLabel'));
 eval(grab('pbomeDimLabel'));
+// 5. tur #6: dal aç/kapa set'leri (index.html'de const olarak tanımlı)
+global._bomCollapsed=new Set();
+global._pbomeCollapsed=new Set();
 global.bomParts=[{id:'b1', parent_id:null, name:'BN'+EVIL, code:'BC<b>', quantity:1, unit:'ad<i>',
   material:'M<script>', operations:[{name:'Op<b>', code:'OC<i>', duration_per_unit:null}], sort_order:1}];
 global._activeBomProduct={name:'Prod<b>', code:'P<i>', unit:'ad'};
@@ -422,6 +425,7 @@ global._pbomeParts=[{id:'q1', parent_custom_id:null, custom_code:'QC<b>', custom
 global._activePbomId='pb1';
 eval(grab('pbomeRenderList'));
 eval(grab('pbomeShowTree'));
+eval(grab('pbomeRenderTree')); // 5. tur #6: render pbomeShowTree'den ayrıldı
 pbomeRenderList();
 const pel=store['pbome-parts-list']||'';
 console.log('\npbomeRenderList / pbomeShowTree (proje BOM editörü):');

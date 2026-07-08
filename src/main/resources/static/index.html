@@ -1364,6 +1364,8 @@
           <span style="color:var(--accent)">←</span> Sol = Aynı seviye &nbsp;|&nbsp;
           <span style="color:#2980b9">→</span> Sağ = Alt parça yap
         </span>
+        <button class="btn btn-ghost btn-sm" onclick="bomExpandAll()" title="Tüm dalları aç">⊞ Tümünü Aç</button>
+        <button class="btn btn-ghost btn-sm" onclick="bomCollapseAll()" title="Tüm dalları kapat">⊟ Tümünü Kapat</button>
         <button class="btn btn-primary btn-sm" onclick="showBomTree()">🌳 Ürün Ağacını Görüntüle</button>
       </div>
     </div>
@@ -1523,6 +1525,8 @@
         <span style="color:var(--accent)">←</span> Sol = Aynı seviye &nbsp;|&nbsp;
         <span style="color:#2980b9">→</span> Sağ = Alt parça yap
       </span>
+      <button class="btn btn-ghost btn-sm" onclick="pbomeExpandAll()" title="Tüm dalları aç">⊞ Aç</button>
+      <button class="btn btn-ghost btn-sm" onclick="pbomeCollapseAll()" title="Tüm dalları kapat">⊟ Kapat</button>
       <button class="btn btn-ghost btn-sm" onclick="openMaterialsModal()" title="Malzeme listesi — parçalarda malzeme buradan seçilir">🔩 Malzeme</button>
       <button class="btn btn-ghost btn-sm" onclick="xlsImportOpen('pbome')" title="Basamaklı Excel'den (1, 1.1, 1.1.2...) toplu parça aktar">📥 Excel'den İçe Aktar</button>
       <button class="btn btn-primary btn-sm" onclick="pbomeShowTree()">🌳 Ağacı Görüntüle</button>
@@ -9483,6 +9487,50 @@ let bomProducts = [];
 let bomParts    = [];
 let _activeBomProduct = null;
 let _dragSrcRow = null;
+// (5. tur #6) Kapalı dallar — oturum boyunca hatırlanır, sayfa yenilenince açılır.
+// Liste ve ağaç görünümü aynı set'i paylaşır.
+const _bomCollapsed   = new Set();
+const _pbomeCollapsed = new Set();
+
+function _bomRefreshCollapseViews(){
+  renderBomList();
+  if(document.getElementById('bom-tree-view').style.display!=='none') renderBomTreeSvg();
+}
+function bomToggle(id){
+  if(_bomCollapsed.has(id)) _bomCollapsed.delete(id); else _bomCollapsed.add(id);
+  _bomRefreshCollapseViews();
+}
+function bomExpandAll(){ _bomCollapsed.clear(); _bomRefreshCollapseViews(); }
+function bomCollapseAll(){
+  new Set(bomParts.map(p=>p.parent_id).filter(Boolean)).forEach(id=>_bomCollapsed.add(id));
+  _bomRefreshCollapseViews();
+}
+function _pbomeRefreshCollapseViews(){
+  pbomeRenderList();
+  if(document.getElementById('pbome-tree-view').style.display!=='none') pbomeRenderTree();
+}
+function pbomeToggle(id){
+  if(_pbomeCollapsed.has(id)) _pbomeCollapsed.delete(id); else _pbomeCollapsed.add(id);
+  _pbomeRefreshCollapseViews();
+}
+function pbomeExpandAll(){ _pbomeCollapsed.clear(); _pbomeRefreshCollapseViews(); }
+function pbomeCollapseAll(){
+  new Set(_pbomeParts.map(p=>p.parent_custom_id).filter(Boolean)).forEach(id=>_pbomeCollapsed.add(id));
+  _pbomeRefreshCollapseViews();
+}
+
+// (5. tur #5) Satırdaki ⚙ ile işlem formunu bu parçayla hazırla — 500-1000
+// parçalık ağaçta yukarıdaki listeden aramak yerine parçadan gelinir.
+function bomOpFor(id){
+  ssSet('bom-op-part', id);
+  document.getElementById('bom-op-part-ss')?.scrollIntoView({behavior:'smooth', block:'center'});
+  setTimeout(()=>document.getElementById('bom-op-def-select-txt')?.focus(), 350);
+}
+function pbomeOpFor(id){
+  ssSet('pbome-op-part', id);
+  document.getElementById('pbome-op-part-ss')?.scrollIntoView({behavior:'smooth', block:'center'});
+  setTimeout(()=>document.getElementById('pbome-op-def-txt')?.focus(), 350);
+}
 
 // ─── Init ───
 let bomOpDefs = []; // İşlem tanımları
@@ -9855,6 +9903,7 @@ async function addBomPart() {
   btn.disabled=false; btn.textContent='+ Parça Ekle';
   if(!Array.isArray(data)||!data[0]){ toast('Kayıt hatası!','error'); return; }
   bomParts.push(data[0]);
+  if(parentId) _bomCollapsed.delete(parentId); // eklenen parça görünsün
   clearBomPartForm();
   renderBomContent();
   toast('Parça eklendi!','success');
@@ -9991,8 +10040,10 @@ function renderBomList() {
     el.innerHTML=`<div class="empty-state"><span class="emoji">📦</span>Henüz parça eklenmedi. Yukarıdan parça ekleyin.</div>`;
     return;
   }
-  // Hiyerarşik sıralama
-  const sorted = buildSortedTree(null, 0);
+  // Hiyerarşik sıralama (kapalı dalların altı listelenmez)
+  const kidCount = new Map();
+  bomParts.forEach(p=>{ if(p.parent_id) kidCount.set(p.parent_id,(kidCount.get(p.parent_id)||0)+1); });
+  const sorted = buildSortedTree(null, 0, _bomCollapsed);
   el.innerHTML = h`${sorted.map(({part,level}) => {
     const ops = Array.isArray(part.operations) ? part.operations : JSON.parse(part.operations||'[]');
     const opsHTML = ops.length ? h`<div class="bom-ops">${ops.map((o,oi)=>{
@@ -10000,6 +10051,8 @@ function renderBomList() {
       return h`<span class="bom-op-tag">⚙ ${o.name} (${o.code})${timeStr} <button onclick="removeBomOp('${raw(part.id)}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px;margin-left:2px">✕</button></span>`;
     })}</div>` : '';
     const indent = level * 24;
+    const kids = kidCount.get(part.id)||0;
+    const isCollapsed = _bomCollapsed.has(part.id);
     return h`<div class="bom-part-row" data-id="${raw(part.id)}" data-level="${level}"
         draggable="true"
         ondragstart="onBomDragStart(event,this)"
@@ -10009,12 +10062,14 @@ function renderBomList() {
         ondragend="onBomDragEnd(event,this)"
         style="margin-left:${indent}px">
       <span class="bom-drag-handle">⠿</span>
+      ${kids?h`<button onclick="bomToggle('${raw(part.id)}')" title="${isCollapsed?'Dalı aç':'Dalı kapat'}" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:12px;padding:0 2px;width:18px">${isCollapsed?'▸':'▾'}</button>`:raw('<span style="display:inline-block;width:18px"></span>')}
       ${level>0?raw(`<span style="color:var(--muted);font-size:10px;margin-right:4px">${'└─'.repeat(1)}</span>`):''}
       <span class="bom-part-code">${part.code}</span>
       <div style="flex:1">
         <div class="bom-part-name-cell">${part.name} ${raw(kindBadge(part.material_kind))}</div>
         <div class="bom-part-meta">
           <span id="bom-qty-display-${raw(part.id)}" style="cursor:pointer;border-bottom:1px dashed var(--muted)" onclick="editBomQty('${raw(part.id)}')" title="Miktarı düzenle">${part.quantity} ${part.unit}</span>
+          ${isCollapsed&&kids?h`<span style="color:var(--accent);cursor:pointer" onclick="bomToggle('${raw(part.id)}')">▸ ${kids} alt parça gizli</span>`:''}
           ${part.weight_kg?h`<span>⚖ ${part.weight_kg} kg</span>`:''}
           ${part.material?h`<span>🔩 ${part.material}</span>`:''}
           ${partDimLabel(part)?h`<span>📐 ${partDimLabel(part)}${part.material_form?' · '+MATERIAL_FORMS[part.material_form]:''}</span>`:(part.material_form?h`<span>📐 ${MATERIAL_FORMS[part.material_form]}</span>`:'')}
@@ -10022,6 +10077,7 @@ function renderBomList() {
         ${opsHTML}
       </div>
       <div style="display:flex;gap:4px;align-items:center">
+        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="bomOpFor('${raw(part.id)}')" title="Bu parçaya işlem ekle — işlem formunu bu parçayla hazırlar">⚙ İşlem</button>
         <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="editBomPart('${raw(part.id)}')" title="Ad / kod / malzeme düzenle">✏️ Düzenle</button>
         <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="bomCopyBranch('${raw(part.id)}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">📋 Kopyala</button>
         <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="editBomQty('${raw(part.id)}')" title="Miktarı düzenle">✏️ Miktar</button>
@@ -10031,11 +10087,16 @@ function renderBomList() {
   })}`;
 }
 
-function buildSortedTree(parentId, level) {
+function buildSortedTree(parentId, level, collapsed) {
+  // collapsed verilirse o id'lerin altı gezilmez (5. tur #6 — dal kapama).
+  // Verilmezse (Excel export vb.) ağaç HER ZAMAN tam döner.
   const children = bomParts.filter(p=>(p.parent_id||null)===(parentId||null))
     .sort((a,b)=>((a.sort_order||0)-(b.sort_order||0)));
   let result = [];
-  children.forEach(p=>{ result.push({part:p,level}); result = result.concat(buildSortedTree(p.id,level+1)); });
+  children.forEach(p=>{
+    result.push({part:p,level});
+    if(!collapsed || !collapsed.has(p.id)) result = result.concat(buildSortedTree(p.id,level+1,collapsed));
+  });
   return result;
 }
 
@@ -10108,7 +10169,8 @@ async function onBomDrop(e, row) {
   }
 
   if(isChild) {
-    // Hedefin ALT parçası yap
+    // Hedefin ALT parçası yap (kapalıysa aç — taşınan parça görünsün)
+    _bomCollapsed.delete(tgtId);
     src.parent_id = tgtId;
     src.level     = (tgt.level||0) + 1;
     await dbUpdate('bom_parts', srcId, {parent_id: tgtId, level: src.level});
@@ -10331,11 +10393,15 @@ function renderBomTreeSvg() {
       const ops = Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
       // h`` parçaları araya boşluk konarak birleşsin diye join(' ') + raw
       const opBadges = raw(ops.map(o=>{ const t=o.duration_per_unit?` ⏱${(o.total_duration||0).toFixed(1)}dk`:""; return h`<span style="background:rgba(41,128,185,.15);border:1px solid rgba(41,128,185,.3);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${o.name}(${o.code})${t}</span>`; }).join(" "));
-      const childrenHtml = buildNode(p.id, level+1);
+      const hasKids = bomParts.some(c=>c.parent_id===p.id);
+      const isCollapsed = _bomCollapsed.has(p.id);
+      const childrenHtml = isCollapsed ? [] : buildNode(p.id, level+1);
       return h`<div class="bom-tree-node">
         <div class="bom-tree-item" style="margin-left:${level*4}px">
+          ${hasKids?h`<span onclick="bomToggle('${raw(p.id)}')" title="${isCollapsed?'Dalı aç':'Dalı kapat'}" style="cursor:pointer;color:var(--accent)">${isCollapsed?'▸':'▾'}</span>`:''}
           <span style="color:var(--accent);font-weight:700">${p.code}</span>
           <span>${p.name}</span>
+          ${isCollapsed&&hasKids?h`<span style="color:var(--muted);font-size:10px;cursor:pointer" onclick="bomToggle('${raw(p.id)}')">(gizli dal)</span>`:''}
           <span style="color:var(--muted);font-size:10px">${p.quantity} ${p.unit}</span>
           ${p.weight_kg?h`<span style="color:var(--muted);font-size:10px">⚖${p.weight_kg}kg</span>`:''}
           ${p.material?h`<span style="color:var(--muted);font-size:10px">🔩${p.material}</span>`:''}
@@ -10736,6 +10802,7 @@ async function pbomeAddPart() {
   if(!Array.isArray(data)||!data[0]){ toast('Kayıt hatası!','error'); return; }
   _pbomeParts.push(data[0]);
   projectBomParts.push(data[0]);
+  if(parentId) _pbomeCollapsed.delete(parentId); // eklenen parça görünsün
   pbomeClearPartForm();
   pbomeRenderContent();
   toast(`"${name}" eklendi!`,'success');
@@ -10834,6 +10901,8 @@ function pbomeRenderList() {
     el.innerHTML=h`<div class="empty-state"><span class="emoji">📦</span>Henüz parça yok. Yukarıdan ekleyin veya ürün ağacından kopyalansın.</div>`;
     return;
   }
+  const kidCount = new Map();
+  _pbomeParts.forEach(p=>{ if(p.parent_custom_id) kidCount.set(p.parent_custom_id,(kidCount.get(p.parent_custom_id)||0)+1); });
   function buildTree(parentId,level) {
     return _pbomeParts.filter(p=>(p.parent_custom_id||null)===(parentId||null))
       .sort((a,b)=>(a.sort_order||0)-(b.sort_order||0))
@@ -10843,7 +10912,9 @@ function pbomeRenderList() {
         const opsHTML=ops.length?h`<div class="bom-ops">${ops.map((o,oi)=>h`<span class="bom-op-tag">⚙${o.name}(${o.code})${o.duration_per_unit?` ⏱${(o.total_duration||0).toFixed(0)}dk`:''} <button onclick="pbomeRemoveOp('${raw(p.id)}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px">✕</button></span>`)}</div>`:''
         const isFromBom = !!p.bom_part_id;
         const indent = level*24;
-        const children = buildTree(p.id,level+1);
+        const kids = kidCount.get(p.id)||0;
+        const isCollapsed = _pbomeCollapsed.has(p.id);
+        const children = isCollapsed?[]:buildTree(p.id,level+1);
         return h`<div class="bom-part-row${p.is_excluded?' excluded':''}" id="pbomep-${p.id}" data-id="${p.id}"
           draggable="true"
           ondragstart="pbomeDragStart(event,this)"
@@ -10853,12 +10924,14 @@ function pbomeRenderList() {
           ondragend="pbomeDragEnd()"
           style="margin-left:${indent}px;${isFromBom?'':'border-left:3px solid var(--green)'}">
           <span class="bom-drag-handle">⠿</span>
+          ${kids?h`<button onclick="pbomeToggle('${raw(p.id)}')" title="${isCollapsed?'Dalı aç':'Dalı kapat'}" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:12px;padding:0 2px;width:18px">${isCollapsed?'▸':'▾'}</button>`:raw('<span style="display:inline-block;width:18px"></span>')}
           ${level>0?raw('<span style="color:var(--muted);font-size:10px;margin-right:2px">└─</span>'):''}
           <span class="bom-part-code" style="${isFromBom?'':'color:var(--green)'}">${p.custom_code}</span>
           <div style="flex:1">
             <div class="bom-part-name-cell">${p.custom_name}${isFromBom?'':' ⭐'} ${raw(kindBadge(p.material_kind||p.resolved_material_kind))}</div>
             <div class="bom-part-meta">
               <span>${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
+              ${isCollapsed&&kids?h`<span style="color:var(--accent);cursor:pointer" onclick="pbomeToggle('${raw(p.id)}')">▸ ${kids} alt parça gizli</span>`:''}
               ${p.custom_weight?h`<span>⚖${p.custom_weight}kg</span>`:''}
               ${p.custom_material?h`<span>🔩${p.custom_material}</span>`:''}
               ${pbomeDimLabel(p)?h`<span>📐${pbomeDimLabel(p)}</span>`:''}
@@ -10867,6 +10940,7 @@ function pbomeRenderList() {
             ${opsHTML}
           </div>
           <div style="display:flex;gap:4px;align-items:center">
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeOpFor('${raw(p.id)}')" title="Bu parçaya işlem ekle — işlem formunu bu parçayla hazırlar">⚙</button>
             <select onchange="pbomeSetDept('${raw(p.id)}',this.value)"
               style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:4px 6px;outline:none;max-width:130px">
               <option value="">— Bölüm —</option>
@@ -11072,7 +11146,7 @@ async function pbomeDeletePart(partId) {
 function pbomeDragStart(e,row){ _pbomeDragSrc=row; row.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; }
 function pbomeDragOver(e,row){ e.preventDefault(); if(!_pbomeDragSrc||row===_pbomeDragSrc) return; const pct=(e.clientX-row.getBoundingClientRect().left)/row.getBoundingClientRect().width; row.classList.remove('drag-over','drag-over-child'); row.classList.add(pct>0.6?'drag-over-child':'drag-over'); }
 function pbomeDragLeave(row){ row.classList.remove('drag-over','drag-over-child'); }
-async function pbomeDrop(e,row){ e.preventDefault(); const isChild=row.classList.contains('drag-over-child'); row.classList.remove('drag-over','drag-over-child'); if(!_pbomeDragSrc||_pbomeDragSrc===row) return; const srcId=_pbomeDragSrc.dataset.id,tgtId=row.dataset.id; const src=_pbomeParts.find(p=>p.id===srcId),tgt=_pbomeParts.find(p=>p.id===tgtId); if(!src||!tgt) return; if(isChild){src.parent_custom_id=tgtId;src.level=(tgt.level||0)+1;await dbUpdate('project_bom_parts',srcId,{parent_custom_id:tgtId,level:src.level});toast(`"${src.custom_name}" → "${tgt.custom_name}" altına taşındı`,'success');}else{src.parent_custom_id=tgt.parent_custom_id||null;src.level=tgt.level||0;await dbUpdate('project_bom_parts',srcId,{parent_custom_id:src.parent_custom_id,level:src.level});toast(`"${src.custom_name}" taşındı`,'success');} _pbomeDragSrc=null; pbomeRenderContent(); }
+async function pbomeDrop(e,row){ e.preventDefault(); const isChild=row.classList.contains('drag-over-child'); row.classList.remove('drag-over','drag-over-child'); if(!_pbomeDragSrc||_pbomeDragSrc===row) return; const srcId=_pbomeDragSrc.dataset.id,tgtId=row.dataset.id; const src=_pbomeParts.find(p=>p.id===srcId),tgt=_pbomeParts.find(p=>p.id===tgtId); if(!src||!tgt) return; if(isChild){_pbomeCollapsed.delete(tgtId);src.parent_custom_id=tgtId;src.level=(tgt.level||0)+1;await dbUpdate('project_bom_parts',srcId,{parent_custom_id:tgtId,level:src.level});toast(`"${src.custom_name}" → "${tgt.custom_name}" altına taşındı`,'success');}else{src.parent_custom_id=tgt.parent_custom_id||null;src.level=tgt.level||0;await dbUpdate('project_bom_parts',srcId,{parent_custom_id:src.parent_custom_id,level:src.level});toast(`"${src.custom_name}" taşındı`,'success');} _pbomeDragSrc=null; pbomeRenderContent(); }
 function pbomeDragEnd(){ document.querySelectorAll('.bom-part-row').forEach(r=>r.classList.remove('dragging','drag-over','drag-over-child')); _pbomeDragSrc=null; }
 
 // ═══ EXCEL'DEN ÜRÜN AĞACI İÇE AKTARMA (arkadaş sesli not: hızlı toplu giriş) ═══
@@ -11212,6 +11286,9 @@ function pbomeShowTree() {
   const tv=document.getElementById('pbome-tree-view');
   tv.style.display='block';
   tv.scrollIntoView({behavior:'smooth'});
+  pbomeRenderTree();
+}
+function pbomeRenderTree() {
   const container=document.getElementById('pbome-tree-container');
   function buildNode(parentId,level) {
     return _pbomeParts.filter(p=>(p.parent_custom_id||null)===(parentId||null))
@@ -11219,12 +11296,16 @@ function pbomeShowTree() {
       .map(p=>{
         const ops=Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
         const dept=p.dept_id?depts.find(d=>d.id===p.dept_id):null;
-        const children=buildNode(p.id,level+1);
+        const hasKids=_pbomeParts.some(c=>c.parent_custom_id===p.id);
+        const isCollapsed=_pbomeCollapsed.has(p.id);
+        const children=isCollapsed?[]:buildNode(p.id,level+1);
         const isCustom=!p.bom_part_id;
         return h`<div class="bom-tree-node">
           <div class="bom-tree-item" style="margin-left:${level*4}px${isCustom?';border-color:var(--green)':''}">
+            ${hasKids?h`<span onclick="pbomeToggle('${raw(p.id)}')" title="${isCollapsed?'Dalı aç':'Dalı kapat'}" style="cursor:pointer;color:var(--accent)">${isCollapsed?'▸':'▾'}</span>`:''}
             <span style="color:${isCustom?'var(--green)':'var(--accent)'};font-weight:700">${p.custom_code}</span>
             <span>${p.custom_name}${isCustom?' ⭐':''}</span>
+            ${isCollapsed&&hasKids?h`<span style="color:var(--muted);font-size:10px;cursor:pointer" onclick="pbomeToggle('${raw(p.id)}')">(gizli dal)</span>`:''}
             <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
             ${p.custom_weight?h`<span style="color:var(--muted);font-size:10px">⚖${p.custom_weight}kg</span>`:''}
             ${pbomeDimLabel(p)?h`<span style="color:var(--muted);font-size:10px">📐${pbomeDimLabel(p)}</span>`:''}
