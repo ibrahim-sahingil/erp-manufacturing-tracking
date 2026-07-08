@@ -136,6 +136,23 @@ chk('whRow: malzeme/tedarikçi kaçırıldı', wr.includes('Mat&lt;script&gt;') 
 chk('whRow: proje/depo adı kaçırıldı', wr.includes('Prj&lt;b&gt;') && wr.includes('Depo&lt;i&gt;'));
 chk('whRow: actionsHTML (raw) korundu', wr.includes('<button onclick="whUndo(1)">Geri</button>'));
 
+// ── renderPurchaseList (satın alma kalemleri) ──
+global.PUR_ACTIONS={PLANNED:[['ORDERED','📦 Sipariş Ver']]};
+global.purSelected=new Set();
+global.purchaseOrders=[];
+global.updatePurSelectBar=()=>{};
+global.purchaseItems=[{id:'p1', status:'PLANNED', code:'K'+EVIL, name:'Ad'+EVIL, project_name:'Prj<b>',
+  unit:'ad<i>', material:'Mat<script>', supplier:'Ted'+EVIL, notes:'Not'+EVIL, quantity:2,
+  unit_price:null, expected_date:null, needs_planning:false}];
+eval(grab('renderPurchaseList'));
+renderPurchaseList();
+const pl=store['pur-list']||'';
+console.log('\nrenderPurchaseList (satın alma):');
+chk('purchase: kod/ad onerror kaçırıldı', pl.includes('K&lt;img') && pl.includes('Ad&lt;img') && !pl.includes('Ad'+EVIL));
+chk('purchase: proje/malzeme/tedarikçi kaçırıldı', pl.includes('Prj&lt;b&gt;') && pl.includes('Mat&lt;script&gt;') && pl.includes('Ted&lt;img'));
+chk('purchase: not kaçırıldı', pl.includes('Not&lt;img'));
+chk('purchase: actions/butonlar (raw) korundu', pl.includes("purSetStatus('p1','ORDERED')") && pl.includes("deletePurchaseItem('p1')") && pl.includes("purToggleSel('p1'"));
+
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);
 }
