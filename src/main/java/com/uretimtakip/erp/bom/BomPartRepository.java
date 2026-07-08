@@ -39,6 +39,9 @@ public interface BomPartRepository extends JpaRepository<BomPart, UUID> {
 
     List<BomPart> findByParentIdOrderBySortOrderAscNameAsc(UUID parentId);
 
+    /** Kod arama — TUM urunler genelinde (5. tur #3: kod akilli doldurma). */
+    List<BomPart> findByCodeIgnoreCaseOrderByCreatedAtDesc(String code);
+
     // ============ EXISTS / COUNT ============
 
     boolean existsByParentId(UUID parentId);

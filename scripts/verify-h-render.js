@@ -468,6 +468,24 @@ console.log('\nviewPublishedBom (yayınlanan ağaç):');
 chk('viewPbom: proje/ürün adı kaçırıldı', _ovl.includes('PBP&lt;b&gt;') && _ovl.includes('Ürün&lt;img'));
 chk('viewPbom: parça kod/ad kaçırıldı', _ovl.includes('VC&lt;b&gt;') && _ovl.includes('VN&lt;img'));
 
+// ── bomCodeLookup klon paneli (5. tur #3: kod akıllı doldurma) ──
+global._codeMatch={bom:null,pbome:null};
+global._codeLookupT=null;
+global.DIM_FIELDS=['width_mm','height_mm','thickness_mm','length_mm','diameter_mm'];
+global.renderFormDims=()=>{};
+global.apiFetch=async(p)=> p.startsWith('/bom-parts/by-code')
+  ? [{id:'src1', code:'KD<b>', name:'Kaynak'+EVIL, product_name:'Ürün<i>', material:'M<script>', child_count:1}]
+  : [{id:'ch1', code:'CC<b>', name:'Çocuk'+EVIL}];
+document.getElementById('bom-part-code').value='KD<b>';
+document.getElementById('bom-part-name').value='';
+eval(grab('bomCodeClearPanel'));
+eval(grab('bomCodeLookup'));
+await bomCodeLookup('bom');
+const ccp=store['bom-code-clone-panel']||'';
+console.log('\nbomCodeLookup (kod akıllı doldurma paneli):');
+chk('codeLookup: kaynak ad/ürün onerror kaçırıldı', ccp.includes('Kaynak&lt;img') && ccp.includes('Ürün&lt;i&gt;') && !ccp.includes('Kaynak'+EVIL));
+chk('codeLookup: alt parça kod/ad kaçırıldı + checkbox (raw) korundu', ccp.includes('CC&lt;b&gt;') && ccp.includes('Çocuk&lt;img') && ccp.includes('code-clone-chk-bom'));
+
 // ── renderMaterialsModalList (malzeme kartoteki — 5. tur #1) ──
 global.materials=[{id:'m1', name:'ST<b>37 "X"'+EVIL, is_active:true},{id:'m2', name:'Pasif<i>', is_active:false}];
 eval(grab('renderMaterialsModalList'));

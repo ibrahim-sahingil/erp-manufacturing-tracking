@@ -1,5 +1,6 @@
 package com.uretimtakip.erp.bom;
 
+import com.uretimtakip.erp.bom.dto.BomPartCodeMatchResponse;
 import com.uretimtakip.erp.bom.dto.BomPartRequest;
 import com.uretimtakip.erp.bom.dto.BomPartResponse;
 import com.uretimtakip.erp.bom.dto.BomPartUpdateRequest;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -27,6 +29,7 @@ import java.util.UUID;
  *   GET    /api/bom-parts                       - tum parcalar (level/sort sirali)
  *   GET    /api/bom-parts/by-product/{productId} - bir urunun parcalari
  *   GET    /api/bom-parts/by-parent/{parentId}   - bir parent'in alt parcalari
+ *   GET    /api/bom-parts/by-code?code=X          - kodun gectigi parcalar (tum urunler; 5. tur #3)
  *   GET    /api/bom-parts/{id}                   - tek parca
  *   POST   /api/bom-parts                        - yeni parca (parent+product validation)
  *   PUT    /api/bom-parts/{id}                   - PARTIAL guncelle (parentId/level dahil; productId IGNORE)
@@ -56,6 +59,12 @@ public class BomPartController {
             @PathVariable UUID parentId) {
         return ResponseEntity.ok(
                 ApiResponse.success(bomPartService.listByParent(parentId)));
+    }
+
+    @GetMapping("/by-code")
+    public ResponseEntity<ApiResponse<List<BomPartCodeMatchResponse>>> findByCode(
+            @RequestParam(name = "code") String code) {
+        return ResponseEntity.ok(ApiResponse.success(bomPartService.findByCode(code)));
     }
 
     @GetMapping("/{id}")

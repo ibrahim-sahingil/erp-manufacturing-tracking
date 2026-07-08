@@ -1,5 +1,6 @@
 package com.uretimtakip.erp.bom;
 
+import com.uretimtakip.erp.bom.dto.BomPartCodeMatchResponse;
 import com.uretimtakip.erp.bom.dto.BomPartRequest;
 import com.uretimtakip.erp.bom.dto.BomPartResponse;
 import com.uretimtakip.erp.bom.dto.BomPartUpdateRequest;
@@ -67,6 +68,31 @@ public class BomPartService {
     public BomPartResponse getById(UUID id) {
         BomPart part = findEntityById(id);
         return BomPartResponse.fromEntity(part);
+    }
+
+    /**
+     * Kodun gectigi parcalar — TUM urun agaclari genelinde (5. tur #3).
+     * En yeni 20 eslesme; urun adi + alt parca sayisi ile birlikte doner.
+     * Frontend parca eklerken adi otomatik doldurmak ve alt parcalari
+     * klonlamayi onermek icin kullanir.
+     */
+    @Transactional(readOnly = true)
+    public List<BomPartCodeMatchResponse> findByCode(String code) {
+        if (code == null || code.isBlank()) {
+            return List.of();
+        }
+        return bomPartRepository.findByCodeIgnoreCaseOrderByCreatedAtDesc(code.trim())
+                .stream()
+                .limit(20)
+                .map(p -> {
+                    BomProduct prod = bomProductRepository.findById(p.getProductId()).orElse(null);
+                    return BomPartCodeMatchResponse.fromEntity(
+                            p,
+                            prod != null ? prod.getName() : null,
+                            prod != null ? prod.getCode() : null,
+                            bomPartRepository.countByParentId(p.getId()));
+                })
+                .collect(Collectors.toList());
     }
 
     @Transactional

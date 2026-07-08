@@ -1261,7 +1261,7 @@
         <div style="font-family:var(--font-display);font-size:16px;letter-spacing:2px;color:var(--accent);margin-bottom:14px">+ PARÇA EKLE</div>
         <div class="form-row" style="grid-template-columns:1fr 1fr">
           <div class="form-group"><label>Parça Adı *</label><input type="text" id="bom-part-name" placeholder="Örn: Gövde Plakası"></div>
-          <div class="form-group"><label>Parça Kodu *</label><input type="text" id="bom-part-code" placeholder="Örn: GP-001"></div>
+          <div class="form-group"><label>Parça Kodu *</label><input type="text" id="bom-part-code" placeholder="Örn: GP-001" oninput="bomCodeLookupDebounced('bom')"></div>
         </div>
         <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
           <div class="form-group"><label>Miktar</label><input type="number" id="bom-part-qty" placeholder="1" min="0.001" step="any" value="1"></div>
@@ -1298,6 +1298,7 @@
             <div id="bom-part-dims" style="display:grid;gap:8px"></div>
           </div>
         </div>
+        <div id="bom-code-clone-panel"></div>
         <div style="margin-top:14px;display:flex;gap:10px">
           <button class="btn btn-primary btn-sm" id="bom-add-part-btn" onclick="addBomPart()">+ Parça Ekle</button>
           <button class="btn btn-ghost btn-sm" onclick="clearBomPartForm()">Temizle</button>
@@ -1430,7 +1431,7 @@
       <div style="font-family:var(--font-display);font-size:16px;letter-spacing:2px;color:var(--accent);margin-bottom:14px">+ PARÇA EKLE</div>
       <div class="form-row" style="grid-template-columns:1fr 1fr">
         <div class="form-group"><label>Parça Adı *</label><input type="text" id="pbome-part-name" placeholder="Örn: Gövde Plakası"></div>
-        <div class="form-group"><label>Parça Kodu *</label><input type="text" id="pbome-part-code" placeholder="Örn: GP-001"></div>
+        <div class="form-group"><label>Parça Kodu *</label><input type="text" id="pbome-part-code" placeholder="Örn: GP-001" oninput="bomCodeLookupDebounced('pbome')"></div>
       </div>
       <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
         <div class="form-group"><label>Miktar</label><input type="number" id="pbome-part-qty" value="1" min="0.001" step="any"></div>
@@ -1467,6 +1468,7 @@
           <div id="pbome-part-dims" style="display:grid;gap:8px"></div>
         </div>
       </div>
+      <div id="pbome-code-clone-panel"></div>
       <div style="margin-top:14px">
         <button class="btn btn-primary btn-sm" onclick="pbomeAddPart()">+ Parça Ekle</button>
         <button class="btn btn-ghost btn-sm" onclick="pbomeClearPartForm()">Temizle</button>
@@ -9871,6 +9873,127 @@ function dimLabel2(form, get){
 function partDimLabel(p){ return dimLabel2(p.material_form, f=>p[f]); }
 function pbomeDimLabel(p){ return dimLabel2(p.material_form ?? p.resolved_material_form, f=>p['custom_'+f] ?? p['resolved_'+f]); }
 
+// ─── (5. tur #3) Parça kodu akıllı doldurma + alt parça klonlama ───
+// Kod yazılırken TÜM ürün ağaçlarında aranır; bulunursa ad/malzeme/tür/form
+// boş alanlara taşınır. Kaynağın alt parçaları varsa listelenir — tiklenenler
+// parça eklendiğinde ALT AĞAÇLARIYLA birlikte yeni parçanın altına kopyalanır.
+// pbome tarafında da kaynak MASTER ürün ağaçlarıdır (custom parça olarak eklenir).
+let _codeLookupT = null;
+const _codeMatch = { bom:null, pbome:null }; // {match, children[]}
+// NOT: bomCodeLookup, ...Debounced'dan ÖNCE tanımlı kalmalı — verify-h-render'ın
+// grab()'ı ad önekiyle arar, tersi sırada yanlış fonksiyonu yakalar.
+function bomCodeClearPanel(target){
+  _codeMatch[target]=null;
+  const p=document.getElementById(target==='bom'?'bom-code-clone-panel':'pbome-code-clone-panel');
+  if(p) p.innerHTML='';
+}
+async function bomCodeLookup(target){
+  const pfx = target==='bom' ? 'bom-part' : 'pbome-part';
+  const inp = document.getElementById(pfx+'-code');
+  bomCodeClearPanel(target);
+  if(!inp) return;
+  const code = inp.value.trim();
+  if(code.length<2) return;
+  let matches=[];
+  try{ matches = await apiFetch('/bom-parts/by-code?code='+encodeURIComponent(code)) || []; }
+  catch(e){ return; } // arama başarısızsa sessiz geç — ekleme akışı bozulmasın
+  if(inp.value.trim()!==code || !matches.length) return; // yazmaya devam edildi / eşleşme yok
+  const m = matches[0];
+  // Boş alanları kaynaktan doldur
+  const nameEl=document.getElementById(pfx+'-name');
+  if(nameEl && !nameEl.value.trim()) nameEl.value = m.name||'';
+  const matEl=document.getElementById(pfx+'-material');
+  if(matEl && !matEl.value.trim() && m.material) matEl.value = m.material;
+  const kindEl=document.getElementById(pfx+'-kind');
+  if(kindEl && !kindEl.value && m.material_kind) kindEl.value = m.material_kind;
+  const formEl=document.getElementById(pfx+'-form');
+  if(formEl && !formEl.value && m.material_form){
+    formEl.value = m.material_form;
+    const vals={}; DIM_FIELDS.forEach(f=>vals[f]=m[f]);
+    renderFormDims(pfx, m.material_form, vals);
+  }
+  // Alt parçaları getir — klonlama önerisi
+  let children=[];
+  if(m.child_count>0){
+    try{ children = await apiFetch('/bom-parts/by-parent/'+m.id) || []; }catch(e){}
+  }
+  if(inp.value.trim()!==code) return;
+  _codeMatch[target] = {match:m, children};
+  const panel=document.getElementById(target==='bom'?'bom-code-clone-panel':'pbome-code-clone-panel');
+  if(!panel) return;
+  panel.innerHTML = h`<div style="background:rgba(46,204,113,.07);border:1px solid rgba(46,204,113,.25);border-radius:6px;padding:10px 12px;margin-top:12px;font-family:var(--font-mono);font-size:11px">
+    <div style="color:var(--green)">💡 "${m.code}" daha önce kullanılmış: <b>${m.name}</b>${m.product_name?h` (ürün: ${m.product_name})`:''}${matches.length>1?h` · +${matches.length-1} yerde daha`:''} — boş alanlar dolduruldu</div>
+    ${children.length?h`<div style="margin-top:8px;color:var(--muted)">Kaynağın alt parçaları — işaretlenenler parça eklenince alt ağacıyla birlikte altına kopyalanır:</div>
+      <div style="display:flex;flex-direction:column;gap:3px;margin-top:6px;max-height:180px;overflow:auto">${children.map((c,ci)=>h`
+        <label style="display:flex;gap:8px;align-items:center;cursor:pointer">
+          <input type="checkbox" class="code-clone-chk-${raw(target)}" data-ix="${ci}">
+          <span style="color:var(--accent)">${c.code}</span><span>${c.name}</span>
+        </label>`)}</div>`:''}
+  </div>`;
+}
+function bomCodeLookupDebounced(target){
+  clearTimeout(_codeLookupT);
+  _codeLookupT = setTimeout(()=>bomCodeLookup(target), 450);
+}
+
+// Tiklenen alt parçaları (alt ağaçlarıyla, by-parent ile dolaşarak) yeni
+// eklenen parçanın altına klonlar. Üst eklenmeden alt eklenemeyeceği için
+// sıralı await; atası eklenemeyen dal zincirleme atlanır.
+async function bomApplyCodeClones(target, newParent){
+  const sel = _codeMatch[target];
+  if(!sel){ return; }
+  const boxes = [...document.querySelectorAll('.code-clone-chk-'+target+':checked')];
+  if(!boxes.length){ bomCodeClearPanel(target); return; }
+  const picked = boxes.map(b=>sel.children[+b.dataset.ix]).filter(Boolean);
+  let ok=0, fail=0;
+  const insertClone = async (src, parentId, level, sortOrder)=>{
+    let d;
+    if(target==='bom'){
+      d = await dbInsert('bom_parts',{
+        product_id:_activeBomProduct.id, parent_id:parentId,
+        name:src.name, code:src.code,
+        quantity:src.quantity||1, unit:src.unit||'adet',
+        weight_kg:src.weight_kg||null, material:src.material||null,
+        material_kind:src.material_kind||null, material_form:src.material_form||null,
+        width_mm:src.width_mm||null, height_mm:src.height_mm||null, thickness_mm:src.thickness_mm||null,
+        length_mm:src.length_mm||null, diameter_mm:src.diameter_mm||null,
+        operations:Array.isArray(src.operations)?src.operations:[],
+        level, sort_order:sortOrder
+      });
+      if(!Array.isArray(d)||!d[0]){ fail++; return null; }
+      bomParts.push(d[0]);
+    } else {
+      d = await dbInsert('project_bom_parts',{
+        id:genId(), project_bom_id:_activePbomId, bom_part_id:null, is_excluded:false,
+        parent_custom_id:parentId,
+        custom_name:src.name, custom_code:src.code,
+        custom_qty:src.quantity||1, custom_unit:src.unit||'adet',
+        custom_weight:src.weight_kg||null, custom_material:src.material||null,
+        material_kind:src.material_kind||null, material_form:src.material_form||null,
+        custom_width_mm:src.width_mm||null, custom_height_mm:src.height_mm||null,
+        custom_thickness_mm:src.thickness_mm||null, custom_length_mm:src.length_mm||null,
+        custom_diameter_mm:src.diameter_mm||null,
+        operations:Array.isArray(src.operations)?src.operations:[],
+        level, sort_order:sortOrder
+      });
+      if(!Array.isArray(d)||!d[0]){ fail++; return null; }
+      _pbomeParts.push(d[0]); projectBomParts.push(d[0]);
+    }
+    ok++; return d[0];
+  };
+  const cloneTree = async (src, parentId, level, sortOrder)=>{
+    const created = await insertClone(src, parentId, level, sortOrder);
+    if(!created) return;
+    let kids=[];
+    try{ kids = await apiFetch('/bom-parts/by-parent/'+src.id) || []; }catch(e){}
+    for(let i=0;i<kids.length;i++) await cloneTree(kids[i], created.id, level+1, i);
+  };
+  const baseLevel = (newParent.level||0)+1;
+  for(let i=0;i<picked.length;i++) await cloneTree(picked[i], newParent.id, baseLevel, i);
+  bomCodeClearPanel(target);
+  toast(fail?`⚠ ${ok} parça kopyalandı, ${fail} satır eklenemedi`:`📋 ${ok} alt parça kaynaktan kopyalandı`, fail?'error':'success');
+}
+
 // ─── Parça Ekle ───
 async function addBomPart() {
   const name = document.getElementById('bom-part-name').value.trim();
@@ -9904,6 +10027,7 @@ async function addBomPart() {
   if(!Array.isArray(data)||!data[0]){ toast('Kayıt hatası!','error'); return; }
   bomParts.push(data[0]);
   if(parentId) _bomCollapsed.delete(parentId); // eklenen parça görünsün
+  await bomApplyCodeClones('bom', data[0]); // (5. tur #3) tiklenen alt parçaları kopyala
   clearBomPartForm();
   renderBomContent();
   toast('Parça eklendi!','success');
@@ -9915,6 +10039,7 @@ function clearBomPartForm() {
   const u=document.getElementById('bom-part-unit'); if(u) u.value='adet';
   const w=document.getElementById('bom-part-weight'); if(w) w.value='';
   renderFormDims('bom-part','');
+  bomCodeClearPanel('bom');
 }
 
 function calcOpTotalTime() {
@@ -10803,6 +10928,7 @@ async function pbomeAddPart() {
   _pbomeParts.push(data[0]);
   projectBomParts.push(data[0]);
   if(parentId) _pbomeCollapsed.delete(parentId); // eklenen parça görünsün
+  await bomApplyCodeClones('pbome', data[0]); // (5. tur #3) tiklenen alt parçaları kopyala
   pbomeClearPartForm();
   pbomeRenderContent();
   toast(`"${name}" eklendi!`,'success');
@@ -10813,6 +10939,7 @@ function pbomeClearPartForm() {
   const q=document.getElementById('pbome-part-qty');if(q)q.value='1';
   const u=document.getElementById('pbome-part-unit');if(u)u.value='adet';
   renderFormDims('pbome-part','');
+  bomCodeClearPanel('pbome');
 }
 
 // ─── İşlem Ekle (5. tur #2: üste / kendine / alta — addBomOperation ikizi) ───
