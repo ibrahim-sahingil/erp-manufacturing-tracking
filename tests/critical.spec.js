@@ -68,6 +68,51 @@ test('XSS: sipariş proje adındaki <img onerror> gerçek tarayıcıda ÇALIŞMA
   }
 });
 
+// ─── Hata mesajı ayrıştırma (2026-07-09: "her hata = şifre hatalı" kusuru) ───
+
+test('mesaj: yanlış şifrede "Kullanıcı adı veya şifre hatalı" denir', async ({ page }) => {
+  await page.goto('/');
+  await page.fill('#login-username', 'testdev');
+  await page.fill('#login-password', 'yanlis-sifre-xyz');
+  await page.click('#login-btn');
+  await expect(page.locator('#login-err')).toHaveText(/Kullanıcı adı veya şifre hatalı/, { timeout: 10000 });
+});
+
+test('mesaj: sunucuya ulaşılamayınca ŞİFRE HATASI DENMEZ, bağlantı hatası denir', async ({ page }) => {
+  await page.goto('/');
+  // Login isteğini ağ seviyesinde düşür — sunucu kapalı senaryosu
+  await page.route('**/api/auth/login', route => route.abort('connectionrefused'));
+  await page.fill('#login-username', 'testdev');
+  await page.fill('#login-password', 'test1234');
+  await page.click('#login-btn');
+  await expect(page.locator('#login-err')).toHaveText(/Sunucuya ulaşılamadı/, { timeout: 10000 });
+  await expect(page.locator('#login-err')).not.toHaveText(/şifre hatalı/);
+});
+
+test('mesaj: iş kuralı hatasında backend mesajı toast olarak görünür (mükerrer malzeme)', async ({ page }) => {
+  await login(page);
+  // Aynı adla iki kez malzeme ekle — ikincisi backend'in Türkçe mesajını göstermeli
+  const name = 'PW-TEST-' + Date.now();
+  const firstId = await page.evaluate(async (n) => {
+    const d = await dbInsert('materials', { name: n });
+    return Array.isArray(d) && d[0] ? d[0].id : null;
+  }, name);
+  expect(firstId).toBeTruthy();
+  try {
+    await page.evaluate(async (n) => { await dbInsert('materials', { name: n }); }, name);
+    await expect(page.locator('#toast')).toContainText(/zaten var/, { timeout: 5000 });
+  } finally {
+    await page.evaluate(async (id) => { await dbDelete('materials', id); }, firstId);
+  }
+});
+
+test('mesaj: okuma başarısız olunca sessiz boş liste yerine uyarı çıkar', async ({ page }) => {
+  await login(page);
+  await page.route('**/api/materials**', route => route.abort('connectionrefused'));
+  await page.evaluate(async () => { await dbGet('materials', 'order=name.asc'); });
+  await expect(page.locator('#toast')).toContainText(/Veriler yüklenemedi/, { timeout: 5000 });
+});
+
 // NOT: Silme/yayınlama/mal kabul guard'ları backend + node scripts/e2e-test.js
 // tarafından API-seviyesinde kapsanıyor (K1/O1/O4/O5/U1 senaryoları). Playwright
 // burada gerçek-tarayıcı davranışına (login akışı + XSS render) odaklanır; UI

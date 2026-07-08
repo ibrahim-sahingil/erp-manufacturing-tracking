@@ -2009,10 +2009,24 @@ let _lastApiError = null;
 
 // Backend'in gercek hata mesajini kullaniciya goster
 // (cagiran yerlerin genel "Kayit hatasi!" toast'ina ek olarak sebep belirtir)
-function _showApiError(e) {
+// Hata mesajı NEDENE göre kullanıcıya çevrilir (5. tur sonrası düzeltme):
+// ağ hatası İngilizce "Failed to fetch" yerine Türkçe; çıplak "HTTP 5xx"
+// sessizce yutulmaz. AUTH_ hariç (handleUnauthorized zaten yönlendirir).
+// Promise.all'lı yüklemelerde aynı mesaj kısa aralıkla tekrar basılmaz.
+let _lastApiToastMsg = '', _lastApiToastAt = 0;
+function _showApiError(e, ctx) {
   if (typeof toast !== 'function' || !e || !e.message) return;
-  if (/^AUTH_/.test(e.message) || /^HTTP \d+$/.test(e.message)) return;
-  toast(e.message, 'error');
+  if (/^AUTH_/.test(e.message)) return;
+  let msg = e.message;
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(msg))
+    msg = 'Sunucuya ulaşılamadı — bağlantınızı kontrol edin (sunucu kapalı olabilir).';
+  else if (/^HTTP 5\d\d$/.test(msg)) msg = 'Sunucu hatası (' + e.message + ') — tekrar deneyin.';
+  else if (/^HTTP \d+$/.test(msg)) msg = 'İstek başarısız (' + e.message + ').';
+  if (ctx === 'get') msg = 'Veriler yüklenemedi: ' + msg;
+  const now = Date.now();
+  if (msg === _lastApiToastMsg && now - _lastApiToastAt < 4000) return;
+  _lastApiToastMsg = msg; _lastApiToastAt = now;
+  toast(msg, 'error');
 }
 
 // ─── Genel API Fonksiyonları ───
@@ -2043,6 +2057,8 @@ async function genelVeriGetir(tabloAdi, query) {
     return applyPgQuery(xlated, parsed);
   } catch(e) {
     console.error('GET hatası', tabloAdi, e.message);
+    // Sessiz boş liste yanıltıcıydı ("kayıt yok" sanılıyordu) — kullanıcıya söyle
+    _showApiError(e, 'get');
     return [];
   }
 }
@@ -5801,7 +5817,11 @@ async function doLogin() {
   err.style.display = 'none';
 
   // JWT login: POST /api/auth/login
-  let auth = null;
+  // Hata mesajı NEDENE göre ayrışır (CORS/proxy 403'ü "şifre hatalı" gibi
+  // göstermek Tailscale geçişinde yanlış teşhise yol açtı — 2026-07-09):
+  //   ağ hatası → "sunucuya ulaşılamadı", 403 → erişim engeli,
+  //   5xx → sunucu hatası, 400/401 → gerçekten yanlış bilgiler.
+  let auth = null, failMsg = 'Kullanıcı adı veya şifre hatalı!';
   try {
     const r = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
@@ -5809,12 +5829,25 @@ async function doLogin() {
       body: JSON.stringify({ username, password })
     });
     const body = await r.json().catch(() => null);
-    if (r.ok && body && body.success !== false && body.data) auth = body.data;
-  } catch(e) { console.error('Login bağlantı hatası', e); }
+    if (r.ok && body && body.success !== false && body.data) {
+      auth = body.data;
+    } else if (r.status === 400 || r.status === 401) {
+      failMsg = 'Kullanıcı adı veya şifre hatalı!';
+    } else if (r.status === 403) {
+      failMsg = 'Erişim engellendi — bu adres sunucunun izin listesinde olmayabilir. Yöneticiye bildirin.';
+    } else if (r.status >= 500) {
+      failMsg = 'Sunucu hatası oluştu — kısa süre sonra tekrar deneyin.';
+    } else {
+      failMsg = (body && body.message) || ('Beklenmeyen yanıt (HTTP ' + r.status + ')');
+    }
+  } catch(e) {
+    console.error('Login bağlantı hatası', e);
+    failMsg = 'Sunucuya ulaşılamadı — bağlantınızı kontrol edin (sunucu kapalı olabilir).';
+  }
 
   if (!auth || !auth.token) {
     btn.disabled = false; btn.textContent = _qrPartId ? 'GİRİŞ YAP & DEVAM ET' : 'GİRİŞ YAP';
-    err.style.display = 'block'; err.textContent = 'Kullanıcı adı veya şifre hatalı!';
+    err.style.display = 'block'; err.textContent = failMsg;
     return;
   }
 
@@ -9509,7 +9542,8 @@ async function matDelete(id){
   const m = materials.find(x=>x.id===id);
   if(!m) return;
   if(!confirm(`"${m.name}" kartotekten silinsin mi?\n\nParçalarda kayıtlı malzeme adları etkilenmez.`)) return;
-  await dbDelete('materials', id);
+  const ok = await dbDelete('materials', id);
+  if(!ok) return; // hata toast'ı adapter'dan geldi
   materials = materials.filter(x=>x.id!==id);
   refreshMaterialDatalist();
   renderMaterialsModalList();
@@ -9754,7 +9788,8 @@ async function docsDelete(docId){
   const d=bomDocs.find(x=>x.id===docId);
   if(!d) return;
   if(!confirm(`"${d.filename}" silinsin mi?\n\nDosya içeriği veritabanından kalıcı olarak silinir.`)) return;
-  await dbDelete('bom_documents', docId);
+  const ok=await dbDelete('bom_documents', docId);
+  if(!ok) return; // hata toast'ı adapter'dan geldi
   bomDocs=bomDocs.filter(x=>x.id!==docId);
   renderDocs();
   if(_activeBomProduct && _activeBomProduct.id===_docsProduct) await refreshDocPartIds();
@@ -10671,7 +10706,8 @@ async function saveBomQty(partId) {
   const qIn  = parseFloat(document.getElementById('bom-qty-in').value);
   const unit = document.getElementById('bom-qty-unit').value;
   if(!qIn || qIn<=0) { toast('Geçerli bir miktar girin!','error'); return; }
-  await dbUpdate('bom_parts', partId, { quantity: qIn, unit });
+  const ok = await dbUpdate('bom_parts', partId, { quantity: qIn, unit });
+  if(!ok) return; // hata toast'ı adapter'dan geldi — "güncellendi" deme
   const part = bomParts.find(p=>p.id===partId);
   if(part) { part.quantity=qIn; part.unit=unit; }
   document.getElementById('bom-qty-overlay')?.remove();
@@ -10767,7 +10803,8 @@ async function deleteBomPart(id) {
     p.parent_id=null; p.level=0;
     await dbUpdate('bom_parts',p.id,{parent_id:null,level:0});
   });
-  await dbDelete('bom_parts',id);
+  const ok = await dbDelete('bom_parts',id);
+  if(!ok){ renderBomContent(); return; } // hata toast'ı adapter'dan geldi
   bomParts=bomParts.filter(p=>p.id!==id);
   renderBomContent();
   toast('Parça silindi.','success');
@@ -10782,7 +10819,8 @@ async function removeBomOp(partId, opIdx) {
   ops.splice(opIdx,1);
   // Koddan işlem kodunu çıkar
   const newCode = part.code.endsWith(removedCode) ? part.code.slice(0,-removedCode.length) : part.code;
-  await dbUpdate('bom_parts',partId,{operations:ops,code:newCode});
+  const ok = await dbUpdate('bom_parts',partId,{operations:ops,code:newCode});
+  if(!ok) return; // hata toast'ı adapter'dan geldi — yerel durumu bozma
   part.operations=ops; part.code=newCode;
   renderBomContent();
   toast('İşlem kaldırıldı.','success');
@@ -11413,9 +11451,10 @@ async function pbomeSaveQty(partId) {
   const qty=parseFloat(document.getElementById('pbome-qty-val').value);
   const unit=document.getElementById('pbome-qty-unit').value;
   if(!qty||qty<=0){toast('Geçerli miktar girin!','error');return;}
+  const ok=await dbUpdate('project_bom_parts',partId,{custom_qty:qty,custom_unit:unit});
+  if(!ok) return; // hata toast'ı adapter'dan geldi — "güncellendi" deme
   const p=_pbomeParts.find(x=>x.id===partId);
   if(p){p.custom_qty=qty;p.custom_unit=unit;}
-  await dbUpdate('project_bom_parts',partId,{custom_qty:qty,custom_unit:unit});
   document.getElementById('pbome-qty-overlay')?.remove();
   pbomeRenderList();
   toast('Miktar güncellendi!','success');
@@ -11537,8 +11576,9 @@ async function pbomeRemoveOp(partId, opIdx) {
   const removedCode=ops[opIdx]?.code||'';
   ops.splice(opIdx,1);
   const newCode=p.custom_code.endsWith(removedCode)?p.custom_code.slice(0,-removedCode.length):p.custom_code;
+  const ok=await dbUpdate('project_bom_parts',partId,{operations:ops,custom_code:newCode});
+  if(!ok) return; // hata toast'ı adapter'dan geldi — yerel durumu bozma
   p.operations=ops; p.custom_code=newCode;
-  await dbUpdate('project_bom_parts',partId,{operations:ops,custom_code:newCode});
   pbomeRenderContent();
   toast('İşlem kaldırıldı.','success');
 }
@@ -11550,7 +11590,8 @@ async function pbomeDeletePart(partId) {
     p.parent_custom_id=null; p.level=0;
     await dbUpdate('project_bom_parts',p.id,{parent_custom_id:null,level:0});
   });
-  await dbDelete('project_bom_parts',partId);
+  const ok=await dbDelete('project_bom_parts',partId);
+  if(!ok){ pbomeRenderContent(); return; } // hata toast'ı adapter'dan geldi
   _pbomeParts=_pbomeParts.filter(p=>p.id!==partId);
   projectBomParts=projectBomParts.filter(p=>p.id!==partId);
   pbomeRenderContent();
