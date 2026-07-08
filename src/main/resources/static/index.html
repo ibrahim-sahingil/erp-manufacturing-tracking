@@ -8798,22 +8798,22 @@ function renderWhStock(){
   const rows = [...map.values()].filter(r=>Math.abs(r.net)>1e-9)
     .sort((a,b)=>(whName(a.wh)||'').localeCompare(whName(b.wh)||'','tr') || a.name.localeCompare(b.name,'tr'));
   if(!rows.length){
-    el.innerHTML = `<div class="empty-state" style="padding:14px"><span class="emoji">📊</span>Depoda malzeme yok</div>`;
+    el.innerHTML = h`<div class="empty-state" style="padding:14px"><span class="emoji">📊</span>Depoda malzeme yok</div>`;
     return;
   }
-  el.innerHTML = rows.map(r=>{
+  el.innerHTML = h`${rows.map(r=>{
     const c = r.net > 0 ? '#2ecc71' : '#e74c3c';
-    return `<div class="pbom-card" style="border-left:3px solid ${c};padding:8px 14px">
+    return h`<div class="pbom-card" style="border-left:3px solid ${c};padding:8px 14px">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0">
-          ${r.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${esc(r.code)}</span>`:''}
-          <span>${esc(r.name)}</span>
-          ${!f?`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">🗄️ ${esc(whName(r.wh)||'—')}</span>`:''}
+          ${r.code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${r.code}</span>`:''}
+          <span>${r.name}</span>
+          ${!f?h`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">🗄️ ${whName(r.wh)||'—'}</span>`:''}
         </div>
-        <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${esc(r.unit)}</span>
+        <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${r.unit}</span>
       </div>
     </div>`;
-  }).join('');
+  })}`;
 }
 
 function renderWhMovements(){
@@ -8823,37 +8823,37 @@ function renderWhMovements(){
   const f = document.getElementById('whm-mv-filter')?.value || '';
   const list = f ? whMovements.filter(m=>m.warehouse_id===f) : whMovements;
   if(!list.length){
-    el.innerHTML = `<div class="empty-state" style="padding:18px"><span class="emoji">📜</span>Hareket kaydı yok</div>`;
+    el.innerHTML = h`<div class="empty-state" style="padding:18px"><span class="emoji">📜</span>Hareket kaydı yok</div>`;
     return;
   }
-  el.innerHTML = list.map(m=>{
+  el.innerHTML = h`${list.map(m=>{
     const isIn = m.movement_type==='IN';
     const c = isIn ? '#2ecc71' : '#e74c3c';
     const src = WH_SOURCE_LABELS[m.source_type] || m.source_type;
     const meta = [
-      '🗄️ '+esc(whName(m.warehouse_id)||'—'),
-      Number(m.quantity)+' '+esc(m.unit||'adet'),
-      m.performed_by ? '👤 '+esc(m.performed_by) : '',
+      '🗄️ '+(whName(m.warehouse_id)||'—'),
+      Number(m.quantity)+' '+(m.unit||'adet'),
+      m.performed_by ? '👤 '+m.performed_by : '',
       '🕓 '+new Date(m.created_at).toLocaleString('tr-TR'),
-      m.notes ? '📝 '+esc(m.notes) : ''
+      m.notes ? '📝 '+m.notes : ''
     ].filter(Boolean).join(' · ');
-    return `<div class="pbom-card" style="border-left:3px solid ${c}">
+    return h`<div class="pbom-card" style="border-left:3px solid ${c}">
       <div class="pbom-card-header">
         <div style="min-width:0">
           <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <span style="color:${c};font-family:var(--font-mono);font-size:12px">${isIn?'⬇ GİRİŞ':'⬆ ÇIKIŞ'}</span>
-            ${m.item_code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${esc(m.item_code)}</span>`:''}
-            ${esc(m.item_name)}
+            ${m.item_code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${m.item_code}</span>`:''}
+            ${m.item_name}
             <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--muted)">${src}</span>
           </div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">${meta}</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <button class="btn btn-ghost btn-sm" onclick="whmDeleteMovement('${m.id}')" style="color:#e74c3c" title="Yanlış kaydı sil">🗑</button>
+          <button class="btn btn-ghost btn-sm" onclick="whmDeleteMovement('${raw(m.id)}')" style="color:#e74c3c" title="Yanlış kaydı sil">🗑</button>
         </div>
       </div>
     </div>`;
-  }).join('');
+  })}`;
 }
 
 async function whmDeleteMovement(id){
