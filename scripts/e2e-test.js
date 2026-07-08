@@ -22,7 +22,12 @@ function grab(name){
   const start = html.indexOf(marker);
   if(start<0) throw new Error(name+' bulunamadı');
   if(name.startsWith('const')) return html.slice(start, html.indexOf(';', start)+1);
-  let i = html.indexOf('{', start), depth = 1; i++;
+  // Önce parametre parantezini atla — destructuring parametrenin '{'sı
+  // gövde açılışı sanılmasın (mvInsert/splitPurchaseItem gibi)
+  let i = html.indexOf('(', start), pd = 1; i++;
+  while(pd>0){ const c=html[i]; if(c==='(')pd++; if(c===')')pd--; i++; }
+  i = html.indexOf('{', i);
+  let depth = 1; i++;
   while(depth>0){ const c=html[i]; if(c==='{')depth++; if(c==='}')depth--; i++; }
   const asyncPrefix = html.slice(Math.max(0,start-6), start)==='async ' ? 'async ' : '';
   return asyncPrefix + html.slice(start, i);
@@ -36,6 +41,8 @@ function grab(name){
 (0,eval)(grab('partWaitingChildren'));
 (0,eval)(grab('woWaitingChildren'));
 (0,eval)(grab('woStartBlockMsg'));
+(0,eval)(grab('mvInsert'));          // temizlik turu: warehouse_movements kurucu (rcvDoReceive kullanır)
+(0,eval)(grab('splitPurchaseItem')); // temizlik turu: kısmi kabul/aktarım ortak bölme çekirdeği
 (0,eval)(grab('rcvDoReceive'));   // 4. tur: kısmi mal kabul çekirdeği
 (0,eval)(grab('_whItemStock'));   // O6: depo net stok hesabı (sevk uyarısının çekirdeği)
 (0,eval)(grab('_unlinkPlanSources')); // E5: plaka iptal/silmede kaynakları havuza döndürme

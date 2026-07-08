@@ -2073,6 +2073,125 @@ function h(strings, ...vals){
   return raw(out);
 }
 
+// ─── Temizlik turu ortak helper'ları (2026-07-08; 13 maddelik dedupe) ───
+// Modal form kontrolü inline stili (16 kopya vardı). Varyant: padding,
+// font-size, genişlik öneki ('' = genişlik yok).
+function INP(pad='10px 12px', fs='13px', w='width:100%;'){
+  return w+'background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:'+fs+';padding:'+pad+';outline:none';
+}
+
+// Kardeş-kod ön-kontrolü (4. tur #1: aynı kod farklı dallarda serbest,
+// KARDEŞLER arasında tekil — 7 kopya vardı). selfId: düzenlemede kendisi
+// hariç; where: ek kapsam (ürün/pbom). Çakışan kaydı ya da null döner.
+function findSiblingDup(list, {code, codeKey='code', parentKey='parent_id', parentId=null, selfId=null, where=null}){
+  const c=(code||'').toLowerCase();
+  return list.find(p=>p.id!==selfId
+    && (!where || where(p))
+    && (p[parentKey]||null)===(parentId||null)
+    && (p[codeKey]||'').toLowerCase()===c) || null;
+}
+
+// Aktif depolar; yoksa uyarı basıp null döner (guard 3 kopya vardı).
+function activeWarehousesOrWarn(){
+  const act = warehouses.filter(w=>w.is_active!==false);
+  if(!act.length){ toast('Önce Depo Yönetimi sekmesinden bir depo tanımlayın!','error'); return null; }
+  return act;
+}
+
+// Depo <option> listesi (ad + opsiyonel konum; 5 kopya vardı). h`` işaretli
+// döndüğünden hem h hem düz şablonda kullanılabilir.
+function whOptionsHTML(list){
+  return h`${list.map(w=>h`<option value="${w.id}">${w.name}${w.location?' — '+w.location:''}</option>`)}`;
+}
+
+// warehouse_movements kaydı (payload kurulumu 6 kopya vardı). performed_by
+// aktif kullanıcıdan; adet <=0 ise 1'e normalize edilir (eski davranış).
+// purchase_item_id / delivery_note_id bağları opsiyonel.
+function mvInsert({whId, type, qty, unit, name, code, sourceType, notes, itemId=null, dnId=null}){
+  const q = Number(qty);
+  const body = {
+    warehouse_id: whId, movement_type: type,
+    quantity: q>0?q:1, unit: unit||'adet',
+    item_name: name, item_code: code||null,
+    source_type: sourceType, notes,
+    performed_by: currentUser?.display_name||currentUser?.username||null
+  };
+  if(itemId) body.purchase_item_id = itemId;
+  if(dnId) body.delivery_note_id = dnId;
+  return dbInsert('warehouse_movements', body);
+}
+
+// Kısmi kabul/aktarımın ortak bölme çekirdeği (rcvDoReceive + whXferConfirm
+// ikizleri): orijinal kalem origPatch ile düşürülür, IN_WAREHOUSE klonu
+// eklenir ve depoya bağlanır. Herhangi bir adım başarısızsa öncekiler geri
+// alınır (B6) ve null döner; başarıda yeni kalem döner. (B7) grup referansı
+// notes'a yazılır — purchase_order_id sipariş kilidi nedeniyle taşınamaz.
+async function splitPurchaseItem(i, {origPatch, origRestore, qty, whId, by, notes, received}){
+  const ok = await dbUpdate('purchase_items', i.id, origPatch);
+  if(!ok) return null;
+  Object.assign(i, origPatch);
+  const grp = i.purchase_order_id ? purchaseOrders.find(o=>o.id===i.purchase_order_id) : null;
+  const d = await dbInsert('purchase_items',{
+    project_name:i.project_name, name:i.name, code:i.code||null,
+    quantity:qty, unit:i.unit||'adet', material:i.material||null,
+    supplier:i.supplier||null, unit_price:i.unit_price||null,
+    currency:i.currency||'TRY', status:'IN_WAREHOUSE',
+    expected_date:i.expected_date||null,
+    notes:notes+(grp?' · 📦 '+grp.name:''), created_by:by});
+  if(!Array.isArray(d)||!d[0]){
+    await dbUpdate('purchase_items', i.id, origRestore);
+    Object.assign(i, origRestore);
+    return null;
+  }
+  const ni = d[0];
+  // create endpoint'i warehouse_id almaz — ayrı update ile bağlanır. (B4)
+  // received_at çağırandan gelir: mal kabulde ŞİMDİ, aktarımda orijinalden.
+  const bind = {warehouse_id: whId, ...received};
+  const wok = await dbUpdate('purchase_items', ni.id, bind);
+  if(!wok){
+    await dbDelete('purchase_items', ni.id);
+    await dbUpdate('purchase_items', i.id, origRestore);
+    Object.assign(i, origRestore);
+    return null;
+  }
+  Object.assign(ni, bind, {status:'IN_WAREHOUSE'});
+  purchaseItems.push(ni);
+  return ni;
+}
+
+// Dal kopyalama çekirdeği (bomCopyBranch/pbomeCopyBranch ikizleri). Alt ağaç
+// SEVİYE SEVİYE Promise.all ile eklenir (üstler bir önceki turda bitmiş olur);
+// (B9) atası eklenemeyen satır ve altı zincirleme atlanıp fail sayılır.
+async function copyBranch({list, partId, parentKey, codeOf, nameOf, table, payload, sibsOf, onInserted, rerender}){
+  const src=list.find(x=>x.id===partId);
+  if(!src) return;
+  const kidsOf=pid=>list.filter(p=>(p[parentKey]||null)===pid)
+    .sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+  const countBranch=pid=>kidsOf(pid).reduce((s,k)=>s+1+countBranch(k.id),0);
+  const total=1+countBranch(src.id);
+  if(!confirm(`"${codeOf(src)} — ${nameOf(src)}" ${total>1?`alt ağacıyla birlikte (${total} parça) `:''}kopyalansın mı?\n\nKopya aynı üstün altına eklenir; kök kodun sonuna -KOPYA gelir (sonra düzenleyin), alt parça kodları aynen korunur.`)) return;
+  let rootCode=codeOf(src)+'-KOPYA', n=2;
+  const sibs=sibsOf(src);
+  while(sibs.some(p=>(codeOf(p)||'').toLowerCase()===rootCode.toLowerCase())) rootCode=codeOf(src)+'-KOPYA'+(n++);
+  // Backend gönderilen id'yi yok sayar → parent bağı DÖNEN id ile kurulur
+  const idMap={};
+  let ok=0, fail=0;
+  let level=[src];
+  while(level.length){
+    const results=await Promise.all(level.map(async p=>{
+      if(p.id!==partId && !idMap[p[parentKey]]) return {p, d:null};
+      return {p, d:await dbInsert(table, payload(p, p.id===partId, rootCode, idMap))};
+    }));
+    for(const {p,d} of results){
+      if(Array.isArray(d)&&d[0]){ idMap[p.id]=d[0].id; onInserted(d[0]); ok++; }
+      else fail++;
+    }
+    level=level.flatMap(p=>kidsOf(p.id));
+  }
+  rerender();
+  toast(fail?`⚠ ${ok} parça kopyalandı, ${fail} satır kopyalanamadı (hata ya da atası eklenemedi)`:`📋 Dal kopyalandı (${ok} parça) — kök kod: "${rootCode}"`, fail?'error':'success');
+}
+
 // ─── Ölçü yardımcıları (sac/profil mm ölçüleri; 0 veya boş = ölçü yok) ───
 function dimVal(v){ const n=parseFloat(v); return (isFinite(n)&&n>0)?n:''; }
 function dimNum(id){ const el=document.getElementById(id); const n=parseFloat(el?el.value:''); return (isFinite(n)&&n>0)?n:0; }
@@ -4434,7 +4553,23 @@ async function woLoadParts() {
 
     const ids = new Set(bucket.map(p=>p.id));
     const roots = bucket.filter(p=>!p.parent_part_id || !ids.has(p.parent_part_id));
-    const kidsOf = id => bucket.filter(p=>p.parent_part_id===id);
+    // O(n²) tarama yerine tek geçişte haritalar (temizlik turu): çocuklar
+    // parent'a, projenin satın alma kalemleri koda göre gruplanır (CANCELLED
+    // zaten woMatChip'in rank filtresinde eleniyor — projPur yeterli)
+    const kidsMap = new Map();
+    bucket.forEach(p=>{
+      const k = p.parent_part_id||null;
+      if(!kidsMap.has(k)) kidsMap.set(k,[]);
+      kidsMap.get(k).push(p);
+    });
+    const kidsOf = id => kidsMap.get(id)||[];
+    const matByCode = new Map();
+    projPur.forEach(i=>{
+      const k = codeKey(i.code);
+      if(!k) return;
+      if(!matByCode.has(k)) matByCode.set(k,[]);
+      matByCode.get(k).push(i);
+    });
     const nodeRow = (p, depth) => {
       const ok = selectable(p);
       const dept = p.department_id ? depts.find(d=>d.id===p.department_id) : null;
@@ -4449,7 +4584,7 @@ async function woLoadParts() {
           <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">
             ${p.material||''} ${p.qty?'· '+p.qty+' adet':''}
             ${dept?h`· 🏭 ${dept.name}`:''}
-            ${raw(woMatChip(p))}
+            ${raw(woMatChip(p, matByCode))}
           </div>
         </div>
       </div>`;
@@ -4463,13 +4598,15 @@ async function woLoadParts() {
   document.getElementById('wo-step3').style.display = 'none';
 }
 
-// Üretim parçasının kendi malzemesinin satın alma durumu (proje + kod eşleşmesi)
-function woMatChip(p){
+// Üretim parçasının kendi malzemesinin satın alma durumu (proje + kod
+// eşleşmesi). byCode: woLoadParts'ın ön kurduğu kod→kalem haritası (O(1);
+// verilmezse global purchaseItems taranır — eski davranış).
+function woMatChip(p, byCode){
   const code = (p.code||'').trim().toLowerCase();
   if(!code) return '';
   const rank = {IN_WAREHOUSE:5, IN_STOCK:4, RECEIVED:3, ORDERED:2, PLANNED:1};
-  const items = purchaseItems.filter(i=>(i.project_name||'')===(p.project||'')
-    && (i.code||'').trim().toLowerCase()===code && rank[i.status]);
+  const pool = byCode ? (byCode.get(code)||[]) : purchaseItems.filter(i=>(i.project_name||'')===(p.project||''));
+  const items = pool.filter(i=>(i.code||'').trim().toLowerCase()===code && rank[i.status]);
   if(!items.length) return '';
   const best = items.reduce((a,b)=>(rank[b.status]||0)>(rank[a.status]||0)?b:a);
   const m = PUR_STATUS[best.status];
@@ -5753,7 +5890,7 @@ function supEdit(id){
   const s = id ? suppliers.find(x=>x.id===id) : {};
   if(id && !s) return;
   document.getElementById('sup-edit-overlay')?.remove();
-  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 11px;outline:none';
+  const inp = INP('9px 11px');
   // (E1) Global esc() kullanılır — eski yerel "yalnız tırnak" sürümü kaldırıldı
   // (aynı isimde iki farklı davranış = gölgeleme/bakım tuzağıydı).
   const overlay = document.createElement('div');
@@ -5977,10 +6114,10 @@ function rcvToggle(proj){
 function rcvReceiveModal(id){
   const i = purchaseItems.find(x=>x.id===id);
   if(!i) return;
-  const act = warehouses.filter(w=>w.is_active!==false);
-  if(!act.length){ toast('Önce Depo Yönetimi sekmesinden bir depo tanımlayın!','error'); return; }
+  const act = activeWarehousesOrWarn();
+  if(!act) return;
   const total = Number(i.quantity)||1;
-  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none';
+  const inp = INP();
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.id = 'rcv-overlay';
@@ -5990,7 +6127,7 @@ function rcvReceiveModal(id){
     <div class="form-group" style="margin-bottom:12px">
       <label>Hedef Depo</label>
       <select id="rcvm-wh" style="${inp}">
-        ${act.map(w=>`<option value="${w.id}">${esc(w.name)}${w.location?' — '+w.location:''}</option>`).join('')}
+        ${whOptionsHTML(act)}
       </select>
     </div>
     <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:8px">
@@ -6065,42 +6202,24 @@ async function rcvDoReceive(id, whId, accepted, returned){
     if(!ok) return false;
     Object.assign(i, {status:'IN_WAREHOUSE', warehouse_id:whId, received_by:by, received_qty:total, returned_qty:retTotal});
   } else {
-    // Kısmi kabul: kalem bölünür
-    const remain = total - accepted;
-    const ok = await dbUpdate('purchase_items', id, {quantity:remain, returned_qty:retTotal});
-    if(!ok) return false;
-    i.quantity = remain; i.returned_qty = retTotal;
-    // (B7) termin + grup referansı taşınır: purchase_order_id bölmede
-    // taşınamaz (sipariş kilidi), grup adı notes'a yazılır; grup detayı
-    // bölünmüş kalemleri kod eşleşmesiyle gösterir
-    const grp = i.purchase_order_id ? purchaseOrders.find(o=>o.id===i.purchase_order_id) : null;
-    const d = await dbInsert('purchase_items',{
-      project_name:i.project_name, name:i.name, code:i.code||null,
-      quantity:accepted, unit:i.unit||'adet', material:i.material||null,
-      supplier:i.supplier||null, unit_price:i.unit_price||null,
-      currency:i.currency||'TRY', status:'IN_WAREHOUSE',
-      expected_date:i.expected_date||null,
-      notes:'Kısmi mal kabul ('+accepted+'/'+total+')'+(grp?' · 📦 '+grp.name:''), created_by:by});
-    if(!Array.isArray(d)||!d[0]){
-      await dbUpdate('purchase_items', id, {quantity:total});
-      i.quantity = total;
-      return false;
-    }
-    const ni = d[0];
+    // Kısmi kabul: kalem bölünür (ortak çekirdek splitPurchaseItem; bağlama
+    // adımı başarısızsa bölme B6 gereği tamamen geri alınır).
     // (B4) bölünen kalem ŞU AN teslim alınıyor — received_at damgası olmadan
     // whUndo onu IN_STOCK'a düşürüp mal kabul akışından koparıyordu.
     // Backend LocalDateTime beklediğinden yerel saat, dilimsiz gönderilir.
     const rcvAt = new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,19);
-    await dbUpdate('purchase_items', ni.id, {warehouse_id:whId, received_by:by, received_qty:accepted, received_at:rcvAt, ordered_at:i.ordered_at||null});
-    Object.assign(ni, {status:'IN_WAREHOUSE', warehouse_id:whId, received_by:by, received_qty:accepted, received_at:rcvAt, ordered_at:i.ordered_at||null});
-    purchaseItems.push(ni);
+    const ni = await splitPurchaseItem(i, {
+      origPatch:{quantity: total-accepted, returned_qty: retTotal},
+      origRestore:{quantity: total},
+      qty: accepted, whId, by,
+      notes:'Kısmi mal kabul ('+accepted+'/'+total+')',
+      received:{received_by:by, received_qty:accepted, received_at:rcvAt, ordered_at:i.ordered_at||null}
+    });
+    if(!ni) return false;
     mvItemId = ni.id;
   }
-  await dbInsert('warehouse_movements',{
-    warehouse_id: whId, purchase_item_id: mvItemId,
-    item_name: i.name, item_code: i.code||null,
-    movement_type: 'IN', quantity: accepted, unit: i.unit||'adet',
-    source_type: 'GOODS_RECEIPT', performed_by: by, notes: mvNote});
+  await mvInsert({whId, type:'IN', qty:accepted, unit:i.unit, name:i.name, code:i.code,
+    sourceType:'GOODS_RECEIPT', notes:mvNote, itemId:mvItemId});
   return true;
 }
 
@@ -6108,9 +6227,9 @@ async function rcvDoReceive(id, whId, accepted, returned){
 function rcvBulkModal(){
   const ids = [...document.querySelectorAll('.rcv-chk:checked')].map(c=>c.value);
   if(!ids.length){ toast('Önce kalem işaretleyin!','error'); return; }
-  const act = warehouses.filter(w=>w.is_active!==false);
-  if(!act.length){ toast('Önce Depo Yönetimi sekmesinden bir depo tanımlayın!','error'); return; }
-  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none';
+  const act = activeWarehousesOrWarn();
+  if(!act) return;
+  const inp = INP();
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.id = 'rcv-bulk-overlay';
@@ -6120,7 +6239,7 @@ function rcvBulkModal(){
     <div class="form-group" style="margin-bottom:18px">
       <label>Hedef Depo</label>
       <select id="rcv-bulk-wh" style="${inp}">
-        ${act.map(w=>`<option value="${w.id}">${esc(w.name)}${w.location?' — '+w.location:''}</option>`).join('')}
+        ${whOptionsHTML(act)}
       </select>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
@@ -6135,11 +6254,10 @@ async function rcvBulkConfirm(ids){
   const whId = document.getElementById('rcv-bulk-wh')?.value;
   document.getElementById('rcv-bulk-overlay')?.remove();
   if(!whId) return;
-  let ok=0, fail=0;
-  for(const id of ids){
-    const done = await rcvDoReceive(id, whId, Number(purchaseItems.find(x=>x.id===id)?.quantity)||1, 0);
-    done ? ok++ : fail++;
-  }
+  // Kalemler bağımsız → paralel işlenir (temizlik turu)
+  const results = await Promise.all(ids.map(id=>
+    rcvDoReceive(id, whId, Number(purchaseItems.find(x=>x.id===id)?.quantity)||1, 0)));
+  const ok = results.filter(Boolean).length, fail = results.length-ok;
   toast(fail ? `⚠ ${ok} kalem alındı, ${fail} kalemde hata` : `🏭 ${ok} kalem ${whName(whId)||'depoya'} alındı`, fail?'error':'success');
   renderReceiving();
   renderPurchaseList();
@@ -6204,7 +6322,7 @@ async function renderMrp(){
       </div>` +
       pool.map(i=>{
         const d = mrpItemDims(i);
-        const inp = 'width:76px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:4px 6px;outline:none';
+        const inp = INP('4px 6px','11px','width:76px;');
         return `<div style="display:flex;gap:10px;align-items:center;padding:6px 4px;border-bottom:1px dashed var(--border);flex-wrap:wrap">
           <input type="checkbox" class="mrp-chk" value="${i.id}" checked style="accent-color:var(--accent)">
           <span style="font-family:var(--font-mono);font-size:11px;min-width:0;flex:1">
@@ -6226,7 +6344,7 @@ async function renderMrp(){
 function renderMrpParams(){
   const el = document.getElementById('mrp-params');
   if(!el) return;
-  const inp = 'background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none';
+  const inp = INP('7px 10px','12px','');
   const sacs = stockSheets.filter(s=>s.kind==='SAC' && s.is_active!==false);
   const profs = stockSheets.filter(s=>s.kind==='PROFIL' && s.is_active!==false);
   el.innerHTML = `
@@ -6596,7 +6714,7 @@ function openStockSheetsModal(){
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.id = 'ss-modal-overlay';
-  const inp = 'background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none';
+  const inp = INP('7px 10px','12px','');
   overlay.innerHTML = `<div class="modal" style="width:720px;max-height:85vh;display:flex;flex-direction:column;text-align:left">
     <h3 style="margin-bottom:4px">⚙ Plaka / Profil Ölçü Kataloğu</h3>
     <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px">İhtiyaç planlamada seçilecek standart ölçüler (örn. 1350×5000×3 sac, 6000mm profil).</p>
@@ -6884,7 +7002,7 @@ function purQuickPrice(id){
   const i = purchaseItems.find(x=>x.id===id);
   if(!i) return;
   document.getElementById('pur-qprice-overlay')?.remove();
-  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 11px;outline:none';
+  const inp = INP('9px 11px');
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.id = 'pur-qprice-overlay';
@@ -6930,7 +7048,7 @@ function editPurchaseItem(id){
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.id = 'pur-edit-overlay';
-  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 11px;outline:none';
+  const inp = INP('9px 11px');
   overlay.innerHTML = `<div class="modal" style="width:520px;text-align:left">
     <h3 style="margin-bottom:4px">✏️ Kalemi Düzenle</h3>
     <p style="margin-bottom:14px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${esc(i.name)} · 📁 ${esc(i.project_name)}</p>
@@ -7096,7 +7214,7 @@ function updatePurSelectBar(){
 // Seçilen kalemlerden grup oluşturma modalı
 function poCreateFromSelection(){
   if(!purSelected.size){ toast('Önce kalem seçin!','error'); return; }
-  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none';
+  const inp = INP();
   const defName = 'Toplu Sipariş ' + new Date().toLocaleDateString('tr-TR');
   const selItems = purchaseItems.filter(i=>purSelected.has(i.id));
   const overlay = document.createElement('div');
@@ -7165,7 +7283,7 @@ function renderPurchaseOrders(){
     el.innerHTML = h`<div class="empty-state"><span class="emoji">📦</span>Henüz toplu sipariş grubu yok<br><span style="font-size:12px;color:var(--muted)">Kalemler sekmesinde 📝 Planlandı kalemleri işaretleyip "Toplu Sipariş Oluştur" deyin</span></div>`;
     return;
   }
-  const inp = 'background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;outline:none;width:100%';
+  const inp = INP('8px 10px','12px');
   el.innerHTML = purchaseOrders.map(o=>{
     const m = PO_STATUS[o.status] || PO_STATUS.DRAFT;
     const items  = purchaseItems.filter(i=>i.purchase_order_id===o.id);
@@ -7375,7 +7493,7 @@ function poApprove(orderId){
   const quotes = poQuotes.filter(q=>q.purchase_order_id===orderId);
   if(!quotes.length){ toast('Onay için önce en az bir teklif girin!','error'); return; }
   if(quotes.length===1) toast('Tek teklifle onaylıyorsunuz — karşılaştırma için birden fazla teklif önerilir','');
-  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;outline:none';
+  const inp = INP('8px 10px','12px');
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.id = 'po-approve-overlay';
@@ -7752,9 +7870,8 @@ function whvProjectPDF(proj){
 async function whTransfer(id){
   const ws = await dbGet('warehouses');
   warehouses = Array.isArray(ws) ? ws : warehouses;
-  const act = warehouses.filter(w=>w.is_active!==false);
-  if(!act.length){
-    toast('Önce Depo Yönetimi sekmesinden bir depo tanımlayın!','error');
+  const act = activeWarehousesOrWarn();
+  if(!act){
     await switchTab('warehouse');
     _whActivateTab('manage');
     return;
@@ -7762,7 +7879,7 @@ async function whTransfer(id){
   if(act.length===1) return whDoTransfer(id, act[0].id);
 
   const i = purchaseItems.find(x=>x.id===id);
-  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none';
+  const inp = INP();
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.id = 'wh-target-overlay';
@@ -7772,7 +7889,7 @@ async function whTransfer(id){
     <div class="form-group" style="margin-bottom:18px">
       <label>Hedef Depo</label>
       <select id="wh-target-sel" style="${inp}">
-        ${act.map(w=>`<option value="${w.id}">${esc(w.name)}${w.location?' — '+w.location:''}</option>`).join('')}
+        ${whOptionsHTML(act)}
       </select>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
@@ -7801,19 +7918,8 @@ async function whDoTransfer(id, warehouseId){
     i.warehouse_id = warehouseId;
     i.received_by = by;
     i.received_qty = qFull;
-    const q = Number(i.quantity);
-    await dbInsert('warehouse_movements', {
-      warehouse_id: warehouseId,
-      purchase_item_id: id,
-      item_name: i.name,
-      item_code: i.code || null,
-      movement_type: 'IN',
-      quantity: q > 0 ? q : 1,
-      unit: i.unit || 'adet',
-      source_type: 'PURCHASE_TRANSFER',
-      performed_by: currentUser?.display_name || currentUser?.username || null,
-      notes: 'Satın almadan depoya aktarım'
-    });
+    await mvInsert({whId:warehouseId, type:'IN', qty:i.quantity, unit:i.unit, name:i.name, code:i.code,
+      sourceType:'PURCHASE_TRANSFER', notes:'Satın almadan depoya aktarım', itemId:id});
   }
   toast('🏭 '+(whName(warehouseId)||'Depo')+' deposuna aktarıldı!','success');
   renderWarehouseList();
@@ -7834,19 +7940,8 @@ async function whUndo(id){
   i.received_by = null;
   i.received_qty = 0;
   if(oldWh){
-    const q = Number(i.quantity);
-    await dbInsert('warehouse_movements', {
-      warehouse_id: oldWh,
-      purchase_item_id: id,
-      item_name: i.name,
-      item_code: i.code || null,
-      movement_type: 'OUT',
-      quantity: q > 0 ? q : 1,
-      unit: i.unit || 'adet',
-      source_type: 'PURCHASE_TRANSFER',
-      performed_by: currentUser?.display_name || currentUser?.username || null,
-      notes: 'Depodan geri alındı'
-    });
+    await mvInsert({whId:oldWh, type:'OUT', qty:i.quantity, unit:i.unit, name:i.name, code:i.code,
+      sourceType:'PURCHASE_TRANSFER', notes:'Depodan geri alındı', itemId:id});
   }
   toast('↩ Depodan geri alındı','success');
   renderWarehouseList();
@@ -7858,54 +7953,58 @@ async function whUndo(id){
 // Kaynak depoya OUT + hedef depoya IN (source_type=WAREHOUSE_TRANSFER).
 // Kalem bağlı aktarımda adet kısmiyse kalem BÖLÜNÜR (orijinal azalır,
 // hedef depoda yeni kalem oluşur); münferit stokta yalnız hareket çifti.
-let _whXfer = null; // {kind:'item'|'loose', ...} — modal onayına taşınan bağlam
+// Bağlam (kind:'item'|'loose'...) global yerine modal butonuna closure ile
+// bağlanır (temizlik turu: _whXfer globali kalktı).
 
 function whXferItem(id){
   const i = purchaseItems.find(x=>x.id===id);
   if(!i || i.status!=='IN_WAREHOUSE' || !i.warehouse_id) return;
   const others = warehouses.filter(w=>w.is_active!==false && w.id!==i.warehouse_id);
   if(!others.length){ toast('Aktarılacak başka aktif depo yok!','error'); return; }
-  _whXfer = {kind:'item', id, src:i.warehouse_id, maxQ:Number(i.quantity)||1, unit:i.unit||'adet'};
-  _whXferOpenModal(`${i.code?esc(i.code)+' — ':''}${esc(i.name)}`, others);
+  _whXferOpenModal(`${esc(i.code?i.code+' — ':'')}${esc(i.name)}`, others,
+    {kind:'item', id, src:i.warehouse_id, maxQ:Number(i.quantity)||1, unit:i.unit||'adet'});
 }
 
 function whXferLoose(whId, name, code, unit, net){
   const others = warehouses.filter(w=>w.is_active!==false && w.id!==whId);
   if(!others.length){ toast('Aktarılacak başka aktif depo yok!','error'); return; }
-  _whXfer = {kind:'loose', src:whId, name, code:code||null, maxQ:Number(net)||0, unit:unit||'adet'};
-  _whXferOpenModal(`${code?esc(code)+' — ':''}${esc(name)}`, others);
+  _whXferOpenModal(`${esc(code?code+' — ':'')}${esc(name)}`, others,
+    {kind:'loose', src:whId, name, code:code||null, maxQ:Number(net)||0, unit:unit||'adet'});
 }
 
-function _whXferOpenModal(label, targets){
-  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none';
+function _whXferOpenModal(label, targets, x){
+  const inp = INP();
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.id = 'whx-overlay';
   overlay.innerHTML = `<div class="modal" style="width:400px;text-align:left">
     <h3 style="margin-bottom:4px">🔁 Depolar Arası Aktarım</h3>
-    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${label}<br>Kaynak: 🗄️ ${esc(whName(_whXfer.src)||'—')} · mevcut ${Number(_whXfer.maxQ.toFixed(4))} ${esc(_whXfer.unit)}</p>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${label}<br>Kaynak: 🗄️ ${esc(whName(x.src)||'—')} · mevcut ${Number(x.maxQ.toFixed(4))} ${esc(x.unit)}</p>
     <div class="form-row" style="grid-template-columns:2fr 1fr;margin-bottom:16px">
       <div class="form-group"><label>Hedef Depo</label>
         <select id="whx-target" style="${inp}">
-          ${targets.map(w=>`<option value="${w.id}">${esc(w.name)}${w.location?' — '+w.location:''}</option>`).join('')}
+          ${whOptionsHTML(targets)}
         </select>
       </div>
       <div class="form-group"><label>Adet</label>
-        <input type="number" id="whx-qty" value="${Number(_whXfer.maxQ.toFixed(4))}" min="0.001" max="${_whXfer.maxQ}" step="0.001" style="${inp}"
-          onkeydown="if(event.key==='Enter')whXferConfirm()">
+        <input type="number" id="whx-qty" value="${Number(x.maxQ.toFixed(4))}" min="0.001" max="${x.maxQ}" step="0.001" style="${inp}">
       </div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
-      <button class="btn btn-ghost" onclick="document.getElementById('whx-overlay').remove();_whXfer=null">İptal</button>
-      <button class="btn btn-primary" onclick="whXferConfirm()">🔁 Aktar</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('whx-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" id="whx-confirm-btn">🔁 Aktar</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
-  setTimeout(()=>{const el=document.getElementById('whx-qty');if(el){el.focus();el.select();}},100);
+  // Bağlam closure ile bağlanır — onclick attribute'unda JSON taşınmaz
+  // (kullanıcı verili name/code alanları attribute kaçışı gerektirirdi)
+  overlay.querySelector('#whx-confirm-btn').onclick = ()=>whXferConfirm(x);
+  const qtyEl = overlay.querySelector('#whx-qty');
+  qtyEl.addEventListener('keydown', e=>{ if(e.key==='Enter') whXferConfirm(x); });
+  setTimeout(()=>{qtyEl.focus();qtyEl.select();},100);
 }
 
-async function whXferConfirm(){
-  const x = _whXfer;
+async function whXferConfirm(x){
   if(!x) return;
   const target = document.getElementById('whx-target')?.value;
   const qty = parseFloat(document.getElementById('whx-qty')?.value);
@@ -7915,81 +8014,56 @@ async function whXferConfirm(){
   document.getElementById('whx-overlay')?.remove();
   const by = currentUser?.display_name||currentUser?.username||null;
   const note = 'Depolar arası aktarım: '+(whName(x.src)||'—')+' → '+(whName(target)||'—');
-  const mv = (whId,type,itemId,name,code,unit,q)=>dbInsert('warehouse_movements',{
-    warehouse_id:whId, purchase_item_id:itemId, item_name:name, item_code:code,
-    movement_type:type, quantity:q, unit,
-    source_type:'WAREHOUSE_TRANSFER', performed_by:by, notes:note});
+  const mv = (whId,type,itemId,name,code,unit,q)=>mvInsert({whId, type, qty:q, unit, name, code,
+    sourceType:'WAREHOUSE_TRANSFER', notes:note, itemId});
+  let outRow=null, inRow=null; // yazılan hareketler — tam refetch yerine listeye eklenir
 
   if(x.kind==='loose'){
     // (B6) hareket çifti kontrollü yazılır: OUT girip IN düşerse kaynak
     // depodan stok sessizce eksilirdi — OUT silinerek telafi edilir
     const out = await mv(x.src,'OUT',null,x.name,x.code,x.unit,qty);
-    if(!Array.isArray(out)||!out[0]){ toast('Aktarım kaydedilemedi! (çıkış hareketi yazılamadı)','error'); _whXfer=null; return; }
+    if(!Array.isArray(out)||!out[0]){ toast('Aktarım kaydedilemedi! (çıkış hareketi yazılamadı)','error'); return; }
     const inn = await mv(target,'IN',null,x.name,x.code,x.unit,qty);
     if(!Array.isArray(inn)||!inn[0]){
       await dbDelete('warehouse_movements', out[0].id);
       toast('Aktarım kaydedilemedi! (giriş hareketi yazılamadı, çıkış geri alındı)','error');
-      _whXfer=null; return;
+      return;
     }
+    outRow=out[0]; inRow=inn[0];
   } else {
     const i = purchaseItems.find(p=>p.id===x.id);
-    if(!i){ _whXfer=null; return; }
+    if(!i) return;
     if(qty >= x.maxQ-1e-9){
       // Tam aktarım: kalem hedef depoya taşınır
       const ok = await dbUpdate('purchase_items', x.id, {warehouse_id: target});
-      if(!ok){ toast('Aktarılamadı!','error'); _whXfer=null; return; }
+      if(!ok){ toast('Aktarılamadı!','error'); return; }
       i.warehouse_id = target;
-      await mv(x.src,'OUT',x.id,i.name,i.code||null,i.unit||'adet',qty);
-      await mv(target,'IN',x.id,i.name,i.code||null,i.unit||'adet',qty);
+      const out = await mv(x.src,'OUT',x.id,i.name,i.code||null,i.unit||'adet',qty);
+      const inn = await mv(target,'IN',x.id,i.name,i.code||null,i.unit||'adet',qty);
+      outRow=Array.isArray(out)?out[0]:null; inRow=Array.isArray(inn)?inn[0]:null;
     } else {
-      // Kısmi: kalem bölünür — orijinal adedi azalır, hedefte yeni kalem
-      // (kabul sayacı da bölünür: depodaki kalemde received_qty == quantity)
-      const ok = await dbUpdate('purchase_items', x.id, {quantity: x.maxQ-qty, received_qty: x.maxQ-qty});
-      if(!ok){ toast('Aktarılamadı!','error'); _whXfer=null; return; }
-      i.quantity = x.maxQ-qty;
-      i.received_qty = x.maxQ-qty;
-      // (B7) termin + grup referansı taşınır (purchase_order_id kilit
-      // nedeniyle taşınamaz; grup detayı kod eşleşmesiyle gösterir)
-      const grp = i.purchase_order_id ? purchaseOrders.find(o=>o.id===i.purchase_order_id) : null;
-      const d = await dbInsert('purchase_items',{
-        project_name:i.project_name, name:i.name, code:i.code||null,
-        quantity:qty, unit:i.unit||'adet', material:i.material||null,
-        supplier:i.supplier||null, unit_price:i.unit_price||null,
-        currency:i.currency||'TRY', status:'IN_WAREHOUSE',
-        expected_date:i.expected_date||null,
-        notes:note+(grp?' · 📦 '+grp.name:''), created_by:by});
-      if(!Array.isArray(d)||!d[0]){
-        // (B6) rollback: adetle birlikte bölünmüş kabul sayacı da geri yüklenir
-        await dbUpdate('purchase_items', x.id, {quantity: x.maxQ, received_qty: x.maxQ});
-        i.quantity = x.maxQ; i.received_qty = x.maxQ;
-        toast('Aktarım başarısız!','error'); _whXfer=null; return;
-      }
-      const ni = d[0];
-      // create endpoint'i warehouse_id almaz — ayrı update ile bağlanır.
-      // (B4) received_at orijinalden kopyalanır: mal kabulden gelen kalemin
-      // bölünmüş parçası da whUndo'da RECEIVED'a dönebilsin (stok kökenli
-      // kalemde damga yok → null gönderilir, backend yok sayar → IN_STOCK).
-      const wok = await dbUpdate('purchase_items', ni.id, {warehouse_id: target, received_by: i.received_by||null, received_qty: qty, received_at: i.received_at||null, ordered_at: i.ordered_at||null});
-      if(!wok){
-        // (B6) yeni kalem depoya bağlanamadı — bölme tamamen geri alınır
-        await dbDelete('purchase_items', ni.id);
-        await dbUpdate('purchase_items', x.id, {quantity: x.maxQ, received_qty: x.maxQ});
-        i.quantity = x.maxQ; i.received_qty = x.maxQ;
-        toast('Aktarım başarısız! (yeni kalem depoya bağlanamadı, bölme geri alındı)','error');
-        _whXfer=null; return;
-      }
-      ni.warehouse_id = target; ni.status='IN_WAREHOUSE';
-      ni.received_by = i.received_by||null; ni.received_qty = qty; ni.received_at = i.received_at||null;
-      ni.ordered_at = i.ordered_at||null;
-      purchaseItems.push(ni);
-      await mv(x.src,'OUT',x.id,i.name,i.code||null,i.unit||'adet',qty);
-      await mv(target,'IN',ni.id,i.name,i.code||null,i.unit||'adet',qty);
+      // Kısmi: kalem bölünür (ortak çekirdek splitPurchaseItem) — orijinal
+      // adedi azalır, hedefte yeni kalem. Kabul sayacı da bölünür (depodaki
+      // kalemde received_qty == quantity); (B4) received_at orijinalden
+      // kopyalanır ki bölünmüş parça whUndo'da RECEIVED'a dönebilsin.
+      const ni = await splitPurchaseItem(i, {
+        origPatch:{quantity: x.maxQ-qty, received_qty: x.maxQ-qty},
+        origRestore:{quantity: x.maxQ, received_qty: x.maxQ},
+        qty, whId: target, by,
+        notes: note,
+        received:{received_by:i.received_by||null, received_qty:qty, received_at:i.received_at||null, ordered_at:i.ordered_at||null}
+      });
+      if(!ni){ toast('Aktarım başarısız! (bölme geri alındı)','error'); return; }
+      const out = await mv(x.src,'OUT',x.id,i.name,i.code||null,i.unit||'adet',qty);
+      const inn = await mv(target,'IN',ni.id,i.name,i.code||null,i.unit||'adet',qty);
+      outRow=Array.isArray(out)?out[0]:null; inRow=Array.isArray(inn)?inn[0]:null;
     }
   }
-  _whXfer = null;
   toast('🔁 '+(whName(target)||'Hedef depo')+' deposuna aktarıldı ('+qty+' '+x.unit+')','success');
-  const mvs = await dbGet('warehouse_movements','order=created_at.desc');
-  if(Array.isArray(mvs)) whMovements = mvs;
+  // Tam tablo refetch'i yerine dönen hareketler listeye eklenir (desc sıra:
+  // en yeni başa — IN, OUT'tan sonra yazıldı)
+  if(inRow) whMovements.unshift(inRow);
+  if(outRow) whMovements.splice(inRow?1:0, 0, outRow);
   renderWarehouseList();
 }
 
@@ -8131,7 +8205,7 @@ function renderDnDetail(){
   if(!n){ el.innerHTML=''; return; }
   const isDraft = n.status==='DRAFT';
   const items = deliveryItems.filter(i=>i.delivery_note_id===n.id);
-  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;outline:none';
+  const inp = INP('8px 10px','12px');
 
   const itemRows = items.length ? h`${items.map((i,idx)=>h`
     <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--border)">
@@ -8273,22 +8347,12 @@ async function dnShip(id){
   if(!confirm(`İrsaliye sevk edilsin mi?\n${items.length} kalem${whItems.length?` (${whItems.length} tanesi depodan düşülecek)`:''}${shortMsg}`)) return;
   const ok = await dbUpdate('delivery_notes', id, {status:'SHIPPED'});
   if(!ok) return;
-  // Depo bağlı kalemler için OUT hareketi (geri almada delivery_note_id ile silinir)
+  // Depo bağlı kalemler için OUT hareketi (geri almada delivery_note_id ile
+  // silinir). Kalemler bağımsız → paralel yazılır (temizlik turu).
   const n = deliveryNotes.find(x=>x.id===id);
-  for(const i of whItems){
-    await dbInsert('warehouse_movements',{
-      warehouse_id: i.warehouse_id,
-      delivery_note_id: id,
-      item_name: i.item_name,
-      item_code: i.item_code||null,
-      movement_type: 'OUT',
-      quantity: Number(i.quantity)>0?Number(i.quantity):1,
-      unit: i.unit||'adet',
-      source_type: 'DELIVERY',
-      performed_by: currentUser?.display_name||currentUser?.username||null,
-      notes: 'İrsaliye sevki: '+(n?.note_no||'')
-    });
-  }
+  await Promise.all(whItems.map(i=>mvInsert({whId:i.warehouse_id, type:'OUT', qty:i.quantity,
+    unit:i.unit, name:i.item_name, code:i.item_code,
+    sourceType:'DELIVERY', notes:'İrsaliye sevki: '+(n?.note_no||''), dnId:id})));
   toast('🚚 Sevk edildi!','success');
   renderDelivery();
 }
@@ -8445,7 +8509,7 @@ async function renderReceive(id){
     action=h`<div style="margin-top:16px">
       <label style="font-family:var(--font-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Hedef Depo</label>
       <select id="rcv-wh" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font-mono);font-size:14px;padding:12px;outline:none;margin-top:6px">
-        ${act.map(w=>h`<option value="${w.id}">${w.name}${w.location?h` — ${w.location}`:''}</option>`)}
+        ${whOptionsHTML(act)}
       </select>
       <button class="btn btn-primary" style="width:100%;margin-top:14px;padding:14px;font-size:15px" onclick="receiveConfirm('${raw(i.id)}')">✅ Mal Kabul — Depoya Al</button>
     </div>`;
@@ -8470,19 +8534,8 @@ async function receiveConfirm(id){
   const rcvBy=currentUser?.display_name||currentUser?.username||null;
   const ok=await dbUpdate('purchase_items', id, {status:'IN_WAREHOUSE', warehouse_id: whId, received_by: rcvBy, received_qty: Number(i.quantity)||1});
   if(!ok){ toast('Mal kabul yapılamadı!','error'); return; }
-  const q=Number(i.quantity);
-  await dbInsert('warehouse_movements',{
-    warehouse_id: whId,
-    purchase_item_id: id,
-    item_name: i.name,
-    item_code: i.code||null,
-    movement_type: 'IN',
-    quantity: q>0?q:1,
-    unit: i.unit||'adet',
-    source_type: 'GOODS_RECEIPT',
-    performed_by: currentUser?.display_name||currentUser?.username||null,
-    notes: 'QR mal kabul'
-  });
+  await mvInsert({whId, type:'IN', qty:i.quantity, unit:i.unit, name:i.name, code:i.code,
+    sourceType:'GOODS_RECEIPT', notes:'QR mal kabul', itemId:id});
   toast('🏭 Depoya alındı!','success');
   renderReceive(id);
 }
@@ -8652,7 +8705,7 @@ async function whmAddWarehouse(){
 function whmEditWarehouse(id){
   const w = warehouses.find(x=>x.id===id);
   if(!w) return;
-  const inp = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 11px;outline:none';
+  const inp = INP('9px 11px');
   getRef('users').then(us=>{
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay open';
@@ -9461,7 +9514,7 @@ async function addBomPart() {
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
   const parentId = document.getElementById('bom-part-parent').value||null;
   // Aynı kod farklı dallarda serbest (4. tur #1) — kontrol kardeşler arasında
-  const dup = bomParts.find(p=>p.product_id===_activeBomProduct.id && (p.parent_id||null)===parentId && (p.code||'').toLowerCase()===code.toLowerCase());
+  const dup = findSiblingDup(bomParts, {code, parentId, where:p=>p.product_id===_activeBomProduct.id});
   if(dup){ toast(`Aynı üst altında "${dup.code}" kodlu bir parça zaten var: ${dup.name}`,'error'); return; }
   const parentPart = parentId ? bomParts.find(p=>p.id===parentId) : null;
   const level = parentPart ? (parentPart.level||0)+1 : 0;
@@ -9525,7 +9578,7 @@ async function addBomOperation() {
   const qty       = parseFloat(part.quantity) || 1;
   const totalTime = duration * qty;
 
-  if(bomParts.find(p=>(p.code||'').toLowerCase()===newCode.toLowerCase() && p.product_id===_activeBomProduct.id && (p.parent_id||null)===(part.parent_id||null))){
+  if(findSiblingDup(bomParts, {code:newCode, parentId:part.parent_id, where:p=>p.product_id===_activeBomProduct.id})){
     toast(`"${newCode}" kodu aynı üst altında zaten mevcut!`,'error'); return;
   }
 
@@ -9623,37 +9676,24 @@ function buildSortedTree(parentId, level) {
 async function bomCopyBranch(partId){
   const src=bomParts.find(x=>x.id===partId);
   if(!src||!_activeBomProduct) return;
-  const collect=pid=>bomParts.filter(p=>(p.parent_id||null)===pid)
-    .sort((a,b)=>(a.sort_order||0)-(b.sort_order||0))
-    .flatMap(k=>[k,...collect(k.id)]);
-  const branch=[src,...collect(src.id)];
-  if(!confirm(`"${src.code} — ${src.name}" ${branch.length>1?`alt ağacıyla birlikte (${branch.length} parça) `:''}kopyalansın mı?\n\nKopya aynı üstün altına eklenir; kök kodun sonuna -KOPYA gelir (sonra düzenleyin), alt parça kodları aynen korunur.`)) return;
-  let rootCode=src.code+'-KOPYA', n=2;
-  const sibs=bomParts.filter(p=>p.product_id===src.product_id && (p.parent_id||null)===(src.parent_id||null));
-  while(sibs.some(p=>(p.code||'').toLowerCase()===rootCode.toLowerCase())) rootCode=src.code+'-KOPYA'+(n++);
-  // Backend gönderilen id'yi yok sayar → parent bağı DÖNEN id ile kurulur
-  const idMap={};
-  let ok=0, fail=0;
-  for(const p of branch){
-    // (B9) atası eklenememiş satır parent'sız (yetim) eklenmesin: branch
-    // derinlik-öncelikli olduğundan bu koruma alt ağacı zincirleme atlar
-    if(p.id!==partId && !idMap[p.parent_id]){ fail++; continue; }
-    const ops=Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
-    const d=await dbInsert('bom_parts',{
+  await copyBranch({
+    list:bomParts, partId, parentKey:'parent_id',
+    codeOf:p=>p.code, nameOf:p=>p.name, table:'bom_parts',
+    sibsOf:()=>bomParts.filter(p=>p.product_id===src.product_id && (p.parent_id||null)===(src.parent_id||null)),
+    payload:(p,isRoot,rootCode,idMap)=>({
       product_id:src.product_id,
-      parent_id:p.id===partId?(src.parent_id||null):idMap[p.parent_id],
-      name:p.name, code:p.id===partId?rootCode:p.code,
+      parent_id:isRoot?(src.parent_id||null):idMap[p.parent_id],
+      name:p.name, code:isRoot?rootCode:p.code,
       quantity:p.quantity||1, unit:p.unit||'adet',
       weight_kg:p.weight_kg||null, material:p.material||null,
       material_kind:p.material_kind||null,
       width_mm:p.width_mm||null, height_mm:p.height_mm||null, thickness_mm:p.thickness_mm||null,
-      operations:ops, level:p.level||0, sort_order:(p.sort_order||0)+1
-    });
-    if(Array.isArray(d)&&d[0]){ idMap[p.id]=d[0].id; bomParts.push(d[0]); ok++; }
-    else fail++;
-  }
-  renderBomContent();
-  toast(fail?`⚠ ${ok} parça kopyalandı, ${fail} satır kopyalanamadı (hata ya da atası eklenemedi)`:`📋 Dal kopyalandı (${ok} parça) — kök kod: "${rootCode}"`, fail?'error':'success');
+      operations:Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]'),
+      level:p.level||0, sort_order:(p.sort_order||0)+1
+    }),
+    onInserted:d=>bomParts.push(d),
+    rerender:renderBomContent
+  });
 }
 
 // ─── Sürükle-Bırak ───
@@ -9850,7 +9890,7 @@ async function saveBomPartEdit(partId) {
   const code     = document.getElementById('bom-edit-code').value.trim();
   const material = document.getElementById('bom-edit-material').value.trim();
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
-  const dup = bomParts.find(p=>p.id!==partId && p.product_id===part.product_id && (p.parent_id||null)===(part.parent_id||null) && (p.code||'').toLowerCase()===code.toLowerCase());
+  const dup = findSiblingDup(bomParts, {code, parentId:part.parent_id, selfId:partId, where:p=>p.product_id===part.product_id});
   if(dup){ toast(`Aynı üst altında "${dup.code}" kodlu bir parça zaten var: ${dup.name}`,'error'); return; }
   // Olcu: bos birakmak = 0 gonderilir (backend'de null "dokunma" demek oldugu icin
   // temizleme 0 ile yapilir; 0 ekranda "olcu yok" sayilir)
@@ -10023,31 +10063,42 @@ function pbomRenderMachineRows(){
   if(!_pbomMachineSel.length) _pbomMachineSel = [''];
   // Bu projeye zaten bağlı makineler listede sunulmaz
   const linked = new Set(projectBoms.filter(pb=>pb.project_name===projName).map(pb=>pb.bom_product_id));
-  const inp = 'flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none';
+  const inp = INP('10px 12px','13px','flex:1;min-width:0;');
   const avail = bomProducts.filter(p=>!linked.has(p.id));
   if(!avail.length){
     wrap.innerHTML = '<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:10px 2px">Bu projeye bağlanabilecek makine kalmadı (hepsi bağlı ya da ürün ağacı yok).</div>';
     if(addBtn) addBtn.style.display = 'none';
     return;
   }
+  // Tüm satırlara TAM liste basılır; başka satırın seçtiği makine disabled
+  // yapılır (temizlik turu: seçimde tam innerHTML rebuild odak kaybettiriyordu)
   wrap.innerHTML = _pbomMachineSel.map((val,idx)=>{
-    const taken = new Set(_pbomMachineSel.filter((v,i)=>i!==idx && v));
-    const opts = avail.filter(p=>!taken.has(p.id));
     return `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
       <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted);width:18px;flex-shrink:0">${idx+1}.</span>
-      <select style="${inp}" onchange="pbomMachineChange(${idx},this.value)">
+      <select id="pbom-mach-sel-${idx}" style="${inp}" onchange="pbomMachineChange(${idx},this.value)">
         <option value="">— Makine seçin —</option>
-        ${opts.map(p=>`<option value="${p.id}" ${p.id===val?'selected':''}>${esc(p.name)}${p.code?' ('+p.code+')':''}</option>`).join('')}
+        ${avail.map(p=>`<option value="${p.id}" ${p.id===val?'selected':''}>${esc(p.name)}${p.code?' ('+p.code+')':''}</option>`).join('')}
       </select>
       ${_pbomMachineSel.length>1?`<button class="btn btn-ghost btn-sm" onclick="pbomRemoveMachineRow(${idx})" title="Satırı kaldır" style="color:var(--red);flex-shrink:0">✕</button>`:''}
     </div>`;
   }).join('');
+  pbomSyncMachineOptions();
   if(addBtn) addBtn.style.display = '';
+}
+
+// Diğer satırlarda seçili makineleri disabled işaretler — yeniden çizim yok
+function pbomSyncMachineOptions(){
+  _pbomMachineSel.forEach((val,idx)=>{
+    const sel = document.getElementById('pbom-mach-sel-'+idx);
+    if(!sel) return;
+    const taken = new Set(_pbomMachineSel.filter((v,i)=>i!==idx && v));
+    [...sel.options].forEach(o=>{ o.disabled = !!o.value && taken.has(o.value); });
+  });
 }
 
 function pbomMachineChange(idx, val){
   _pbomMachineSel[idx] = val;
-  pbomRenderMachineRows(); // diğer satırların listelerinden düşsün
+  pbomSyncMachineOptions(); // diğer satırlarda disabled olsun (odak korunur)
 }
 
 function pbomAddMachineRow(){
@@ -10154,20 +10205,26 @@ async function openPbomEditor(pbomId) {
       // ID eşleştirme: backend gönderilen id'yi YOK SAYAR, kendi UUID'sini
       // üretir — parent bağı için DÖNEN gerçek id kullanılmalı (genId ile
       // gönderilen parent_custom_id backend'de 500 veriyordu, bağlar kopuktu).
+      // Seviye seviye Promise.all (temizlik turu): aynı seviyedekiler paralel
+      // eklenir, üst bağları bir önceki seviyenin dönen id'lerinden kurulur
       const idMap = {};
-      for(const p of origParts) {
-        const newParentId = p.parent_id ? (idMap[p.parent_id]||null) : null;
-        const ops = Array.isArray(p.operations)?p.operations:[];
-        const data = await dbInsert('project_bom_parts',{
-          project_bom_id: pbomId, bom_part_id: p.id,
-          is_excluded: false,
-          custom_name: p.name, custom_code: p.code,
-          custom_qty: p.quantity||1, custom_unit: p.unit||'adet',
-          custom_weight: p.weight_kg||null, custom_material: p.material||null,
-          dept_id: null, parent_custom_id: newParentId,
-          operations: ops, level: p.level||0, sort_order: p.sort_order||0
-        });
-        if(Array.isArray(data)&&data[0]){ idMap[p.id]=data[0].id; projectBomParts.push(data[0]); }
+      const byLevel = new Map();
+      origParts.forEach(p=>{ const l=p.level||0; if(!byLevel.has(l)) byLevel.set(l,[]); byLevel.get(l).push(p); });
+      for(const lvl of [...byLevel.keys()].sort((a,b)=>a-b)){
+        await Promise.all(byLevel.get(lvl).map(async p=>{
+          const newParentId = p.parent_id ? (idMap[p.parent_id]||null) : null;
+          const ops = Array.isArray(p.operations)?p.operations:[];
+          const data = await dbInsert('project_bom_parts',{
+            project_bom_id: pbomId, bom_part_id: p.id,
+            is_excluded: false,
+            custom_name: p.name, custom_code: p.code,
+            custom_qty: p.quantity||1, custom_unit: p.unit||'adet',
+            custom_weight: p.weight_kg||null, custom_material: p.material||null,
+            dept_id: null, parent_custom_id: newParentId,
+            operations: ops, level: p.level||0, sort_order: p.sort_order||0
+          });
+          if(Array.isArray(data)&&data[0]){ idMap[p.id]=data[0].id; projectBomParts.push(data[0]); }
+        }));
       }
       toast('✅ '+origParts.length+' parça kopyalandı!','success');
     } else {
@@ -10274,7 +10331,7 @@ async function pbomeAddPart() {
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
   const parentId = document.getElementById('pbome-part-parent').value||null;
   // Aynı kod farklı dallarda serbest (4. tur #1) — kontrol kardeşler arasında
-  const dup = _pbomeParts.find(p=>(p.parent_custom_id||null)===parentId && (p.custom_code||'').toLowerCase()===code.toLowerCase());
+  const dup = findSiblingDup(_pbomeParts, {code, codeKey:'custom_code', parentKey:'parent_custom_id', parentId});
   if(dup){ toast(`Aynı üst altında "${dup.custom_code}" kodlu bir parça zaten var: ${dup.custom_name}`,'error'); return; }
   const parent   = parentId ? _pbomeParts.find(p=>p.id===parentId) : null;
   const level    = parent ? (parent.level||0)+1 : 0;
@@ -10322,7 +10379,7 @@ async function pbomeAddOp() {
   const qty     = parseFloat(part.custom_qty)||1;
   const ops     = [{name:opName,code:opCode,desc,duration_per_unit:dur||null,total_duration:dur?dur*qty:null}];
 
-  if(_pbomeParts.find(p=>(p.custom_code||'').toLowerCase()===newCode.toLowerCase() && (p.parent_custom_id||null)===(part.parent_custom_id||null))){
+  if(findSiblingDup(_pbomeParts, {code:newCode, codeKey:'custom_code', parentKey:'parent_custom_id', parentId:part.parent_custom_id})){
     toast(`"${newCode}" kodu aynı üst altında zaten mevcut!`,'error'); return;
   }
 
@@ -10512,7 +10569,7 @@ async function pbomeSavePartEdit(partId) {
   const code=document.getElementById('pbome-edit-code').value.trim();
   const material=document.getElementById('pbome-edit-material').value.trim();
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
-  const dup=_pbomeParts.find(x=>x.id!==partId && (x.parent_custom_id||null)===(p.parent_custom_id||null) && (x.custom_code||'').toLowerCase()===code.toLowerCase());
+  const dup=findSiblingDup(_pbomeParts, {code, codeKey:'custom_code', parentKey:'parent_custom_id', parentId:p.parent_custom_id, selfId:partId});
   if(dup){ toast(`Aynı üst altında "${dup.custom_code}" kodlu bir parça zaten var: ${dup.custom_name}`,'error'); return; }
   const custom_width_mm=dimNum('pbome-edit-width'), custom_height_mm=dimNum('pbome-edit-height'), custom_thickness_mm=dimNum('pbome-edit-thickness');
   const material_kind=document.getElementById('pbome-edit-kind').value; // ''=override'i temizle
@@ -10535,27 +10592,15 @@ async function pbomeSavePartEdit(partId) {
 async function pbomeCopyBranch(partId){
   const src=_pbomeParts.find(x=>x.id===partId);
   if(!src||!_activePbomId) return;
-  const collect=pid=>_pbomeParts.filter(p=>(p.parent_custom_id||null)===pid)
-    .sort((a,b)=>(a.sort_order||0)-(b.sort_order||0))
-    .flatMap(k=>[k,...collect(k.id)]);
-  const branch=[src,...collect(src.id)];
-  if(!confirm(`"${src.custom_code} — ${src.custom_name}" ${branch.length>1?`alt ağacıyla birlikte (${branch.length} parça) `:''}kopyalansın mı?\n\nKopya aynı üstün altına eklenir; kök kodun sonuna -KOPYA gelir (sonra düzenleyin), alt parça kodları aynen korunur.`)) return;
-  let rootCode=src.custom_code+'-KOPYA', n=2;
-  const sibs=_pbomeParts.filter(p=>(p.parent_custom_id||null)===(src.parent_custom_id||null));
-  while(sibs.some(p=>(p.custom_code||'').toLowerCase()===rootCode.toLowerCase())) rootCode=src.custom_code+'-KOPYA'+(n++);
-  // Backend gönderilen id'yi yok sayar → parent bağı DÖNEN id ile kurulur
-  const idMap={};
-  let ok=0, fail=0;
-  for(const p of branch){
-    // (B9) atası eklenememiş satır parent'sız (yetim) eklenmesin: branch
-    // derinlik-öncelikli olduğundan bu koruma alt ağacı zincirleme atlar
-    if(p.id!==partId && !idMap[p.parent_custom_id]){ fail++; continue; }
-    const ops=Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
-    const d=await dbInsert('project_bom_parts',{
+  await copyBranch({
+    list:_pbomeParts, partId, parentKey:'parent_custom_id',
+    codeOf:p=>p.custom_code, nameOf:p=>p.custom_name, table:'project_bom_parts',
+    sibsOf:()=>_pbomeParts.filter(p=>(p.parent_custom_id||null)===(src.parent_custom_id||null)),
+    payload:(p,isRoot,rootCode,idMap)=>({
       project_bom_id:_activePbomId, bom_part_id:null,
       is_excluded:p.is_excluded||false,
       custom_name:p.custom_name,
-      custom_code:p.id===partId?rootCode:p.custom_code,
+      custom_code:isRoot?rootCode:p.custom_code,
       custom_qty:p.custom_qty||1, custom_unit:p.custom_unit||'adet',
       custom_weight:p.custom_weight??null,
       custom_material:p.custom_material??p.resolved_material??null,
@@ -10564,14 +10609,13 @@ async function pbomeCopyBranch(partId){
       custom_thickness_mm:p.custom_thickness_mm??p.resolved_thickness_mm??null,
       material_kind:p.material_kind??p.resolved_material_kind??null,
       dept_id:p.dept_id||null,
-      parent_custom_id:p.id===partId?(src.parent_custom_id||null):idMap[p.parent_custom_id],
-      operations:ops, level:p.level||0, sort_order:(p.sort_order||0)+1
-    });
-    if(Array.isArray(d)&&d[0]){ idMap[p.id]=d[0].id; _pbomeParts.push(d[0]); projectBomParts.push(d[0]); ok++; }
-    else fail++;
-  }
-  pbomeRenderContent();
-  toast(fail?`⚠ ${ok} parça kopyalandı, ${fail} satır kopyalanamadı (hata ya da atası eklenemedi)`:`📋 Dal kopyalandı (${ok} parça) — kök kod: "${rootCode}"`, fail?'error':'success');
+      parent_custom_id:isRoot?(src.parent_custom_id||null):idMap[p.parent_custom_id],
+      operations:Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]'),
+      level:p.level||0, sort_order:(p.sort_order||0)+1
+    }),
+    onInserted:d=>{ _pbomeParts.push(d); projectBomParts.push(d); },
+    rerender:pbomeRenderContent
+  });
 }
 
 // İşlem kaldır
@@ -10911,12 +10955,12 @@ async function pbomPublishParts(pb, allPbParts, templateParts){
     if(tpl && tpl.parent_id) return allPbParts.find(x=>x.bom_part_id===tpl.parent_id) || null;
     return null;
   };
-  const linkedThisPass = new Set(); // aynı koda toplanan parçada İLK dalın atası kazanır
-  for(const p of allPbParts){
+  // Aynı koda toplanan parçada İLK dalın (g.rows[0] — allPbParts sırasında
+  // ilk gelen) atası kazanır; üretime giden her grup tam bir kez işlenir.
+  for(const g of prodGroups.values()){
+    const p = g.rows[0];
     const childPartId = partIdByPbp[p.id];
     if(!childPartId) continue;
-    if(linkedThisPass.has(childPartId)) continue;
-    linkedThisPass.add(childPartId);
     let anc = parentOf(p);
     let parentPartId = null;
     while(anc){
@@ -11034,7 +11078,7 @@ async function addPbomCustomPart(pbomId) {
   const parentId = document.getElementById('pbom-custom-parent')?.value||null;
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
 
-  const dupCheck = projectBomParts.find(p=>p.project_bom_id===pbomId && (p.parent_custom_id||null)===(parentId||null) && (p.custom_code||'').toLowerCase()===code.toLowerCase());
+  const dupCheck = findSiblingDup(projectBomParts, {code, codeKey:'custom_code', parentKey:'parent_custom_id', parentId, where:p=>p.project_bom_id===pbomId});
   if(dupCheck){ toast(`Aynı üst altında "${dupCheck.custom_code}" kodlu bir parça zaten var: ${dupCheck.custom_name}`,'error'); return; }
 
   const existing = projectBomParts.filter(p=>p.project_bom_id===pbomId&&!p.bom_part_id);

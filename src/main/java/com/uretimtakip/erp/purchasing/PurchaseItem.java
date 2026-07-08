@@ -56,6 +56,9 @@ import java.util.UUID;
  *                                     kaynak kalemin baglandigi plaka/profil kalemi)
  *   ordered_at          timestamp     NULL
  *   received_at         timestamp     NULL
+ *   received_by         varchar(150)  NULL (mal kabulu yapan hesap, 4. tur #3)
+ *   received_qty        numeric(15,4) DEFAULT 0 NOT NULL (depoya kabul edilen toplam adet)
+ *   returned_qty        numeric(15,4) DEFAULT 0 NOT NULL (tedarikciye iade edilen toplam adet)
  *   created_by          varchar(150)  NULL
  *   created_at          timestamp     (BaseEntity'den)
  */

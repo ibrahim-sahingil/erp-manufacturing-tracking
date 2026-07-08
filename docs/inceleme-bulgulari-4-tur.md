@@ -95,24 +95,41 @@ ve altını atla (fail say), Excel import'taki desen gibi.
 ### B10 (KÜÇÜK/TEMİZLİK) — Ölü publishProjectBom silinsin
 `index.html` ~11088, çağıranı yok (~90 satır). Sil.
 
-## YEDEKTE BEKLEYEN İYİLEŞTİRME ÖNERİLERİ (hata değil; ayrı "temizlik turu")
-- bomCopyBranch/pbomeCopyBranch ikizleri → tek parametrik copyBranch helper.
-- whXferConfirm/rcvDoReceive bölme mantığı → tek splitPurchaseItem helper.
-- Kardeş-kod ön-kontrolü 7 kopya → tek findSiblingDup helper.
-- warehouse_movements payload kurulumu 6 kopya → tek mvInsert helper (whXfer'in
-  lokal mv()'si module-level'a çıkarılabilir).
-- Depo <option> listesi + "önce depo tanımlayın" guard'ı 5 kopya → helper.
-- `const inp = 'width:100%...'` stil dizesi ~40 kopya → tek sabit/CSS sınıfı.
-- _whXfer globali yerine onclick'e JSON argüman (rcvBulkConfirm deseni).
-- linkedThisPass Set yerine prodGroups.values() üzerinden g.rows[0] ile bağ.
-- pbomRenderMachineRows tam innerHTML rebuild (focus kaybı) → option.disabled.
-- woLoadParts: tüm purchase_items + tüm pbp çekiliyor → projeye filtreli çek;
-  kidsOf/woMatChip O(n²) → Map ile O(1); büyük projede gecikme.
-- Kopyalama/toplu kabul döngüleri sıralı await → seviye-seviye Promise.all.
-- whXferConfirm sonrası tüm hareket tablosunu yeniden çekmek yerine dönen
-  kayıtları listeye ekle.
-- PurchaseItem.java sınıf doc bloğuna received_by/received_qty/returned_qty
-  kolonlarını ekle (CLAUDE.md: entity doc = şema belgesi).
+## YEDEKTE BEKLEYEN İYİLEŞTİRME ÖNERİLERİ — TEMİZLİK TURU TAMAMLANDI (2026-07-08, `temizlik-turu` dalı)
+- ✅ bomCopyBranch/pbomeCopyBranch ikizleri → tek parametrik `copyBranch` helper
+  (+ seviye-seviye Promise.all ile paralel ekleme).
+- ✅ whXferConfirm/rcvDoReceive bölme mantığı → tek `splitPurchaseItem` helper.
+  BONUS: rcvDoReceive'de depo bağlama adımı başarısızsa artık bölme B6 gereği
+  tamamen geri alınır (eskiden sonuç yok sayılıyordu).
+- ✅ Kardeş-kod ön-kontrolü 7 kopya → tek `findSiblingDup` helper.
+- ✅ warehouse_movements payload 6 kopya → tek `mvInsert` helper (whXfer'in
+  lokal mv()'si bunun sarmalayıcısı oldu; e2e-test.js grab listesine eklendi).
+- ✅ Depo <option> + "önce depo tanımlayın" guard'ı → `whOptionsHTML` +
+  `activeWarehousesOrWarn` (option'larda location artık esc'li — küçük kapama).
+- ✅~ `const inp` stil dizesi: 16 JS bildirimi tek `INP(pad,fs,w)` kurucusuna
+  indi. Statik HTML'deki ~20 inline kopya BİLİNÇLİ bırakıldı — CSS sınıfına
+  taşımak inline-style özgüllüğü yüzünden görsel regresyon riski, kazanım yok.
+- ✅ _whXfer globali kalktı — bağlam modal butonuna closure ile bağlanır
+  (onclick'te JSON taşınmadı: kullanıcı verili name/code attribute kaçışı
+  gerektirirdi, querySelector+closure daha güvenli).
+- ✅ linkedThisPass Set → prodGroups.values() üzerinden g.rows[0] (davranış aynı:
+  ilk dal kazanır).
+- ✅ pbomRenderMachineRows: seçimde tam rebuild yok → `pbomSyncMachineOptions`
+  option.disabled günceller, odak korunur.
+- ✅~ woLoadParts: kidsOf + woMatChip O(n²) → Map (woMatChip ikinci parametre
+  `byCode` aldı, verilmezse eski yol). "Projeye filtreli çek" YAPILMADI:
+  adapter tüm listeyi çekip client-side filtreliyor (genelVeriGetir), sorguya
+  filtre eklemek trafiği azaltmaz — gerçek kazanım backend'e path filtresi
+  eklemek olur (purchase_items'ta yok; ayrı iş).
+- ✅ Sıralı await'ler: copyBranch + openPbomEditor kopyası seviye-seviye
+  Promise.all; rcvBulkConfirm ve dnShip hareketleri tam paralel.
+- ✅ whXferConfirm: tam hareket-tablosu refetch'i yerine dönen OUT/IN kayıtları
+  whMovements'a unshift edilir.
+- ✅ PurchaseItem.java sınıf doc bloğuna received_by/received_qty/returned_qty
+  kolonları eklendi.
+- NOT: e2e-test.js + verify-h-render.js `grab()` düzeltildi — destructuring
+  parametreli fonksiyonlarda ({a,b}) parametre parantezi atlanıp gövde
+  '{'sından sayılıyor (mvInsert/splitPurchaseItem grab'i için gerekliydi).
 
 ## Bağlam
 - Genel sistem denetimi (K1-K3, O1-O7, E1-E7, U1-U8): docs/denetim-eksik-korkuluklar.md
