@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 7nROESsSmU8QZlsfai2LH8b9jM2MHvwTddv2dGkcPvYPFed6JeuedWx5b1hZ9Zz
+\restrict fjLdFjo8cnjmJV4d5IbyjVB0ipuMPgv8vdDhW0WYGitkPAWeKUv54RmvukFKabJ
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -146,6 +146,18 @@ CREATE TABLE public.departments (
     name character varying(100) NOT NULL,
     sort_order integer DEFAULT 1,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: materials; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.materials (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying(150) NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp without time zone DEFAULT now()
 );
 
 
@@ -615,6 +627,14 @@ ALTER TABLE ONLY public.delivery_notes
 
 ALTER TABLE ONLY public.departments
     ADD CONSTRAINT departments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: materials materials_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.materials
+    ADD CONSTRAINT materials_pkey PRIMARY KEY (id);
 
 
 --
@@ -1397,5 +1417,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 7nROESsSmU8QZlsfai2LH8b9jM2MHvwTddv2dGkcPvYPFed6JeuedWx5b1hZ9Zz
+\unrestrict fjLdFjo8cnjmJV4d5IbyjVB0ipuMPgv8vdDhW0WYGitkPAWeKUv54RmvukFKabJ
 

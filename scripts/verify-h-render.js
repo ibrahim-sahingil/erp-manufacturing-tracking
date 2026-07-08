@@ -459,6 +459,15 @@ console.log('\nviewPublishedBom (yayınlanan ağaç):');
 chk('viewPbom: proje/ürün adı kaçırıldı', _ovl.includes('PBP&lt;b&gt;') && _ovl.includes('Ürün&lt;img'));
 chk('viewPbom: parça kod/ad kaçırıldı', _ovl.includes('VC&lt;b&gt;') && _ovl.includes('VN&lt;img'));
 
+// ── renderMaterialsModalList (malzeme kartoteki — 5. tur #1) ──
+global.materials=[{id:'m1', name:'ST<b>37 "X"'+EVIL, is_active:true},{id:'m2', name:'Pasif<i>', is_active:false}];
+eval(grab('renderMaterialsModalList'));
+renderMaterialsModalList();
+const mml=store['mat-modal-list']||'';
+console.log('\nrenderMaterialsModalList (malzeme kartoteki):');
+chk('materials: ad onerror kaçırıldı', mml.includes('ST&lt;b&gt;37 &quot;X&quot;&lt;img') && !mml.includes('ST<b>37'));
+chk('materials: pasif rozeti (raw) + butonlar korundu', mml.includes('(pasif)') && mml.includes("matRename('m1')") && mml.includes("matDelete('m2')"));
+
 // ── searchSelect / ssRenderList (aranabilir combobox — arkadaş isteği #8) ──
 global.document.addEventListener=()=>{};
 els['xs-ss']={ value:'', dataset:{}, style:{}, contains:()=>false,
