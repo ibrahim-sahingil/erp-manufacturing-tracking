@@ -2291,21 +2291,21 @@ function deptWoStripHTML(deptId){
       + (resolved.length>3 ? ` +${resolved.length-3}` : '');
     const meta = [
       fmtDt(w.start_datetime) ? '🕐 '+fmtDt(w.start_datetime)+(fmtDt(w.end_datetime)?' → '+fmtDt(w.end_datetime):'') : '',
-      w.assigned_user ? '👷 '+esc(w.assigned_user) : '',
-      w.workspace_name ? '📍 '+esc(w.workspace_name) : '',
-      w.notes ? '🗒 '+esc(w.notes) : ''
+      w.assigned_user ? '👷 '+w.assigned_user : '',
+      w.workspace_name ? '📍 '+w.workspace_name : '',
+      w.notes ? '🗒 '+w.notes : ''
     ].filter(Boolean).join(' · ');
     // (#8) Planlı iş emrinde bitmemiş alt parça uyarısı
     const woWaiting = w.status==='planned' ? woWaitingChildren(w.id) : [];
     const waitingNote = woWaiting.length
-      ? `<div style="font-family:var(--font-mono);font-size:10px;color:var(--red,#e74c3c);margin-top:4px">${woStartBlockMsg(woWaiting).replace('⛔ Başlatılamaz — önce','⏳ Başlatmadan önce')}</div>` : '';
+      ? h`<div style="font-family:var(--font-mono);font-size:10px;color:var(--red,#e74c3c);margin-top:4px">${woStartBlockMsg(woWaiting).replace('⛔ Başlatılamaz — önce','⏳ Başlatmadan önce')}</div>` : '';
     const btns = (ACTIONS[w.status]||[]).map(([s,txt])=>
-      `<button class="btn btn-ghost btn-sm" onclick="dashWoSetStatus('${w.id}','${s}')">${txt}</button>`).join('');
+      h`<button class="btn btn-ghost btn-sm" onclick="dashWoSetStatus('${raw(w.id)}','${raw(s)}')">${txt}</button>`);
 
     // İş emrinin parçaları (arkadaş notu #5: iş emrine girilir, içindeki
     // parçalar QR'larıyla listelenir, bitip bitmediği oradan takip edilir)
     const isOpen = _dashWoOpen.has(w.id);
-    const partsTable = wops.length ? `<div id="dwop-${w.id}" style="display:${isOpen?'block':'none'};margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
+    const partsTable = wops.length ? h`<div id="dwop-${w.id}" style="display:${isOpen?'block':'none'};margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
       <div class="report-table">
         <div class="report-table-header">
           <div>Parça</div>
@@ -2317,18 +2317,18 @@ function deptWoStripHTML(deptId){
         </div>
         ${wops.map(wp=>{
           const pd = parts.find(x=>x.id===wp.part_id);
-          if(!pd) return `<div class="report-table-row"><div style="color:var(--muted)">(silinmiş parça)</div><div></div><div class="rtc-hide"></div><div class="rtc-hide"></div><div></div><div></div></div>`;
+          if(!pd) return h`<div class="report-table-row"><div style="color:var(--muted)">(silinmiş parça)</div><div></div><div class="rtc-hide"></div><div class="rtc-hide"></div><div></div><div></div></div>`;
           const qd=parseInt(pd.qty_done)||0, qr2=parseInt(pd.qty_reject)||0;
           const qt2=parseInt(pd.qty)||0;
           const qp2=Math.max(0,qt2-qd-qr2);
           const bd=qt2?Math.round(qd/qt2*100):0, br=qt2?Math.round(qr2/qt2*100):0;
           const bp=qt2?100-bd-br:0;
-          return `<div class="report-table-row">
-            <div><div style="font-size:13px;font-weight:600">${esc(pd.name)}</div><div style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${esc(pd.code)}</div></div>
+          return h`<div class="report-table-row">
+            <div><div style="font-size:13px;font-weight:600">${pd.name}</div><div style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${pd.code}</div></div>
             <div class="report-num" style="color:var(--green)">${qd}</div>
             <div class="report-num rtc-hide" style="color:var(--yellow)">${qp2}</div>
             <div class="report-num rtc-hide" style="color:var(--red)">${qr2}</div>
-            <div style="text-align:center">${statusBadge(pd.status)}</div>
+            <div style="text-align:center">${raw(statusBadge(pd.status))}</div>
             <div style="display:flex;gap:8px;align-items:center">
               <div style="flex:1">
                 <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);text-align:right;margin-bottom:3px">${qd+qr2}/${qt2||'?'}</div>
@@ -2338,35 +2338,35 @@ function deptWoStripHTML(deptId){
                   <div style="flex:${br};background:var(--red)"></div>
                 </div>
               </div>
-              <button class="icon-btn" title="QR göster" onclick="showQR('${pd.id}','${ea(pd.name)}','${ea(pd.code)}','${ea(pd.drawing||'')}')">📷</button>
-              <button class="icon-btn" title="Geçmiş" onclick="showLog('${pd.id}','${ea(pd.name)}')">📋</button>
+              <button class="icon-btn" title="QR göster" onclick="showQR('${raw(pd.id)}','${raw(ea(pd.name))}','${raw(ea(pd.code))}','${raw(ea(pd.drawing||''))}')">📷</button>
+              <button class="icon-btn" title="Geçmiş" onclick="showLog('${raw(pd.id)}','${raw(ea(pd.name))}')">📋</button>
             </div>
           </div>`;
-        }).join('')}
+        })}
       </div>
     </div>` : '';
 
-    return `<div class="pbom-card" style="border-left:3px solid ${color}">
+    return h`<div class="pbom-card" style="border-left:3px solid ${color}">
       <div class="pbom-card-header">
         <div style="min-width:0">
           <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             📋 İş Emri
             <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${color}44;color:${color};background:${color}11">${st}</span>
-            ${partNames?`<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${partNames}</span>`:''}
+            ${partNames?h`<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${partNames}</span>`:''}
           </div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">${meta}</div>
           ${waitingNote}
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          ${wops.length?`<button class="btn btn-ghost btn-sm" id="dwob-${w.id}" onclick="dashWoToggleParts('${w.id}')">🔧 Parçalar (${wops.length}) ${isOpen?'▴':'▾'}</button>`:''}
+          ${wops.length?h`<button class="btn btn-ghost btn-sm" id="dwob-${w.id}" onclick="dashWoToggleParts('${raw(w.id)}')">🔧 Parçalar (${wops.length}) ${isOpen?'▴':'▾'}</button>`:''}
           ${btns}
         </div>
       </div>
       ${partsTable}
     </div>`;
-  }).join('');
+  });
 
-  return `<div style="margin-bottom:24px">
+  return h`<div style="margin-bottom:24px">
     <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">📋 İş Emirleri (${deptWos.length})</div>
     ${rows}
   </div>`;
@@ -2476,16 +2476,11 @@ function renderStats(){
 
 function renderBreadcrumb(){
   const bc = document.getElementById('breadcrumb');
-  let html = `<button class="breadcrumb-btn" onclick="renderDashboard()">🏠 Projeler</button>`;
-  if(_activeProject){
-    html += `<span class="breadcrumb-sep">›</span>`;
-    if(_activeDept) html += `<button class="breadcrumb-btn" onclick="openProject('${ea(_activeProject)}')">${esc(_activeProject)}</button>`;
-    else html += `<span class="breadcrumb-current">${esc(_activeProject)}</span>`;
-  }
-  if(_activeDept){
-    html += `<span class="breadcrumb-sep">›</span><span class="breadcrumb-current">${esc(_activeDept.name)}</span>`;
-  }
-  bc.innerHTML = html;
+  bc.innerHTML = h`<button class="breadcrumb-btn" onclick="renderDashboard()">🏠 Projeler</button>${
+    _activeProject ? h`<span class="breadcrumb-sep">›</span>${
+      _activeDept ? h`<button class="breadcrumb-btn" onclick="openProject('${raw(ea(_activeProject))}')">${_activeProject}</button>`
+                  : h`<span class="breadcrumb-current">${_activeProject}</span>`}` : ''}${
+    _activeDept ? h`<span class="breadcrumb-sep">›</span><span class="breadcrumb-current">${_activeDept.name}</span>` : ''}`;
 }
 
 // KATMAN 1 — Projeler
@@ -2494,7 +2489,7 @@ function renderProjectCards(){
   parts.forEach(p=>{ const k=p.project||'(Proje Yok)'; if(!projects[k])projects[k]=[]; projects[k].push(p); });
   const el = document.getElementById('layer-projects');
   if(!Object.keys(projects).length){
-    el.innerHTML=`<div class="empty-state"><span class="emoji">📁</span>Henüz proje eklenmedi</div>`;
+    el.innerHTML=h`<div class="empty-state"><span class="emoji">📁</span>Henüz proje eklenmedi</div>`;
     return;
   }
 
@@ -2507,8 +2502,7 @@ function renderProjectCards(){
 
   const pinnedCount = entries.filter(([name])=>isPinned('project',name)).length;
 
-  el.innerHTML = (pinnedCount>0 ? `<div class="pinned-label">📌 Sabitlenmiş Projeler</div>` : '') +
-    `<div class="project-cards">`+entries.map(([name,plist])=>{
+  el.innerHTML = h`${pinnedCount>0 ? raw('<div class="pinned-label">📌 Sabitlenmiş Projeler</div>') : ''}<div class="project-cards">${entries.map(([name,plist])=>{
     const waitCnt = plist.filter(isPartAwaitingPlanning).length;
     const act = plist.filter(p=>!isPartAwaitingPlanning(p));
     const d=act.filter(x=>x.status==='done').length;
@@ -2530,17 +2524,17 @@ function renderProjectCards(){
       .sort((a,b)=>a-b)[0];
     const firstDateStr = firstDate ? firstDate.toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
     const woLine = woBadgeCounts(workOrders.filter(w=>(w.project_name||'(Proje Yok)')===name));
-    return `<div class="project-card${pinned?' pinned':''}" onclick="openProject('${ea(name)}')">
-      <button class="pin-btn${pinned?' active':''}" onclick="togglePin('project','${ea(name)}',event)" title="${pinned?'Sabitlemeyi kaldır':'Sabitle'}">📌</button>
-      <div class="project-card-name">${esc(name)}</div>
-      <div class="project-card-count">${t?`${t} parça &middot; %${qdp} tamamlandı <span style="font-size:10px;opacity:.6">(adet bazlı)</span>`:`Üretimde parça yok`}</div>
-      ${woLine?`<div style="font-family:var(--font-mono);font-size:10px;margin-top:2px">📋 ${woLine}</div>`:''}
-      ${waitCnt?`<div style="font-family:var(--font-mono);font-size:10px;color:var(--yellow);margin-top:2px">⏳ ${waitCnt} parça · satın alma / üretim planlaması bekliyor</div>`:''}
+    return h`<div class="project-card${pinned?' pinned':''}" onclick="openProject('${raw(ea(name))}')">
+      <button class="pin-btn${pinned?' active':''}" onclick="togglePin('project','${raw(ea(name))}',event)" title="${pinned?'Sabitlemeyi kaldır':'Sabitle'}">📌</button>
+      <div class="project-card-name">${name}</div>
+      <div class="project-card-count">${t?h`${t} parça &middot; %${qdp} tamamlandı <span style="font-size:10px;opacity:.6">(adet bazlı)</span>`:'Üretimde parça yok'}</div>
+      ${woLine?h`<div style="font-family:var(--font-mono);font-size:10px;margin-top:2px">📋 ${raw(woLine)}</div>`:''}
+      ${waitCnt?h`<div style="font-family:var(--font-mono);font-size:10px;color:var(--yellow);margin-top:2px">⏳ ${waitCnt} parça · satın alma / üretim planlaması bekliyor</div>`:''}
       <div class="project-mini-bars">
         <div class="pmb-done" style="flex:${qdp}"></div>
         <div class="pmb-pending" style="flex:${qpp}"></div>
         <div class="pmb-reject" style="flex:${qrp}"></div>
-        ${qdp+qpp+qrp===0?`<div style="flex:100;background:var(--border)"></div>`:''}
+        ${qdp+qpp+qrp===0?raw('<div style="flex:100;background:var(--border)"></div>'):''}
       </div>
       <div class="project-mini-legend">
         <span class="pml-item"><span class="pml-dot" style="background:var(--green)"></span>${d} parça · <b>${qd}</b> adet yapıldı (%${qdp})</span>
@@ -2552,7 +2546,7 @@ function renderProjectCards(){
         <span>📅 ${firstDateStr}</span>
       </div>
     </div>`;
-  }).join('')+`</div>`;
+  })}</div>`;
 }
 
 // KATMAN 2 — Bölümler
@@ -2870,24 +2864,24 @@ function renderParts(){
   const fp = document.getElementById('f-project');
   if(fp){
     const curFp = fp.value;
-    fp.innerHTML = '<option value="">— Sipariş seçin —</option>' +
-      orderProjects.map(pr=>`<option value="${pr}"${pr===curFp?' selected':''}>${pr}</option>`).join('');
+    fp.innerHTML = h`<option value="">— Sipariş seçin —</option>${
+      orderProjects.map(pr=>h`<option value="${pr}"${pr===curFp?raw(' selected'):''}>${pr}</option>`)}`;
   }
 
   // Bölüm formu dropdown — d-project
   const dp = document.getElementById('d-project');
   if(dp){
     const curDp = dp.value;
-    dp.innerHTML = '<option value="">— Sipariş seçin —</option>' +
-      orderProjects.map(pr=>`<option value="${pr}"${pr===curDp?' selected':''}>${pr}</option>`).join('');
+    dp.innerHTML = h`<option value="">— Sipariş seçin —</option>${
+      orderProjects.map(pr=>h`<option value="${pr}"${pr===curDp?raw(' selected'):''}>${pr}</option>`)}`;
   }
 
   // Filtre dropdown — parts-project-filter
   const projects = [...new Set(parts.map(p=>p.project||'(Proje Yok)'))].sort();
   const pf = document.getElementById('parts-project-filter');
   const cur = pf.value;
-  pf.innerHTML = '<option value="">Tüm Projeler</option>' +
-    projects.map(pr=>`<option value="${pr}"${pr===cur?' selected':''}>${pr}</option>`).join('');
+  pf.innerHTML = h`<option value="">Tüm Projeler</option>${
+    projects.map(pr=>h`<option value="${pr}"${pr===cur?raw(' selected'):''}>${pr}</option>`)}`;
   updatePartsFilters(true);
 }
 
@@ -2896,8 +2890,8 @@ function updatePartsFilters(skipRender){
   const df = document.getElementById('parts-dept-filter');
   const curDept = df.value;
   const projDepts = projFilter ? depts.filter(d=>d.project===projFilter) : depts;
-  df.innerHTML = '<option value="">Tüm Bölümler</option>' +
-    projDepts.map(d=>`<option value="${d.id}"${d.id===curDept?' selected':''}>${esc(d.name)}</option>`).join('');
+  df.innerHTML = h`<option value="">Tüm Bölümler</option>${
+    projDepts.map(d=>h`<option value="${d.id}"${d.id===curDept?raw(' selected'):''}>${d.name}</option>`)}`;
   if(!skipRender) renderPartsFiltered();
 }
 
@@ -2911,7 +2905,7 @@ function renderPartsFiltered(){
     (!deptFilter||p.department_id===deptFilter)
   );
   const list = document.getElementById('parts-list');
-  if(!filtered.length){ list.innerHTML=`<div class="empty-state"><span class="emoji">📦</span>Parça bulunamadı</div>`; return; }
+  if(!filtered.length){ list.innerHTML=h`<div class="empty-state"><span class="emoji">📦</span>Parça bulunamadı</div>`; return; }
 
   // Proje > Bölüm grupla
   const byProject = {};
@@ -2922,15 +2916,15 @@ function renderPartsFiltered(){
     if(!byProject[k][dk]) byProject[k][dk]=[];
     byProject[k][dk].push(p);
   });
-  list.innerHTML = Object.entries(byProject).map(([proj,byDept])=>`
+  list.innerHTML = h`${Object.entries(byProject).map(([proj,byDept])=>h`
     <div style="margin-bottom:28px">
-      <div class="divider-title">📁 ${esc(proj)}</div>
-      ${Object.entries(byDept).map(([dname,plist])=>`
+      <div class="divider-title">📁 ${proj}</div>
+      ${Object.entries(byDept).map(([dname,plist])=>h`
         <div style="margin-bottom:16px">
           <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--accent);letter-spacing:1px;margin-bottom:8px;margin-left:4px">🏭 ${dname} — ${plist.length} parça</div>
-          <div class="parts-grid">${plist.map((p,i)=>partRowHTML(p,i,true)).join('')}</div>
-        </div>`).join('')}
-    </div>`).join('');
+          <div class="parts-grid">${plist.map((p,i)=>raw(partRowHTML(p,i,true)))}</div>
+        </div>`)}
+    </div>`)}`;
 }
 
 // ═══ DEPT YÖNETIMI ═══
@@ -3241,21 +3235,21 @@ async function showLog(id,name){
   const logsHtml=logs.length?logs.map(l=>{
     const qd=parseInt(l.qty_done)||0,qp=parseInt(l.qty_pending)||0,qr=parseInt(l.qty_reject)||0;
     const qtys=[
-      qd?`<span class="log-qty-badge log-qty-done">✅ ${qd}</span>`:'',
-      qp?`<span class="log-qty-badge log-qty-pend">⏳ ${qp}</span>`:'',
-      qr?`<span class="log-qty-badge log-qty-reject">❌ ${qr}</span>`:''
-    ].filter(Boolean).join('');
-    return `<div class="log-entry">
+      qd?h`<span class="log-qty-badge log-qty-done">✅ ${qd}</span>`:'',
+      qp?h`<span class="log-qty-badge log-qty-pend">⏳ ${qp}</span>`:'',
+      qr?h`<span class="log-qty-badge log-qty-reject">❌ ${qr}</span>`:''
+    ].filter(Boolean);
+    return h`<div class="log-entry">
       <span class="log-time">${new Date(l.created_at).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
-      <span class="log-user">${esc(l.username)}</span>
+      <span class="log-user">${l.username}</span>
       <div class="log-qtys">${qtys}</div>
-      ${l.note?`<div class="log-note">📝 ${l.note}</div>`:''}
+      ${l.note?h`<div class="log-note">📝 ${l.note}</div>`:''}
     </div>`;
-  }).join(''):'<p style="color:var(--muted);font-family:var(--font-mono);font-size:12px">İşlem kaydı yok.</p>';
+  }):raw('<p style="color:var(--muted);font-family:var(--font-mono);font-size:12px">İşlem kaydı yok.</p>');
   const overlay=document.createElement('div');
   overlay.className='modal-overlay open';
-  overlay.innerHTML=`<div class="modal" style="max-width:560px;width:95vw;text-align:left">
-    <h3 style="margin-bottom:4px">${esc(name)}</h3>
+  overlay.innerHTML=h`<div class="modal" style="max-width:560px;width:95vw;text-align:left">
+    <h3 style="margin-bottom:4px">${name}</h3>
     <p style="margin-bottom:12px">İşlem Geçmişi</p>
     <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
       <span class="log-qty-badge log-qty-done" style="padding:5px 14px;font-size:12px">✅ Toplam ${td}</span>
@@ -3299,7 +3293,7 @@ function renderStatsView() {
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
   const today = now.toISOString().slice(0,10);
 
-  el.innerHTML = `
+  el.innerHTML = h`
     <div class="stats-filter-bar">
       <div>
         <label>Başlangıç Tarihi</label>
@@ -3313,14 +3307,14 @@ function renderStatsView() {
         <label>Proje</label>
         <select id="stat-project">
           <option value="">Tüm Projeler</option>
-          ${[...new Set(parts.map(p=>p.project||'(Proje Yok)'))].sort().map(pr=>`<option value="${pr}">${pr}</option>`).join('')}
+          ${[...new Set(parts.map(p=>p.project||'(Proje Yok)'))].sort().map(pr=>h`<option value="${pr}">${pr}</option>`)}
         </select>
       </div>
       <div>
         <label>Personel</label>
         <select id="stat-user">
           <option value="">Tüm Personel</option>
-          ${users.map(u=>`<option value="${esc(u.name)}">${esc(u.name)}</option>`).join('')}
+          ${users.map(u=>h`<option value="${u.name}">${u.name}</option>`)}
         </select>
       </div>
       <button class="btn btn-primary" onclick="loadStats()">🔍 Filtrele</button>
@@ -3338,7 +3332,7 @@ async function loadStats() {
   if(!start || !end) { toast('Tarih aralığı seçin!','error'); return; }
 
   const el = document.getElementById('stats-result');
-  el.innerHTML = `<div class="empty-state"><div class="spinner" style="margin:0 auto"></div><p style="margin-top:16px">Yükleniyor...</p></div>`;
+  el.innerHTML = h`<div class="empty-state"><div class="spinner" style="margin:0 auto"></div><p style="margin-top:16px">Yükleniyor...</p></div>`;
 
   // Tüm logları çek — tarih filtresi
   const endDateTime = end + 'T23:59:59';
@@ -3347,7 +3341,7 @@ async function loadStats() {
 
   const logs = await dbGet('logs', query);
   if(!Array.isArray(logs) || !logs.length) {
-    el.innerHTML = `<div class="empty-state"><span class="emoji">🔍</span>Bu tarih aralığında kayıt bulunamadı</div>`;
+    el.innerHTML = h`<div class="empty-state"><span class="emoji">🔍</span>Bu tarih aralığında kayıt bulunamadı</div>`;
     return;
   }
 
@@ -3363,7 +3357,7 @@ async function loadStats() {
     : logs;
 
   if(!filteredLogs.length) {
-    el.innerHTML = `<div class="empty-state"><span class="emoji">🔍</span>Seçilen projede kayıt bulunamadı</div>`;
+    el.innerHTML = h`<div class="empty-state"><span class="emoji">🔍</span>Seçilen projede kayıt bulunamadı</div>`;
     return;
   }
 
@@ -3398,11 +3392,11 @@ async function loadStats() {
     const rp = 100-dp-pp;
     const color = avatarColors[i%avatarColors.length];
     const userInfo = users.find(u=>u.name===name);
-    return `<div class="personnel-card" id="pc-${name.replace(/\s/g,'_')}" style="--c:${color}" onclick="filterTableByUser('${name.replace(/'/g,"\\'")}')">
+    return h`<div class="personnel-card" id="pc-${name.replace(/\s/g,'_')}" style="--c:${color}" onclick="filterTableByUser('${raw(ea(name))}')">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
         <div class="personnel-avatar" style="background:${color};flex-shrink:0">${name.charAt(0)}</div>
         <div>
-          <div class="personnel-name">${esc(name)}</div>
+          <div class="personnel-name">${name}</div>
           <div class="personnel-dept">${userInfo?[userInfo.dept,userInfo.role].filter(Boolean).join(' · '):'—'}</div>
         </div>
       </div>
@@ -3424,17 +3418,17 @@ async function loadStats() {
         <div style="flex:${dp};background:var(--green)"></div>
         <div style="flex:${pp};background:var(--yellow)"></div>
         <div style="flex:${rp};background:var(--red)"></div>
-        ${!total?'<div style="flex:100;background:var(--border)"></div>':''}
+        ${!total?raw('<div style="flex:100;background:var(--border)"></div>'):''}
       </div>
       <div class="personnel-ops">Toplam: <b style="color:var(--text)">${total}</b> adet · ${s.ops} işlem</div>
     </div>`;
-  }).join('');
+  });
 
   // Detay log tablosu — global değişkende sakla, filtrele
   window._statsLogs = filteredLogs;
   window._statsPartsMap = partsMap;
 
-  el.innerHTML = `
+  el.innerHTML = h`
     <!-- Özet istatistikler -->
     <div class="stats-row" style="margin-bottom:24px">
       <div class="stat-card" style="--c:var(--accent)">
@@ -3474,23 +3468,23 @@ function renderDetailTable(logs, partsMap) {
     const p = partsMap[l.part_id];
     const qd=parseInt(l.qty_done)||0, qp=parseInt(l.qty_pending)||0, qr=parseInt(l.qty_reject)||0;
     const dt = new Date(l.created_at).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    return `<div class="stats-table-row">
+    return h`<div class="stats-table-row">
       <div>
         <div style="font-weight:600;font-size:13px">${p?p.name:'—'}</div>
         <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${p?p.code:l.part_id} ${p&&p.project?'· '+p.project:''}</div>
       </div>
-      <div style="font-family:var(--font-mono);font-size:11px;color:var(--accent);text-align:center">${esc(l.username)}</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--accent);text-align:center">${l.username}</div>
       <div style="font-family:var(--font-display);font-size:18px;color:var(--green);text-align:center">${qd}</div>
       <div style="font-family:var(--font-display);font-size:18px;color:var(--yellow);text-align:center" class="stc-hide">${qp}</div>
       <div style="font-family:var(--font-display);font-size:18px;color:var(--red);text-align:center" class="stc-hide">${qr}</div>
-      <div style="text-align:center">${statusBadge(l.status)}</div>
-      <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${dt}${l.note?'<br>📝 '+l.note:''}</div>
+      <div style="text-align:center">${raw(statusBadge(l.status))}</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${dt}${l.note?h`<br>📝 ${l.note}`:''}</div>
     </div>`;
-  }).join('');
+  });
 
   const wrap = document.getElementById('detail-table-wrap');
   if(!wrap) return;
-  wrap.innerHTML = `<div class="stats-table">
+  wrap.innerHTML = h`<div class="stats-table">
     <div class="stats-table-header">
       <div>Parça</div>
       <div style="text-align:center">Personel</div>
@@ -3500,7 +3494,7 @@ function renderDetailTable(logs, partsMap) {
       <div style="text-align:center">Durum</div>
       <div>Tarih / Not</div>
     </div>
-    ${rows||'<div style="padding:24px;text-align:center;color:var(--muted);font-family:var(--font-mono);font-size:12px">Kayıt bulunamadı</div>'}
+    ${rows.length?rows:raw('<div style="padding:24px;text-align:center;color:var(--muted);font-family:var(--font-mono);font-size:12px">Kayıt bulunamadı</div>')}
   </div>`;
 }
 
@@ -3815,8 +3809,8 @@ function renderPdForm() {
   const sel = document.getElementById('pd-project');
   if(!sel) return;
   const cur = sel.value;
-  sel.innerHTML = '<option value="">— Sipariş seçin —</option>' +
-    orders.map(o=>`<option value="${esc(o.project_name)}"${o.project_name===cur?' selected':''}>${esc(o.project_name)}</option>`).join('');
+  sel.innerHTML = h`<option value="">— Sipariş seçin —</option>${
+    orders.map(o=>h`<option value="${o.project_name}"${o.project_name===cur?raw(' selected'):''}>${o.project_name}</option>`)}`;
 }
 
 async function loadAndRenderPd() {
@@ -3925,47 +3919,47 @@ async function submitRevise(id, oldStart, oldEnd) {
 async function renderPdList() {
   const el = document.getElementById('pd-list');
   if(!el) return;
-  if(!projectDates.length){ el.innerHTML=`<div class="empty-state"><span class="emoji">🗓</span>Henüz proje tarihi eklenmedi</div>`; return; }
+  if(!projectDates.length){ el.innerHTML=h`<div class="empty-state"><span class="emoji">🗓</span>Henüz proje tarihi eklenmedi</div>`; return; }
 
   // Revizyonları çek
   const revData = await dbGet('project_date_revisions','order=created_at.desc');
   const revisions = Array.isArray(revData)?revData:[];
 
-  el.innerHTML = projectDates.map(d => {
+  el.innerHTML = h`${projectDates.map(d => {
     const start = new Date(d.start_date);
     const end   = new Date(d.end_date);
     const days  = Math.round((end-start)/(1000*60*60*24));
     const revs  = revisions.filter(r=>r.project_date_id===d.id);
-    const revsHTML = revs.length ? `
+    const revsHTML = revs.length ? h`
       <div class="pd-revisions">
         <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:6px">🔄 Revize Geçmişi (${revs.length})</div>
-        ${revs.map(r=>`<div class="pd-rev-item">
+        ${revs.map(r=>h`<div class="pd-rev-item">
           <span style="color:var(--muted);min-width:110px">${new Date(r.created_at).toLocaleDateString('tr-TR')}</span>
           <span style="color:var(--yellow)">${r.old_start} → ${r.old_end}</span>
           <span style="color:var(--muted)">→</span>
           <span style="color:var(--green)">${r.new_start} → ${r.new_end}</span>
-          ${r.revised_by?`<span style="color:var(--accent)">${esc(r.revised_by)}</span>`:''}
-          <span style="color:var(--text);flex:1">📝 ${esc(r.reason)}</span>
-        </div>`).join('')}
+          ${r.revised_by?h`<span style="color:var(--accent)">${r.revised_by}</span>`:''}
+          <span style="color:var(--text);flex:1">📝 ${r.reason}</span>
+        </div>`)}
       </div>` : '';
 
-    return `<div class="pd-card">
+    return h`<div class="pd-card">
       <div class="pd-card-header">
-        <div class="pd-project-name">${esc(d.project_name)}</div>
+        <div class="pd-project-name">${d.project_name}</div>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-ghost btn-sm" onclick="openReviseModal('${d.id}')">🔄 Revize</button>
-          <button class="btn btn-ghost btn-sm" onclick="deletePd('${d.id}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">🗑️</button>
+          <button class="btn btn-ghost btn-sm" onclick="openReviseModal('${raw(d.id)}')">🔄 Revize</button>
+          <button class="btn btn-ghost btn-sm" onclick="deletePd('${raw(d.id)}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">🗑️</button>
         </div>
       </div>
       <div class="pd-dates">
         <div class="pd-date-item"><span class="pd-date-label">Başlangıç</span>${start.toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'})}</div>
         <div class="pd-date-item"><span class="pd-date-label">Bitiş</span>${end.toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'})}</div>
         <div class="pd-date-item"><span class="pd-date-label">Süre</span><span class="pd-duration">${days} gün</span></div>
-        ${revs.length?`<div class="pd-date-item"><span class="pd-date-label">Revize</span><span style="color:var(--yellow);font-family:var(--font-mono);font-size:13px;font-weight:600">${revs.length}×</span></div>`:''}
+        ${revs.length?h`<div class="pd-date-item"><span class="pd-date-label">Revize</span><span style="color:var(--yellow);font-family:var(--font-mono);font-size:13px;font-weight:600">${revs.length}×</span></div>`:''}
       </div>
       ${revsHTML}
     </div>`;
-  }).join('');
+  })}`;
 }
 
 // ─── GANTT ───
@@ -4402,7 +4396,7 @@ async function woLoadParts() {
   const grid = document.getElementById('wo-parts-grid');
   if (!bucket.length) {
     grid.style.display = '';
-    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><span class="emoji">📦</span>Bu projede parça bulunamadı</div>`;
+    grid.innerHTML = h`<div class="empty-state" style="grid-column:1/-1"><span class="emoji">📦</span>Bu projede parça bulunamadı</div>`;
   } else {
     grid.style.display = 'block'; // grid yerine ağaç (girintili liste)
 
@@ -4431,10 +4425,10 @@ async function woLoadParts() {
 
     const purRow = (i, depth) => {
       const m = PUR_STATUS[i.status] || PUR_STATUS.PLANNED;
-      return `<div style="margin:2px 0 2px ${depth*22+30}px;padding:4px 10px;border-left:2px dashed ${m.color}66;font-family:var(--font-mono);font-size:10px;color:var(--muted)">
-        🛒 ${i.code?`<span style="color:var(--accent)">${esc(i.code)}</span> — `:''}${esc(i.name)}
-        · ${Number(i.quantity||1)} ${esc(i.unit||'adet')}
-        <span style="color:${m.color}">${m.icon} ${m.label}</span>${i.status==='IN_WAREHOUSE'&&whName(i.warehouse_id)?` · 🗄️ ${esc(whName(i.warehouse_id))}`:''}
+      return h`<div style="margin:2px 0 2px ${depth*22+30}px;padding:4px 10px;border-left:2px dashed ${m.color}66;font-family:var(--font-mono);font-size:10px;color:var(--muted)">
+        🛒 ${i.code?h`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
+        · ${Number(i.quantity||1)} ${i.unit||'adet'}
+        <span style="color:${m.color}">${m.icon} ${m.label}</span>${i.status==='IN_WAREHOUSE'&&whName(i.warehouse_id)?h` · 🗄️ ${whName(i.warehouse_id)}`:''}
       </div>`;
     };
 
@@ -4444,31 +4438,24 @@ async function woLoadParts() {
     const nodeRow = (p, depth) => {
       const ok = selectable(p);
       const dept = p.department_id ? depts.find(d=>d.id===p.department_id) : null;
-      const row = `<div class="wo-part-item" id="wopi-${p.id}"
-          ${ok?`onclick="woTogglePart('${p.id}','${ea(p.name)}','${ea(p.code)}')"`:''}
+      const row = h`<div class="wo-part-item" id="wopi-${p.id}"
+          ${ok?h`onclick="woTogglePart('${raw(p.id)}','${raw(ea(p.name))}','${raw(ea(p.code))}')"`:''}
           style="margin:3px 0 3px ${depth*22}px;padding:8px 12px;display:flex;gap:10px;align-items:center;${ok?'':'opacity:.45;cursor:default'}">
         <span class="wo-part-check">✓</span>
-        ${depth>0?`<span style="color:var(--muted);font-size:10px">└─</span>`:''}
+        ${depth>0?raw('<span style="color:var(--muted);font-size:10px">└─</span>'):''}
         <div style="min-width:0;flex:1">
-          <div class="wo-part-item-name" style="display:inline">${esc(p.name)}</div>
-          <span class="wo-part-item-code" style="margin-left:8px">${esc(p.code)}${p.drawing?' · '+esc(p.drawing):''}</span>
+          <div class="wo-part-item-name" style="display:inline">${p.name}</div>
+          <span class="wo-part-item-code" style="margin-left:8px">${p.code}${p.drawing?' · '+p.drawing:''}</span>
           <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">
-            ${esc(p.material||'')} ${p.qty?'· '+p.qty+' adet':''}
-            ${dept?`· 🏭 ${esc(dept.name)}`:''}
-            ${woMatChip(p)}
+            ${p.material||''} ${p.qty?'· '+p.qty+' adet':''}
+            ${dept?h`· 🏭 ${dept.name}`:''}
+            ${raw(woMatChip(p))}
           </div>
         </div>
       </div>`;
-      return row
-        + (purByPart[p.id]||[]).map(i=>purRow(i, depth+1)).join('')
-        + kidsOf(p.id).map(k=>nodeRow(k, depth+1)).join('');
+      return h`${row}${(purByPart[p.id]||[]).map(i=>purRow(i, depth+1))}${kidsOf(p.id).map(k=>nodeRow(k, depth+1))}`;
     };
-    let html = roots.map(p=>nodeRow(p,0)).join('');
-    if(purLoose.length){
-      html += `<div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:14px 0 4px">🛒 Satın alma malzemeleri (ağaç dışı) · ${purLoose.length}</div>`
-        + purLoose.map(i=>purRow(i,0)).join('');
-    }
-    grid.innerHTML = html;
+    grid.innerHTML = h`${roots.map(p=>nodeRow(p,0))}${purLoose.length?h`<div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:14px 0 4px">🛒 Satın alma malzemeleri (ağaç dışı) · ${purLoose.length}</div>${purLoose.map(i=>purRow(i,0))}`:''}`;
   }
   _woSelectedParts.clear();
   document.getElementById('wo-selected-count').textContent = '';
@@ -4507,9 +4494,9 @@ function woStep2Next() {
   // Seçilen parçaların özeti
   const selected = parts.filter(p => _woSelectedParts.has(p.id));
   const summary = document.getElementById('wo-selected-parts-summary');
-  summary.innerHTML = `
+  summary.innerHTML = h`
     <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:8px">Seçilen Parçalar (${selected.length})</div>
-    <div class="wo-summary-chips">${selected.map(p=>`<span class="wo-summary-chip">📦 ${esc(p.name)} <span style="opacity:.6">${esc(p.code)}</span></span>`).join('')}</div>`;
+    <div class="wo-summary-chips">${selected.map(p=>h`<span class="wo-summary-chip">📦 ${p.name} <span style="opacity:.6">${p.code}</span></span>`)}</div>`;
   document.getElementById('wo-step3').style.display = 'block';
   document.getElementById('wo-step3').scrollIntoView({behavior:'smooth'});
 }
@@ -5302,33 +5289,33 @@ function renderWorkspaces() {
   if (!list) return;
 
   if (!filtered.length) {
-    list.innerHTML = `<div class="empty-state"><span class="emoji">🏭</span>Henüz çalışma alanı / makine eklenmedi</div>`;
+    list.innerHTML = h`<div class="empty-state"><span class="emoji">🏭</span>Henüz çalışma alanı / makine eklenmedi</div>`;
     return;
   }
 
-  list.innerHTML = `<div class="ws-grid">${filtered.map(w => {
+  list.innerHTML = h`<div class="ws-grid">${filtered.map(w => {
     const members = wsMembers.filter(m => m.workspace_id === w.id);
     const icon = WS_TYPE_ICONS[w.type] || '🏭';
     const typeLbl = WS_TYPE_LABELS[w.type] || w.type;
     const typeCss = WS_TYPE_CSS[w.type] || 'ws-type-area';
 
     const membersHTML = members.length
-      ? members.map(m => `
+      ? h`${members.map(m => h`
           <div class="ws-member-item">
             <div class="ws-member-avatar">${m.user_name.charAt(0).toUpperCase()}</div>
             <div style="flex:1">
-              <div class="ws-member-name">${esc(m.user_name)}</div>
-              ${m.role ? `<div class="ws-member-role">${esc(m.role)}</div>` : ''}
+              <div class="ws-member-name">${m.user_name}</div>
+              ${m.role ? h`<div class="ws-member-role">${m.role}</div>` : ''}
             </div>
-            <button class="icon-btn" style="width:26px;height:26px;font-size:11px" onclick="removeWsMember('${m.id}','${w.id}')">✕</button>
-          </div>`).join('')
-      : `<div class="ws-empty-members">👤 Henüz personel atanmadı</div>`;
+            <button class="icon-btn" style="width:26px;height:26px;font-size:11px" onclick="removeWsMember('${raw(m.id)}','${raw(w.id)}')">✕</button>
+          </div>`)}`
+      : h`<div class="ws-empty-members">👤 Henüz personel atanmadı</div>`;
 
-    return `<div class="ws-card">
+    return h`<div class="ws-card">
       <div class="ws-card-header">
         <div>
-          <div class="ws-card-title">${icon} ${esc(w.name)}</div>
-          ${w.description ? `<div class="ws-card-desc">${esc(w.description)}</div>` : ''}
+          <div class="ws-card-title">${icon} ${w.name}</div>
+          ${w.description ? h`<div class="ws-card-desc">${w.description}</div>` : ''}
         </div>
         <span class="ws-type-badge ${typeCss}">${typeLbl}</span>
       </div>
@@ -5336,12 +5323,12 @@ function renderWorkspaces() {
       <div class="ws-card-footer">
         <span class="ws-member-count">👥 ${members.length} kişi</span>
         <div style="display:flex;gap:6px">
-          <button class="btn btn-primary btn-sm" onclick="openWsMemberModal('${w.id}','${ea(w.name)}')">+ Personel Ata</button>
-          <button class="icon-btn" onclick="deleteWorkspace('${w.id}')">🗑️</button>
+          <button class="btn btn-primary btn-sm" onclick="openWsMemberModal('${raw(w.id)}','${raw(ea(w.name))}')">+ Personel Ata</button>
+          <button class="icon-btn" onclick="deleteWorkspace('${raw(w.id)}')">🗑️</button>
         </div>
       </div>
     </div>`;
-  }).join('')}</div>`;
+  })}</div>`;
 }
 
 async function saveWorkspace() {
@@ -5400,21 +5387,21 @@ function renderWsCurrentMembers(wsId) {
   const el = document.getElementById('ws-current-members');
   if (!el) return;
   if (!members.length) {
-    el.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);text-align:center;padding:12px">Henüz personel atanmamış</div>`;
+    el.innerHTML = h`<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);text-align:center;padding:12px">Henüz personel atanmamış</div>`;
     return;
   }
-  el.innerHTML = `
+  el.innerHTML = h`
     <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:8px">Atanan Personel (${members.length})</div>
     <div style="background:var(--surface2);border-radius:6px;padding:8px;margin-bottom:12px;max-height:180px;overflow-y:auto">
-      ${members.map(m => `
+      ${members.map(m => h`
         <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border)">
           <div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#000;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:13px;flex-shrink:0">${m.user_name.charAt(0)}</div>
           <div style="flex:1">
-            <div style="font-size:13px;font-weight:600">${esc(m.user_name)}</div>
-            ${m.role?`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${esc(m.role)}</div>`:''}
+            <div style="font-size:13px;font-weight:600">${m.user_name}</div>
+            ${m.role?h`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${m.role}</div>`:''}
           </div>
-          <button onclick="removeWsMember('${m.id}','${wsId}')" style="background:transparent;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:2px 6px">✕</button>
-        </div>`).join('')}
+          <button onclick="removeWsMember('${raw(m.id)}','${raw(wsId)}')" style="background:transparent;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:2px 6px">✕</button>
+        </div>`)}
     </div>`;
 }
 
@@ -7623,10 +7610,10 @@ function renderWarehouseList(){
 // ── Proje bazlı görünüm: proje kartları (accordion) ──
 function whvProjectHTML(){
   const rel = purchaseItems.filter(i=>['ORDERED','RECEIVED','IN_STOCK','IN_WAREHOUSE'].includes(i.status));
-  if(!rel.length) return `<div class="empty-state"><span class="emoji">🏭</span>Depoya girmiş veya beklenen malzeme yok</div>`;
+  if(!rel.length) return h`<div class="empty-state"><span class="emoji">🏭</span>Depoya girmiş veya beklenen malzeme yok</div>`;
   const groups = {};
   rel.forEach(i=>{ const k=i.project_name||'—'; (groups[k]=groups[k]||[]).push(i); });
-  return Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([proj,list])=>{
+  return h`${Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([proj,list])=>{
     const inWh = list.filter(i=>i.status==='IN_WAREHOUSE');
     const pending = list.filter(i=>i.status!=='IN_WAREHOUSE');
     const open = _whvActiveProj===proj;
@@ -7635,39 +7622,34 @@ function whvProjectHTML(){
       // Depodakiler DEPO başlığı altında gruplu (depo dağılımı)
       const whGroups = {};
       inWh.forEach(i=>{ const k=whName(i.warehouse_id)||'—'; (whGroups[k]=whGroups[k]||[]).push(i); });
-      body = `<div style="margin-top:12px">`;
-      Object.entries(whGroups).sort(([a],[b])=>a.localeCompare(b,'tr')).forEach(([wn,items])=>{
-        body += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--green,#2ecc71);margin:10px 0 6px">🗄️ ${esc(wn)} · ${items.length} malzeme</div>`
-          + items.map(i=>whRow(i, `<button class="btn btn-ghost btn-sm" onclick="whXferItem('${i.id}')" title="Başka depoya aktar">🔁 Aktar</button>
-              <button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)).join('');
-      });
-      if(pending.length){
-        body += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#2980b9;margin:14px 0 6px">📦 Beklenen Girişler · ${pending.length}</div>`
-          + pending.map(i=>{
+      const whSections = Object.entries(whGroups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([wn,items])=>
+        h`<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--green,#2ecc71);margin:10px 0 6px">🗄️ ${wn} · ${items.length} malzeme</div>${
+          items.map(i=>raw(whRow(i, `<button class="btn btn-ghost btn-sm" onclick="whXferItem('${i.id}')" title="Başka depoya aktar">🔁 Aktar</button>
+              <button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)))}`);
+      body = h`<div style="margin-top:12px">${whSections}${pending.length?h`<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#2980b9;margin:14px 0 6px">📦 Beklenen Girişler · ${pending.length}</div>${
+          pending.map(i=>{
             const btn = (i.status==='RECEIVED'||i.status==='IN_STOCK')
               ? `<button class="btn btn-primary btn-sm" onclick="whTransfer('${i.id}')">🏭 Depoya Aktar</button>`
               : `<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">teslim bekleniyor</span>`;
-            return whRow(i, btn);
-          }).join('');
-      }
-      body += `</div>`;
+            return raw(whRow(i, btn));
+          })}`:''}</div>`;
     }
-    return `<div class="pbom-card" style="margin-bottom:12px">
-      <div class="pbom-card-header" onclick="whvToggleProj('${ea(proj)}')" style="cursor:pointer">
+    return h`<div class="pbom-card" style="margin-bottom:12px">
+      <div class="pbom-card-header" onclick="whvToggleProj('${raw(ea(proj))}')" style="cursor:pointer">
         <div>
-          <div class="pbom-card-title">📁 ${esc(proj)}</div>
+          <div class="pbom-card-title">📁 ${proj}</div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
             ${inWh.length?`🏭 ${inWh.length} depoda`:''}${inWh.length&&pending.length?' · ':''}${pending.length?`📦 ${pending.length} beklenen`:''}
           </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center" onclick="event.stopPropagation()">
-          <button class="btn btn-ghost btn-sm" onclick="whvProjectPDF('${ea(proj)}')" title="Proje depo raporu yazdır">🖨 PDF</button>
-          <span style="font-family:var(--font-mono);font-size:14px;color:var(--muted);cursor:pointer" onclick="whvToggleProj('${ea(proj)}')">${open?'▾':'▸'}</span>
+          <button class="btn btn-ghost btn-sm" onclick="whvProjectPDF('${raw(ea(proj))}')" title="Proje depo raporu yazdır">🖨 PDF</button>
+          <span style="font-family:var(--font-mono);font-size:14px;color:var(--muted);cursor:pointer" onclick="whvToggleProj('${raw(ea(proj))}')">${open?'▾':'▸'}</span>
         </div>
       </div>
       ${body}
     </div>`;
-  }).join('');
+  })}`;
 }
 
 function whvToggleProj(proj){
@@ -7678,7 +7660,7 @@ function whvToggleProj(proj){
 // ── Depo bazlı görünüm: seçilen deponun içi proje gruplu + münferit ──
 function whvWarehouseHTML(){
   const whId = document.getElementById('whv-wh-sel')?.value || '';
-  if(!whId) return `<div class="empty-state"><span class="emoji">🗄️</span>Yukarıdan bir depo seçin</div>`;
+  if(!whId) return h`<div class="empty-state"><span class="emoji">🗄️</span>Yukarıdan bir depo seçin</div>`;
 
   const inWh = purchaseItems.filter(i=>i.status==='IN_WAREHOUSE' && i.warehouse_id===whId);
   const projGroups = {};
@@ -7696,33 +7678,29 @@ function whvWarehouseHTML(){
     .sort((a,b)=>a.name.localeCompare(b.name,'tr'));
 
   if(!inWh.length && !loose.length)
-    return `<div class="empty-state"><span class="emoji">🏭</span>Bu depoda malzeme yok</div>`;
+    return h`<div class="empty-state"><span class="emoji">🏭</span>Bu depoda malzeme yok</div>`;
 
-  let html = '';
-  Object.entries(projGroups).sort(([a],[b])=>a.localeCompare(b,'tr')).forEach(([proj,items])=>{
-    html += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:14px 0 6px">📁 ${esc(proj)} · ${items.length} malzeme</div>`
-      + items.map(i=>whRow(i, `<button class="btn btn-ghost btn-sm" onclick="whXferItem('${i.id}')" title="Başka depoya aktar">🔁 Aktar</button>
-          <button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)).join('');
-  });
-  if(loose.length){
-    html += `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:14px 0 6px">📦 Münferit (projesiz) · ${loose.length} kalem</div>`
-      + loose.map(r=>{
+  const projSections = Object.entries(projGroups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([proj,items])=>
+    h`<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:14px 0 6px">📁 ${proj} · ${items.length} malzeme</div>${
+      items.map(i=>raw(whRow(i, `<button class="btn btn-ghost btn-sm" onclick="whXferItem('${i.id}')" title="Başka depoya aktar">🔁 Aktar</button>
+          <button class="btn btn-ghost btn-sm" onclick="whUndo('${i.id}')" title="Depodan geri çıkar">↩ Geri Al</button>`)))}`);
+  const looseSection = loose.length ? h`<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:14px 0 6px">📦 Münferit (projesiz) · ${loose.length} kalem</div>${
+      loose.map(r=>{
         const c = r.net > 0 ? '#2ecc71' : '#e74c3c';
-        return `<div class="pbom-card" style="border-left:3px solid ${c};padding:8px 14px">
+        return h`<div class="pbom-card" style="border-left:3px solid ${c};padding:8px 14px">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between">
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0">
-              ${r.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${esc(r.code)}</span>`:''}
-              <span>${esc(r.name)}</span>
+              ${r.code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${r.code}</span>`:''}
+              <span>${r.name}</span>
             </div>
             <span style="display:flex;gap:8px;align-items:center">
-              <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${esc(r.unit)}</span>
-              ${r.net>0?`<button class="btn btn-ghost btn-sm" onclick="whXferLoose('${whId}','${ea(r.name)}','${ea(r.code||'')}','${ea(r.unit)}',${r.net})" title="Başka depoya aktar">🔁</button>`:''}
+              <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${r.unit}</span>
+              ${r.net>0?h`<button class="btn btn-ghost btn-sm" onclick="whXferLoose('${raw(whId)}','${raw(ea(r.name))}','${raw(ea(r.code||''))}','${raw(ea(r.unit))}',${r.net})" title="Başka depoya aktar">🔁</button>`:''}
             </span>
           </div>
         </div>`;
-      }).join('');
-  }
-  return html;
+      })}` : '';
+  return h`${projSections}${looseSection}`;
 }
 
 // ── Proje depo raporu PDF (🖨) ──
@@ -8803,22 +8781,22 @@ function renderWhStock(){
   const rows = [...map.values()].filter(r=>Math.abs(r.net)>1e-9)
     .sort((a,b)=>(whName(a.wh)||'').localeCompare(whName(b.wh)||'','tr') || a.name.localeCompare(b.name,'tr'));
   if(!rows.length){
-    el.innerHTML = `<div class="empty-state" style="padding:14px"><span class="emoji">📊</span>Depoda malzeme yok</div>`;
+    el.innerHTML = h`<div class="empty-state" style="padding:14px"><span class="emoji">📊</span>Depoda malzeme yok</div>`;
     return;
   }
-  el.innerHTML = rows.map(r=>{
+  el.innerHTML = h`${rows.map(r=>{
     const c = r.net > 0 ? '#2ecc71' : '#e74c3c';
-    return `<div class="pbom-card" style="border-left:3px solid ${c};padding:8px 14px">
+    return h`<div class="pbom-card" style="border-left:3px solid ${c};padding:8px 14px">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0">
-          ${r.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${esc(r.code)}</span>`:''}
-          <span>${esc(r.name)}</span>
-          ${!f?`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">🗄️ ${esc(whName(r.wh)||'—')}</span>`:''}
+          ${r.code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${r.code}</span>`:''}
+          <span>${r.name}</span>
+          ${!f?h`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">🗄️ ${whName(r.wh)||'—'}</span>`:''}
         </div>
-        <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${esc(r.unit)}</span>
+        <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${r.unit}</span>
       </div>
     </div>`;
-  }).join('');
+  })}`;
 }
 
 function renderWhMovements(){
@@ -8828,37 +8806,37 @@ function renderWhMovements(){
   const f = document.getElementById('whm-mv-filter')?.value || '';
   const list = f ? whMovements.filter(m=>m.warehouse_id===f) : whMovements;
   if(!list.length){
-    el.innerHTML = `<div class="empty-state" style="padding:18px"><span class="emoji">📜</span>Hareket kaydı yok</div>`;
+    el.innerHTML = h`<div class="empty-state" style="padding:18px"><span class="emoji">📜</span>Hareket kaydı yok</div>`;
     return;
   }
-  el.innerHTML = list.map(m=>{
+  el.innerHTML = h`${list.map(m=>{
     const isIn = m.movement_type==='IN';
     const c = isIn ? '#2ecc71' : '#e74c3c';
     const src = WH_SOURCE_LABELS[m.source_type] || m.source_type;
     const meta = [
-      '🗄️ '+esc(whName(m.warehouse_id)||'—'),
-      Number(m.quantity)+' '+esc(m.unit||'adet'),
-      m.performed_by ? '👤 '+esc(m.performed_by) : '',
+      '🗄️ '+(whName(m.warehouse_id)||'—'),
+      Number(m.quantity)+' '+(m.unit||'adet'),
+      m.performed_by ? '👤 '+m.performed_by : '',
       '🕓 '+new Date(m.created_at).toLocaleString('tr-TR'),
-      m.notes ? '📝 '+esc(m.notes) : ''
+      m.notes ? '📝 '+m.notes : ''
     ].filter(Boolean).join(' · ');
-    return `<div class="pbom-card" style="border-left:3px solid ${c}">
+    return h`<div class="pbom-card" style="border-left:3px solid ${c}">
       <div class="pbom-card-header">
         <div style="min-width:0">
           <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <span style="color:${c};font-family:var(--font-mono);font-size:12px">${isIn?'⬇ GİRİŞ':'⬆ ÇIKIŞ'}</span>
-            ${m.item_code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${esc(m.item_code)}</span>`:''}
-            ${esc(m.item_name)}
+            ${m.item_code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${m.item_code}</span>`:''}
+            ${m.item_name}
             <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--muted)">${src}</span>
           </div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">${meta}</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <button class="btn btn-ghost btn-sm" onclick="whmDeleteMovement('${m.id}')" style="color:#e74c3c" title="Yanlış kaydı sil">🗑</button>
+          <button class="btn btn-ghost btn-sm" onclick="whmDeleteMovement('${raw(m.id)}')" style="color:#e74c3c" title="Yanlış kaydı sil">🗑</button>
         </div>
       </div>
     </div>`;
-  }).join('');
+  })}`;
 }
 
 async function whmDeleteMovement(id){
@@ -8933,41 +8911,41 @@ async function renderAppUsers() {
 
   const nonDev = appUsers.filter(u => u.role !== 'developer');
   if (!nonDev.length) {
-    list.innerHTML = `<div class="empty-state"><span class="emoji">🔑</span>Henüz kullanıcı eklenmedi</div>`;
+    list.innerHTML = h`<div class="empty-state"><span class="emoji">🔑</span>Henüz kullanıcı eklenmedi</div>`;
     return;
   }
 
-  list.innerHTML = nonDev.map(u => {
+  list.innerHTML = h`${nonDev.map(u => {
     const perms = Array.isArray(u.permissions) ? u.permissions : JSON.parse(u.permissions||'[]');
     const permBadges = perms.map(p => {
       const labels = {dashboard:'Dashboard',parts:'Parçalar',users:'Personel',stats:'İstatistik',orders:'Siparişler',orders_view:'Siparişler (Görüntüle)',orders_edit:'Siparişler (Düzenle)',planning:'Planlama',scan:'QR Okutma'};
-      return `<span style="background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:2px 8px;font-family:var(--font-mono);font-size:10px;color:var(--accent)">${labels[p]||p}</span>`;
-    }).join('');
+      return h`<span style="background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:2px 8px;font-family:var(--font-mono);font-size:10px;color:var(--accent)">${labels[p]||p}</span>`;
+    });
 
-    return `<div class="appuser-card">
+    return h`<div class="appuser-card">
       <div class="appuser-avatar">${(u.display_name||u.username).charAt(0).toUpperCase()}</div>
       <div style="flex:1">
         <div style="font-weight:600;font-size:14px;margin-bottom:3px">${u.display_name||u.username}
           <span class="appuser-role-badge" style="margin-left:6px">${u.role==='developer'?'Geliştirici':'Kullanıcı'}</span>
-          ${!u.is_active?'<span style="background:rgba(231,76,60,.15);color:var(--red);border:1px solid rgba(231,76,60,.3);border-radius:10px;padding:2px 8px;font-family:var(--font-mono);font-size:10px;margin-left:6px">Pasif</span>':''}
+          ${!u.is_active?raw('<span style="background:rgba(231,76,60,.15);color:var(--red);border:1px solid rgba(231,76,60,.3);border-radius:10px;padding:2px 8px;font-family:var(--font-mono);font-size:10px;margin-left:6px">Pasif</span>'):''}
         </div>
-        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:4px">@${esc(u.username)}</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:4px">@${u.username}</div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
           <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">Şifre:</span>
           <span style="font-family:var(--font-mono);font-size:12px;letter-spacing:2px" title="Şifreler şifrelenmiş (BCrypt) saklanır, görüntülenemez">•••••••• 🔒</span>
         </div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px">${permBadges||'<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">Yetki yok</span>'}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${perms.length?permBadges:raw('<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">Yetki yok</span>')}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px">
-        <button class="btn btn-ghost btn-sm" onclick="editAppUserPerms('${u.id}')">✏️ Yetki</button>
-        <button class="btn btn-ghost btn-sm" onclick="adminChangePassword('${u.id}','${ea(u.display_name||u.username)}')">🔑 Şifre</button>
-        <button class="btn btn-ghost btn-sm" onclick="toggleAppUserActive('${u.id}',${u.is_active})" style="${u.is_active?'color:var(--yellow)':'color:var(--green)'}">
+        <button class="btn btn-ghost btn-sm" onclick="editAppUserPerms('${raw(u.id)}')">✏️ Yetki</button>
+        <button class="btn btn-ghost btn-sm" onclick="adminChangePassword('${raw(u.id)}','${raw(ea(u.display_name||u.username))}')">🔑 Şifre</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleAppUserActive('${raw(u.id)}',${raw(String(!!u.is_active))})" style="${u.is_active?'color:var(--yellow)':'color:var(--green)'}">
           ${u.is_active?'⏸ Pasif Yap':'▶ Aktif Yap'}
         </button>
-        <button class="btn btn-ghost btn-sm" onclick="deleteAppUser('${u.id}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">🗑️</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteAppUser('${raw(u.id)}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">🗑️</button>
       </div>
     </div>`;
-  }).join('');
+  })}`;
 }
 
 function editAppUserPerms(id) {
@@ -8982,7 +8960,7 @@ function editAppUserPerms(id) {
   overlay.id = 'perm-overlay';
   overlay.innerHTML = `<div class="modal" style="width:460px;text-align:left">
     <h3 style="margin-bottom:4px">Yetki Düzenle</h3>
-    <p style="margin-bottom:16px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${u.display_name||u.username} · @${esc(u.username)}</p>
+    <p style="margin-bottom:16px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${esc(u.display_name||u.username)} · @${esc(u.username)}</p>
     <div class="perm-grid" id="edit-perms">
       ${allPerms.map(p => `
         <div class="perm-item ${perms.includes(p)?'checked':''}" data-perm="${p}" onclick="togglePerm(this)">
@@ -9316,16 +9294,16 @@ function renderOpDefsList() {
     el.innerHTML=`<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);text-align:center;padding:20px">Henüz işlem tanımı eklenmedi</div>`;
     return;
   }
-  el.innerHTML = bomOpDefs.map(op=>`
+  el.innerHTML = h`${bomOpDefs.map(op=>h`
     <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border-radius:6px;margin-bottom:6px;border:1px solid var(--border)">
       <div style="flex:1">
-        <div style="font-weight:600;font-size:13px">${esc(op.name)}
-          <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:4px;padding:1px 7px;margin-left:6px">${esc(op.code)}</span>
+        <div style="font-weight:600;font-size:13px">${op.name}
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:4px;padding:1px 7px;margin-left:6px">${op.code}</span>
         </div>
-        ${op.description?`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:2px">${esc(op.description)}</div>`:''}
+        ${op.description?h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:2px">${op.description}</div>`:''}
       </div>
-      <button class="icon-btn" onclick="deleteBomOpDef('${op.id}')" title="Sil" style="color:var(--red)">🗑️</button>
-    </div>`).join('');
+      <button class="icon-btn" onclick="deleteBomOpDef('${raw(op.id)}')" title="Sil" style="color:var(--red)">🗑️</button>
+    </div>`)}`;
 }
 
 async function saveBomOpDef() {
@@ -9593,14 +9571,14 @@ function renderBomList() {
   }
   // Hiyerarşik sıralama
   const sorted = buildSortedTree(null, 0);
-  el.innerHTML = sorted.map(({part,level}) => {
+  el.innerHTML = h`${sorted.map(({part,level}) => {
     const ops = Array.isArray(part.operations) ? part.operations : JSON.parse(part.operations||'[]');
-    const opsHTML = ops.length ? `<div class="bom-ops">${ops.map((o,oi)=>{
+    const opsHTML = ops.length ? h`<div class="bom-ops">${ops.map((o,oi)=>{
       const timeStr = o.duration_per_unit ? ` ⏱${o.total_duration?.toFixed(1)||'?'}dk` : '';
-      return `<span class="bom-op-tag">⚙ ${esc(o.name)} (${esc(o.code)})${timeStr} <button onclick="removeBomOp('${part.id}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px;margin-left:2px">✕</button></span>`;
-    }).join('')}</div>` : '';
+      return h`<span class="bom-op-tag">⚙ ${o.name} (${o.code})${timeStr} <button onclick="removeBomOp('${raw(part.id)}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px;margin-left:2px">✕</button></span>`;
+    })}</div>` : '';
     const indent = level * 24;
-    return `<div class="bom-part-row" data-id="${part.id}" data-level="${level}"
+    return h`<div class="bom-part-row" data-id="${raw(part.id)}" data-level="${level}"
         draggable="true"
         ondragstart="onBomDragStart(event,this)"
         ondragover="onBomDragOver(event,this)"
@@ -9609,26 +9587,26 @@ function renderBomList() {
         ondragend="onBomDragEnd(event,this)"
         style="margin-left:${indent}px">
       <span class="bom-drag-handle">⠿</span>
-      ${level>0?`<span style="color:var(--muted);font-size:10px;margin-right:4px">${'└─'.repeat(1)}</span>`:''}
-      <span class="bom-part-code">${esc(part.code)}</span>
+      ${level>0?raw(`<span style="color:var(--muted);font-size:10px;margin-right:4px">${'└─'.repeat(1)}</span>`):''}
+      <span class="bom-part-code">${part.code}</span>
       <div style="flex:1">
-        <div class="bom-part-name-cell">${esc(part.name)} ${kindBadge(part.material_kind)}</div>
+        <div class="bom-part-name-cell">${part.name} ${raw(kindBadge(part.material_kind))}</div>
         <div class="bom-part-meta">
-          <span id="bom-qty-display-${part.id}" style="cursor:pointer;border-bottom:1px dashed var(--muted)" onclick="editBomQty('${part.id}')" title="Miktarı düzenle">${part.quantity} ${esc(part.unit)}</span>
-          ${part.weight_kg?`<span>⚖ ${part.weight_kg} kg</span>`:''}
-          ${part.material?`<span>🔩 ${esc(part.material)}</span>`:''}
-          ${dimLabel(part.width_mm,part.height_mm,part.thickness_mm)?`<span>📐 ${dimLabel(part.width_mm,part.height_mm,part.thickness_mm)}</span>`:''}
+          <span id="bom-qty-display-${raw(part.id)}" style="cursor:pointer;border-bottom:1px dashed var(--muted)" onclick="editBomQty('${raw(part.id)}')" title="Miktarı düzenle">${part.quantity} ${part.unit}</span>
+          ${part.weight_kg?h`<span>⚖ ${part.weight_kg} kg</span>`:''}
+          ${part.material?h`<span>🔩 ${part.material}</span>`:''}
+          ${dimLabel(part.width_mm,part.height_mm,part.thickness_mm)?h`<span>📐 ${dimLabel(part.width_mm,part.height_mm,part.thickness_mm)}</span>`:''}
         </div>
         ${opsHTML}
       </div>
       <div style="display:flex;gap:4px;align-items:center">
-        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="editBomPart('${part.id}')" title="Ad / kod / malzeme düzenle">✏️ Düzenle</button>
-        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="bomCopyBranch('${part.id}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">📋 Kopyala</button>
-        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="editBomQty('${part.id}')" title="Miktarı düzenle">✏️ Miktar</button>
-        <button class="icon-btn" title="Sil" onclick="deleteBomPart('${part.id}')">🗑️</button>
+        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="editBomPart('${raw(part.id)}')" title="Ad / kod / malzeme düzenle">✏️ Düzenle</button>
+        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="bomCopyBranch('${raw(part.id)}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">📋 Kopyala</button>
+        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="editBomQty('${raw(part.id)}')" title="Miktarı düzenle">✏️ Miktar</button>
+        <button class="icon-btn" title="Sil" onclick="deleteBomPart('${raw(part.id)}')">🗑️</button>
       </div>
     </div>`;
-  }).join('');
+  })}`;
 }
 
 function buildSortedTree(parentId, level) {
@@ -9933,30 +9911,31 @@ function renderBomTreeSvg() {
       .sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
     return children.map(p=>{
       const ops = Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
-      const opBadges = ops.map(o=>{ const t=o.duration_per_unit?` ⏱${(o.total_duration||0).toFixed(1)}dk`:""; return `<span style="background:rgba(41,128,185,.15);border:1px solid rgba(41,128,185,.3);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${esc(o.name)}(${esc(o.code)})${t}</span>`; }).join(" ");
+      // h`` parçaları araya boşluk konarak birleşsin diye join(' ') + raw
+      const opBadges = raw(ops.map(o=>{ const t=o.duration_per_unit?` ⏱${(o.total_duration||0).toFixed(1)}dk`:""; return h`<span style="background:rgba(41,128,185,.15);border:1px solid rgba(41,128,185,.3);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${o.name}(${o.code})${t}</span>`; }).join(" "));
       const childrenHtml = buildNode(p.id, level+1);
-      return `<div class="bom-tree-node">
+      return h`<div class="bom-tree-node">
         <div class="bom-tree-item" style="margin-left:${level*4}px">
-          <span style="color:var(--accent);font-weight:700">${esc(p.code)}</span>
-          <span>${esc(p.name)}</span>
-          <span style="color:var(--muted);font-size:10px">${p.quantity} ${esc(p.unit)}</span>
-          ${p.weight_kg?`<span style="color:var(--muted);font-size:10px">⚖${p.weight_kg}kg</span>`:''}
-          ${p.material?`<span style="color:var(--muted);font-size:10px">🔩${esc(p.material)}</span>`:''}
-          ${dimLabel(p.width_mm,p.height_mm,p.thickness_mm)?`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.width_mm,p.height_mm,p.thickness_mm)}</span>`:''}
+          <span style="color:var(--accent);font-weight:700">${p.code}</span>
+          <span>${p.name}</span>
+          <span style="color:var(--muted);font-size:10px">${p.quantity} ${p.unit}</span>
+          ${p.weight_kg?h`<span style="color:var(--muted);font-size:10px">⚖${p.weight_kg}kg</span>`:''}
+          ${p.material?h`<span style="color:var(--muted);font-size:10px">🔩${p.material}</span>`:''}
+          ${dimLabel(p.width_mm,p.height_mm,p.thickness_mm)?h`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.width_mm,p.height_mm,p.thickness_mm)}</span>`:''}
           ${opBadges}
         </div>
-        ${childrenHtml?`<div class="bom-tree-children">${childrenHtml}</div>`:''}
+        ${childrenHtml.length?h`<div class="bom-tree-children">${childrenHtml}</div>`:''}
       </div>`;
-    }).join('');
+    });
   }
 
   const p = _activeBomProduct;
   const rootChildren = buildNode(null, 0);
-  container.innerHTML = `
+  container.innerHTML = h`
     <div class="bom-tree-node">
       <div class="bom-tree-item root">
-        🏭 <span>${p.code?esc(p.code)+' — ':''}${esc(p.name)}</span>
-        <span style="color:var(--muted);font-size:10px">${esc(p.unit)}</span>
+        🏭 <span>${p.code?p.code+' — ':''}${p.name}</span>
+        <span style="color:var(--muted);font-size:10px">${p.unit}</span>
         <span style="color:var(--muted);font-size:10px">${bomParts.length} parça</span>
       </div>
       <div class="bom-tree-children">${rootChildren}</div>
@@ -10015,8 +9994,8 @@ function renderPbomDropdowns() {
   if(prSel) {
     const cur = prSel.value;
     const projNames = [...new Set(orders.map(o=>o.project_name).filter(Boolean))].sort();
-    prSel.innerHTML = '<option value="">— Proje seçin —</option>' +
-      projNames.map(n=>`<option value="${n}">${n}</option>`).join('');
+    prSel.innerHTML = h`<option value="">— Proje seçin —</option>${
+      projNames.map(n=>h`<option value="${n}">${n}</option>`)}`;
     if(projNames.includes(cur)) prSel.value = cur;
   }
   pbomRenderMachineRows();
@@ -10115,26 +10094,25 @@ function renderProjectBomList() {
   if(!el) return;
   renderPbomDropdowns();
   if(!projectBoms.length){
-    el.innerHTML=`<div class="empty-state"><span class="emoji">🔗</span>Henüz proje bağlantısı oluşturulmadı</div>`;
+    el.innerHTML=h`<div class="empty-state"><span class="emoji">🔗</span>Henüz proje bağlantısı oluşturulmadı</div>`;
     return;
   }
   // Kartlar PROJE başlığı altında gruplanır (#1 arkadaş isteği, görsel 100)
   const groups = {};
   projectBoms.forEach(pb=>{ const k=pb.project_name||'—'; (groups[k]=groups[k]||[]).push(pb); });
-  el.innerHTML = Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([proj,list])=>
-    `<div style="font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:20px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px">
-      📁 ${esc(proj)} <span style="color:var(--muted);text-transform:none">· ${list.length} ürün ağacı</span>
-    </div>` +
-    list.map(pb => {
+  el.innerHTML = h`${Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([proj,list])=>
+    h`<div style="font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:20px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px">
+      📁 ${proj} <span style="color:var(--muted);text-transform:none">· ${list.length} ürün ağacı</span>
+    </div>${list.map(pb => {
     const prod = bomProducts.find(p=>p.id===pb.bom_product_id);
     const isPublished = pb.status==='published';
     const pbParts = projectBomParts.filter(p=>p.project_bom_id===pb.id);
     const excCount = pbParts.filter(p=>p.is_excluded).length;
 
-    return `<div class="pbom-card">
+    return h`<div class="pbom-card">
       <div class="pbom-card-header">
         <div>
-          <div class="pbom-card-title">🌳 ${prod?.name||'—'} ${prod?.code?`<span style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">(${esc(prod.code)})</span>`:''}</div>
+          <div class="pbom-card-title">🌳 ${prod?.name||'—'} ${prod?.code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">(${prod.code})</span>`:''}</div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
             ${excCount>0?excCount+' parça hariç tutuldu · ':''}
             ${isPublished?'Yayınlandı: '+new Date(pb.published_at).toLocaleDateString('tr-TR'):'Taslak'}
@@ -10142,14 +10120,14 @@ function renderProjectBomList() {
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <span class="${isPublished?'pbom-status-published':'pbom-status-draft'}">${isPublished?'✅ Yayınlandı':'📝 Taslak'}</span>
-          <button class="btn btn-primary btn-sm" onclick="openAndPublishPbom('${pb.id}')">${isPublished?'🔄 Yeniden Yayınla':'🚀 Yayınla'}</button>
-          <button class="btn btn-ghost btn-sm" onclick="openPbomEditor('${pb.id}')">✏️ Düzenle</button>
-          ${isPublished?`<button class="btn btn-ghost btn-sm" onclick="viewPublishedBom('${pb.id}')" style="color:var(--green);border-color:rgba(46,204,113,.3)">🌳 Ağacı Gör</button>`:''}
-          <button class="btn btn-ghost btn-sm" onclick="deleteProjectBom('${pb.id}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">🗑️</button>
+          <button class="btn btn-primary btn-sm" onclick="openAndPublishPbom('${raw(pb.id)}')">${isPublished?'🔄 Yeniden Yayınla':'🚀 Yayınla'}</button>
+          <button class="btn btn-ghost btn-sm" onclick="openPbomEditor('${raw(pb.id)}')">✏️ Düzenle</button>
+          ${isPublished?h`<button class="btn btn-ghost btn-sm" onclick="viewPublishedBom('${raw(pb.id)}')" style="color:var(--green);border-color:rgba(46,204,113,.3)">🌳 Ağacı Gör</button>`:''}
+          <button class="btn btn-ghost btn-sm" onclick="deleteProjectBom('${raw(pb.id)}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">🗑️</button>
         </div>
       </div>
     </div>`;
-  }).join('')).join('');
+  })}`)}`;
 }
 
 // ─── Proje Ürün Ağacı Düzenleyici (Tam Ekran View) ───
@@ -10382,7 +10360,7 @@ function pbomeRenderList() {
   const el = document.getElementById('pbome-parts-list');
   if(!el) return;
   if(!_pbomeParts.length){
-    el.innerHTML=`<div class="empty-state"><span class="emoji">📦</span>Henüz parça yok. Yukarıdan ekleyin veya ürün ağacından kopyalansın.</div>`;
+    el.innerHTML=h`<div class="empty-state"><span class="emoji">📦</span>Henüz parça yok. Yukarıdan ekleyin veya ürün ağacından kopyalansın.</div>`;
     return;
   }
   function buildTree(parentId,level) {
@@ -10391,11 +10369,11 @@ function pbomeRenderList() {
       .map(p=>{
         const ops=Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
         const dept=p.dept_id?depts.find(d=>d.id===p.dept_id):null;
-        const opsHTML=ops.length?`<div class="bom-ops">${ops.map((o,oi)=>`<span class="bom-op-tag">⚙${esc(o.name)}(${esc(o.code)})${o.duration_per_unit?` ⏱${(o.total_duration||0).toFixed(0)}dk`:''} <button onclick="pbomeRemoveOp('${p.id}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px">✕</button></span>`).join('')}</div>`:''
+        const opsHTML=ops.length?h`<div class="bom-ops">${ops.map((o,oi)=>h`<span class="bom-op-tag">⚙${o.name}(${o.code})${o.duration_per_unit?` ⏱${(o.total_duration||0).toFixed(0)}dk`:''} <button onclick="pbomeRemoveOp('${raw(p.id)}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px">✕</button></span>`)}</div>`:''
         const isFromBom = !!p.bom_part_id;
         const indent = level*24;
         const children = buildTree(p.id,level+1);
-        return `<div class="bom-part-row${p.is_excluded?' excluded':''}" id="pbomep-${p.id}" data-id="${p.id}"
+        return h`<div class="bom-part-row${p.is_excluded?' excluded':''}" id="pbomep-${p.id}" data-id="${p.id}"
           draggable="true"
           ondragstart="pbomeDragStart(event,this)"
           ondragover="pbomeDragOver(event,this)"
@@ -10404,34 +10382,34 @@ function pbomeRenderList() {
           ondragend="pbomeDragEnd()"
           style="margin-left:${indent}px;${isFromBom?'':'border-left:3px solid var(--green)'}">
           <span class="bom-drag-handle">⠿</span>
-          ${level>0?`<span style="color:var(--muted);font-size:10px;margin-right:2px">└─</span>`:''}
-          <span class="bom-part-code" style="${isFromBom?'':'color:var(--green)'}">${esc(p.custom_code)}</span>
+          ${level>0?raw('<span style="color:var(--muted);font-size:10px;margin-right:2px">└─</span>'):''}
+          <span class="bom-part-code" style="${isFromBom?'':'color:var(--green)'}">${p.custom_code}</span>
           <div style="flex:1">
-            <div class="bom-part-name-cell">${esc(p.custom_name)}${isFromBom?'':' ⭐'} ${kindBadge(p.material_kind||p.resolved_material_kind)}</div>
+            <div class="bom-part-name-cell">${p.custom_name}${isFromBom?'':' ⭐'} ${raw(kindBadge(p.material_kind||p.resolved_material_kind))}</div>
             <div class="bom-part-meta">
-              <span>${p.custom_qty||1} ${esc(p.custom_unit||'adet')}</span>
-              ${p.custom_weight?`<span>⚖${p.custom_weight}kg</span>`:''}
-              ${p.custom_material?`<span>🔩${esc(p.custom_material)}</span>`:''}
-              ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?`<span>📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
-              ${dept?`<span style="color:#2980b9">🏭${esc(dept.name)}</span>`:''}
+              <span>${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
+              ${p.custom_weight?h`<span>⚖${p.custom_weight}kg</span>`:''}
+              ${p.custom_material?h`<span>🔩${p.custom_material}</span>`:''}
+              ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?h`<span>📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
+              ${dept?h`<span style="color:#2980b9">🏭${dept.name}</span>`:''}
             </div>
             ${opsHTML}
           </div>
           <div style="display:flex;gap:4px;align-items:center">
-            <select onchange="pbomeSetDept('${p.id}',this.value)"
+            <select onchange="pbomeSetDept('${raw(p.id)}',this.value)"
               style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:4px 6px;outline:none;max-width:130px">
               <option value="">— Bölüm —</option>
-              ${depts.map(d=>`<option value="${d.id}"${d.id===p.dept_id?' selected':''}>${esc(d.name)}</option>`).join('')}
+              ${depts.map(d=>h`<option value="${d.id}"${d.id===p.dept_id?raw(' selected'):''}>${d.name}</option>`)}
             </select>
-            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditPart('${p.id}')" title="Ad / kod / malzeme düzenle">📝</button>
-            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeCopyBranch('${p.id}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">📋</button>
-            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditQty('${p.id}')" title="Miktar düzenle">✏️</button>
-            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px;color:var(--red)" onclick="pbomeDeletePart('${p.id}')" title="Sil">🗑️</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditPart('${raw(p.id)}')" title="Ad / kod / malzeme düzenle">📝</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeCopyBranch('${raw(p.id)}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">📋</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditQty('${raw(p.id)}')" title="Miktar düzenle">✏️</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px;color:var(--red)" onclick="pbomeDeletePart('${raw(p.id)}')" title="Sil">🗑️</button>
           </div>
         </div>${children}`;
-      }).join('');
+      });
   }
-  el.innerHTML = buildTree(null,0);
+  el.innerHTML = h`${buildTree(null,0)}`;
 }
 
 // Bölüm ata
@@ -10697,19 +10675,19 @@ function xlsImportRenderModal(data){
 
 function xlsImportRenderList(){
   const el=document.getElementById('xls-import-list'); if(!el||!_xlsImport) return;
-  el.innerHTML=_xlsImport.rows.map(r=>{
+  el.innerHTML=h`${_xlsImport.rows.map(r=>{
     const dims=dimLabel(r.width_mm,r.height_mm,r.thickness_mm);
     const checked=_xlsImport.checked.has(r.level_no);
-    return `<div style="display:flex;gap:8px;align-items:center;padding:5px 6px;margin-left:${(r.level||0)*22}px;border-left:2px solid ${r.error?'var(--red)':'var(--border)'};${r.error?'opacity:.8':''}">
-      <input type="checkbox" ${checked?'checked':''} ${r.error?'disabled':''} onchange="xlsImportToggle('${r.level_no}',this.checked)">
+    return h`<div style="display:flex;gap:8px;align-items:center;padding:5px 6px;margin-left:${(r.level||0)*22}px;border-left:2px solid ${r.error?'var(--red)':'var(--border)'};${r.error?'opacity:.8':''}">
+      <input type="checkbox" ${checked?raw('checked'):''} ${r.error?raw('disabled'):''} onchange="xlsImportToggle('${raw(ea(r.level_no))}',this.checked)">
       <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);min-width:44px">${r.level_no}</span>
-      <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">${esc(r.code||'—')}</span>
-      <span style="font-size:12px">${esc(r.name||'—')}</span>
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">${r.code||'—'}</span>
+      <span style="font-size:12px">${r.name||'—'}</span>
       <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${r.quantity||1} adet${r.material?' · 🔩'+r.material:''}${dims?' · 📐'+dims:''}</span>
-      ${kindBadge(r.material_kind)}
-      ${r.error?`<span style="font-family:var(--font-mono);font-size:10px;color:var(--red)">⚠ ${r.error}</span>`:''}
+      ${raw(kindBadge(r.material_kind))}
+      ${r.error?h`<span style="font-family:var(--font-mono);font-size:10px;color:var(--red)">⚠ ${r.error}</span>`:''}
     </div>`;
-  }).join('');
+  })}`;
   const btn=document.getElementById('xls-import-apply-btn');
   if(btn) btn.textContent=`➕ Seçilenleri Ekle (${_xlsImport.checked.size})`;
 }
@@ -10777,23 +10755,23 @@ function pbomeShowTree() {
         const dept=p.dept_id?depts.find(d=>d.id===p.dept_id):null;
         const children=buildNode(p.id,level+1);
         const isCustom=!p.bom_part_id;
-        return `<div class="bom-tree-node">
+        return h`<div class="bom-tree-node">
           <div class="bom-tree-item" style="margin-left:${level*4}px${isCustom?';border-color:var(--green)':''}">
-            <span style="color:${isCustom?'var(--green)':'var(--accent)'};font-weight:700">${esc(p.custom_code)}</span>
-            <span>${esc(p.custom_name)}${isCustom?' ⭐':''}</span>
-            <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${esc(p.custom_unit||'adet')}</span>
-            ${p.custom_weight?`<span style="color:var(--muted);font-size:10px">⚖${p.custom_weight}kg</span>`:''}
-            ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
-            ${dept?`<span style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;font-size:10px;color:#2980b9">🏭${esc(dept.name)}</span>`:''}
-            ${ops.map(o=>`<span style="background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.2);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${esc(o.name)}(${esc(o.code)})</span>`).join('')}
+            <span style="color:${isCustom?'var(--green)':'var(--accent)'};font-weight:700">${p.custom_code}</span>
+            <span>${p.custom_name}${isCustom?' ⭐':''}</span>
+            <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
+            ${p.custom_weight?h`<span style="color:var(--muted);font-size:10px">⚖${p.custom_weight}kg</span>`:''}
+            ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?h`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
+            ${dept?h`<span style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;font-size:10px;color:#2980b9">🏭${dept.name}</span>`:''}
+            ${ops.map(o=>h`<span style="background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.2);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${o.name}(${o.code})</span>`)}
           </div>
-          ${children?`<div class="bom-tree-children">${children}</div>`:''}
+          ${children.length?h`<div class="bom-tree-children">${children}</div>`:''}
         </div>`;
-      }).join('');
+      });
   }
   const pb=projectBoms.find(p=>p.id===_activePbomId);
   const prod=bomProducts.find(p=>p.id===pb?.bom_product_id);
-  container.innerHTML=`<div class="bom-tree-node">
+  container.innerHTML=h`<div class="bom-tree-node">
     <div class="bom-tree-item root">🏭 <span>${prod?.code?prod.code+' — ':''}${prod?.name||''}</span>
       <span style="color:var(--muted);font-size:10px">📁 ${pb?.project_name||''}</span>
       <span style="color:var(--muted);font-size:10px">${_pbomeParts.length} parça</span>
@@ -11094,8 +11072,8 @@ function renderPbomCustomParts(pbomId) {
   const parentSel = document.getElementById('pbom-custom-parent');
   if(parentSel) {
     const cur = parentSel.value;
-    parentSel.innerHTML = '<option value="">— Ana seviye —</option>' +
-      customParts.map(p=>`<option value="${p.id}"${p.id===cur?' selected':''}>${'  '.repeat(p.level||0)}${esc(p.custom_code)} — ${esc(p.custom_name)}</option>`).join('');
+    parentSel.innerHTML = h`<option value="">— Ana seviye —</option>${
+      customParts.map(p=>h`<option value="${p.id}"${p.id===cur?raw(' selected'):''}>${'  '.repeat(p.level||0)}${p.custom_code} — ${p.custom_name}</option>`)}`;
   }
 
   if(!customParts.length){ el.innerHTML=''; return; }
@@ -11108,36 +11086,36 @@ function renderPbomCustomParts(pbomId) {
         const ops  = Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
         const indent = level*20;
         const children = buildCustomTree(p.id, level+1);
-        return `<div id="cprow-${p.id}" class="bom-part-row" style="margin-left:${indent}px;background:rgba(46,204,113,.04);border-left:3px solid var(--green)"
+        return h`<div id="cprow-${p.id}" class="bom-part-row" style="margin-left:${indent}px;background:rgba(46,204,113,.04);border-left:3px solid var(--green)"
           draggable="true"
-          ondragstart="cpDragStart(event,'${p.id}','${pbomId}')"
+          ondragstart="cpDragStart(event,'${raw(p.id)}','${raw(pbomId)}')"
           ondragover="cpDragOver(event,this)"
           ondragleave="cpDragLeave(this)"
-          ondrop="cpDrop(event,this,'${p.id}','${pbomId}')"
+          ondrop="cpDrop(event,this,'${raw(p.id)}','${raw(pbomId)}')"
           ondragend="cpDragEnd()">
           <span class="bom-drag-handle" style="color:var(--green)">⠿</span>
-          ${level>0?`<span style="color:var(--muted);font-size:10px;margin-right:2px">└─</span>`:''}
-          <span class="bom-part-code" style="color:var(--green)">${esc(p.custom_code)}</span>
+          ${level>0?raw('<span style="color:var(--muted);font-size:10px;margin-right:2px">└─</span>'):''}
+          <span class="bom-part-code" style="color:var(--green)">${p.custom_code}</span>
           <div style="flex:1">
-            <div class="bom-part-name-cell">${esc(p.custom_name)}</div>
+            <div class="bom-part-name-cell">${p.custom_name}</div>
             <div class="bom-part-meta">
-              <span>${p.custom_qty||1} ${esc(p.custom_unit||'adet')}</span>
-              ${p.custom_weight?`<span>⚖${p.custom_weight}kg</span>`:''}
-              ${p.custom_material?`<span>🔩${esc(p.custom_material)}</span>`:''}
-              ${dept?`<span style="color:#2980b9">🏭${esc(dept.name)}</span>`:''}
-              ${ops.map(o=>`<span class="bom-op-tag">⚙${esc(o.name)}(${esc(o.code)})</span>`).join('')}
+              <span>${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
+              ${p.custom_weight?h`<span>⚖${p.custom_weight}kg</span>`:''}
+              ${p.custom_material?h`<span>🔩${p.custom_material}</span>`:''}
+              ${dept?h`<span style="color:#2980b9">🏭${dept.name}</span>`:''}
+              ${ops.map(o=>h`<span class="bom-op-tag">⚙${o.name}(${o.code})</span>`)}
             </div>
           </div>
           <div style="display:flex;gap:4px;flex-shrink:0">
-            <button class="btn btn-ghost btn-sm" style="padding:3px 7px;font-size:10px" onclick="openPbomCustomEdit('${p.id}','${pbomId}')">✏️</button>
-            <button class="btn btn-ghost btn-sm" style="padding:3px 7px;font-size:10px" onclick="openPbomCustomOp('${p.id}','${pbomId}')">⚙</button>
-            <button class="icon-btn" style="color:var(--red);font-size:11px" onclick="removePbomCustomPart('${p.id}','${pbomId}')">🗑️</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 7px;font-size:10px" onclick="openPbomCustomEdit('${raw(p.id)}','${raw(pbomId)}')">✏️</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 7px;font-size:10px" onclick="openPbomCustomOp('${raw(p.id)}','${raw(pbomId)}')">⚙</button>
+            <button class="icon-btn" style="color:var(--red);font-size:11px" onclick="removePbomCustomPart('${raw(p.id)}','${raw(pbomId)}')">🗑️</button>
           </div>
         </div>${children}`;
-      }).join('');
+      });
   }
 
-  el.innerHTML = `<div style="background:rgba(46,204,113,.04);border-top:1px dashed rgba(46,204,113,.3);padding:8px 0">
+  el.innerHTML = h`<div style="background:rgba(46,204,113,.04);border-top:1px dashed rgba(46,204,113,.3);padding:8px 0">
     <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;color:var(--green);letter-spacing:1px;padding:4px 16px 8px;display:flex;justify-content:space-between">
       <span>⭐ Projeye Özel Parçalar (${customParts.length})</span>
       <span style="color:var(--muted)">← Sol = Aynı seviye | → Sağ = Alt parça yap</span>
@@ -11410,34 +11388,35 @@ async function viewPublishedBom(pbomId) {
         const dept = p.dept_id ? depts.find(d=>d.id===p.dept_id) : null;
         const ops  = Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
         const projectPart = parts.find(x=>x.project===pb.project_name&&x.code===p.custom_code);
-        const partStatus  = projectPart ? statusBadge(projectPart.status) : '';
+        const partStatus  = projectPart ? raw(statusBadge(projectPart.status)) : '';
         const isCustom = !p.bom_part_id;
         const children = buildTreeNode(p.id, level+1);
-        return `<div class="bom-tree-node">
+        return h`<div class="bom-tree-node">
           <div class="bom-tree-item" style="${isCustom?'border-color:var(--green);':''}">
-            <span style="color:${isCustom?'var(--green)':'var(--accent)'};font-weight:700">${esc(p.custom_code)}</span>
-            <span>${esc(p.custom_name)}${isCustom?' ⭐':''}</span>
-            <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${esc(p.custom_unit||'adet')}</span>
-            ${p.custom_weight?`<span style="color:var(--muted);font-size:10px">⚖${p.custom_weight}kg</span>`:''}
-            ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
-            ${dept?`<span style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;font-size:10px;color:#2980b9">🏭${esc(dept.name)}</span>`:''}
-            ${ops.map(o=>`<span style="background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.2);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${esc(o.name)}(${esc(o.code)})</span>`).join('')}
+            <span style="color:${isCustom?'var(--green)':'var(--accent)'};font-weight:700">${p.custom_code}</span>
+            <span>${p.custom_name}${isCustom?' ⭐':''}</span>
+            <span style="color:var(--muted);font-size:10px">${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
+            ${p.custom_weight?h`<span style="color:var(--muted);font-size:10px">⚖${p.custom_weight}kg</span>`:''}
+            ${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)?h`<span style="color:var(--muted);font-size:10px">📐${dimLabel(p.custom_width_mm??p.resolved_width_mm,p.custom_height_mm??p.resolved_height_mm,p.custom_thickness_mm??p.resolved_thickness_mm)}</span>`:''}
+            ${dept?h`<span style="background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;font-size:10px;color:#2980b9">🏭${dept.name}</span>`:''}
+            ${ops.map(o=>h`<span style="background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.2);border-radius:3px;padding:1px 5px;font-size:9px;color:#2980b9">⚙${o.name}(${o.code})</span>`)}
             ${partStatus}
           </div>
-          ${children?`<div class="bom-tree-children">${children}</div>`:''}
+          ${children.length?h`<div class="bom-tree-children">${children}</div>`:''}
         </div>`;
-      }).join('');
+      });
   }
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.id = 'pbom-view-overlay';
-  overlay.innerHTML = `<div class="modal" style="width:min(860px,96vw);height:90vh;text-align:left;display:flex;flex-direction:column">
+  const treeNodes = buildTreeNode(null,0);
+  overlay.innerHTML = h`<div class="modal" style="width:min(860px,96vw);height:90vh;text-align:left;display:flex;flex-direction:column">
     <div style="flex-shrink:0;margin-bottom:14px;display:flex;align-items:flex-start;justify-content:space-between">
       <div>
-        <h3>🌳 ${esc(pb.project_name)} — Proje Ürün Ağacı</h3>
+        <h3>🌳 ${pb.project_name} — Proje Ürün Ağacı</h3>
         <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:4px">
-          ${esc(prod.name)}${prod.code?' ('+prod.code+')':''} · Yayınlandı: ${new Date(pb.published_at).toLocaleDateString('tr-TR')}
+          ${prod.name}${prod.code?' ('+prod.code+')':''} · Yayınlandı: ${new Date(pb.published_at).toLocaleDateString('tr-TR')}
           · ${pbParts.filter(p=>!p.is_excluded).length} parça
         </p>
       </div>
@@ -11446,10 +11425,10 @@ async function viewPublishedBom(pbomId) {
     <div style="overflow-y:auto;flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;min-height:0">
       <div class="bom-tree-node">
         <div class="bom-tree-item root">
-          🏭 <span>${prod.code?esc(prod.code)+' — ':''}${esc(prod.name)}</span>
-          <span style="color:var(--muted);font-size:10px">${esc(pb.project_name)}</span>
+          🏭 <span>${prod.code?prod.code+' — ':''}${prod.name}</span>
+          <span style="color:var(--muted);font-size:10px">${pb.project_name}</span>
         </div>
-        <div class="bom-tree-children">${buildTreeNode(null,0)||'<div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;padding:10px">Parça yok</div>'}</div>
+        <div class="bom-tree-children">${treeNodes.length?treeNodes:raw('<div style="color:var(--muted);font-family:var(--font-mono);font-size:12px;padding:10px">Parça yok</div>')}</div>
       </div>
     </div>
   </div>`;

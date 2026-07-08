@@ -63,12 +63,15 @@ ikinci kişi fikir/test notu sağlar, geliştirme yapmaz.
   (`.join('')` YOK — h array'i kendi birleştirir), `onclick="fn('${…}')"` gibi
   JS-in-attribute bağlamında `${raw(ea(x))}` (h'in HTML-esc'i JS'i bozar; sabit/
   UUID argümanlar güvenli). Elle `esc()` hâlâ geçerli ama yeni kodda `h\`\``
-  tercih edilir (esc-unutma riskini yapısal olarak kaldırır). Geçiş kısmî:
-  güvenlik-hassas ekranlar (QR tarama/mal kabul, personel/bölüm/tedarikçi)
-  dönüştü; kalan esc'li kod güvenli, fırsatçı dönüşür. Dönüştürülen render'lar
+  tercih edilir (esc-unutma riskini yapısal olarak kaldırır). Geçiş TAMAM
+  (2026-07-08): tüm liste/kart/ağaç render'ları h``'de. Bilinçli esc'li kalanlar:
+  renderMrp/renderMrpParams (onclick içinde `=>` — h'e alma), modal formlar ve
+  PDF/print (window.open + document.write, ayrı doküman). Dönüştürülen render'lar
   `node scripts/verify-h-render.js` ile XSS-regresyona karşı korunur (yeni
   fonksiyon dönüştükçe oraya senaryo ekle); `esc`/`raw`/`h` mekanizması
   e2e-test.js'te de birim-testli (ikisi index.html ile AYNI tutulmalı).
+  Dikkat: h`` içinde boolean interpolasyonu `''` basar — onclick'e boolean
+  geçerken `${raw(String(!!v))}` kullan.
 
 ## Çalışma Düzeni
 
