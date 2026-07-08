@@ -2476,16 +2476,11 @@ function renderStats(){
 
 function renderBreadcrumb(){
   const bc = document.getElementById('breadcrumb');
-  let html = `<button class="breadcrumb-btn" onclick="renderDashboard()">🏠 Projeler</button>`;
-  if(_activeProject){
-    html += `<span class="breadcrumb-sep">›</span>`;
-    if(_activeDept) html += `<button class="breadcrumb-btn" onclick="openProject('${ea(_activeProject)}')">${esc(_activeProject)}</button>`;
-    else html += `<span class="breadcrumb-current">${esc(_activeProject)}</span>`;
-  }
-  if(_activeDept){
-    html += `<span class="breadcrumb-sep">›</span><span class="breadcrumb-current">${esc(_activeDept.name)}</span>`;
-  }
-  bc.innerHTML = html;
+  bc.innerHTML = h`<button class="breadcrumb-btn" onclick="renderDashboard()">🏠 Projeler</button>${
+    _activeProject ? h`<span class="breadcrumb-sep">›</span>${
+      _activeDept ? h`<button class="breadcrumb-btn" onclick="openProject('${raw(ea(_activeProject))}')">${_activeProject}</button>`
+                  : h`<span class="breadcrumb-current">${_activeProject}</span>`}` : ''}${
+    _activeDept ? h`<span class="breadcrumb-sep">›</span><span class="breadcrumb-current">${_activeDept.name}</span>` : ''}`;
 }
 
 // KATMAN 1 — Projeler
@@ -5302,33 +5297,33 @@ function renderWorkspaces() {
   if (!list) return;
 
   if (!filtered.length) {
-    list.innerHTML = `<div class="empty-state"><span class="emoji">🏭</span>Henüz çalışma alanı / makine eklenmedi</div>`;
+    list.innerHTML = h`<div class="empty-state"><span class="emoji">🏭</span>Henüz çalışma alanı / makine eklenmedi</div>`;
     return;
   }
 
-  list.innerHTML = `<div class="ws-grid">${filtered.map(w => {
+  list.innerHTML = h`<div class="ws-grid">${filtered.map(w => {
     const members = wsMembers.filter(m => m.workspace_id === w.id);
     const icon = WS_TYPE_ICONS[w.type] || '🏭';
     const typeLbl = WS_TYPE_LABELS[w.type] || w.type;
     const typeCss = WS_TYPE_CSS[w.type] || 'ws-type-area';
 
     const membersHTML = members.length
-      ? members.map(m => `
+      ? h`${members.map(m => h`
           <div class="ws-member-item">
             <div class="ws-member-avatar">${m.user_name.charAt(0).toUpperCase()}</div>
             <div style="flex:1">
-              <div class="ws-member-name">${esc(m.user_name)}</div>
-              ${m.role ? `<div class="ws-member-role">${esc(m.role)}</div>` : ''}
+              <div class="ws-member-name">${m.user_name}</div>
+              ${m.role ? h`<div class="ws-member-role">${m.role}</div>` : ''}
             </div>
-            <button class="icon-btn" style="width:26px;height:26px;font-size:11px" onclick="removeWsMember('${m.id}','${w.id}')">✕</button>
-          </div>`).join('')
-      : `<div class="ws-empty-members">👤 Henüz personel atanmadı</div>`;
+            <button class="icon-btn" style="width:26px;height:26px;font-size:11px" onclick="removeWsMember('${raw(m.id)}','${raw(w.id)}')">✕</button>
+          </div>`)}`
+      : h`<div class="ws-empty-members">👤 Henüz personel atanmadı</div>`;
 
-    return `<div class="ws-card">
+    return h`<div class="ws-card">
       <div class="ws-card-header">
         <div>
-          <div class="ws-card-title">${icon} ${esc(w.name)}</div>
-          ${w.description ? `<div class="ws-card-desc">${esc(w.description)}</div>` : ''}
+          <div class="ws-card-title">${icon} ${w.name}</div>
+          ${w.description ? h`<div class="ws-card-desc">${w.description}</div>` : ''}
         </div>
         <span class="ws-type-badge ${typeCss}">${typeLbl}</span>
       </div>
@@ -5336,12 +5331,12 @@ function renderWorkspaces() {
       <div class="ws-card-footer">
         <span class="ws-member-count">👥 ${members.length} kişi</span>
         <div style="display:flex;gap:6px">
-          <button class="btn btn-primary btn-sm" onclick="openWsMemberModal('${w.id}','${ea(w.name)}')">+ Personel Ata</button>
-          <button class="icon-btn" onclick="deleteWorkspace('${w.id}')">🗑️</button>
+          <button class="btn btn-primary btn-sm" onclick="openWsMemberModal('${raw(w.id)}','${raw(ea(w.name))}')">+ Personel Ata</button>
+          <button class="icon-btn" onclick="deleteWorkspace('${raw(w.id)}')">🗑️</button>
         </div>
       </div>
     </div>`;
-  }).join('')}</div>`;
+  })}</div>`;
 }
 
 async function saveWorkspace() {
@@ -5400,21 +5395,21 @@ function renderWsCurrentMembers(wsId) {
   const el = document.getElementById('ws-current-members');
   if (!el) return;
   if (!members.length) {
-    el.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);text-align:center;padding:12px">Henüz personel atanmamış</div>`;
+    el.innerHTML = h`<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);text-align:center;padding:12px">Henüz personel atanmamış</div>`;
     return;
   }
-  el.innerHTML = `
+  el.innerHTML = h`
     <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:8px">Atanan Personel (${members.length})</div>
     <div style="background:var(--surface2);border-radius:6px;padding:8px;margin-bottom:12px;max-height:180px;overflow-y:auto">
-      ${members.map(m => `
+      ${members.map(m => h`
         <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border)">
           <div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#000;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:13px;flex-shrink:0">${m.user_name.charAt(0)}</div>
           <div style="flex:1">
-            <div style="font-size:13px;font-weight:600">${esc(m.user_name)}</div>
-            ${m.role?`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${esc(m.role)}</div>`:''}
+            <div style="font-size:13px;font-weight:600">${m.user_name}</div>
+            ${m.role?h`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${m.role}</div>`:''}
           </div>
-          <button onclick="removeWsMember('${m.id}','${wsId}')" style="background:transparent;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:2px 6px">✕</button>
-        </div>`).join('')}
+          <button onclick="removeWsMember('${raw(m.id)}','${raw(wsId)}')" style="background:transparent;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:2px 6px">✕</button>
+        </div>`)}
     </div>`;
 }
 
@@ -9316,16 +9311,16 @@ function renderOpDefsList() {
     el.innerHTML=`<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);text-align:center;padding:20px">Henüz işlem tanımı eklenmedi</div>`;
     return;
   }
-  el.innerHTML = bomOpDefs.map(op=>`
+  el.innerHTML = h`${bomOpDefs.map(op=>h`
     <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border-radius:6px;margin-bottom:6px;border:1px solid var(--border)">
       <div style="flex:1">
-        <div style="font-weight:600;font-size:13px">${esc(op.name)}
-          <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:4px;padding:1px 7px;margin-left:6px">${esc(op.code)}</span>
+        <div style="font-weight:600;font-size:13px">${op.name}
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:4px;padding:1px 7px;margin-left:6px">${op.code}</span>
         </div>
-        ${op.description?`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:2px">${esc(op.description)}</div>`:''}
+        ${op.description?h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:2px">${op.description}</div>`:''}
       </div>
-      <button class="icon-btn" onclick="deleteBomOpDef('${op.id}')" title="Sil" style="color:var(--red)">🗑️</button>
-    </div>`).join('');
+      <button class="icon-btn" onclick="deleteBomOpDef('${raw(op.id)}')" title="Sil" style="color:var(--red)">🗑️</button>
+    </div>`)}`;
 }
 
 async function saveBomOpDef() {
@@ -9593,14 +9588,14 @@ function renderBomList() {
   }
   // Hiyerarşik sıralama
   const sorted = buildSortedTree(null, 0);
-  el.innerHTML = sorted.map(({part,level}) => {
+  el.innerHTML = h`${sorted.map(({part,level}) => {
     const ops = Array.isArray(part.operations) ? part.operations : JSON.parse(part.operations||'[]');
-    const opsHTML = ops.length ? `<div class="bom-ops">${ops.map((o,oi)=>{
+    const opsHTML = ops.length ? h`<div class="bom-ops">${ops.map((o,oi)=>{
       const timeStr = o.duration_per_unit ? ` ⏱${o.total_duration?.toFixed(1)||'?'}dk` : '';
-      return `<span class="bom-op-tag">⚙ ${esc(o.name)} (${esc(o.code)})${timeStr} <button onclick="removeBomOp('${part.id}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px;margin-left:2px">✕</button></span>`;
-    }).join('')}</div>` : '';
+      return h`<span class="bom-op-tag">⚙ ${o.name} (${o.code})${timeStr} <button onclick="removeBomOp('${raw(part.id)}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px;margin-left:2px">✕</button></span>`;
+    })}</div>` : '';
     const indent = level * 24;
-    return `<div class="bom-part-row" data-id="${part.id}" data-level="${level}"
+    return h`<div class="bom-part-row" data-id="${raw(part.id)}" data-level="${level}"
         draggable="true"
         ondragstart="onBomDragStart(event,this)"
         ondragover="onBomDragOver(event,this)"
@@ -9609,26 +9604,26 @@ function renderBomList() {
         ondragend="onBomDragEnd(event,this)"
         style="margin-left:${indent}px">
       <span class="bom-drag-handle">⠿</span>
-      ${level>0?`<span style="color:var(--muted);font-size:10px;margin-right:4px">${'└─'.repeat(1)}</span>`:''}
-      <span class="bom-part-code">${esc(part.code)}</span>
+      ${level>0?raw(`<span style="color:var(--muted);font-size:10px;margin-right:4px">${'└─'.repeat(1)}</span>`):''}
+      <span class="bom-part-code">${part.code}</span>
       <div style="flex:1">
-        <div class="bom-part-name-cell">${esc(part.name)} ${kindBadge(part.material_kind)}</div>
+        <div class="bom-part-name-cell">${part.name} ${raw(kindBadge(part.material_kind))}</div>
         <div class="bom-part-meta">
-          <span id="bom-qty-display-${part.id}" style="cursor:pointer;border-bottom:1px dashed var(--muted)" onclick="editBomQty('${part.id}')" title="Miktarı düzenle">${part.quantity} ${esc(part.unit)}</span>
-          ${part.weight_kg?`<span>⚖ ${part.weight_kg} kg</span>`:''}
-          ${part.material?`<span>🔩 ${esc(part.material)}</span>`:''}
-          ${dimLabel(part.width_mm,part.height_mm,part.thickness_mm)?`<span>📐 ${dimLabel(part.width_mm,part.height_mm,part.thickness_mm)}</span>`:''}
+          <span id="bom-qty-display-${raw(part.id)}" style="cursor:pointer;border-bottom:1px dashed var(--muted)" onclick="editBomQty('${raw(part.id)}')" title="Miktarı düzenle">${part.quantity} ${part.unit}</span>
+          ${part.weight_kg?h`<span>⚖ ${part.weight_kg} kg</span>`:''}
+          ${part.material?h`<span>🔩 ${part.material}</span>`:''}
+          ${dimLabel(part.width_mm,part.height_mm,part.thickness_mm)?h`<span>📐 ${dimLabel(part.width_mm,part.height_mm,part.thickness_mm)}</span>`:''}
         </div>
         ${opsHTML}
       </div>
       <div style="display:flex;gap:4px;align-items:center">
-        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="editBomPart('${part.id}')" title="Ad / kod / malzeme düzenle">✏️ Düzenle</button>
-        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="bomCopyBranch('${part.id}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">📋 Kopyala</button>
-        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="editBomQty('${part.id}')" title="Miktarı düzenle">✏️ Miktar</button>
-        <button class="icon-btn" title="Sil" onclick="deleteBomPart('${part.id}')">🗑️</button>
+        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="editBomPart('${raw(part.id)}')" title="Ad / kod / malzeme düzenle">✏️ Düzenle</button>
+        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="bomCopyBranch('${raw(part.id)}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">📋 Kopyala</button>
+        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="editBomQty('${raw(part.id)}')" title="Miktarı düzenle">✏️ Miktar</button>
+        <button class="icon-btn" title="Sil" onclick="deleteBomPart('${raw(part.id)}')">🗑️</button>
       </div>
     </div>`;
-  }).join('');
+  })}`;
 }
 
 function buildSortedTree(parentId, level) {
