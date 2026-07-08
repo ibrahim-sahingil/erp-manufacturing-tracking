@@ -7176,7 +7176,7 @@ function renderPurchaseOrders(){
   const el = document.getElementById('po-list');
   if(!el) return;
   if(!purchaseOrders.length){
-    el.innerHTML = `<div class="empty-state"><span class="emoji">📦</span>Henüz toplu sipariş grubu yok<br><span style="font-size:12px;color:var(--muted)">Kalemler sekmesinde 📝 Planlandı kalemleri işaretleyip "Toplu Sipariş Oluştur" deyin</span></div>`;
+    el.innerHTML = h`<div class="empty-state"><span class="emoji">📦</span>Henüz toplu sipariş grubu yok<br><span style="font-size:12px;color:var(--muted)">Kalemler sekmesinde 📝 Planlandı kalemleri işaretleyip "Toplu Sipariş Oluştur" deyin</span></div>`;
     return;
   }
   const inp = 'background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;outline:none;width:100%';
@@ -7189,64 +7189,63 @@ function renderPurchaseOrders(){
     // Üye kalemler — fiyat kaleme TEK TEK yazılabilir (arkadaş görseli:
     // "fiyat istenilirse tek tek"; toplu teklif fiyatından bağımsız)
     const canPrice = o.status!=='CANCELLED';
-    const itemRows = items.length ? items.map(i=>
-      `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--border);flex-wrap:wrap">
+    const itemRows = items.length ? h`${items.map(i=>h`<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--border);flex-wrap:wrap">
         <span style="font-family:var(--font-mono);font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">
-          ${i.code?`<span style="color:var(--accent)">${esc(i.code)}</span> — `:''}${esc(i.name)}
-          <span style="color:var(--muted)"> · ${Number(i.quantity||1)} ${esc(i.unit||'adet')} · 📁 ${esc(i.project_name)}</span>
+          ${i.code?h`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
+          <span style="color:var(--muted)"> · ${Number(i.quantity||1)} ${i.unit||'adet'} · 📁 ${i.project_name}</span>
         </span>
         <span style="display:flex;gap:4px;align-items:center;flex-shrink:0">
-          ${canPrice?`<input type="number" id="poip-${i.id}" value="${i.unit_price!=null?Number(i.unit_price):''}" placeholder="birim fiyat" min="0" step="0.01" style="${inp};width:95px;padding:4px 6px;font-size:11px">
+          ${canPrice?raw(`<input type="number" id="poip-${i.id}" value="${i.unit_price!=null?Number(i.unit_price):''}" placeholder="birim fiyat" min="0" step="0.01" style="${inp};width:95px;padding:4px 6px;font-size:11px">
           <select id="poic-${i.id}" style="${inp};width:60px;padding:4px 3px;font-size:11px">
             ${['TRY','EUR','USD'].map(c=>`<option value="${c}" ${(i.currency||'TRY')===c?'selected':''}>${c}</option>`).join('')}
           </select>
-          <button class="btn btn-ghost btn-sm" onclick="poSetItemPrice('${i.id}')" title="Kalem fiyatını kaydet">💾</button>`
-          : (i.unit_price!=null?`<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">💰 ${purFmtMoney(i.unit_price)} ${i.currency||'TRY'}</span>`:'')}
-          ${isDraft?`<button class="btn btn-ghost btn-sm" onclick="poRemoveItem('${i.id}')" title="Gruptan çıkar">➖</button>`:''}
+          <button class="btn btn-ghost btn-sm" onclick="poSetItemPrice('${i.id}')" title="Kalem fiyatını kaydet">💾</button>`)
+          : (i.unit_price!=null?raw(`<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">💰 ${purFmtMoney(i.unit_price)} ${i.currency||'TRY'}</span>`):'')}
+          ${isDraft?raw(`<button class="btn btn-ghost btn-sm" onclick="poRemoveItem('${i.id}')" title="Gruptan çıkar">➖</button>`):''}
         </span>
-      </div>`).join('')
-      : `<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:4px 0">Grupta kalem kalmadı</div>`;
+      </div>`)}`
+      : h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:4px 0">Grupta kalem kalmadı</div>`;
     // (B7) Bölünen kalemler purchase_order_id bağını taşıyamaz (sipariş
     // kilidi); grup teslimatı izlenebilsin diye kod eşleşmesiyle listelenir
     const memberKey = new Set(items.map(i=>i.project_name+'|'+(i.code||'').toLowerCase()));
-    const splitRows = purchaseItems.filter(i=>!i.purchase_order_id && i.code
+    const splitRows = h`${purchaseItems.filter(i=>!i.purchase_order_id && i.code
       && ['RECEIVED','IN_WAREHOUSE'].includes(i.status)
       && memberKey.has(i.project_name+'|'+i.code.toLowerCase()))
-      .map(i=>`<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px dashed var(--border)">
+      .map(i=>h`<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px dashed var(--border)">
         <span style="font-family:var(--font-mono);font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">
-          🔀 ${i.code?`<span style="color:var(--accent)">${esc(i.code)}</span> — `:''}${esc(i.name)}
-          <span style="color:var(--muted)"> · ${Number(i.quantity||1)} ${esc(i.unit||'adet')} · ${i.status==='IN_WAREHOUSE'?'🏭 '+esc(whName(i.warehouse_id)||'Depoda'):'📥 Teslim alındı'}</span>
+          🔀 ${i.code?h`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
+          <span style="color:var(--muted)"> · ${Number(i.quantity||1)} ${i.unit||'adet'} · ${i.status==='IN_WAREHOUSE'?'🏭 '+(whName(i.warehouse_id)||'Depoda'):'📥 Teslim alındı'}</span>
         </span>
-      </div>`).join('');
+      </div>`)}`;
     // Kalem fiyatları toplamı (girilenlerden; teklif toplamıyla kıyas için)
     const itemTotals = {};
     items.forEach(i=>{ if(i.unit_price!=null){ const c=i.currency||'TRY'; itemTotals[c]=(itemTotals[c]||0)+Number(i.unit_price)*Number(i.quantity||1); }});
     const itemTotalStr = Object.entries(itemTotals).map(([c,t])=>purFmtMoney(t)+' '+c).join(' + ');
 
     // Teklifler
-    const quoteRows = quotes.length ? quotes.map(q=>{
+    const quoteRows = quotes.length ? h`${quotes.map(q=>{
       const isWinner = o.selected_quote_id===q.id;
       const c = isWinner ? '#27ae60' : (q.rejection_reason ? '#e74c3c' : 'var(--border)');
       const meta = [
         q.total_price!=null ? '💰 '+purFmtMoney(q.total_price)+' '+(q.currency||'TRY') : '',
         q.delivery_date ? '📆 '+new Date(q.delivery_date).toLocaleDateString('tr-TR') : '',
-        q.contact_info ? '☎ '+esc(q.contact_info) : '',
-        q.notes ? '🗒 '+esc(q.notes) : ''
+        q.contact_info ? '☎ '+q.contact_info : '',
+        q.notes ? '🗒 '+q.notes : ''
       ].filter(Boolean).join(' · ');
-      return `<div style="border:1px solid ${c};border-radius:6px;padding:8px 12px;margin-bottom:6px;${isWinner?'background:#27ae6011':''}">
+      return h`<div style="border:1px solid ${c};border-radius:6px;padding:8px 12px;margin-bottom:6px;${isWinner?raw('background:#27ae6011'):''}">
         <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
           <span style="font-family:var(--font-mono);font-size:12px">
-            🏢 <b>${esc(q.supplier_name)}</b>
-            ${isWinner?'<span style="color:#27ae60;font-size:10px"> ✔ ONAYLANAN</span>':''}
+            🏢 <b>${q.supplier_name}</b>
+            ${isWinner?raw('<span style="color:#27ae60;font-size:10px"> ✔ ONAYLANAN</span>'):''}
           </span>
           <span style="display:flex;gap:6px;align-items:center">
             <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${meta}</span>
-            ${isDraft?`<button class="btn btn-ghost btn-sm" onclick="poDeleteQuote('${q.id}')" title="Teklifi sil">🗑</button>`:''}
+            ${isDraft?h`<button class="btn btn-ghost btn-sm" onclick="poDeleteQuote('${raw(q.id)}')" title="Teklifi sil">🗑</button>`:''}
           </span>
         </div>
-        ${!isWinner && q.rejection_reason ? `<div style="font-family:var(--font-mono);font-size:10px;color:#e74c3c;margin-top:4px">✖ Elenme gerekçesi: ${esc(q.rejection_reason)}</div>`:''}
+        ${!isWinner && q.rejection_reason ? h`<div style="font-family:var(--font-mono);font-size:10px;color:#e74c3c;margin-top:4px">✖ Elenme gerekçesi: ${q.rejection_reason}</div>`:''}
       </div>`;
-    }).join('') : `<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">Henüz teklif girilmedi</div>`;
+    })}` : h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">Henüz teklif girilmedi</div>`;
 
     // Teklif ekleme formu (sadece DRAFT)
     const quoteForm = isDraft ? `
@@ -7264,8 +7263,8 @@ function renderPurchaseOrders(){
 
     // Onay bilgisi
     const approvalInfo = (o.status==='APPROVED'||o.status==='ORDERED') && o.approval_note
-      ? `<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:8px;border-left:2px solid #27ae60;padding-left:10px">
-          ✔ Onay: ${esc(o.approval_note)}${o.approved_by?` — <b>${esc(o.approved_by)}</b>`:''}${o.approved_at?' · '+new Date(o.approved_at).toLocaleString('tr-TR'):''}
+      ? h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:8px;border-left:2px solid #27ae60;padding-left:10px">
+          ✔ Onay: ${o.approval_note}${o.approved_by?h` — <b>${o.approved_by}</b>`:''}${o.approved_at?' · '+new Date(o.approved_at).toLocaleString('tr-TR'):''}
         </div>` : '';
 
     // Duruma göre aksiyonlar

@@ -153,6 +153,23 @@ chk('purchase: proje/malzeme/tedarikçi kaçırıldı', pl.includes('Prj&lt;b&gt
 chk('purchase: not kaçırıldı', pl.includes('Not&lt;img'));
 chk('purchase: actions/butonlar (raw) korundu', pl.includes("purSetStatus('p1','ORDERED')") && pl.includes("deletePurchaseItem('p1')") && pl.includes("purToggleSel('p1'"));
 
+// ── renderPurchaseOrders (toplu sipariş grupları) ──
+global.PO_STATUS={DRAFT:{icon:'📝',label:'Taslak',color:'#f5a623'}, ORDERED:{icon:'📦',label:'Sipariş',color:'#2980b9'}};
+global.poQuotes=[{id:'q1', purchase_order_id:'po1', supplier_name:'Firma'+EVIL, contact_info:'İlet<b>',
+  notes:'QNot<script>', rejection_reason:'Red<img>', total_price:null, currency:'TRY', delivery_date:null}];
+global.purchaseItems=[{id:'i1', purchase_order_id:'po1', code:'K'+EVIL, name:'Ad'+EVIL, project_name:'Prj<b>',
+  unit:'ad<i>', quantity:2, unit_price:null, currency:'TRY', status:'PLANNED'}];
+global.purchaseOrders=[{id:'po1', name:'Grup'+EVIL, status:'DRAFT', selected_quote_id:null}];
+eval(grab('renderPurchaseOrders'));
+renderPurchaseOrders();
+const po=store['po-list']||'';
+console.log('\nrenderPurchaseOrders (sipariş grupları):');
+chk('po: grup adı onerror kaçırıldı', po.includes('Grup&lt;img') && !po.includes('Grup'+EVIL));
+chk('po: üye kalem kod/ad/proje kaçırıldı', po.includes('K&lt;img') && po.includes('Ad&lt;img') && po.includes('Prj&lt;b&gt;'));
+chk('po: teklif firma/iletişim kaçırıldı', po.includes('Firma&lt;img') && po.includes('İlet&lt;b&gt;'));
+chk('po: teklif not/red gerekçesi <script> kaçırıldı', po.includes('QNot&lt;script&gt;') && po.includes('Red&lt;img'));
+chk('po: butonlar (raw) korundu', po.includes("poDeleteQuote('q1')") && po.includes("poRemoveItem('i1')") && po.includes("poAddQuote('po1')"));
+
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);
 }
