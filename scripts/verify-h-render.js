@@ -123,6 +123,19 @@ chk('receiving: tedarikçi/birim <script> kaçırıldı', rcvv.includes('Ted&lt;
 chk('receiving: bulkBar JS onclick (raw) bozulmadı', rcvv.includes("querySelectorAll('.rcv-chk').forEach"));
 chk('receiving: satır butonları/checkbox (raw) korundu', rcvv.includes("rcvReceiveModal('r1')") && rcvv.includes('class="rcv-chk"'));
 
+// ── whRow (depo satır helper — renderWarehouseList tarafından kullanılır) ──
+global.PUR_STATUS={IN_WAREHOUSE:{icon:'🏭',label:'Depoda',color:'#2ecc71'}, PLANNED:{icon:'📝',label:'Pl',color:'#f5a623'}};
+global.whName=()=>'Depo<i>';
+eval(grab('whRow'));
+const wr=String(whRow({code:'K'+EVIL, name:'Ad'+EVIL, status:'IN_WAREHOUSE', warehouse_id:'w1',
+  project_name:'Prj<b>', material:'Mat<script>', supplier:'Ted'+EVIL, quantity:2, unit:'ad<i>', returned_qty:0},
+  '<button onclick="whUndo(1)">Geri</button>'));
+console.log('\nwhRow (depo satırı):');
+chk('whRow: kod/ad onerror kaçırıldı', wr.includes('K&lt;img') && wr.includes('Ad&lt;img') && !wr.includes('Ad'+EVIL));
+chk('whRow: malzeme/tedarikçi kaçırıldı', wr.includes('Mat&lt;script&gt;') && wr.includes('Ted&lt;img'));
+chk('whRow: proje/depo adı kaçırıldı', wr.includes('Prj&lt;b&gt;') && wr.includes('Depo&lt;i&gt;'));
+chk('whRow: actionsHTML (raw) korundu', wr.includes('<button onclick="whUndo(1)">Geri</button>'));
+
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);
 }
