@@ -15,6 +15,7 @@ function grab(name){
   return asyncPrefix + html.slice(start,i);
 }
 // h`` mekanizması — index.html'deki esc/raw/_hval/h ile AYNI olmalı
+global.ea = s => (s==null?'':String(s)).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
 global.esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 global.raw = s => { const r=new String(s==null?'':String(s)); r.__html=true; return r; };
 global._hval = v => (v==null||v===false||v===true)?'':(v&&v.__html)?v.toString():Array.isArray(v)?v.map(_hval).join(''):esc(v);
@@ -82,6 +83,45 @@ chk('receive: tedarikçi onerror kaçırıldı', rcv.includes('Ted&lt;img'));
 chk('receive: malzeme <script> kaçırıldı', rcv.includes('Mat&lt;script&gt;'));
 chk('receive: depo option adı kaçırıldı', rcv.includes('<option value="w1">Depo&lt;b&gt;'));
 chk('receive: yapı/buton (raw) korundu', rcv.includes('📦 QR Mal Kabul') && rcv.includes("receiveConfirm('i1')"));
+
+// ── renderOrders (sipariş kartları) ──
+global.currentUser={role:'developer'};
+global.users=[{name:'Onay<b>', dept:'D<i>'}];
+global.isPinned=()=>false;
+global.purFmtMoney=n=>String(n);
+global.orders=[];
+global.purchaseItems=[];
+const _fakeOrder={id:'o1', project_name:'Prj'+EVIL, customer_name:'Müş<b>',
+  customer_email:'a@b<i>', customer_phone:'555<script>', location:'Loc<img>', approved_by:'Ap<b>',
+  notes:'Not'+EVIL, price:100, currency:'TRY', status:'active',
+  items:[{name:'İt'+EVIL, desc:'Ds<script>x', qty:2}], created_at:'2026-01-01'};
+global.dbGet=async(t)=> t==='orders'?[_fakeOrder] : [];
+eval(grab('loadOrders'));   // gerçek: orders = dbGet('orders') → sahte order
+eval(grab('renderOrders'));
+await renderOrders();
+const ord=store['orders-list']||'', appr=store['o-approved']||'';
+console.log('\nrenderOrders (sipariş kartları):');
+chk('orders: proje adı onerror kaçırıldı', ord.includes('Prj&lt;img') && !ord.includes('Prj'+EVIL));
+chk('orders: müşteri e-posta/telefon kaçırıldı', ord.includes('a@b&lt;i&gt;') && ord.includes('555&lt;script&gt;'));
+chk('orders: kalem adı/açıklama <script> kaçırıldı', ord.includes('İt&lt;img') && ord.includes('Ds&lt;script&gt;x'));
+chk('orders: not kaçırıldı', ord.includes('Not&lt;img'));
+chk('orders: onaylayan option kaçırıldı', appr.includes('Onay&lt;b&gt;'));
+chk('orders: kart yapısı/buton (raw) korundu', ord.includes('class="order-card') && ord.includes("editOrder('o1')") && ord.includes("togglePin('order','o1'"));
+
+// ── renderReceiving (mal kabul) ──
+global._rcvActiveProj='PROJ'; // grup açık → satırlar + bulkBar render olsun
+global.whName=()=>'Depo<i>';
+global.purchaseItems=[];
+global.dbGet=async(t)=> t==='purchase_items'?[{id:'r1', project_name:'PROJ', status:'ORDERED',
+  code:'K'+EVIL, name:'İsim'+EVIL, unit:'ad<i>', supplier:'Ted<script>', quantity:2, returned_qty:0}] : [];
+eval(grab('renderReceiving'));
+await renderReceiving();
+const rcvv=store['rcv-list']||'';
+console.log('\nrenderReceiving (mal kabul):');
+chk('receiving: kod/isim onerror kaçırıldı', rcvv.includes('K&lt;img') && rcvv.includes('İsim&lt;img') && !rcvv.includes('İsim'+EVIL));
+chk('receiving: tedarikçi/birim <script> kaçırıldı', rcvv.includes('Ted&lt;script&gt;') && rcvv.includes('ad&lt;i&gt;'));
+chk('receiving: bulkBar JS onclick (raw) bozulmadı', rcvv.includes("querySelectorAll('.rcv-chk').forEach"));
+chk('receiving: satır butonları/checkbox (raw) korundu', rcvv.includes("rcvReceiveModal('r1')") && rcvv.includes('class="rcv-chk"'));
 
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);

@@ -3566,8 +3566,7 @@ async function renderOrders() {
   const sel = document.getElementById('o-approved');
   if(sel) {
     const cur = sel.value;
-    sel.innerHTML = '<option value="">— Seçin —</option>' +
-      users.map(u=>`<option value="${esc(u.name)}"${u.name===cur?' selected':''}>${esc(u.name)}${u.dept?' ('+esc(u.dept)+')':''}</option>`).join('');
+    sel.innerHTML = h`<option value="">— Seçin —</option>${users.map(u=>h`<option value="${u.name}"${u.name===cur?raw(' selected'):''}>${u.name}${u.dept?h` (${u.dept})`:''}</option>`)}`;
   }
 
   if(!orders.length) await loadOrders();
@@ -3593,23 +3592,22 @@ async function renderOrders() {
   const list = document.getElementById('orders-list');
   if(!list) return;
   if(!filtered.length) {
-    list.innerHTML = `<div class="empty-state"><span class="emoji">📋</span>Henüz sipariş eklenmedi</div>`;
+    list.innerHTML = h`<div class="empty-state"><span class="emoji">📋</span>Henüz sipariş eklenmedi</div>`;
     return;
   }
 
   const pinnedOrders = filtered.filter(o => isPinned('order', o.id));
-  list.innerHTML = (pinnedOrders.length > 0 ? `<div class="pinned-label">📌 Sabitlenmiş Siparişler</div>` : '') +
-    filtered.map(o => {
+  list.innerHTML = h`${pinnedOrders.length > 0 ? raw('<div class="pinned-label">📌 Sabitlenmiş Siparişler</div>') : ''}${filtered.map(o => {
     const items = Array.isArray(o.items) ? o.items : (typeof o.items==='string'?JSON.parse(o.items||'[]'):[]);
     const statusMap = { active:{cls:'osb-active',lbl:'Aktif'}, pending:{cls:'osb-pending',lbl:'Beklemede'}, completed:{cls:'osb-completed',lbl:'Tamamlandı'}, cancelled:{cls:'osb-cancelled',lbl:'İptal'} };
     const st = statusMap[o.status] || statusMap.active;
     const priceStr = o.price ? Number(o.price).toLocaleString('tr-TR',{minimumFractionDigits:2}) + ' ' + (o.currency||'TRY') : '—';
     const createdAt = o.created_at ? new Date(o.created_at).toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
-    const itemsHTML = items.length ? `
+    const itemsHTML = items.length ? h`
       <table class="order-items-table">
         <tr><th>Parça / Makine</th><th>Açıklama</th><th style="text-align:right">Adet</th></tr>
-        ${items.map(it=>`<tr><td><b>${esc(it.name||'—')}</b></td><td style="color:var(--muted)">${esc(it.desc||'—')}</td><td style="text-align:right">${esc(it.qty||'—')}</td></tr>`).join('')}
-      </table>` : `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-bottom:10px">Kalem girilmemiş</div>`;
+        ${items.map(it=>h`<tr><td><b>${it.name||'—'}</b></td><td style="color:var(--muted)">${it.desc||'—'}</td><td style="text-align:right">${it.qty||'—'}</td></tr>`)}
+      </table>` : h`<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-bottom:10px">Kalem girilmemiş</div>`;
 
     const pinned = isPinned('order', o.id);
     // Malzeme bedeli: bu projenin satın alma kalemlerinden (iptaller hariç)
@@ -3621,36 +3619,36 @@ async function renderOrders() {
       }
     });
     const matStr = Object.entries(matTotals).map(([c,t])=>purFmtMoney(t)+' '+c).join(' + ');
-    return `<div class="order-card${pinned?' pinned':''}" style="position:relative">
-      <button class="pin-btn${pinned?' active':''}" onclick="togglePin('order','${o.id}',event)" title="${pinned?'Sabitlemeyi kaldır':'Sabitle'}">📌</button>
+    return h`<div class="order-card${pinned?' pinned':''}" style="position:relative">
+      <button class="pin-btn${pinned?' active':''}" onclick="togglePin('order','${raw(o.id)}',event)" title="${pinned?'Sabitlemeyi kaldır':'Sabitle'}">📌</button>
       <div class="order-card-header" style="padding-right:32px">
         <div>
-          <div class="order-card-title">${esc(o.project_name||'—')}</div>
-          <div class="order-card-customer">👤 ${esc(o.customer_name||'—')} ${o.customer_email?'· '+esc(o.customer_email):''} ${o.customer_phone?'· '+esc(o.customer_phone):''}</div>
+          <div class="order-card-title">${o.project_name||'—'}</div>
+          <div class="order-card-customer">👤 ${o.customer_name||'—'} ${o.customer_email?h`· ${o.customer_email}`:''} ${o.customer_phone?h`· ${o.customer_phone}`:''}</div>
         </div>
         <span class="order-status-badge ${st.cls}"><span class="dot" style="background:currentColor"></span>${st.lbl}</span>
       </div>
       <div class="order-meta-grid">
-        <div class="order-meta-item"><label>📍 Konum</label><span>${esc(o.location||'—')}</span></div>
+        <div class="order-meta-item"><label>📍 Konum</label><span>${o.location||'—'}</span></div>
         <div class="order-meta-item"><label>⏱ Teslim Süresi</label><span>${o.delivery_days?o.delivery_days+' Gün':'—'}</span></div>
-        <div class="order-meta-item"><label>✅ Onaylayan</label><span>${esc(o.approved_by||'—')}</span></div>
+        <div class="order-meta-item"><label>✅ Onaylayan</label><span>${o.approved_by||'—'}</span></div>
         <div class="order-meta-item"><label>📅 Tarih</label><span>${createdAt}</span></div>
       </div>
       ${itemsHTML}
-      ${o.notes?`<div style="background:var(--surface2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-bottom:10px">📝 ${esc(o.notes)}</div>`:''}
+      ${o.notes?h`<div style="background:var(--surface2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-bottom:10px">📝 ${o.notes}</div>`:''}
       <div class="order-card-footer">
         <div>
           <div class="order-price">${priceStr}</div>
           <div class="order-price-sub">Proje Fiyatı</div>
-          ${matStr?`<div class="order-price-sub" style="margin-top:4px">💰 Malzeme bedeli: <b style="color:var(--accent)">${matStr}</b></div>`:''}
+          ${matStr?h`<div class="order-price-sub" style="margin-top:4px">💰 Malzeme bedeli: <b style="color:var(--accent)">${matStr}</b></div>`:''}
         </div>
         <div class="order-actions">
-          <button class="btn btn-ghost btn-sm" onclick="editOrder('${o.id}')" style="${canEdit?'':'display:none'}">✏️ Düzenle</button>
-          <button class="btn btn-ghost btn-sm" onclick="deleteOrder('${o.id}')" style="color:var(--red);border-color:rgba(231,76,60,.3);${canEdit?'':'display:none'}">🗑️ Sil</button>
+          <button class="btn btn-ghost btn-sm" onclick="editOrder('${raw(o.id)}')" style="${canEdit?'':'display:none'}">✏️ Düzenle</button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteOrder('${raw(o.id)}')" style="color:var(--red);border-color:rgba(231,76,60,.3);${canEdit?'':'display:none'}">🗑️ Sil</button>
         </div>
       </div>
     </div>`;
-  }).join('');
+  })}`;
 }
 
 // Sipariş kalemleri
@@ -5919,17 +5917,18 @@ async function renderReceiving(){
   if(Array.isArray(pi)) purchaseItems = pi;
   const rel = purchaseItems.filter(i=>['ORDERED','RECEIVED','IN_WAREHOUSE'].includes(i.status));
   if(!rel.length){
-    el.innerHTML = `<div class="empty-state"><span class="emoji">📥</span>Sipariş verilmiş kalem yok<br><span style="font-size:12px;color:var(--muted)">Kalemler sekmesinden "📦 Sipariş Ver" denince burada görünür</span></div>`;
+    el.innerHTML = h`<div class="empty-state"><span class="emoji">📥</span>Sipariş verilmiş kalem yok<br><span style="font-size:12px;color:var(--muted)">Kalemler sekmesinden "📦 Sipariş Ver" denince burada görünür</span></div>`;
     return;
   }
   const groups = {};
   rel.forEach(i=>{ const k=i.project_name||'—'; (groups[k]=groups[k]||[]).push(i); });
-  el.innerHTML = Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([proj,list])=>{
+  el.innerHTML = h`${Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,'tr')).map(([proj,list])=>{
     const waiting = list.filter(i=>i.status==='ORDERED');
     const arrived = list.filter(i=>i.status!=='ORDERED');
     const open = _rcvActiveProj===proj;
     // Toplu aktarım (4. tur #3): bekleyen/teslim alınmış satırlar işaretlenip
-    // tek seferde istenilen depoya alınır
+    // tek seferde istenilen depoya alınır. bulkBar statik (JS onclick içerir →
+    // h'e verilmez, raw ile ham geçirilir).
     const selectable = list.filter(i=>['ORDERED','RECEIVED'].includes(i.status));
     const bulkBar = !open || !selectable.length ? '' :
       `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;padding:8px 10px;background:var(--surface2);border:1px dashed var(--border);border-radius:8px">
@@ -5938,46 +5937,46 @@ async function renderReceiving(){
         <button class="btn btn-primary btn-sm" onclick="rcvBulkModal()">✅ Seçilenleri Depoya Al</button>
         <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">işaretli kalemler tam adetle kabul edilir</span>
       </div>`;
-    const rows = !open ? '' : bulkBar + `<div style="margin-top:10px">` + list
+    const rows = !open ? '' : h`${raw(bulkBar)}<div style="margin-top:10px">${list
       .sort((a,b)=>(a.status==='ORDERED'?0:1)-(b.status==='ORDERED'?0:1))
       .map(i=>{
         const isWaiting = i.status==='ORDERED';
         const icon = isWaiting ? '⏳' : '✅';
         const ret = Number(i.returned_qty)||0;
         const meta = [
-          Number(i.quantity||1)+' '+esc(i.unit||'adet')+(isWaiting?' bekleniyor':''),
+          Number(i.quantity||1)+' '+(i.unit||'adet')+(isWaiting?' bekleniyor':''),
           ret ? '↩ '+ret+' iade edildi' : '',
-          i.supplier ? '🏢 '+esc(i.supplier) : '',
+          i.supplier ? '🏢 '+i.supplier : '',
           i.expected_date && isWaiting ? '📆 '+new Date(i.expected_date).toLocaleDateString('tr-TR') : '',
-          i.status==='IN_WAREHOUSE' ? '🏭 '+esc(whName(i.warehouse_id)||'Depoda') : (i.status==='RECEIVED'?'📥 Teslim alındı':''),
-          !isWaiting && i.received_by ? '👤 '+esc(i.received_by) : ''
+          i.status==='IN_WAREHOUSE' ? '🏭 '+(whName(i.warehouse_id)||'Depoda') : (i.status==='RECEIVED'?'📥 Teslim alındı':''),
+          !isWaiting && i.received_by ? '👤 '+i.received_by : ''
         ].filter(Boolean).join(' · ');
-        return `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--border);flex-wrap:wrap">
+        return h`<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--border);flex-wrap:wrap">
           <span style="font-family:var(--font-mono);font-size:11px;min-width:0;flex:1;display:flex;gap:8px;align-items:center">
-            ${['ORDERED','RECEIVED'].includes(i.status)?`<input type="checkbox" class="rcv-chk" value="${i.id}" style="accent-color:var(--accent);flex-shrink:0">`:''}
-            <span style="min-width:0">${icon} ${i.code?`<span style="color:var(--accent)">${esc(i.code)}</span> — `:''}${esc(i.name)}
+            ${['ORDERED','RECEIVED'].includes(i.status)?h`<input type="checkbox" class="rcv-chk" value="${raw(i.id)}" style="accent-color:var(--accent);flex-shrink:0">`:''}
+            <span style="min-width:0">${icon} ${i.code?h`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
             <span style="color:var(--muted)"> · ${meta}</span></span>
           </span>
           <span style="display:flex;gap:4px;flex-shrink:0">
-            ${isWaiting?`<button class="btn btn-primary btn-sm" onclick="rcvReceiveModal('${i.id}')">✅ Geldi (depoya al)</button>`:''}
-            ${i.status==='RECEIVED'?`<button class="btn btn-ghost btn-sm" onclick="whTransfer('${i.id}')">🏭 Depoya Aktar</button>`:''}
-            ${['ORDERED','RECEIVED'].includes(i.status)?`<button class="btn btn-ghost btn-sm" onclick="printGoodsReceiptPDF(['${i.id}'])" title="QR'lı mal kabul fişi">📄 Fiş</button>`:''}
+            ${isWaiting?h`<button class="btn btn-primary btn-sm" onclick="rcvReceiveModal('${raw(i.id)}')">✅ Geldi (depoya al)</button>`:''}
+            ${i.status==='RECEIVED'?h`<button class="btn btn-ghost btn-sm" onclick="whTransfer('${raw(i.id)}')">🏭 Depoya Aktar</button>`:''}
+            ${['ORDERED','RECEIVED'].includes(i.status)?h`<button class="btn btn-ghost btn-sm" onclick="printGoodsReceiptPDF(['${raw(i.id)}'])" title="QR'lı mal kabul fişi">📄 Fiş</button>`:''}
           </span>
         </div>`;
-      }).join('') + `</div>`;
-    return `<div class="pbom-card" style="margin-bottom:12px">
-      <div class="pbom-card-header" onclick="rcvToggle('${ea(proj)}')" style="cursor:pointer">
+      })}</div>`;
+    return h`<div class="pbom-card" style="margin-bottom:12px">
+      <div class="pbom-card-header" onclick="rcvToggle('${raw(ea(proj))}')" style="cursor:pointer">
         <div>
-          <div class="pbom-card-title">📁 ${esc(proj)}</div>
+          <div class="pbom-card-title">📁 ${proj}</div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
-            ${waiting.length?`⏳ ${waiting.length} bekleyen`:''}${waiting.length&&arrived.length?' · ':''}${arrived.length?`✅ ${arrived.length} gelen`:''}
+            ${waiting.length?h`⏳ ${waiting.length} bekleyen`:''}${waiting.length&&arrived.length?' · ':''}${arrived.length?h`✅ ${arrived.length} gelen`:''}
           </div>
         </div>
         <span style="font-family:var(--font-mono);font-size:14px;color:var(--muted)">${open?'▾':'▸'}</span>
       </div>
       ${rows}
     </div>`;
-  }).join('');
+  })}`;
 }
 
 function rcvToggle(proj){
