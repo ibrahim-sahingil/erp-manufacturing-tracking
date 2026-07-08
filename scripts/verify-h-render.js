@@ -170,6 +170,27 @@ chk('po: teklif firma/iletişim kaçırıldı', po.includes('Firma&lt;img') && p
 chk('po: teklif not/red gerekçesi <script> kaçırıldı', po.includes('QNot&lt;script&gt;') && po.includes('Red&lt;img'));
 chk('po: butonlar (raw) korundu', po.includes("poDeleteQuote('q1')") && po.includes("poRemoveItem('i1')") && po.includes("poAddQuote('po1')"));
 
+// ── renderWorkOrders (iş emirleri) ──
+global.workOrders=[{id:'w1', project_name:'Prj<b>', status:'planned', assigned_user:'Kişi'+EVIL,
+  workspace_name:'WS<script>', notes:'Not'+EVIL, start_datetime:null, department_name:'Dep<i>'}];
+global.orders=[];
+global.workOrderParts=[{work_order_id:'w1', part_id:'p1', part_name:'PAd'+EVIL, part_code:'PK<b>', qty:2}];
+global.parts=[{id:'p1', status:'pending'}];
+global.WO_STATUS={planned:{css:'wos-planned',lbl:'Planlı'}};
+global.statusBadge=()=>'<span class="badge">x</span>';
+global._woPrintSelected=new Set();
+global.dbGet=async(t)=> t==='work_order_revisions'?[{id:'rv1', work_order_id:'w1', field_changed:'Alan<b>',
+  new_value:'Yeni<script>', revised_by:'Rev<img>', reason:'Sebep'+EVIL, created_at:'2026-01-01'}] : [];
+eval(grab('renderWorkOrders'));
+await renderWorkOrders();
+const wo=store['wo-list']||'';
+console.log('\nrenderWorkOrders (iş emirleri):');
+chk('wo: parça adı/kod onerror kaçırıldı', wo.includes('PAd&lt;img') && wo.includes('PK&lt;b&gt;') && !wo.includes('PAd'+EVIL));
+chk('wo: personel/çalışma alanı/not kaçırıldı', wo.includes('Kişi&lt;img') && wo.includes('WS&lt;script&gt;') && wo.includes('Not&lt;img'));
+chk('wo: revize alanları <script> kaçırıldı', wo.includes('Alan&lt;b&gt;') && wo.includes('Yeni&lt;script&gt;') && wo.includes('Sebep&lt;img'));
+chk('wo: statusBadge/butonlar (raw) korundu', wo.includes('<span class="badge">x</span>') && wo.includes("deleteWorkOrder('w1')"));
+chk('wo: openWoReviseModal ea onclick (tırnak kaçışlı) bozulmadı', wo.includes('openWoReviseModal(') && wo.includes("'w1'"));
+
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);
 }

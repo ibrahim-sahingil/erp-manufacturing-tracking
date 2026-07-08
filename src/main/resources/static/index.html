@@ -4627,8 +4627,7 @@ async function renderWorkOrders() {
       ...workOrders.map(w=>w.project_name)
     ].filter(Boolean))].sort();
     const cur = projF_el.value;
-    projF_el.innerHTML = '<option value="">Tüm Projeler</option>' +
-      allProjs.map(n=>`<option value="${n}"${n===cur?' selected':''}>${n}</option>`).join('');
+    projF_el.innerHTML = h`<option value="">Tüm Projeler</option>${allProjs.map(n=>h`<option value="${n}"${n===cur?raw(' selected'):''}>${n}</option>`)}`;
   }
 
   const filtered = workOrders.filter(w=>
@@ -4641,8 +4640,8 @@ async function renderWorkOrders() {
 
   if (!filtered.length) {
     list.innerHTML = projF
-      ? `<div class="empty-state"><span class="emoji">📄</span>${projF} projesine ait iş emri bulunamadı</div>`
-      : `<div class="empty-state"><span class="emoji">📄</span>Henüz iş emri oluşturulmadı</div>`;
+      ? h`<div class="empty-state"><span class="emoji">📄</span>${projF} projesine ait iş emri bulunamadı</div>`
+      : h`<div class="empty-state"><span class="emoji">📄</span>Henüz iş emri oluşturulmadı</div>`;
     return;
   }
 
@@ -4671,7 +4670,7 @@ async function renderWorkOrders() {
 
       // Parça tablosu
       const partsTableHTML = wParts.length
-        ? `<div class="wo-parts-list">
+        ? h`<div class="wo-parts-list">
             <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:6px">📦 Parçalar (${wParts.length})</div>
             <table class="wo-parts-table">
               <thead>
@@ -4686,29 +4685,29 @@ async function renderWorkOrders() {
                 ${wParts.map(p => {
                   const partDetail = parts.find(x => x.id === p.part_id);
                   const pStatus = partDetail ? statusBadge(partDetail.status) : '<span style="color:var(--muted)">—</span>';
-                  return `<tr>
+                  return h`<tr>
                     <td style="font-weight:600">${p.part_name}</td>
                     <td style="color:var(--accent)">${p.part_code}</td>
                     <td style="text-align:center;color:var(--text)">${p.qty}</td>
-                    <td>${pStatus}</td>
+                    <td>${raw(pStatus)}</td>
                   </tr>`;
-                }).join('')}
+                })}
               </tbody>
             </table>
           </div>`
-        : `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-bottom:10px">Parça kaydı yok</div>`;
+        : h`<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-bottom:10px">Parça kaydı yok</div>`;
 
-      const revHTML = revs.length ? `
+      const revHTML = revs.length ? h`
         <div class="wo-rev-list">
           <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:6px">🔄 Revize Geçmişi (${revs.length})</div>
-          ${revs.map(r=>`<div class="wo-rev-item">
+          ${revs.map(r=>h`<div class="wo-rev-item">
             <span style="color:var(--muted);min-width:90px">${new Date(r.created_at).toLocaleDateString('tr-TR')}</span>
-            <span style="color:var(--accent)">${esc(r.field_changed)}</span>
+            <span style="color:var(--accent)">${r.field_changed}</span>
             <span style="color:var(--muted)">→</span>
-            <span style="color:var(--green)">${esc(r.new_value)}</span>
-            ${r.revised_by?`<span style="color:var(--accent)">${esc(r.revised_by)}</span>`:''}
-            <span style="color:var(--text);flex:1">📝 ${esc(r.reason)}</span>
-          </div>`).join('')}
+            <span style="color:var(--green)">${r.new_value}</span>
+            ${r.revised_by?h`<span style="color:var(--accent)">${r.revised_by}</span>`:''}
+            <span style="color:var(--text);flex:1">📝 ${r.reason}</span>
+          </div>`)}
         </div>` : '';
 
       const idx = woIndex--;
