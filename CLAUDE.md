@@ -86,3 +86,17 @@ ikinci kişi fikir/test notu sağlar, geliştirme yapmaz.
 - Test kullanıcısı: `testdev` / `test1234` (developer rolü).
 - API smoke: login → token → `GET /api/parts` vb. (`Authorization: Bearer <token>`).
 - DB bütünlük taraması örnekleri git geçmişinde (sahipsiz kayıt/şifre kontrolleri).
+- **Üç katmanlı otomatik test** (hepsi sunucu 8080'de çalışırken):
+  1. `node scripts/e2e-test.js <token>` — iş kuralı senaryoları CANLI backend'e
+     karşı (yayınlama/adet, mal kabul, silme guard'ları K1/O1/O4/O5/U1, rol
+     denetimi K3, atomik sayaç U4 vb.). index.html'den saf fonksiyonları `grab`
+     ile çıkarıp Node'da koşar; izole `E2E-TEST-<ts>` projesi kurup temizler.
+  2. `node scripts/verify-h-render.js` — dönüştürülmüş `h\`\`` render'larını DOM
+     shim ile çalıştırıp XSS payload'unun kaçırıldığını doğrular (sunucu
+     GEREKMEZ). Yeni fonksiyon `h\`\``'ye dönüştükçe buraya senaryo eklenir.
+  3. `npx playwright test` (veya `npm run test:e2e`) — gerçek Chromium'da login
+     akışı + XSS render kanıtı (`tests/critical.spec.js`). `@playwright/test`
+     devDependency; `node_modules` gitignore'da, `npx playwright install chromium`
+     ile tarayıcı kurulur. Config çalışan 8080'e bağlanır (webServer başlatmaz).
+- `esc`/`raw`/`h` mekanizması index.html + e2e-test.js + verify-h-render.js'te
+  üç yerde tanımlı; değişirse ÜÇÜNÜ de senkron tut.

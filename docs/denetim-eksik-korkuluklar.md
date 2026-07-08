@@ -69,8 +69,25 @@ HİÇBİR DÜZELTME YAPILMADI — önce karar bekleniyor. Önem sırasına göre
 >     tarif edilen kopma erişilemez. Kod değişikliği gerekmiyor.
 >   - E3 OPERASYONEL (kod değil): QR fiş linkleri location.origin'e bağlı,
 >     tünel adresi değişince ölür → kalıcı adres/adlandırılmış tünel gerekir.
-> Kalan tek opsiyonel iş: E1 tagged-template (h`...`) sürdürülebilirlik
-> refactoru. Denetimdeki KOD gerektiren tüm bulgular kapandı.
+> **KAPANIŞ TURU (`kalan-eksikler-kapanis` dalı) — TÜM eksikler kapatıldı:**
+>   - U4 (QR sayaç yarışı): atomik SQL increment — PartRepository.incrementQty
+>     + PartLogService; submitScan parts PUT'undan sayaçlar çıktı (tek otorite
+>     log POST). Schema/migration yok.
+>   - U7 (yayınlama atomik değil): hata varsa BOM draft kalır, retry'a yönlendirir
+>     (idempotent-retry zaten çalışıyor); yarım yayın 'published' sayılmıyor.
+>   - E3 (QR link kalıcı değil): app.base-url + GET /api/config (permitAll) +
+>     frontend QR_BASE. Boşken location fallback. Kalıcı QR için Cloudflare'a
+>     sabit hostname bağlanıp app.base-url doldurulmalı (operasyonel).
+>   - Tagged-template (Faz 4): güvenlik-hassas büyük ekranların tamamı h``'ye
+>     çevrildi (Orders/Receiving/PurchaseList/PurchaseOrders/WorkOrders/irsaliye
+>     + whRow + önceki QR/yönetim ekranları). Küçük/statik render'lar (dashboard/
+>     stats/planning/workspaces/mrp/appusers/BOM ağaçları, whvProjectHTML/
+>     whvWarehouseHTML) esc'li GÜVENLİ, politika ile fırsatçı dönüşür.
+>   - Playwright (Faz 5): gerçek Chromium testleri (login + XSS'in tarayıcıda
+>     çalışmadığı kanıtı). tests/critical.spec.js.
+> Artık denetimdeki hiçbir açık madde kalmadı; U4/U7/E3 çözüldü, E4 geçersizdi,
+> E3'ün operasyonel yanı (sabit tünel) kod-dışı. Kalan yalnız tagged-template'in
+> küçük/statik render'ları (opsiyonel, güvenli).
 
 ## 🔴 KRİTİK
 
