@@ -10983,11 +10983,16 @@ async function openAndPublishPbom(pbomId) {
     const tplData = await dbGet('bom_parts','product_id=eq.'+prod.id);
     const r = await pbomPublishParts(pb, allPbParts, Array.isArray(tplData)?tplData:[]);
 
-    await dbUpdate('project_bom', pbomId, {status:'published', published_at:new Date().toISOString()});
-    pb.status='published'; pb.published_at=new Date().toISOString();
+    // (U7) Yarım yayını "published" SAYMA: hata varsa BOM draft kalsın ki
+    // kullanıcı düzeltip tekrar yayınlasın (yayınlama idempotent — mevcutlar
+    // atlanır, eksikler tamamlanır). "published" damgası retry ihtiyacını gizler.
+    if(!r.errors){
+      await dbUpdate('project_bom', pbomId, {status:'published', published_at:new Date().toISOString()});
+      pb.status='published'; pb.published_at=new Date().toISOString();
+    }
 
     renderProjectBomList();
-    toast(pbomPublishMsg(r), r.errors?'error':'success');
+    toast(pbomPublishMsg(r) + (r.errors?' — düzeltip "Tekrar Yayınla"ya basın (yarım yayın kaydedilmedi)':''), r.errors?'error':'success');
     console.log('Tamamlandı —', r);
   } finally { _publishing = false; }
 }
@@ -11012,13 +11017,17 @@ async function pbomePublish() {
     const tplData = await dbGet('bom_parts','product_id=eq.'+prod.id);
     const r = await pbomPublishParts(pb, allPbParts, Array.isArray(tplData)?tplData:[]);
 
-    await dbUpdate('project_bom',_activePbomId,{status:'published',published_at:new Date().toISOString()});
-    pb.status='published'; pb.published_at=new Date().toISOString();
-    if(publishBtn) publishBtn.style.display='none';
-    const badge=document.getElementById('pbome-status-badge');
-    if(badge) badge.innerHTML='<span class="pbom-status-published">✅ Yayınlandı</span>';
+    // (U7) Hata varsa "published" yapma + butonu gizleme — draft kalsın ki
+    // "Tekrar Yayınla" mümkün olsun (idempotent retry eksikleri tamamlar).
+    if(!r.errors){
+      await dbUpdate('project_bom',_activePbomId,{status:'published',published_at:new Date().toISOString()});
+      pb.status='published'; pb.published_at=new Date().toISOString();
+      if(publishBtn) publishBtn.style.display='none';
+      const badge=document.getElementById('pbome-status-badge');
+      if(badge) badge.innerHTML='<span class="pbom-status-published">✅ Yayınlandı</span>';
+    }
 
-    toast(pbomPublishMsg(r), r.errors?'error':'success');
+    toast(pbomPublishMsg(r) + (r.errors?' — düzeltip "Tekrar Yayınla"ya basın (yarım yayın kaydedilmedi)':''), r.errors?'error':'success');
     console.log('Yayınlama tamamlandı —', r);
   } finally { _publishing = false; if(publishBtn) publishBtn.disabled = false; }
 }
