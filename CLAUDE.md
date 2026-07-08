@@ -97,6 +97,8 @@ ikinci kişi fikir/test notu sağlar, geliştirme yapmaz.
   2. `node scripts/verify-h-render.js` — dönüştürülmüş `h\`\`` render'larını DOM
      shim ile çalıştırıp XSS payload'unun kaçırıldığını doğrular (sunucu
      GEREKMEZ). Yeni fonksiyon `h\`\``'ye dönüştükçe buraya senaryo eklenir.
+     Kardeşi `node scripts/verify-whxfer.js`: depolar arası aktarım çekirdeğini
+     (whXferConfirm loose/tam/kısmi + B6 rollback) in-memory db shim'iyle koşar.
   3. `npx playwright test` (veya `npm run test:e2e`) — gerçek Chromium'da login
      akışı + XSS render kanıtı (`tests/critical.spec.js`). `@playwright/test`
      devDependency; `node_modules` gitignore'da, `npx playwright install chromium`
