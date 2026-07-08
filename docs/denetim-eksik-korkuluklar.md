@@ -78,16 +78,22 @@ HİÇBİR DÜZELTME YAPILMADI — önce karar bekleniyor. Önem sırasına göre
 >   - E3 (QR link kalıcı değil): app.base-url + GET /api/config (permitAll) +
 >     frontend QR_BASE. Boşken location fallback. Kalıcı QR için Cloudflare'a
 >     sabit hostname bağlanıp app.base-url doldurulmalı (operasyonel).
->   - Tagged-template (Faz 4): güvenlik-hassas büyük ekranların tamamı h``'ye
->     çevrildi (Orders/Receiving/PurchaseList/PurchaseOrders/WorkOrders/irsaliye
->     + whRow + önceki QR/yönetim ekranları). Küçük/statik render'lar (dashboard/
->     stats/planning/workspaces/mrp/appusers/BOM ağaçları, whvProjectHTML/
->     whvWarehouseHTML) esc'li GÜVENLİ, politika ile fırsatçı dönüşür.
+>   - Tagged-template (Faz 4, 2026-07-08 TAMAMLANDI): güvenlik-hassas büyük
+>     ekranlar + tüm kategori-1 render'lar h``'ye çevrildi (Orders/Receiving/
+>     PurchaseList/PurchaseOrders/WorkOrders/irsaliye/whRow/QR/yönetim +
+>     dashboard/parça/istatistik/proje-tarih/iş-emri-sihirbazı/depo görünümleri/
+>     appusers/BOM ekranları). verify-h-render.js 103 kontrolle hepsini korur.
+>     Bilinçli h-DIŞI bırakılanlar (esc'li GÜVENLİ): renderMrp/renderMrpParams
+>     (inline-JS onclick `=>` içerir), modal formlar (supEdit, editPurchaseItem,
+>     editBomPart, openWoReviseModal, openReviseModal, pbome*Edit/Op,
+>     whmEditWarehouse, rcvReceiveModal, openPurImport, openPbomCustomEdit,
+>     editAppUserPerms) ve PDF/print (dnPrint, printWorkOrders,
+>     printGoodsReceiptPDF, whvProjectPDF — ayrı doküman, esc yeterli).
 >   - Playwright (Faz 5): gerçek Chromium testleri (login + XSS'in tarayıcıda
 >     çalışmadığı kanıtı). tests/critical.spec.js.
 > Artık denetimdeki hiçbir açık madde kalmadı; U4/U7/E3 çözüldü, E4 geçersizdi,
-> E3'ün operasyonel yanı (sabit tünel) kod-dışı. Kalan yalnız tagged-template'in
-> küçük/statik render'ları (opsiyonel, güvenli).
+> E3'ün operasyonel yanı (sabit tünel) kod-dışı. Tagged-template geçişi de
+> tamamlandı; yeni innerHTML şablonları CLAUDE.md gereği h`` ile yazılır.
 
 ## 🔴 KRİTİK
 
