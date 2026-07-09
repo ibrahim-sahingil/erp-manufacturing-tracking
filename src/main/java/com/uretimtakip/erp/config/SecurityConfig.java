@@ -119,6 +119,14 @@ public class SecurityConfig {
                                     "/api/workspace-members/**"},
                             "ROLE_DEVELOPER");
 
+                    // DENETIM IZI: uretim gecmisi (part_logs) SILME yalnizca
+                    // gelistiricide. POST acik kalir — QR okutan isci uretim
+                    // kaydi yazar. Frontend bu DELETE ucunu hic kullanmiyor,
+                    // dolayisiyla kimsenin gunluk isi kirilmaz. PartLogService'te
+                    // guard yok: silinen kayit geri gelmez, iz de birakmaz.
+                    auth.requestMatchers(HttpMethod.DELETE, "/api/part-logs/**")
+                            .hasAuthority("ROLE_DEVELOPER");
+
                     // Diger her endpoint icin authentication gerekli
                     auth.anyRequest().authenticated();
                 })

@@ -100,10 +100,26 @@ function izinVerilmeli(ad, r) {
   reddedilmeli('DELETE /bom-documents (teknik resim ucu)',
       await lim('DELETE', '/bom-documents/' + prodId)); // id sahte; 403 yetkiden once gelmeli
   reddedilmeli('DELETE /orders (proje) — K3',  await lim('DELETE', '/orders/' + prodId));
+  // Denetim izi: uretim gecmisi silme yalnizca developer (5. tur). POST acik
+  // kalmali — QR okutan isci uretim kaydi yaziyor (asagida kirilma kontrolu).
+  reddedilmeli('DELETE /part-logs (uretim gecmisi — denetim izi)',
+      await lim('DELETE', '/part-logs/' + prodId)); // id sahte; 403 yetkiden once gelmeli
 
   console.log('\n═══ Kirilma kontrolu: OKUMA acik kalmali ═══');
   izinVerilmeli('GET /bom-products', await lim('GET', '/bom-products'));
   izinVerilmeli('GET /warehouses',   await lim('GET', '/warehouses'));
+
+  console.log('\n═══ Kirilma kontrolu: uretim akisi YAZMA kilitli olmamali ═══');
+  // Gecersiz govde ile 400/404 donebilir; onemli olan 403 (yetki) OLMAMASI.
+  const yetkiEngeliOlmamali = (ad, r) => {
+    const ok = r.status !== 403;
+    console.log((ok ? `  ✅ yetki engeli yok [${r.status}]` : '  ❌ 403 — QR/saha akisi KIRILDI') + '  ' + ad);
+    if (!ok) fail++;
+  };
+  yetkiEngeliOlmamali('POST /part-logs (QR uretim kaydi)',
+      await lim('POST', '/part-logs', { part_id: prodId, quantity: 1 }));
+  yetkiEngeliOlmamali('POST /warehouse-movements (mal kabul)',
+      await lim('POST', '/warehouse-movements', { warehouse_id: whId, movement_type: 'IN', quantity: 1 }));
 
   console.log('\n═══ Kirilma kontrolu: developer hala yazabilmeli ═══');
   izinVerilmeli('dev POST /materials', await dev('POST', '/materials', { name: 'AUTHZ Dev Malzeme ' + sfx }));

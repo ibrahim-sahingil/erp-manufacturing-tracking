@@ -6020,7 +6020,12 @@ async function switchTab(tab) {
       ? currentUser.permissions
       : JSON.parse(currentUser.permissions || '[]');
     const isDev = currentUser.role === 'developer';
-    if (!isDev && tab !== 'appusers') {
+    if (!isDev) {
+      // (5. denetim turu) Eskiden koşul `!isDev && tab !== 'appusers'` idi:
+      // EN korunması gereken sekme kontrolden MUAF tutuluyordu. Kullanıcı
+      // yönetimi yalnızca developer'a açıktır (yazma zaten UserService'te
+      // denetleniyor; bu kontrol ekranın açılmasını da engeller).
+      if (tab === 'appusers') { toast('Bu bölüme erişim yetkiniz yok!', 'error'); return; }
       let hasAccess = perms.includes(tab);
       if (tab === 'orders') hasAccess = perms.includes('orders_view') || perms.includes('orders_edit') || perms.includes('orders');
       if (!hasAccess) { toast('Bu bölüme erişim yetkiniz yok!', 'error'); return; }
@@ -10162,22 +10167,50 @@ async function saveNewProductCore() {
   toast('Ürün eklendi!','success');
 }
 
+// Ürünü + tüm ağacını siler (5. denetim turu). Backend guard'ları:
+//   BomProductService  → parçası varsa ürünü silmez
+//   BomPartService     → alt parçası varsa parçayı silmez, projede kullanılıyorsa silmez
+// Bu yüzden parçalar YAPRAKTAN KÖKE (level azalan) sırayla silinir. Eskiden
+// onay metni "tüm parçalarını siler" diyordu ama kod hiç parça silmiyordu ve
+// sonucu kontrol etmediğinden red durumunda bile "silindi" deyip ürünü listeden
+// kaldırıyordu (yenileyince geri geliyordu).
 async function deleteCurrentProduct() {
   if(!_activeBomProduct) return;
-  // Backend parça/proje bağı varsa REDDEDER (BomProductService guard'ı). Onay
-  // metni eskiden "tüm parçalarını siler" diyordu — yanlış vaat; ayrıca sonuç
-  // kontrol edilmediğinden red durumunda bile "silindi" denip ürün listeden
-  // kalkıyordu (yenileyince geri geliyordu). 5. denetim turu.
-  if(!confirm(`"${_activeBomProduct.name}" ürünü silinsin mi?\n(Ürünün parçaları veya proje bağlantısı varsa önce onları silmelisiniz.)`)) return;
-  const ok = await dbDelete('bom_products', _activeBomProduct.id);
-  if(!ok) return; // hata toast'ı adapter'dan geldi — "silindi" deme
-  bomProducts = bomProducts.filter(p=>p.id!==_activeBomProduct.id);
-  _activeBomProduct = null; bomParts = [];
-  renderBomProductSelect();
-  document.getElementById('bom-content').style.display='none';
-  document.getElementById('bom-tree-view').style.display='none';
-  bomToggleDeleteBtn();
-  toast('Ürün silindi.','success');
+  const urun = _activeBomProduct;
+  const adet = bomParts.length;
+  const mesaj = adet
+    ? `"${urun.name}" ürünü ve ${adet} parçası KALICI olarak silinecek.\n\nBu işlem geri alınamaz. Devam edilsin mi?`
+    : `"${urun.name}" ürünü silinsin mi?`;
+  if(!confirm(mesaj)) return;
+
+  const bitti = btnBusy('bom-delete-product-btn', 'Siliniyor...');
+  if(!bitti) return; // zaten işlemde
+  try {
+    // Yapraktan köke: alt parçası kalmayan her parça silinebilir
+    const sirali = [...bomParts].sort((a,b)=>(b.level||0)-(a.level||0));
+    for(const p of sirali){
+      const silindi = await dbDelete('bom_parts', p.id);
+      if(!silindi){
+        // Hata toast'ı adapter'dan geldi (ör. parça bir projede kullanılıyor).
+        // Yarım kalan silmeyi kullanıcıya doğru göster: listeyi tazele.
+        await loadBomParts();
+        renderBomContent();
+        return;
+      }
+    }
+    const ok = await dbDelete('bom_products', urun.id);
+    if(!ok){ await loadBomParts(); renderBomContent(); return; }
+
+    bomProducts = bomProducts.filter(p=>p.id!==urun.id);
+    _activeBomProduct = null; bomParts = [];
+    renderBomProductSelect();
+    document.getElementById('bom-content').style.display='none';
+    document.getElementById('bom-tree-view').style.display='none';
+    toast(adet ? `Ürün ve ${adet} parçası silindi.` : 'Ürün silindi.','success');
+  } finally {
+    bitti();
+    bomToggleDeleteBtn();
+  }
 }
 
 // ─── İçerik Render ───
@@ -12469,17 +12502,6 @@ async function togglePbomPart(pbomId, partId, include) {
   }
   const row = document.getElementById('pbomrow-'+partId);
   if(row) row.classList.toggle('excluded',!include);
-}
-
-async function setPbomPartQty(pbomId, partId, qty) {
-  const existing = projectBomParts.find(p=>p.project_bom_id===pbomId&&p.bom_part_id===partId);
-  if(existing) {
-    existing.custom_qty = parseFloat(qty);
-    await dbUpdate('project_bom_parts', existing.id, {custom_qty:parseFloat(qty)});
-  } else {
-    const data = await dbInsert('project_bom_parts',{id:genId(),project_bom_id:pbomId,bom_part_id:partId,custom_qty:parseFloat(qty)});
-    if(Array.isArray(data)&&data[0]) projectBomParts.push(data[0]);
-  }
 }
 
 async function setPbomPartDept(pbomId, partId, deptId) {
