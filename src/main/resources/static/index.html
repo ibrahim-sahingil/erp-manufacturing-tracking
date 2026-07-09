@@ -2462,12 +2462,14 @@ async function init(){
     // Session kontrolü
     const saved = sessionStorage.getItem('ut_user');
     if(saved){
-      currentUser = JSON.parse(saved);
-      document.getElementById('login-screen').style.display='none';
-      showLoading();
-      applyPermissions();
-      await loadAll(); hideLoading();
-      renderDashboard(); renderParts(); renderUsers(); renderDeptList();
+      try {
+        currentUser = JSON.parse(saved);
+        document.getElementById('login-screen').style.display='none';
+        showLoading();
+        applyPermissions();
+        await loadAll(); hideLoading();
+        renderDashboard(); renderParts(); renderUsers(); renderDeptList();
+      } catch(e) { failsafeToLogin(e); }
     } else {
       // Beni hatırla kontrolü — kayıtlı token ile otomatik giriş
       // (logout yapıldıysa atla; token süresi dolmuşsa ilk API çağrısında
@@ -2487,7 +2489,7 @@ async function init(){
           await loadAll(); hideLoading();
           renderDashboard(); renderParts(); renderUsers(); renderDeptList();
           return;
-        } catch(e) {}
+        } catch(e) { failsafeToLogin(e); }
       }
       // Login ekranı zaten görünür — kullanıcı giriş yapacak
     }
@@ -2496,6 +2498,21 @@ async function init(){
 
 function showLoading(){ document.getElementById('loading-screen').style.display='flex'; }
 function hideLoading(){ document.getElementById('loading-screen').style.display='none'; }
+
+// (5. denetim turu) Oturum/"beni hatırla" ile otomatik giriş yarıda patlarsa
+// login ekranı GİZLİ, yükleniyor ekranı AÇIK kalıyordu ve hata yutuluyordu —
+// kullanıcı sonsuz spinner'da kalıyor, ne olduğunu anlamıyordu. Artık her
+// başarısızlıkta temiz biçimde login ekranına dönülür.
+function failsafeToLogin(err){
+  console.error('Otomatik giriş başarısız:', err);
+  authToken = null; currentUser = null;
+  sessionStorage.removeItem('ut_token');
+  sessionStorage.removeItem('ut_user');
+  hideLoading();
+  const ls = document.getElementById('login-screen');
+  if(ls) ls.style.display=''; // stil sayfasındaki flex'e geri dön
+  toast('Oturum geri yüklenemedi — lütfen tekrar giriş yapın.','error');
+}
 async function loadAll(){
   const [p,u,d,o] = await Promise.all([
     dbGet('parts','order=created_at.asc'),

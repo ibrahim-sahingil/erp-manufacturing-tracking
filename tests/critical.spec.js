@@ -113,6 +113,24 @@ test('mesaj: okuma başarısız olunca sessiz boş liste yerine uyarı çıkar',
   await expect(page.locator('#toast')).toContainText(/Veriler yüklenemedi/, { timeout: 5000 });
 });
 
+// (5. denetim turu) Bozuk oturum verisiyle açılışta kullanıcı SONSUZ yükleniyor
+// ekranında kalıyordu: login ekranı gizleniyor, spinner açılıyor, hata boş bir
+// catch{} içinde yutuluyordu. Artık failsafeToLogin() temizce login'e döndürür.
+test('açılış: bozuk oturum verisi sonsuz spinner bırakmaz, login ekranına döner', async ({ page }) => {
+  await login(page);
+  // permissions bozuk bir dize: JSON.parse'i applyPermissions() İÇİNDE, yani
+  // login ekranı gizlenip spinner açıldıktan SONRA patlatır — asıl tuzak buydu.
+  await page.evaluate(() => {
+    const u = JSON.parse(sessionStorage.getItem('ut_user'));
+    u.permissions = '{bozuk-json';
+    sessionStorage.setItem('ut_user', JSON.stringify(u));
+  });
+  await page.reload();
+  await expect(page.locator('#login-screen')).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('#loading-screen')).toBeHidden();
+  await expect(page.locator('#toast')).toContainText(/tekrar giriş/i, { timeout: 5000 });
+});
+
 // NOT: Silme/yayınlama/mal kabul guard'ları backend + node scripts/e2e-test.js
 // tarafından API-seviyesinde kapsanıyor (K1/O1/O4/O5/U1 senaryoları). Playwright
 // burada gerçek-tarayıcı davranışına (login akışı + XSS render) odaklanır; UI
