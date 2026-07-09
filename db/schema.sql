@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict oXaUkJUXlcWBMmRGy7s2AcPYhl6M8iCP3HAnyIxFm9jJFFyW4Sfa4vke5uVZhZY
+\restrict pdWbMbjKGSyHjpStlaCkUW7hRzUdgQw4XKyerupSij2aVJfR2hgxaBSGWfvaISF
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -515,9 +515,35 @@ CREATE TABLE public.warehouse_movements (
     notes text,
     created_at timestamp without time zone DEFAULT now(),
     delivery_note_id uuid,
+    reservation_id uuid,
     CONSTRAINT warehouse_movements_quantity_check CHECK ((quantity > (0)::numeric)),
-    CONSTRAINT warehouse_movements_source_check CHECK (((source_type)::text = ANY (ARRAY[('MANUAL'::character varying)::text, ('PURCHASE_TRANSFER'::character varying)::text, ('GOODS_RECEIPT'::character varying)::text, ('DELIVERY'::character varying)::text, ('WAREHOUSE_TRANSFER'::character varying)::text]))),
+    CONSTRAINT warehouse_movements_source_check CHECK (((source_type)::text = ANY ((ARRAY['MANUAL'::character varying, 'PURCHASE_TRANSFER'::character varying, 'GOODS_RECEIPT'::character varying, 'DELIVERY'::character varying, 'WAREHOUSE_TRANSFER'::character varying, 'RESERVATION'::character varying, 'RESERVATION_ADJUST'::character varying])::text[]))),
     CONSTRAINT warehouse_movements_type_check CHECK (((movement_type)::text = ANY ((ARRAY['IN'::character varying, 'OUT'::character varying])::text[])))
+);
+
+
+--
+-- Name: warehouse_reservations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.warehouse_reservations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    project_name character varying(100) NOT NULL,
+    warehouse_id uuid NOT NULL,
+    item_name character varying(200) NOT NULL,
+    item_code character varying(100),
+    requested_qty numeric(15,4) NOT NULL,
+    approved_qty numeric(15,4),
+    unit character varying(20) DEFAULT 'adet'::character varying,
+    status character varying(20) DEFAULT 'REQUESTED'::character varying NOT NULL,
+    shortage_reason text,
+    requested_by character varying(150),
+    approved_by character varying(150),
+    approved_at timestamp without time zone,
+    notes text,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT warehouse_reservations_requested_qty_check CHECK ((requested_qty > (0)::numeric)),
+    CONSTRAINT warehouse_reservations_status_check CHECK (((status)::text = ANY ((ARRAY['REQUESTED'::character varying, 'APPROVED'::character varying, 'PARTIAL'::character varying, 'REJECTED'::character varying, 'CANCELLED'::character varying])::text[])))
 );
 
 
@@ -858,6 +884,14 @@ ALTER TABLE ONLY public.warehouse_movements
 
 
 --
+-- Name: warehouse_reservations warehouse_reservations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.warehouse_reservations
+    ADD CONSTRAINT warehouse_reservations_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: warehouses warehouses_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1135,6 +1169,20 @@ CREATE INDEX idx_work_orders_status ON public.work_orders USING btree (status);
 --
 
 CREATE INDEX idx_work_orders_workspace_id ON public.work_orders USING btree (workspace_id);
+
+
+--
+-- Name: idx_wres_project; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_wres_project ON public.warehouse_reservations USING btree (project_name);
+
+
+--
+-- Name: idx_wres_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_wres_status ON public.warehouse_reservations USING btree (status);
 
 
 --
@@ -1416,11 +1464,27 @@ ALTER TABLE ONLY public.warehouse_movements
 
 
 --
+-- Name: warehouse_movements warehouse_movements_reservation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.warehouse_movements
+    ADD CONSTRAINT warehouse_movements_reservation_id_fkey FOREIGN KEY (reservation_id) REFERENCES public.warehouse_reservations(id) ON DELETE SET NULL;
+
+
+--
 -- Name: warehouse_movements warehouse_movements_warehouse_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.warehouse_movements
     ADD CONSTRAINT warehouse_movements_warehouse_fkey FOREIGN KEY (warehouse_id) REFERENCES public.warehouses(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: warehouse_reservations warehouse_reservations_warehouse_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.warehouse_reservations
+    ADD CONSTRAINT warehouse_reservations_warehouse_id_fkey FOREIGN KEY (warehouse_id) REFERENCES public.warehouses(id) ON DELETE RESTRICT;
 
 
 --
@@ -1515,5 +1579,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict oXaUkJUXlcWBMmRGy7s2AcPYhl6M8iCP3HAnyIxFm9jJFFyW4Sfa4vke5uVZhZY
+\unrestrict pdWbMbjKGSyHjpStlaCkUW7hRzUdgQw4XKyerupSij2aVJfR2hgxaBSGWfvaISF
 

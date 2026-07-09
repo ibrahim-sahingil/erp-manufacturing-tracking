@@ -125,9 +125,21 @@ public class BomDocumentService {
         return toMeta(saved);
     }
 
+    /**
+     * Silme guard'i (7. tur acik not): bom_document_parts join'i CASCADE
+     * oldugundan bagli dokuman DB'yi bozmadan silinebiliyordu ama parcalarin
+     * teknik resim kapsami SESSIZCE yok oluyordu. Bagli parca varsa once
+     * baglar kaldirilmali (frontend docsDelete bunu onayli tek adimda yapar).
+     */
     @Transactional
     public void delete(UUID id) {
         BomDocument doc = findEntityById(id);
+        if (!doc.getPartIds().isEmpty()) {
+            throw new BusinessException(
+                    "Bu dosyaya " + doc.getPartIds().size() + " parca bagli — "
+                            + "silmeden once parca baglarini kaldirin.",
+                    "DOC_LINKED");
+        }
         bomDocumentRepository.delete(doc);
         log.info("BomDocument deleted: id={}, file={}", id, doc.getFilename());
     }

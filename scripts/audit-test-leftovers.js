@@ -21,7 +21,7 @@ const get = async ep => {
   return Array.isArray(j.data) ? j.data : [];
 };
 const testMi = x => [x.code, x.name, x.project_name, x.custom_code, x.custom_name,
-                     x.item_code, x.username].some(v => ONEK.test(v || ''));
+                     x.item_code, x.item_name, x.username].some(v => ONEK.test(v || ''));
 
 (async () => {
   const lr = await fetch(BASE + 'auth/login', { method: 'POST',
@@ -32,7 +32,7 @@ const testMi = x => [x.code, x.name, x.project_name, x.custom_code, x.custom_nam
 
   const tablolar = ['parts', 'bom-parts', 'bom-products', 'project-bom-parts',
                     'bom-operations', 'orders', 'purchase-items', 'warehouses',
-                    'warehouse-movements'];
+                    'warehouse-movements', 'warehouse-reservations'];
   let toplam = 0;
   for (const ep of tablolar) {
     const kalan = (await get(ep)).filter(testMi);

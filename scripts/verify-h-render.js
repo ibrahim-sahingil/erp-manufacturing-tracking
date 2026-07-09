@@ -548,9 +548,10 @@ eval(grab('mipSummaryHTML'));
 const mipRow = String(mipRowHTML({
   key:'k', code:'SOM<b>'+EVIL, name:'M12 "Somun"'+EVIL, unit:'ad<i>et',
   need:50, stockTotal:40, received:0, ordered:0, planned:0, missing:10,
+  reserved:0, pendingReserve:0,
   stockByWh:[{whId:'A', name:'A-Depo'+EVIL, qty:30},{whId:'B', name:'B-Depo', qty:10}],
   status:'MISSING'
-}));
+}, 0));
 const mipSum = String(mipSummaryHTML([{status:'MISSING'},{status:'DONE'}]));
 console.log('\nmipRowHTML / mipSummaryHTML (MİP):');
 chk('mip: parça adı onerror kaçırıldı', mipRow.includes('M12 &quot;Somun&quot;&lt;img') && !mipRow.includes('Somun'+EVIL));
@@ -559,6 +560,50 @@ chk('mip: birim kaçırıldı', mipRow.includes('ad&lt;i&gt;et'));
 chk('mip: depo adı (dağılım + öneri) kaçırıldı', !mipRow.includes('<img src=x') && mipRow.includes('A-Depo&lt;img'));
 chk('mip: durum rozeti ve renk (raw) korundu', mipRow.includes('#e74c3c') && mipRow.includes('Sipariş verilmedi'));
 chk('mip: özet kutuları sayıları bastı', mipSum.includes('>1<') && mipSum.includes('Tamamlandı'));
+// Aşama 2: aksiyon butonu dalları (idx sayısal → attribute güvenli)
+chk('mip: rezervasyon butonu çıktı (stok var + ihtiyaç var)', mipRow.includes('mipReserveModal(0)'));
+const mipRowPend = String(mipRowHTML({
+  key:'k', code:'C', name:'N', unit:'ad', need:50, stockTotal:40, received:0,
+  ordered:0, planned:0, missing:10, reserved:0, pendingReserve:40,
+  stockByWh:[], status:'MISSING'
+}, 1));
+chk('mip: bekleyen talepte buton disabled + yeni talep yok',
+    mipRowPend.includes('disabled') && mipRowPend.includes('Depoda bekliyor') && !mipRowPend.includes('mipReserveModal(1)'));
+const mipRowRez = String(mipRowHTML({
+  key:'k', code:'C', name:'N', unit:'ad', need:30, stockTotal:0, received:0,
+  ordered:0, planned:0, missing:0, reserved:30, pendingReserve:0,
+  stockByWh:[], status:'RESERVED'
+}, 2));
+chk('mip: RESERVED satırda rezerve rozeti + buton yok',
+    mipRowRez.includes('Depoya rezerve') && !mipRowRez.includes('mipReserveModal(2)'));
+
+// ── renderWhReservations (7. tur #4 Aşama 2 — depocu onay listesi) ──
+// Talep eden / proje / malzeme adı / not / kayıp açıklaması kullanıcı verisidir.
+const WRES_STATUS_SRC = html.match(/const WRES_STATUS = (\{[\s\S]*?\n\});/);
+global.WRES_STATUS = eval('(' + WRES_STATUS_SRC[1] + ')');
+global.whName=()=>'Depo<i>';
+global.whMovements=[{warehouse_id:'w1', item_name:'Mlz'+EVIL, item_code:'RK<b>', movement_type:'IN', quantity:40}];
+global.whReservations=[
+  {id:'res1', status:'REQUESTED', project_name:'RPrj'+EVIL, warehouse_id:'w1',
+   item_name:'Mlz'+EVIL, item_code:'RK<b>', requested_qty:30, unit:'ad<i>',
+   requested_by:'İsteyen<b>', notes:'RNot<script>', created_at:'2026-07-10T10:00:00'},
+  {id:'res2', status:'PARTIAL', project_name:'P2', warehouse_id:'w1',
+   item_name:'M2', item_code:null, requested_qty:30, approved_qty:15, unit:'ad',
+   shortage_reason:'Kayıp'+EVIL, created_at:'2026-07-09T10:00:00'}
+];
+eval(grab('whStockOf'));
+eval(grab('_whItemStock'));
+eval(grab('renderWhReservations'));
+renderWhReservations();
+const wresL=store['wh-reservations']||'';
+console.log('\nrenderWhReservations (rezervasyon talepleri):');
+chk('wres: malzeme adı onerror kaçırıldı', wresL.includes('Mlz&lt;img') && !wresL.includes('Mlz'+EVIL));
+chk('wres: proje / talep eden / not kaçırıldı', wresL.includes('RPrj&lt;img') && wresL.includes('İsteyen&lt;b&gt;') && wresL.includes('RNot&lt;script&gt;'));
+chk('wres: kayıp açıklaması kaçırıldı', wresL.includes('Kayıp&lt;img'));
+chk('wres: kod kaçırıldı', wresL.includes('RK&lt;b&gt;'));
+chk('wres: onay/iptal butonları (raw) korundu', wresL.includes("whResApproveModal('res1')") && wresL.includes("whResCancel('res1')"));
+chk('wres: kayıtlı stok bekleyen satırda gösterildi', wresL.includes('kayıtlı stok: 40'));
+chk('wres: sonuçlanan kısmi onay rozeti', wresL.includes('Kısmi onay') && wresL.includes('onaylanan: 15'));
 
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);

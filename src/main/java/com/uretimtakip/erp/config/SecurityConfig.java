@@ -90,6 +90,8 @@ public class SecurityConfig {
                     // parts, work-orders*, warehouse-movements, purchase-items.
                     // Bunlari QR okutan isci ve saha kullanicilari yaziyor; kilit
                     // eslemesi netlesmeden kapatmak gunluk isi durdurur.
+                    // (warehouse-reservations MIP Asama 2'de kilitli eklendi —
+                    // asagida; kapsam disi DEGIL.)
                     writeRule(auth, new String[]{"/api/bom-products/**", "/api/bom-parts/**",
                                     "/api/bom-operations/**", "/api/project-bom/**",
                                     "/api/project-bom-parts/**"},
@@ -98,6 +100,15 @@ public class SecurityConfig {
                             "ROLE_DEVELOPER", "bom", "docs");
                     writeRule(auth, new String[]{"/api/warehouses/**"},
                             "ROLE_DEVELOPER", "warehouse");
+                    // MIP Asama 2 — rezervasyon: onay YALNIZ depocu (fiziksel
+                    // sayim + stok cikisi yazar); talep/iptal/silme MIP ve depo
+                    // sekmesi kullanicilarinin. Spesifik kural ONCE gelmeli:
+                    // Spring Security ilk eslesen kurali uygular, '/**' deseni
+                    // '/{id}/approve'u da yutar.
+                    writeRule(auth, new String[]{"/api/warehouse-reservations/*/approve"},
+                            "ROLE_DEVELOPER", "warehouse");
+                    writeRule(auth, new String[]{"/api/warehouse-reservations/**"},
+                            "ROLE_DEVELOPER", "mip", "warehouse");
                     writeRule(auth, new String[]{"/api/purchase-orders/**",
                                     "/api/purchase-order-quotes/**"},
                             "ROLE_DEVELOPER", "purchasing");

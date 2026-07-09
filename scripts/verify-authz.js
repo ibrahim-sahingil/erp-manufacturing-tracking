@@ -100,6 +100,15 @@ function izinVerilmeli(ad, r) {
   reddedilmeli('DELETE /bom-documents (teknik resim ucu)',
       await lim('DELETE', '/bom-documents/' + prodId)); // id sahte; 403 yetkiden once gelmeli
   reddedilmeli('DELETE /orders (proje) — K3',  await lim('DELETE', '/orders/' + prodId));
+  // MIP Asama 2: rezervasyon uclari kilitli (talep=mip/warehouse, onay=warehouse)
+  reddedilmeli('POST /warehouse-reservations (rezervasyon talebi)',
+      await lim('POST', '/warehouse-reservations',
+        { project_name: 'HACK', warehouse_id: whId, item_name: 'HACK', requested_qty: 1 }));
+  reddedilmeli('POST /warehouse-reservations/{id}/approve (rezervasyon onayi)',
+      await lim('POST', '/warehouse-reservations/' + prodId + '/approve',
+        { approved_qty: 1 })); // id sahte; 403 yetkiden once gelmeli
+  reddedilmeli('DELETE /warehouse-reservations (rezervasyon kaydi)',
+      await lim('DELETE', '/warehouse-reservations/' + prodId));
   // Denetim izi: uretim gecmisi silme yalnizca developer (5. tur). POST acik
   // kalmali — QR okutan isci uretim kaydi yaziyor (asagida kirilma kontrolu).
   reddedilmeli('DELETE /part-logs (uretim gecmisi — denetim izi)',

@@ -25,6 +25,7 @@ public class WarehouseMovementResponse {
     private UUID warehouseId;
     private UUID purchaseItemId;
     private UUID deliveryNoteId;
+    private UUID reservationId;
     private String itemName;
     private String itemCode;
     private String movementType;
@@ -41,6 +42,7 @@ public class WarehouseMovementResponse {
                 .warehouseId(e.getWarehouseId())
                 .purchaseItemId(e.getPurchaseItemId())
                 .deliveryNoteId(e.getDeliveryNoteId())
+                .reservationId(e.getReservationId())
                 .itemName(e.getItemName())
                 .itemCode(e.getItemCode())
                 .movementType(e.getMovementType())

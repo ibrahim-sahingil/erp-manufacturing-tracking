@@ -143,7 +143,11 @@ MSYS_NO_PATHCONV=1 taskkill /F /IM java.exe   # Git Bash: /F'i F:/ yapmasın
 - **7. tur bekçileri** (2026-07-10):
   - `node scripts/verify-mip.js` (sunucusuz) — MİP hesap çekirdeği: eşleştirme
     (kod > ad), tür filtresi, `custom_*`/`resolved_*` override, aynı kodun adet
-    toplamı, beş durum önceliği, sızıntı (başka proje / CANCELLED).
+    toplamı, durum önceliği (DONE > RESERVED > FROM_STOCK > WAITING > SUPPLY >
+    MISSING), sızıntı (başka proje / CANCELLED), Aşama 2 rezervasyon muhasebesi
+    (APPROVED/PARTIAL approved_qty karşılanmış sayılır — OUT stoğu zaten
+    düşürdüğünden çifte sayım yok; REQUESTED missing'i değiştirmez) +
+    `mipReservePlan` dağıtımı.
   - `node scripts/verify-opdef-cascade.js` (sunucu gerekir) — işlem tanımının
     bölüm alanı + kod değişince ağaç kodlarının yeniden inşası.
   - `node scripts/audit-test-leftovers.js` (sunucu gerekir, SALT OKUNUR) — test

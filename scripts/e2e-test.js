@@ -101,7 +101,8 @@ function partToApi(b){
 const EP = {parts:'parts', purchase_items:'purchase-items', project_bom:'project-bom',
   project_bom_parts:'project-bom-parts', bom_products:'bom-products', bom_parts:'bom-parts',
   work_orders:'work-orders', work_order_parts:'work-order-parts', orders:'orders',
-  warehouses:'warehouses', warehouse_movements:'warehouse-movements'};
+  warehouses:'warehouses', warehouse_movements:'warehouse-movements',
+  warehouse_reservations:'warehouse-reservations'};
 globalThis.dbGet = async (t,q)=>{
   let d = await api('GET','/'+EP[t]);
   if(!Array.isArray(d)) return [];
@@ -127,6 +128,28 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
 (async()=>{
   const created = {parts:[], pi:[], wo:[], wop:[], mv:[], wh:[]};
   try {
+    console.log('═══ 6a: BAYAT CACHE → PROJESİZ KAYIT DÜZELTMESİ (retry) ═══');
+    // Gerçek adapter fonksiyonlarıyla, sahte apiFetch üzerinden: 'orders'
+    // cache'i boşken proje açılır; eski yol null döner (parça projesiz
+    // yazılırdı), resolveOrderIdOrRetry cache'i tazeleyip bulmalı.
+    globalThis.TABLE_ENDPOINTS = {orders:'orders'};
+    let _fakeOrders = [];
+    globalThis.apiFetch = async ()=> _fakeOrders;
+    (0,eval)(grab('const _ref').replace('const _ref =','globalThis._ref ='));
+    (0,eval)(grab('_isUuid'));
+    (0,eval)(grab('getRef'));
+    (0,eval)(grab('invalidateRef'));
+    (0,eval)(grab('projectNameToOrderId'));
+    (0,eval)(grab('resolveOrderIdOrRetry'));
+    await getRef('orders'); // boş liste 30 sn'liğine cache'lendi
+    _fakeOrders = [{id:'yeni-order-uuid', project_name:'E2E-YENI-PROJE'}]; // proje az önce açıldı
+    check('bayat cache: eski yol null döner (hatanın kendisi)',
+      (await projectNameToOrderId('E2E-YENI-PROJE'))===null);
+    check('resolveOrderIdOrRetry cache tazeleyip bulur',
+      (await resolveOrderIdOrRetry('E2E-YENI-PROJE'))==='yeni-order-uuid');
+    check('hiç olmayan proje retry sonrası da null',
+      (await resolveOrderIdOrRetry('E2E-HAYALET'))===null);
+
     console.log('═══ KURULUM ═══ proje:', PROJ);
     const order = await api('POST','/orders',{project_name:PROJ, customer_name:'E2E Müşteri'});
     check('sipariş oluştu', !!order); orderId = order.id;
@@ -460,6 +483,77 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     check('kaleme bağlı mal kabul hareketi SİLİNEMEDİ', /defterden silinemez/i.test(_lastApiError||''), _lastApiError);
     check('hareket yerinde duruyor', (await dbGet('warehouse_movements')).some(m=>m.id===mvIn.id));
 
+    console.log('═══ 7.TUR #4 AŞAMA 2: DEPO REZERVASYONU (talep → kısmi onay) ═══');
+    // test.txt senaryosu: kayıtta 30 görünüyor, sayımda 15 çıkıyor →
+    // 15 onay (RESERVATION OUT) + 15 kayıp satın almaya + envanter düzeltme OUT.
+    const rezIn = await api('POST','/warehouse-movements',{warehouse_id:wh.id,
+      item_name:'E2E Rezerv Malzeme', item_code:'E2E-REZ', movement_type:'IN',
+      quantity:30, source_type:'MANUAL'});
+    check('rezervasyon stoğu girildi (30)', !!rezIn, _lastApiError||'');
+    globalThis._lastApiError = null;
+    const sahte = await api('POST','/warehouse-movements',{warehouse_id:wh.id,
+      item_name:'E2E Rezerv Malzeme', item_code:'E2E-REZ', movement_type:'OUT',
+      quantity:1, source_type:'RESERVATION'});
+    check('dışarıdan RESERVATION hareketi REDDEDİLDİ', !sahte, _lastApiError);
+
+    const wres = await api('POST','/warehouse-reservations',{project_name:PROJ,
+      warehouse_id:wh.id, item_name:'E2E Rezerv Malzeme', item_code:'E2E-REZ',
+      requested_qty:30, unit:'adet', requested_by:'E2E MİP'});
+    check('talep oluştu (REQUESTED)', !!wres && wres.status==='REQUESTED', wres&&wres.status);
+
+    globalThis._lastApiError = null;
+    const g1 = await api('POST','/warehouse-reservations/'+wres.id+'/approve',
+      {approved_qty:15, write_adjustment:true});
+    check('açıklamasız kısmi onay REDDEDİLDİ', !g1 && /aciklama zorunlu/i.test(_lastApiError||''), _lastApiError);
+    globalThis._lastApiError = null;
+    const g2 = await api('POST','/warehouse-reservations/'+wres.id+'/approve',
+      {approved_qty:31, shortage_reason:'x'});
+    check('istenenden fazla onay REDDEDİLDİ', !g2, _lastApiError);
+
+    const onay = await api('POST','/warehouse-reservations/'+wres.id+'/approve',
+      {approved_qty:15, shortage_reason:'Sayımda 15 çıktı — kayıp/envanter yanlış',
+       write_adjustment:true, approved_by:'E2E Depocu'});
+    check('kısmi onay → PARTIAL, onaylanan 15',
+      !!onay && onay.status==='PARTIAL' && Number(onay.approved_qty)===15,
+      onay ? onay.status+'/'+onay.approved_qty : _lastApiError);
+    const rezMvs = (await dbGet('warehouse_movements')).filter(m=>m.reservation_id===wres.id);
+    const rezOut = rezMvs.find(m=>m.source_type==='RESERVATION');
+    const rezAdj = rezMvs.find(m=>m.source_type==='RESERVATION_ADJUST');
+    check('RESERVATION OUT 15 yazıldı (projeye mal edildi)',
+      !!rezOut && rezOut.movement_type==='OUT' && Number(rezOut.quantity)===15);
+    check('RESERVATION_ADJUST OUT 15 yazıldı (hayalet stok düzeltildi)',
+      !!rezAdj && rezAdj.movement_type==='OUT' && Number(rezAdj.quantity)===15);
+    globalThis.whMovements = await dbGet('warehouse_movements');
+    check('net stok 0 (30 giriş − 15 rezerve − 15 düzeltme)',
+      _whItemStock(wh.id,'E2E Rezerv Malzeme','E2E-REZ')===0,
+      _whItemStock(wh.id,'E2E Rezerv Malzeme','E2E-REZ'));
+    globalThis.whMovements = [];
+    const eksikPi = (await dbGet('purchase_items')).find(i=>
+      i.project_name===PROJ && i.code==='E2E-REZ' && i.status==='PLANNED');
+    check('eksik 15 satın almaya düştü (PLANNED + gerekçeli not)',
+      !!eksikPi && Number(eksikPi.quantity)===15 && /rezervasyon eksigi/i.test(eksikPi.notes||''),
+      eksikPi ? eksikPi.quantity+' / '+(eksikPi.notes||'') : 'kalem yok');
+
+    globalThis._lastApiError = null;
+    const tekrar = await api('POST','/warehouse-reservations/'+wres.id+'/approve',
+      {approved_qty:15, shortage_reason:'x'});
+    check('ikinci onay REDDEDİLDİ (sonuçlanmış talep)', !tekrar && /sonuclanmis/i.test(_lastApiError||''), _lastApiError);
+    globalThis._lastApiError = null;
+    await api('DELETE','/warehouse-movements/'+rezOut.id);
+    check('rezervasyona bağlı hareket SİLİNEMEDİ', /silinemez/i.test(_lastApiError||''), _lastApiError);
+
+    // Stok aşımı guard'ı + iptal akışı (stok artık 0)
+    const wres2 = await api('POST','/warehouse-reservations',{project_name:PROJ,
+      warehouse_id:wh.id, item_name:'E2E Rezerv Malzeme', item_code:'E2E-REZ', requested_qty:5});
+    globalThis._lastApiError = null;
+    const g3 = await api('POST','/warehouse-reservations/'+wres2.id+'/approve',{approved_qty:5});
+    check('kayıtlı stoğu aşan onay REDDEDİLDİ', !g3 && /stogu asiyor/i.test(_lastApiError||''), _lastApiError);
+    const iptal = await api('POST','/warehouse-reservations/'+wres2.id+'/cancel');
+    check('bekleyen talep iptal edildi (CANCELLED)', !!iptal && iptal.status==='CANCELLED', iptal&&iptal.status);
+    globalThis._lastApiError = null;
+    const iptal2 = await api('POST','/warehouse-reservations/'+wres.id+'/cancel');
+    check('sonuçlanmış talep iptal EDİLEMEDİ', !iptal2, _lastApiError);
+
     console.log('═══ K2: PROJE ADI DEĞİŞİNCE STRING TABLOLAR TAŞINIYOR ═══');
     const RENAMED = PROJ+'-ADI';
     const ren = await api('PUT','/orders/'+orderId, {project_name:RENAMED, customer_name:'E2E Müşteri'});
@@ -469,6 +563,11 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const piOrphan = (await dbGet('purchase_items')).filter(i=>i.project_name===PROJ).length;
     check('satın alma + BOM bağları yeni ada taşındı (sahipsiz kayıt 0)',
       piMoved>=2 && pbMoved>=1 && piOrphan===0, `pi=${piMoved} pb=${pbMoved} orphan=${piOrphan}`);
+    // Aşama 2: warehouse_reservations da STRING tablo — taşınmalı
+    const wrMoved = (await dbGet('warehouse_reservations')).filter(r=>r.project_name===RENAMED).length;
+    const wrOrphan = (await dbGet('warehouse_reservations')).filter(r=>r.project_name===PROJ).length;
+    check('rezervasyonlar yeni ada taşındı (sahipsiz 0)', wrMoved>=2 && wrOrphan===0,
+      `wr=${wrMoved} orphan=${wrOrphan}`);
     await api('PUT','/orders/'+orderId, {project_name:PROJ, customer_name:'E2E Müşteri'});
     const piBack = (await dbGet('purchase_items')).filter(i=>i.project_name===PROJ).length;
     check('geri adlandırmada da taşındı', piBack===piMoved, piBack);
@@ -534,6 +633,11 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const piAll = await dbGet('purchase_items');
     for(const i of piAll.filter(x=>x.project_name===PROJ && x.stock_plan_id)) await del('purchase_items', i.id);
     for(const i of (await dbGet('purchase_items')).filter(x=>x.project_name===PROJ)) await del('purchase_items', i.id);
+    // Rezervasyonlar HAREKETLERDEN ÖNCE silinmeli: bağlı RESERVATION hareketi
+    // rezervasyon yaşarken silinemez (guard); rezervasyon silinince bağ
+    // SET NULL olur ve hareket süpürülebilir. DELETE bu yüzden serbest.
+    for(const r of (await dbGet('warehouse_reservations')).filter(x=>x.project_name===PROJ))
+      await del('warehouse_reservations', r.id);
     // E2E hareketleri (rcvDoReceive'in yazdıkları dahil) kod önekiyle süpürülür
     for(const m of (await dbGet('warehouse_movements')).filter(m=>(m.item_code||'').startsWith('E2E-')))
       await del('warehouse_movements', m.id);
@@ -565,6 +669,7 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
       (await dbGet('project_bom')).filter(x=>x.project_name===PROJ).length +
       (await dbGet('orders')).filter(x=>x.project_name===PROJ).length +
       (await dbGet('warehouse_movements')).filter(m=>(m.item_code||'').startsWith('E2E-')).length +
+      (await dbGet('warehouse_reservations')).filter(x=>x.project_name===PROJ).length +
       kalanUrunler.length +
       (await dbGet('bom_parts')).filter(p=>kalanUrunIds.has(p.product_id)).length;
     check('temizlik tamam (0 artık kayıt)', leftovers===0, leftovers);

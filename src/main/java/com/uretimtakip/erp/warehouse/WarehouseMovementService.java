@@ -34,12 +34,21 @@ public class WarehouseMovementService {
     /** DB'deki warehouse_movements_source_check ile ayni liste. */
     private static final Set<String> VALID_SOURCES = Set.of(
             "MANUAL", "PURCHASE_TRANSFER", "GOODS_RECEIPT", "DELIVERY",
-            "WAREHOUSE_TRANSFER");
+            "WAREHOUSE_TRANSFER", "RESERVATION", "RESERVATION_ADJUST");
+
+    /**
+     * Yalniz WarehouseReservationService.approve'un ayni transaction'da
+     * yazdigi kaynaklar — disaridan POST kabul edilmez (reservation_id'siz
+     * sahte rezervasyon cikisi engellenir).
+     */
+    private static final Set<String> INTERNAL_SOURCES = Set.of(
+            "RESERVATION", "RESERVATION_ADJUST");
 
     private final WarehouseMovementRepository warehouseMovementRepository;
     private final WarehouseRepository warehouseRepository;
     private final PurchaseItemRepository purchaseItemRepository;
     private final DeliveryNoteRepository deliveryNoteRepository;
+    private final WarehouseReservationRepository warehouseReservationRepository;
 
     @Transactional(readOnly = true)
     public List<WarehouseMovementResponse> listAll() {
@@ -74,6 +83,11 @@ public class WarehouseMovementService {
             throw new BusinessException(
                     "Gecersiz kaynak tipi: " + sourceType
                             + ". Gecerli degerler: " + VALID_SOURCES,
+                    "WAREHOUSE_MOVEMENT_INVALID_SOURCE");
+        }
+        if (INTERNAL_SOURCES.contains(sourceType)) {
+            throw new BusinessException(
+                    "Bu kaynak tipi yalnizca rezervasyon onay akisinda yazilir: " + sourceType,
                     "WAREHOUSE_MOVEMENT_INVALID_SOURCE");
         }
 
@@ -117,6 +131,14 @@ public class WarehouseMovementService {
                     "Bu hareket satin alma kalemine bagli (mal kabul / depo aktarimi), "
                             + "defterden silinemez. Duzeltme icin kalemi 'Depodan Geri Al' "
                             + "ile cikarin.",
+                    "WAREHOUSE_MOVEMENT_LINKED");
+        }
+        if (INTERNAL_SOURCES.contains(src)
+                && movement.getReservationId() != null
+                && warehouseReservationRepository.existsById(movement.getReservationId())) {
+            throw new BusinessException(
+                    "Bu hareket bir depo rezervasyonuna bagli, defterden silinemez. "
+                            + "Once rezervasyon kaydini silin.",
                     "WAREHOUSE_MOVEMENT_LINKED");
         }
         if ("DELIVERY".equals(src) && movement.getDeliveryNoteId() != null) {

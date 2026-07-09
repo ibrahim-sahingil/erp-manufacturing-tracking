@@ -997,7 +997,7 @@
 
   <div style="background:rgba(41,128,185,.08);border:1px solid rgba(41,128,185,.2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">
     💡 Depo stoğu <b>projelere ayrılmamış serbest havuzdur</b> — aynı malzemeyi başka bir proje de görüyor olabilir.
-    Depoya rezervasyon emri gönderme (tam/kısmi onay) sonraki aşamada eklenecek.
+    📦 Rezervasyon emri gönderin: depocu sayıma göre tam/kısmi onaylar, onaylanan stoktan düşüp projeye ayrılır, eksik satın almaya düşer.
   </div>
 
   <div id="mip-list"></div>
@@ -1127,6 +1127,8 @@
         <div id="wh-summary" style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto"></div>
       </div>
     </div>
+    <!-- MİP rezervasyon talepleri (Aşama 2): depocu burada tam/kısmi onaylar -->
+    <div id="wh-reservations"></div>
     <div id="whv-content"></div>
   </div>
 
@@ -1671,6 +1673,7 @@ const TABLE_ENDPOINTS = {
   purchase_items: 'purchase-items',
   warehouses: 'warehouses',
   warehouse_movements: 'warehouse-movements',
+  warehouse_reservations: 'warehouse-reservations',
   purchase_orders: 'purchase-orders',
   purchase_order_quotes: 'purchase-order-quotes',
   delivery_notes: 'delivery-notes',
@@ -1741,6 +1744,18 @@ async function projectNameToOrderId(name){
   const os = await getRef('orders');
   const m = os.find(x => x.project_name === name);
   return m ? m.id : null;
+}
+// Yeni açılan proje 30 sn'lik 'orders' cache'inde OLMAYABİLİR — o durumda
+// projectNameToOrderId sessizce null döner (7. turda yayınlanan üretim parçası
+// projesiz kaydoluyordu). Cache tazelenip BİR kez daha denenir; hâlâ null ise
+// çağıran karar verir (parts.toApi hata fırlatır, ensureProjectDept null döner).
+async function resolveOrderIdOrRetry(name){
+  let id = await projectNameToOrderId(name);
+  if(!id && name){
+    invalidateRef('orders');
+    id = await projectNameToOrderId(name);
+  }
+  return id;
 }
 async function orderIdToProjectName(id){
   if(!id) return null;
@@ -1854,7 +1869,15 @@ const FIELD_XLATE = {
       const o = { ...b };
       if ('drawing' in o) { o.drawing_no = o.drawing; delete o.drawing; }
       if ('qty' in o) { o.total_qty = o.qty; delete o.qty; }
-      if (o.project && !o.order_id) o.order_id = await projectNameToOrderId(o.project);
+      // Bayat cache'te proje adı çözülemezse parça SESSİZCE projesiz yazılırdı
+      // (yayınlanan üretim parçası kayboluyordu) — tazele+dene, olmadıysa
+      // kaydı durdur. throw genelVeriEkle/Guncelle'nin catch'ine düşer
+      // (toast + başarısız dönüş). Aynı desene ihtiyaç duyarsa departments/
+      // project_dates/work_orders toApi'leri de resolveOrderIdOrRetry'a geçebilir.
+      if (o.project && !o.order_id) {
+        o.order_id = await resolveOrderIdOrRetry(o.project);
+        if (!o.order_id) throw new Error('"' + o.project + '" projesi bulunamadı — parça projesiz kaydedilmedi. Listeyi yenileyip tekrar deneyin.');
+      }
       if (o.notes && !o.description) o.description = o.notes; // BOM aktariminda operasyon notlari
       delete o.project; delete o.department; delete o.notes;
       return o;
@@ -6098,26 +6121,39 @@ async function switchTab(tab) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MİP — MALZEME İHTİYAÇ PLANLAMA (7. tur #4, Aşama 1: GÖRÜNÜRLÜK)
+// MİP — MALZEME İHTİYAÇ PLANLAMA (7. tur #4, Aşama 1: GÖRÜNÜRLÜK + Aşama 2: REZERVASYON)
 // ═══════════════════════════════════════════════════════════════════════════
 // Sorun: ürün ağacı yayınlanınca Tedarik/Hammadde/Sarf parçaları doğrudan satın
 // almaya düşüyor; depoda o malzemeden VAR MI hiç bakılmıyor. Elde 30 somun
 // dururken 50 tane daha sipariş ediliyor.
 //
-// Aşama 1 HİÇBİR YERE YAZMAZ — yalnızca okur: ihtiyaç (ağaç) ile stok (depolar)
-// ve satın alma durumunu yan yana koyar, eksiği ve renkli durumu gösterir.
-// Depoya rezervasyon emri / kısmi onay Aşama 2'de gelecek.
+// Aşama 1: ihtiyaç (ağaç) ile stok (depolar) ve satın alma durumunu yan yana
+// koyar, eksiği ve renkli durumu gösterir.
+// Aşama 2: satırdan depoya REZERVASYON TALEBİ gönderilir (warehouse_reservations);
+// depocu depo sekmesinde tam/kısmi onaylar. ONAY BACKEND'DE tek transaction'dır
+// (WarehouseReservationService.approve): OUT hareket(ler)i + eksik için PLANNED
+// satın alma kalemi ORADA yazılır — frontend mvInsert ÇAĞIRMAZ (çift OUT riski).
 //
 // DİKKAT: depo stoğu PROJESİZ serbest havuzdur (warehouse_movements'ta proje
-// alanı yok) — aynı stoğu başka bir proje de görüyor olabilir. Kullanıcı kararı:
-// ham stok gösterilir + uyarı yazılır.
+// alanı yok) — aynı stoğu başka bir proje de görüyor olabilir. Rezervasyon tam
+// da bunu çözer: onaylanan miktar OUT ile havuzdan düşüp projeye mal edilir.
 
 const MIP_STATUS = {
   DONE:      {label:'Tamamlandı',        icon:'✅', color:'#2ecc71'},
+  RESERVED:  {label:'Depoya rezerve',     icon:'📦', color:'#16a085'},
   FROM_STOCK:{label:'Depodan karşılanır', icon:'🏭', color:'#27ae60'},
   WAITING:   {label:'Sipariş bekleniyor', icon:'⏳', color:'#f5a623'},
   SUPPLY:    {label:'Tedarik edilecek',   icon:'🛒', color:'#8e44ad'},
   MISSING:   {label:'Sipariş verilmedi',  icon:'⚠', color:'#e74c3c'}
+};
+
+// Rezervasyon talebi durumları (depo sekmesindeki liste rozetleri)
+const WRES_STATUS = {
+  REQUESTED: {label:'Onay bekliyor', icon:'⏳', color:'#f5a623'},
+  APPROVED:  {label:'Tam onay',      icon:'✅', color:'#2ecc71'},
+  PARTIAL:   {label:'Kısmi onay',    icon:'◐',  color:'#e67e22'},
+  REJECTED:  {label:'Reddedildi',    icon:'✖',  color:'#e74c3c'},
+  CANCELLED: {label:'İptal edildi',  icon:'🚫', color:'#7f8c8d'}
 };
 
 // Ağaç parçasının etkin değerleri: custom_* birer OVERRIDE'dır, boşsa şablondan
@@ -6149,8 +6185,10 @@ function mipGroupParts(pbParts){
 }
 
 // SAF hesap çekirdeği — sunucusuz test edilir (scripts/verify-mip.js).
-// Dönüş: {…grup, stockByWh, stockTotal, ordered, received, planned, missing, status}
-function mipCalcRow(group, warehouses, movements, purchaseItems, projectName){
+// reservations parametresi Aşama 2'de eklendi; default [] eski çağrıları korur.
+// Dönüş: {…grup, stockByWh, stockTotal, reserved, pendingReserve, ordered,
+//         received, planned, missing, status}
+function mipCalcRow(group, warehouses, movements, purchaseItems, projectName, reservations = []){
   const stockByWh = warehouses
     .map(w => ({whId: w.id, name: w.name, qty: whStockOf(movements, w.id, group.name, group.code)}))
     .filter(x => x.qty > 1e-9);
@@ -6167,24 +6205,40 @@ function mipCalcRow(group, warehouses, movements, purchaseItems, projectName){
     else if(i.status === 'PLANNED') planned += q;
   }
 
-  const missing = Math.max(0, group.need - stockTotal - received);
+  // Rezervasyonlar (Aşama 2): onaylanan miktar OUT ile stoktan ZATEN düştü —
+  // 'reserved' ihtiyacın karşılanmış kısmıdır, stockTotal ile çifte sayılmaz.
+  // REQUESTED yalnızca bilgidir (depocu onayı bekler), missing'i DEĞİŞTİRMEZ.
+  let reserved = 0, pendingReserve = 0;
+  for(const r of reservations){
+    if(r.project_name !== projectName) continue;
+    if(mipKey(r.item_name, r.item_code) !== group.key) continue;
+    if(r.status === 'APPROVED' || r.status === 'PARTIAL') reserved += Number(r.approved_qty) || 0;
+    else if(r.status === 'REQUESTED') pendingReserve += Number(r.requested_qty) || 0;
+  }
 
-  // Durum önceliği (ilk eşleşen kazanır)
+  const missing = Math.max(0, group.need - stockTotal - received - reserved);
+
+  // Durum önceliği (ilk eşleşen kazanır). RESERVED, FROM_STOCK'tan ÖNCE
+  // sınanmalı — yoksa rezerve edilmiş satır "depodan karşılanır" görünür.
   let status;
   if(received >= group.need && group.need > 0)      status = 'DONE';
+  else if(missing < 1e-9 && reserved > 0)           status = 'RESERVED';
   else if(missing < 1e-9 && stockTotal > 0)         status = 'FROM_STOCK';
   else if(ordered > 0)                              status = 'WAITING';
   else if(stockTotal < 1e-9 && missing > 0)         status = 'SUPPLY';
   else                                              status = 'MISSING';
 
-  return {...group, stockByWh, stockTotal, ordered, received, planned, missing, status};
+  return {...group, stockByWh, stockTotal, reserved, pendingReserve, ordered, received, planned, missing, status};
 }
 
 // "30 A-Depo'dan, 10 B-Depo'dan, 10 satın al" önerisi
+// (row.reserved Aşama 1 çağrılarında undefined olabilir → 0 sayılır)
 function mipSuggest(row){
   const parcalar = [];
-  let kalan = row.need - row.received;
+  const rezerve = Number(row.reserved) || 0;
+  let kalan = row.need - row.received - rezerve;
   if(row.received > 0) parcalar.push(`${mipNum(row.received)} mal kabul edildi`);
+  if(rezerve > 0) parcalar.push(`${mipNum(rezerve)} depoya rezerve`);
   for(const s of row.stockByWh){
     if(kalan <= 1e-9) break;
     const al = Math.min(s.qty, kalan);
@@ -6195,22 +6249,40 @@ function mipSuggest(row){
   return parcalar.join(' · ') || 'İhtiyaç yok';
 }
 
+// Rezervasyon talebi dağıtım önerisi — SAF (verify-mip.js test eder):
+// karşılanmamış ihtiyacı depolara stokları oranında değil SIRAYLA dağıtır
+// (mipSuggest ile aynı mantık). Dönüş: [{whId, name, stok, qty}]
+function mipReservePlan(row){
+  const plan = [];
+  let kalan = row.need - (Number(row.received)||0) - (Number(row.reserved)||0);
+  for(const s of row.stockByWh || []){
+    if(kalan <= 1e-9) break;
+    const q = Math.min(s.qty, kalan);
+    plan.push({whId: s.whId, name: s.name, stok: mipNum(s.qty), qty: mipNum(q)});
+    kalan -= q;
+  }
+  return plan;
+}
+
 function mipNum(v){ return Number(Number(v).toFixed(4)); }
 
 // ─── Render ───
 let _mipRows = [];
+let whReservations = []; // rezervasyon talepleri (MİP + depo sekmesi paylaşır)
 
 async function renderMip(){
-  const [pbs, ws, mv, pi] = await Promise.all([
+  const [pbs, ws, mv, pi, res] = await Promise.all([
     dbGet('project_bom'),
     dbGet('warehouses'),
     dbGet('warehouse_movements'),
-    dbGet('purchase_items')
+    dbGet('purchase_items'),
+    dbGet('warehouse_reservations')
   ]);
   if(Array.isArray(pbs)) projectBoms = pbs;
   if(Array.isArray(ws)) warehouses = ws;
   if(Array.isArray(mv)) whMovements = mv;
   if(Array.isArray(pi)) purchaseItems = pi;
+  if(Array.isArray(res)) whReservations = res;
 
   // Proje seçici: yalnızca YAYINLANMIŞ ağacı olan projeler (tekilleştirilmiş)
   const sel = document.getElementById('mip-project-sel');
@@ -6249,9 +6321,9 @@ async function renderMipList(){
 
   const gruplar = mipGroupParts(parts);
   _mipRows = gruplar
-    .map(g => mipCalcRow(g, warehouses, whMovements, purchaseItems, proje))
+    .map(g => mipCalcRow(g, warehouses, whMovements, purchaseItems, proje, whReservations))
     .sort((a,b)=>{
-      const oncelik = {MISSING:0, SUPPLY:1, WAITING:2, FROM_STOCK:3, DONE:4};
+      const oncelik = {MISSING:0, SUPPLY:1, WAITING:2, RESERVED:3, FROM_STOCK:4, DONE:5};
       return (oncelik[a.status]-oncelik[b.status]) || a.name.localeCompare(b.name,'tr');
     });
 
@@ -6261,7 +6333,7 @@ async function renderMipList(){
     el.innerHTML = h`<div class="empty-state" style="padding:26px"><span class="emoji">✅</span>Bu projede satın alınacak parça yok (Tedarik / Hammadde / Sarf türü parça bulunamadı)</div>`;
     return;
   }
-  el.innerHTML = h`${_mipRows.map(r=>mipRowHTML(r))}`;
+  el.innerHTML = h`${_mipRows.map((r,i)=>mipRowHTML(r,i))}`;
 }
 
 function mipSummaryHTML(rows){
@@ -6275,16 +6347,27 @@ function mipSummaryHTML(rows){
     ${kutu('Sipariş verilmedi', say('MISSING'), MIP_STATUS.MISSING.color)}
     ${kutu('Tedarik edilecek', say('SUPPLY'), MIP_STATUS.SUPPLY.color)}
     ${kutu('Sipariş bekleniyor', say('WAITING'), MIP_STATUS.WAITING.color)}
+    ${kutu('Depoya rezerve', say('RESERVED'), MIP_STATUS.RESERVED.color)}
     ${kutu('Depodan karşılanır', say('FROM_STOCK'), MIP_STATUS.FROM_STOCK.color)}
     ${kutu('Tamamlandı', say('DONE'), MIP_STATUS.DONE.color)}
   </div>`;
 }
 
-function mipRowHTML(r){
+function mipRowHTML(r, idx){
   const st = MIP_STATUS[r.status];
   const dagilim = r.stockByWh.length
     ? r.stockByWh.map(s=>`${s.name}: ${mipNum(s.qty)}`).join(' · ')
     : 'Hiçbir depoda yok';
+  // Aksiyon (Aşama 2): bekleyen talep varken yeni talep engellenir (mükerrer
+  // rezervasyon); yoksa stoğun karşılayabildiği ihtiyaç kaldıkça buton çıkar.
+  // idx sabit sayıdır → onclick attribute'unda güvenle taşınır (h`` boolean/
+  // nesne interpolasyonu yerine iki ayrı şablon dalı — CLAUDE.md tuzağı).
+  let aksiyon = '';
+  if(r.pendingReserve > 0){
+    aksiyon = h`<button class="btn btn-ghost btn-sm" disabled title="Depocunun onayı bekleniyor — sonuç için listeyi yenileyin">⏳ Depoda bekliyor (${mipNum(r.pendingReserve)})</button>`;
+  } else if(r.stockTotal > 1e-9 && (r.need - r.received - r.reserved) > 1e-9){
+    aksiyon = h`<button class="btn btn-primary btn-sm" onclick="mipReserveModal(${raw(String(Number(idx)))})">📦 Rezervasyon Emri</button>`;
+  }
   return h`<div class="pbom-card" style="border-left:3px solid ${raw(st.color)};margin-bottom:8px">
     <div class="pbom-card-header">
       <div style="min-width:0;flex:1">
@@ -6296,6 +6379,7 @@ function mipRowHTML(r){
         <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:4px">
           🎯 İhtiyaç: <b style="color:var(--text)">${mipNum(r.need)} ${r.unit}</b>
           &nbsp;·&nbsp; 🏭 Stok: <b style="color:${raw(r.stockTotal>0?'var(--green,#2ecc71)':'var(--muted)')}">${mipNum(r.stockTotal)}</b>
+          ${r.reserved?h`&nbsp;·&nbsp; 📦 Rezerve: <b style="color:${raw(MIP_STATUS.RESERVED.color)}">${mipNum(r.reserved)}</b>`:''}
           ${r.received?h`&nbsp;·&nbsp; 📥 Mal kabul: <b style="color:var(--green,#2ecc71)">${mipNum(r.received)}</b>`:''}
           ${r.ordered?h`&nbsp;·&nbsp; 📦 Siparişte: <b style="color:#2980b9">${mipNum(r.ordered)}</b>`:''}
           ${r.planned?h`&nbsp;·&nbsp; 📝 Planlandı: ${mipNum(r.planned)}`:''}
@@ -6304,8 +6388,90 @@ function mipRowHTML(r){
         <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">🗄️ ${dagilim}</div>
         <div style="font-family:var(--font-mono);font-size:11px;color:#2980b9;margin-top:3px">💡 ${mipSuggest(r)}</div>
       </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${aksiyon}</div>
     </div>
   </div>`;
+}
+
+// ─── Aşama 2: Rezervasyon talebi modalı (MİP tarafı) ───
+// rcvReceiveModal deseni: modal iskeleti template + esc(), onay butonu
+// CLOSURE ile bağlanır (kullanıcı verili ad/kod onclick attribute'una girmez).
+function mipReserveModal(idx){
+  const r = _mipRows[idx];
+  if(!r) return;
+  const proje = document.getElementById('mip-project-sel')?.value || '';
+  if(!proje) return;
+  const plan = mipReservePlan(r);
+  if(!plan.length){ toast('Depolarda rezerve edilecek stok yok!','error'); return; }
+  const kalan = mipNum(Math.max(0, r.need - (Number(r.received)||0) - (Number(r.reserved)||0)));
+  const inp = INP();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'mipres-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:460px;text-align:left">
+    <h3 style="margin-bottom:4px">📦 Depoya Rezervasyon Emri</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${r.code?esc(r.code)+' — ':''}${esc(r.name)} · 📁 ${esc(proje)}<br>Karşılanacak ihtiyaç: ${kalan} ${esc(r.unit||'adet')}${r.reserved?' · daha önce rezerve: '+mipNum(r.reserved):''}</p>
+    ${plan.map(p=>`<div class="form-group" style="margin-bottom:10px">
+      <label>🗄️ ${esc(p.name)} — kayıtlı stok: ${p.stok}</label>
+      <input type="number" class="mipres-qty" data-wh="${esc(p.whId)}" value="${p.qty}" min="0" max="${p.stok}" step="0.001" style="${inp}" oninput="mipReserveCalc()">
+    </div>`).join('')}
+    <div class="form-group" style="margin-bottom:10px"><label>Depocuya not (isteğe bağlı)</label>
+      <input type="text" id="mipres-note" style="${inp}"></div>
+    <div id="mipres-summary" data-kalan="${kalan}" style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('mipres-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" id="mipres-confirm">📦 Talebi Gönder</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#mipres-confirm').onclick = ()=>mipReserveConfirm(r, proje);
+  mipReserveCalc();
+  setTimeout(()=>{const el=overlay.querySelector('.mipres-qty');if(el){el.focus();el.select();}},100);
+}
+
+function mipReserveCalc(){
+  const sum = document.getElementById('mipres-summary');
+  if(!sum) return;
+  const kalan = parseFloat(sum.dataset.kalan)||0;
+  let toplam = 0;
+  document.querySelectorAll('.mipres-qty').forEach(el=>{ toplam += parseFloat(el.value)||0; });
+  const acik = Math.max(0, kalan-toplam);
+  sum.innerHTML = `📦 Talep edilecek: <span style="color:var(--green,#2ecc71)">${Number(toplam.toFixed(4))}</span>`
+    + (acik>1e-9 ? ` · 🛒 stokla karşılanmayan: <span style="color:#f5a623">${Number(acik.toFixed(4))}</span> (satın alma listesinde kalır)` : '');
+}
+
+async function mipReserveConfirm(r, proje){
+  const bitti = btnBusy('mipres-confirm', '⏳ Gönderiliyor…');
+  if(!bitti) return; // zaten gönderiliyor (çift tıklama)
+  try{
+    const kalemler = [...document.querySelectorAll('.mipres-qty')]
+      .map(el=>({whId: el.dataset.wh, qty: parseFloat(el.value)||0, max: parseFloat(el.max)||0}))
+      .filter(k=>k.qty>0);
+    if(!kalemler.length){ toast('En az bir depo için miktar girin!','error'); return; }
+    for(const k of kalemler){
+      if(k.qty > k.max+1e-9){ toast('Miktar depodaki kayıtlı stoğu aşamaz!','error'); return; }
+    }
+    const not = document.getElementById('mipres-note')?.value?.trim() || null;
+    const by = currentUser?.display_name||currentUser?.username||null;
+    // Her depo talebi BAĞIMSIZ kayıttır — biri düşerse öncekiler geçerli kalır
+    // (rollback gerekmez); kullanıcı hatayı görüp kalanı yeniden gönderir.
+    let yazilan = 0;
+    for(const k of kalemler){
+      const d = await dbInsert('warehouse_reservations', {
+        project_name: proje, warehouse_id: k.whId,
+        item_name: r.name, item_code: r.code||null,
+        requested_qty: k.qty, unit: r.unit||'adet',
+        requested_by: by, notes: not
+      });
+      if(!Array.isArray(d)||!d[0]){ toast('Talep yazılamadı — kalan depolar gönderilmedi!','error'); break; }
+      yazilan++;
+    }
+    if(yazilan){
+      document.getElementById('mipres-overlay')?.remove();
+      toast('📦 '+yazilan+' depoya rezervasyon talebi gönderildi — depocu onayı bekleniyor','success');
+      renderMip();
+    }
+  } finally { bitti(); }
 }
 
 // ═══ TEDARİKÇİ KARTOTEKİ (#12 arkadaş isteği: cari rehber) ═══
@@ -8147,14 +8313,16 @@ function _whActivateTab(tab){
 function switchWarehouseTab(tab){ _whActivateTab(tab); }
 
 async function renderWarehouse(){
-  const [pi, ws, mv] = await Promise.all([
+  const [pi, ws, mv, res] = await Promise.all([
     dbGet('purchase_items','order=created_at.asc'),
     dbGet('warehouses'),
-    dbGet('warehouse_movements','order=created_at.desc') // münferit (projesiz) stok için (#5)
+    dbGet('warehouse_movements','order=created_at.desc'), // münferit (projesiz) stok için (#5)
+    dbGet('warehouse_reservations') // MİP rezervasyon talepleri (Aşama 2)
   ]);
   purchaseItems = Array.isArray(pi) ? pi : purchaseItems;
   warehouses = Array.isArray(ws) ? ws : warehouses;
   whMovements = Array.isArray(mv) ? mv : whMovements;
+  whReservations = Array.isArray(res) ? res : whReservations;
 
   // Depo bazlı mod için depo dropdown'u
   const sel = document.getElementById('whv-wh-sel');
@@ -8163,8 +8331,156 @@ async function renderWarehouse(){
     sel.innerHTML = h`<option value="">— Depo seçin —</option>${warehouses.map(w=>h`<option value="${w.id}">${w.name}${w.is_active===false?raw(' (pasif)'):''}</option>`)}`;
     if(warehouses.some(w=>w.id===cur)) sel.value = cur;
   }
+  renderWhReservations();
   renderWarehouseList();
   if(document.getElementById('wh-tab-manage')?.classList.contains('active')) renderWarehouseManage();
+}
+
+// ─── MİP rezervasyon talepleri (Aşama 2, depocu tarafı) ───
+// Bekleyenler onay/iptal butonlu; son sonuçlananlar rozetli kısa liste.
+function renderWhReservations(){
+  const el = document.getElementById('wh-reservations');
+  if(!el) return;
+  const bekleyen = whReservations.filter(r=>r.status==='REQUESTED');
+  const sonuclanan = whReservations.filter(r=>r.status!=='REQUESTED' && r.status!=='CANCELLED').slice(0,8);
+  if(!bekleyen.length && !sonuclanan.length){ el.innerHTML=''; return; }
+
+  const satir = (r, aksiyonlar) => {
+    const st = WRES_STATUS[r.status] || WRES_STATUS.REQUESTED;
+    const stok = _whItemStock(r.warehouse_id, r.item_name, r.item_code);
+    const meta = [
+      '📁 '+r.project_name,
+      '🗄️ '+(whName(r.warehouse_id)||'—'),
+      'istenen: '+mipNum(r.requested_qty)+' '+(r.unit||'adet'),
+      r.status==='REQUESTED' ? 'kayıtlı stok: '+mipNum(stok) : (r.approved_qty!=null ? 'onaylanan: '+mipNum(r.approved_qty) : ''),
+      r.requested_by ? '👤 '+r.requested_by : '',
+      r.created_at ? new Date(r.created_at).toLocaleDateString('tr-TR') : ''
+    ].filter(Boolean).join(' · ');
+    return h`<div class="pbom-card" style="border-left:3px solid ${raw(st.color)};margin-bottom:6px">
+      <div class="pbom-card-header">
+        <div style="min-width:0;flex:1">
+          <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${raw(st.color)}55;color:${raw(st.color)};background:${raw(st.color)}15;white-space:nowrap">${st.icon} ${st.label}</span>
+            ${r.item_code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${r.item_code}</span>`:''}
+            ${r.item_name}
+          </div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">${meta}</div>
+          ${r.notes?h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:2px">📝 ${r.notes}</div>`:''}
+          ${r.shortage_reason?h`<div style="font-family:var(--font-mono);font-size:11px;color:#e67e22;margin-top:2px">⚠ ${r.shortage_reason}</div>`:''}
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${aksiyonlar}</div>
+      </div>
+    </div>`;
+  };
+
+  el.innerHTML = h`<div class="form-card" style="margin-bottom:16px">
+    <div style="font-family:var(--font-display);font-size:16px;letter-spacing:2px;color:var(--accent);margin-bottom:10px">📦 MİP REZERVASYON TALEPLERİ${bekleyen.length?h` <span style="font-family:var(--font-mono);font-size:11px;color:${raw(WRES_STATUS.REQUESTED.color)}">(${bekleyen.length} bekliyor)</span>`:''}</div>
+    ${bekleyen.length
+      ? bekleyen.map(r=>satir(r, h`<button class="btn btn-primary btn-sm" onclick="whResApproveModal('${raw(ea(r.id))}')">✅ Sayım / Onay</button><button class="btn btn-ghost btn-sm" onclick="whResCancel('${raw(ea(r.id))}')">✖ İptal</button>`))
+      : h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:6px">Bekleyen talep yok.</div>`}
+    ${sonuclanan.length?h`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:10px 0 6px">Son sonuçlananlar</div>${sonuclanan.map(r=>satir(r, ''))}`:''}
+  </div>`;
+}
+
+// Onay modalı — rcvReceiveModal deseni: canlı özet + kısmi onayda zorunlu
+// açıklama + envanter düzeltme checkbox'ı (default İŞARETLİ: hayalet stok
+// temizlenmezse MİP aynı stoğa tekrar rezervasyon önerir).
+function whResApproveModal(id){
+  const r = whReservations.find(x=>x.id===id);
+  if(!r || r.status!=='REQUESTED') return;
+  const istenen = Number(r.requested_qty)||0;
+  const stok = _whItemStock(r.warehouse_id, r.item_name, r.item_code);
+  const maxOnay = Math.max(0, Math.min(istenen, stok));
+  const inp = INP();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'wres-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:460px;text-align:left">
+    <h3 style="margin-bottom:4px">📦 Rezervasyon Onayı</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${r.item_code?esc(r.item_code)+' — ':''}${esc(r.item_name)} · 📁 ${esc(r.project_name)}<br>İstenen: ${mipNum(istenen)} ${esc(r.unit||'adet')} · Kayıtlı stok: ${mipNum(stok)}${r.requested_by?' · 👤 '+esc(r.requested_by):''}</p>
+    <div class="form-group" style="margin-bottom:8px">
+      <label>Fiziksel sayıma göre onaylanan miktar</label>
+      <input type="number" id="wres-qty" value="${maxOnay}" min="0" max="${maxOnay}" step="0.001" style="${inp}" oninput="whResCalc()">
+    </div>
+    <div id="wres-summary" data-istenen="${istenen}" style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px"></div>
+    <div class="form-group" id="wres-reason-wrap" style="margin-bottom:10px">
+      <label>Eksiğin açıklaması <span style="color:#e74c3c">* (kısmi onayda zorunlu)</span></label>
+      <textarea id="wres-reason" rows="2" placeholder="Örn: sayımda 15 çıktı — kayıp / envanter yanlış" style="${inp};resize:vertical"></textarea>
+    </div>
+    <label id="wres-adj-wrap" style="display:flex;gap:8px;align-items:flex-start;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px;cursor:pointer">
+      <input type="checkbox" id="wres-adjust" checked style="margin-top:2px">
+      <span>Eksik için <b>envanter düzeltme hareketi</b> yaz (kayıtlı stok gerçeğe çekilir; işaretlenmezse hayalet miktar kayıtta kalır)</span>
+    </label>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('wres-overlay').remove()">Vazgeç</button>
+      <button class="btn btn-primary" id="wres-confirm">✅ Sonuçlandır</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#wres-confirm').onclick = ()=>whResApproveConfirm(id);
+  whResCalc();
+  setTimeout(()=>{const el=document.getElementById('wres-qty');if(el){el.focus();el.select();}},100);
+}
+
+function whResCalc(){
+  const sum = document.getElementById('wres-summary');
+  if(!sum) return;
+  const istenen = parseFloat(sum.dataset.istenen)||0;
+  const onay = parseFloat(document.getElementById('wres-qty')?.value)||0;
+  const eksik = Math.max(0, istenen-onay);
+  const kismi = eksik>1e-9;
+  const rw = document.getElementById('wres-reason-wrap');
+  if(rw) rw.style.display = kismi ? '' : 'none';
+  const aw = document.getElementById('wres-adj-wrap');
+  if(aw) aw.style.display = kismi ? 'flex' : 'none';
+  sum.innerHTML = `✅ <span style="color:var(--green,#2ecc71)">${Number(onay.toFixed(4))}</span> projeye rezerve edilir (stoktan düşer)`
+    + (kismi ? ` · 🛒 <span style="color:#e67e22">${Number(eksik.toFixed(4))}</span> eksik → satın almaya düşer` : '');
+}
+
+async function whResApproveConfirm(id){
+  const r = whReservations.find(x=>x.id===id);
+  if(!r) return;
+  const istenen = Number(r.requested_qty)||0;
+  const onayStr = document.getElementById('wres-qty')?.value;
+  const onay = parseFloat(onayStr);
+  if(onayStr==='' || isNaN(onay) || onay<0){ toast('Geçerli bir miktar girin!','error'); return; }
+  if(onay > istenen+1e-9){ toast('Onaylanan, istenen miktardan ('+mipNum(istenen)+') fazla olamaz!','error'); return; }
+  const eksik = Math.max(0, istenen-onay);
+  const aciklama = document.getElementById('wres-reason')?.value?.trim() || '';
+  if(eksik>1e-9 && !aciklama){ toast('Kısmi onayda / redde açıklama zorunlu (kayıp, envanter yanlış vb.)','error'); return; }
+  const duzelt = !!document.getElementById('wres-adjust')?.checked;
+  const bitti = btnBusy('wres-confirm', '⏳ Kaydediliyor…');
+  if(!bitti) return;
+  try{
+    // Onay BACKEND'de tek transaction: OUT hareket(ler)i + eksik için PLANNED
+    // satın alma kalemi orada yazılır. apiFetch hata toast'ı GÖSTERMEZ ve
+    // body'yi stringify ETMEZ — ikisi de burada yapılır.
+    try{
+      await apiFetch('/warehouse-reservations/'+id+'/approve', {method:'POST',
+        body: JSON.stringify({
+          approved_qty: onay,
+          shortage_reason: eksik>1e-9 ? aciklama : null,
+          write_adjustment: eksik>1e-9 && duzelt,
+          approved_by: currentUser?.display_name||currentUser?.username||null
+        })});
+    }catch(e){ toast(e.message||'Onay kaydedilemedi!','error'); return; }
+    document.getElementById('wres-overlay')?.remove();
+    toast(onay>0
+      ? '✅ '+mipNum(onay)+' '+(r.unit||'adet')+' projeye rezerve edildi'+(eksik>1e-9?' · '+mipNum(eksik)+' satın almaya düştü':'')
+      : '✖ Talep reddedildi — '+mipNum(eksik)+' satın almaya düştü', 'success');
+    renderWarehouse(); // rezervasyon + hareket + satın alma kalemleri tazelenir
+  } finally { bitti(); }
+}
+
+async function whResCancel(id){
+  const r = whReservations.find(x=>x.id===id);
+  if(!r || r.status!=='REQUESTED') return;
+  if(!confirm('Rezervasyon talebi iptal edilsin mi?\n\n'+(r.item_code?r.item_code+' — ':'')+r.item_name+' · '+mipNum(r.requested_qty)+' '+(r.unit||'adet')+' ('+r.project_name+')')) return;
+  try{
+    await apiFetch('/warehouse-reservations/'+id+'/cancel', {method:'POST'});
+  }catch(e){ toast(e.message||'İptal edilemedi!','error'); return; }
+  toast('Rezervasyon talebi iptal edildi','success');
+  renderWarehouse();
 }
 
 function whRow(i, actionsHTML){
@@ -10111,7 +10427,15 @@ async function docsSaveParts(docId){
 async function docsDelete(docId){
   const d=bomDocs.find(x=>x.id===docId);
   if(!d) return;
-  if(!confirm(`"${d.filename}" silinsin mi?\n\nDosya içeriği veritabanından kalıcı olarak silinir.`)) return;
+  // Backend guard'ı (DOC_LINKED) bağlı dokümanı silmez — bağ sayısı onaya
+  // yazılır ve onaylanırsa bağlar TEK adımda kaldırılıp öyle silinir.
+  const bagli=(d.part_ids||[]).length;
+  if(!confirm(`"${d.filename}" silinsin mi?\n\nDosya içeriği veritabanından kalıcı olarak silinir.${bagli?`\n⚠ ${bagli} parça bağı var — silmeden önce bağlar kaldırılacak (parçaların teknik resim kapsamından düşer).`:''}`)) return;
+  if(bagli){
+    const ok0=await dbUpdate('bom_documents', docId, {part_ids: []});
+    if(!ok0) return; // hata toast'ı adapter'dan geldi
+    d.part_ids=[];
+  }
   const ok=await dbDelete('bom_documents', docId);
   if(!ok) return; // hata toast'ı adapter'dan geldi
   bomDocs=bomDocs.filter(x=>x.id!==docId);
@@ -11799,14 +12123,9 @@ function pbomeClearPartForm() {
 // kullanıcının kararı gereği OTOMATİK oluşturulur.
 async function ensureProjectDept(projectName, deptName){
   if(!deptName || !projectName) return null;
-  let orderId = await projectNameToOrderId(projectName);
-  if(!orderId){
-    // projectNameToOrderId 30 sn'lik referans cache'ine bakar; yeni açılmış bir
-    // proje orada yoksa sessizce null döner ve bölüm HİÇ oluşturulmaz.
-    // Cache'i tazeleyip bir kez daha dene.
-    invalidateRef('orders');
-    orderId = await projectNameToOrderId(projectName);
-  }
+  // Bayat cache koruması ortak helper'da (resolveOrderIdOrRetry); null'da
+  // sessiz kalmak BURADA bilinçli — bölüm oluşturulamazsa parça bölümsüz kalır.
+  const orderId = await resolveOrderIdOrRetry(projectName);
   if(!orderId) return null;
   const list = await dbGet('departments','order_id=eq.'+orderId);
   const mevcut = (Array.isArray(list)?list:[]).find(d =>

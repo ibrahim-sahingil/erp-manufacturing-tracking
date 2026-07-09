@@ -30,6 +30,13 @@ import java.util.UUID;
  *   WAREHOUSE_TRANSFER- depolar arasi aktarim (4. tur #2): kaynak depoya OUT +
  *                       hedef depoya IN cifti; kalem bagli aktarimda
  *                       purchase_item_id dolu, munferit stokta NULL
+ *   RESERVATION       - MIP rezervasyon onayi (Asama 2, 7. tur #4): onaylanan
+ *                       miktar OUT ile projeye mal edilir (reservation_id dolu).
+ *                       YALNIZ WarehouseReservationService.approve yazar -
+ *                       disaridan POST reddedilir (create'e bak).
+ *   RESERVATION_ADJUST- rezervasyon kismi onayinda kayip miktarin envanter
+ *                       duzeltme OUT'u (sayimda cikmayan hayalet stok).
+ *                       O da yalniz approve icinden yazilir.
  *
  * item_name/item_code SNAPSHOT'tir: kaynak satin alma kalemi silinse de
  * (purchase_item_id SET NULL olur) hareket gecmisi anlamli kalir.
@@ -38,6 +45,7 @@ import java.util.UUID;
  *   id               uuid          (BaseEntity'den)
  *   warehouse_id     uuid          NOT NULL (FK -> warehouses, ON DELETE RESTRICT)
  *   purchase_item_id uuid          NULL (FK -> purchase_items, ON DELETE SET NULL)
+ *   reservation_id   uuid          NULL (FK -> warehouse_reservations, ON DELETE SET NULL)
  *   item_name        varchar(200)  NOT NULL (snapshot)
  *   item_code        varchar(100)  NULL (snapshot)
  *   movement_type    varchar(10)   NOT NULL CHECK (IN/OUT)
@@ -66,6 +74,9 @@ public class WarehouseMovement extends BaseEntity {
 
     @Column(name = "delivery_note_id")
     private UUID deliveryNoteId;
+
+    @Column(name = "reservation_id")
+    private UUID reservationId;
 
     @Column(name = "item_name", nullable = false, length = 200)
     private String itemName;

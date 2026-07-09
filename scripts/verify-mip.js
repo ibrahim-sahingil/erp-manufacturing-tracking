@@ -3,13 +3,17 @@
 // index.html'den saf fonksiyonlari grab() ile cikarip Node'da kosar:
 //   mipKey / whStockOf / mipGroupParts / mipCalcRow / mipSuggest
 //
-// Kapsanan kurallar (7. tur #4, Asama 1):
+// Kapsanan kurallar (7. tur #4, Asama 1 + Asama 2 rezervasyon):
 //   - Sadece satin alinan turler (TEDARIK/HAMMADDE/SARF) listelenir
 //   - custom_* bir OVERRIDE'dir; bossa resolved_* kullanilir
 //   - Ayni kod agacin farkli dallarinda tekrar edebilir -> adetler TOPLANIR
 //   - Eslesme: kod oncelikli, kod yoksa ad
-//   - missing = max(0, need - stok - malKabul)
-//   - Durum onceligi: DONE > FROM_STOCK > WAITING > SUPPLY > MISSING
+//   - missing = max(0, need - stok - malKabul - rezerve)
+//   - Durum onceligi: DONE > RESERVED > FROM_STOCK > WAITING > SUPPLY > MISSING
+//   - APPROVED/PARTIAL rezervasyonun approved_qty'si 'reserved' sayilir
+//     (OUT stoktan zaten dusurdu — cifte sayim yok); REQUESTED yalniz
+//     pendingReserve olarak raporlanir, missing'i DEGISTIRMEZ
+//   - mipReservePlan: karsilanmamis ihtiyaci depolara SIRAYLA dagitir
 //
 // Kullanim: node scripts/verify-mip.js
 const fs = require('fs');
@@ -50,6 +54,7 @@ eval(grab('mipGroupParts'));
 eval(grab('mipCalcRow'));
 eval(grab('mipNum'));
 eval(grab('mipSuggest'));
+eval(grab('mipReservePlan'));
 
 const WH = [{id: 'A', name: 'A-Depo'}, {id: 'B', name: 'B-Depo'}];
 const mv = (whId, name, code, type, qty) =>
@@ -144,6 +149,72 @@ chk('baska malzemenin kalemi sayilmaz',
     mipCalcRow(g50, WH, [], [pi('PROJE-1', 'Baska', 'BSK-9', 'ORDERED', 50)], 'PROJE-1').ordered === 0);
 chk('negatif stokta eksik sismez (max 0)',
     mipCalcRow({...g50, need: 5}, WH, bolStok, [], 'PROJE-1').missing === 0);
+
+console.log('\n═══ mipCalcRow: rezervasyonlar (Asama 2) ═══');
+const wres = (proje, name, code, status, reqQty, appQty) =>
+  ({project_name: proje, item_name: name, item_code: code, status,
+    requested_qty: reqQty, approved_qty: appQty});
+
+// Arkadasin senaryosu: 50 ihtiyac, A'da 40 vardi; 30'u onaylandi -> OUT yazildi,
+// kayitli stok 10'a dustu. reserved=30 karsilanmis sayilir, eksik 10 kalir.
+const mvRezSonrasi = [
+  mv('A', 'M12 Somun', 'SOM-12', 'IN', 40),
+  mv('A', 'M12 Somun', 'SOM-12', 'OUT', 30) // rezervasyon OUT'u (backend yazdi)
+];
+const rezOnayli = [wres('PROJE-1', 'M12 Somun', 'SOM-12', 'APPROVED', 30, 30)];
+const rRez = mipCalcRow(g50, WH, mvRezSonrasi, [], 'PROJE-1', rezOnayli);
+chk('reserved 30 okundu', rRez.reserved === 30, rRez.reserved);
+chk('cifte sayim yok: eksik 10 (50 - 10 stok - 30 rezerve)', rRez.missing === 10, rRez.missing);
+chk('oneri rezerveyi soyler', mipSuggest(rRez).includes('30 depoya rezerve'), mipSuggest(rRez));
+
+// RESERVED durumu FROM_STOCK'tan ONCE: rezerve + stok ihtiyaci kapatiyor
+const rRez2 = mipCalcRow({...g50, need: 40}, WH, mvRezSonrasi, [], 'PROJE-1', rezOnayli);
+chk('rezerve+stok yeterli -> RESERVED (FROM_STOCK degil)', rRez2.status === 'RESERVED', rRez2.status);
+chk('RESERVED iken eksik 0', rRez2.missing === 0);
+
+// PARTIAL: yalniz ONAYLANAN miktar sayilir (30 istendi, 15 cikti)
+const rKismi = mipCalcRow(g50, WH, mvRezSonrasi, [],
+  'PROJE-1', [wres('PROJE-1', 'M12 Somun', 'SOM-12', 'PARTIAL', 30, 15)]);
+chk('PARTIAL onaylanan kadar sayilir (15)', rKismi.reserved === 15, rKismi.reserved);
+
+// REQUESTED: yalniz bilgi — missing DEGISMEZ, pendingReserve raporlanir
+const rBekleyen = mipCalcRow(g50, WH, hareketler, [],
+  'PROJE-1', [wres('PROJE-1', 'M12 Somun', 'SOM-12', 'REQUESTED', 40, null)]);
+chk('REQUESTED missing degistirmez', rBekleyen.missing === 10, rBekleyen.missing);
+chk('pendingReserve raporlanir (40)', rBekleyen.pendingReserve === 40, rBekleyen.pendingReserve);
+chk('REQUESTED reserved sayilmaz', rBekleyen.reserved === 0);
+
+// Sizinti: baska proje / CANCELLED / REJECTED sayilmaz
+chk('BASKA projenin rezervasyonu sayilmaz',
+    mipCalcRow(g50, WH, [], [], 'PROJE-1',
+      [wres('BASKA-PROJE', 'M12 Somun', 'SOM-12', 'APPROVED', 30, 30)]).reserved === 0);
+chk('CANCELLED rezervasyon sayilmaz',
+    mipCalcRow(g50, WH, [], [], 'PROJE-1',
+      [wres('PROJE-1', 'M12 Somun', 'SOM-12', 'CANCELLED', 30, null)]).pendingReserve === 0);
+chk('REJECTED rezervasyon sayilmaz',
+    mipCalcRow(g50, WH, [], [], 'PROJE-1',
+      [wres('PROJE-1', 'M12 Somun', 'SOM-12', 'REJECTED', 30, 0)]).reserved === 0);
+chk('baska malzemenin rezervasyonu sayilmaz',
+    mipCalcRow(g50, WH, [], [], 'PROJE-1',
+      [wres('PROJE-1', 'Baska', 'BSK-9', 'APPROVED', 30, 30)]).reserved === 0);
+
+console.log('\n═══ mipReservePlan: dagitim onerisi ═══');
+const pRow = (need, received, reserved, stockByWh) => ({need, received, reserved, stockByWh});
+const dag1 = mipReservePlan(pRow(50, 0, 0,
+  [{whId: 'A', name: 'A-Depo', qty: 30}, {whId: 'B', name: 'B-Depo', qty: 10}]));
+chk('stok yetmiyorsa depolar sirayla bosaltilir (30+10)',
+    dag1.length === 2 && dag1[0].qty === 30 && dag1[1].qty === 10,
+    JSON.stringify(dag1.map(p => p.qty)));
+const dag2 = mipReservePlan(pRow(35, 0, 0,
+  [{whId: 'A', name: 'A-Depo', qty: 30}, {whId: 'B', name: 'B-Depo', qty: 10}]));
+chk('kalan ihtiyac kadar istenir (30+5)',
+    dag2.length === 2 && dag2[0].qty === 30 && dag2[1].qty === 5,
+    JSON.stringify(dag2.map(p => p.qty)));
+const dag3 = mipReservePlan(pRow(50, 10, 30, [{whId: 'A', name: 'A-Depo', qty: 25}]));
+chk('mal kabul + onceki rezerve dusulur (50-10-30=10)',
+    dag3.length === 1 && dag3[0].qty === 10, JSON.stringify(dag3));
+chk('ihtiyac karsilanmissa plan bos',
+    mipReservePlan(pRow(30, 0, 30, [{whId: 'A', name: 'A-Depo', qty: 25}])).length === 0);
 
 console.log('\n' + '─'.repeat(60));
 if(fail){ console.log(`❌ ${fail} kontrol BASARISIZ.`); process.exit(1); }

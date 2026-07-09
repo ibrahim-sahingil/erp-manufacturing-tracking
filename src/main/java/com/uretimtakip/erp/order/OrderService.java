@@ -8,6 +8,7 @@ import com.uretimtakip.erp.order.dto.OrderResponse;
 import com.uretimtakip.erp.part.PartRepository;
 import com.uretimtakip.erp.projectbom.ProjectBomRepository;
 import com.uretimtakip.erp.purchasing.PurchaseItemRepository;
+import com.uretimtakip.erp.warehouse.WarehouseReservationRepository;
 import com.uretimtakip.erp.workorder.WorkOrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,7 @@ public class OrderService {
     private final WorkOrderRepository workOrderRepository;
     private final PurchaseItemRepository purchaseItemRepository;
     private final ProjectBomRepository projectBomRepository;
+    private final WarehouseReservationRepository warehouseReservationRepository;
 
     @Transactional(readOnly = true)
     public List<OrderResponse> listAll() {
@@ -146,8 +148,12 @@ public class OrderService {
                     oldProjectName, updated.getProjectName());
             int renamedBoms = projectBomRepository.renameProjectName(
                     oldProjectName, updated.getProjectName());
-            log.info("Project renamed '{}' -> '{}': purchase_items={}, project_bom={}",
-                    oldProjectName, updated.getProjectName(), renamedItems, renamedBoms);
+            int renamedReservations = warehouseReservationRepository.renameProjectName(
+                    oldProjectName, updated.getProjectName());
+            log.info("Project renamed '{}' -> '{}': purchase_items={}, project_bom={}, "
+                            + "warehouse_reservations={}",
+                    oldProjectName, updated.getProjectName(), renamedItems, renamedBoms,
+                    renamedReservations);
         }
 
         return OrderResponse.fromEntity(updated);
@@ -165,12 +171,14 @@ public class OrderService {
         long workOrders = workOrderRepository.countByOrderId(id);
         long purchaseItems = purchaseItemRepository.countByProjectName(order.getProjectName());
         long projectBoms = projectBomRepository.countByProjectName(order.getProjectName());
-        if (parts + workOrders + purchaseItems + projectBoms > 0) {
+        long reservations = warehouseReservationRepository.countByProjectName(order.getProjectName());
+        if (parts + workOrders + purchaseItems + projectBoms + reservations > 0) {
             StringBuilder sb = new StringBuilder("Bu proje silinemez, bagli kayitlari var:");
             if (parts > 0) sb.append(" ").append(parts).append(" uretim parcasi,");
             if (workOrders > 0) sb.append(" ").append(workOrders).append(" is emri,");
             if (purchaseItems > 0) sb.append(" ").append(purchaseItems).append(" satin alma kalemi,");
             if (projectBoms > 0) sb.append(" ").append(projectBoms).append(" urun agaci baglantisi,");
+            if (reservations > 0) sb.append(" ").append(reservations).append(" depo rezervasyonu,");
             sb.setLength(sb.length() - 1);
             sb.append(". Once bunlari silin/tasiyin.");
             throw new BusinessException(sb.toString(), "ORDER_HAS_DEPENDENT_DATA");
