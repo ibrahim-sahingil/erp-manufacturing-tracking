@@ -543,16 +543,30 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     for(const p of projParts) await dbUpdate('parts', p.id, {status:'pending', qty_done:0, qty_reject:0, parent_part_id:null});
     for(const p of projParts) await del('parts', p.id);
     for(const pb of (await dbGet('project_bom')).filter(x=>x.project_name===PROJ)) await del('project_bom', pb.id);
-    for(const bp of (await dbGet('bom_products')).filter(x=>(x.name||'')==='E2E Ürün')) await del('bom_products', bp.id);
+    // BomProductService parçası olan ürünü SİLMEZ; önce şablon parçaları
+    // yapraktan köke silinmeli. Eskiden bu adım yoktu: silme sessizce
+    // reddediliyor (hata yutuluyor), her koşuda bir "E2E Ürün" + parçaları
+    // DB'de birikiyordu (33 ürün / 160 parça bulundu, 2026-07-10'da temizlendi).
+    const e2eUrunler = (await dbGet('bom_products')).filter(x=>(x.name||'')==='E2E Ürün');
+    const e2eUrunIds = new Set(e2eUrunler.map(p=>p.id));
+    const e2eParcalar = (await dbGet('bom_parts')).filter(p=>e2eUrunIds.has(p.product_id))
+      .sort((a,b)=>(b.level||0)-(a.level||0)); // önce yapraklar (alt parçası olan silinemez)
+    for(const p of e2eParcalar) await del('bom_parts', p.id);
+    for(const bp of e2eUrunler) await del('bom_products', bp.id);
     for(const id of created.wh) await del('warehouses', id);
     for(const o of (await dbGet('orders')).filter(x=>x.project_name===PROJ)) await del('orders', o.id);
-    // temizlik doğrulaması
+    // temizlik doğrulaması — bom_products/bom_parts da SAYILIR (eskiden sayılmıyordu,
+    // bu yüzden "0 artık kayıt" diyor ama ürünler birikiyordu)
+    const kalanUrunler = (await dbGet('bom_products')).filter(x=>(x.name||'')==='E2E Ürün');
+    const kalanUrunIds = new Set(kalanUrunler.map(p=>p.id));
     const leftovers =
       (await dbGet('purchase_items')).filter(x=>x.project_name===PROJ).length +
       (await dbGet('parts')).filter(x=>x.project===PROJ).length +
       (await dbGet('project_bom')).filter(x=>x.project_name===PROJ).length +
       (await dbGet('orders')).filter(x=>x.project_name===PROJ).length +
-      (await dbGet('warehouse_movements')).filter(m=>(m.item_code||'').startsWith('E2E-')).length;
+      (await dbGet('warehouse_movements')).filter(m=>(m.item_code||'').startsWith('E2E-')).length +
+      kalanUrunler.length +
+      (await dbGet('bom_parts')).filter(p=>kalanUrunIds.has(p.product_id)).length;
     check('temizlik tamam (0 artık kayıt)', leftovers===0, leftovers);
     console.log('\n═══ SONUÇ: ' + (failures? failures+' HATA ❌' : 'TÜM TESTLER GEÇTİ ✅') + ' ═══');
     process.exit(failures?1:0);

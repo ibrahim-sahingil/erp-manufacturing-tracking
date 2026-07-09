@@ -146,6 +146,14 @@ MSYS_NO_PATHCONV=1 taskkill /F /IM java.exe   # Git Bash: /F'i F:/ yapmasın
     toplamı, beş durum önceliği, sızıntı (başka proje / CANCELLED).
   - `node scripts/verify-opdef-cascade.js` (sunucu gerekir) — işlem tanımının
     bölüm alanı + kod değişince ağaç kodlarının yeniden inşası.
+  - `node scripts/audit-test-leftovers.js` (sunucu gerekir, SALT OKUNUR) — test
+    öneki (`E2E`, `AUDIT`, `MIP`…) taşıyan artık kayıt kalmış mı. Bir test
+    scriptinin temizliği sızdırıyorsa bunu yakalar.
+- **Test temizliği tuzağı:** `dbDelete(...).catch(()=>{})` ile yutulan hatalar
+  sessiz sızıntı yapar. `BomProductService` parçası olan ürünü SİLMEZ → şablon
+  parçaları önce yapraktan köke silinmeli. Temizlik doğrulaması silinen HER
+  tabloyu saymalı; e2e-test.js `bom_products`/`bom_parts` saymadığı için
+  "0 artık kayıt" derken 33 ürün + 160 parça biriktirmişti (2026-07-10).
 - **Ağaç parçalarında override kuralı:** `project_bom_parts.custom_code`/`custom_qty`
   birer OVERRIDE'dır; boşsa etkin değer bağlı şablon parçasından türetilir
   (`ProjectBomPartService.effectiveCode`). **Boş `custom_code`'un üzerine yazma** —
