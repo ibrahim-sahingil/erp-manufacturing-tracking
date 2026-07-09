@@ -44,6 +44,8 @@ function grab(name){
 (0,eval)(grab('mvInsert'));          // temizlik turu: warehouse_movements kurucu (rcvDoReceive kullanır)
 (0,eval)(grab('splitPurchaseItem')); // temizlik turu: kısmi kabul/aktarım ortak bölme çekirdeği
 (0,eval)(grab('rcvDoReceive'));   // 4. tur: kısmi mal kabul çekirdeği
+(0,eval)(grab('mipKey'));         // 7. tur #4: eşleştirme anahtarı (kod önce, yoksa ad)
+(0,eval)(grab('whStockOf'));      // 7. tur #4: saf stok hesabı — _whItemStock buna delege eder
 (0,eval)(grab('_whItemStock'));   // O6: depo net stok hesabı (sevk uyarısının çekirdeği)
 (0,eval)(grab('_unlinkPlanSources')); // E5: plaka iptal/silmede kaynakları havuza döndürme
 

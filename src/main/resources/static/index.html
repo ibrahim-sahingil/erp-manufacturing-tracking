@@ -507,6 +507,7 @@
     <button class="nav-tab" data-tab="users" onclick="switchTab('users')">👷 Personel</button>
     <button class="nav-tab" data-tab="stats" onclick="switchTab('stats')">📈 İstatistik</button>
     <button class="nav-tab" data-tab="orders" onclick="switchTab('orders')">📋 Siparişler</button>
+    <button class="nav-tab" data-tab="mip" onclick="switchTab('mip')">📐 MİP</button>
     <button class="nav-tab" data-tab="purchasing" onclick="switchTab('purchasing')">🛒 Satın Alma</button>
     <button class="nav-tab" data-tab="warehouse" onclick="switchTab('warehouse')">🏭 Depo</button>
     <button class="nav-tab" data-tab="delivery" onclick="switchTab('delivery')">🚚 İrsaliye</button>
@@ -974,6 +975,34 @@
 
 <!-- KULLANICI YÖNETİMİ (sadece geliştirici) -->
 <!-- SATIN ALMA PLANLAMASI -->
+<!-- MİP — Malzeme İhtiyaç Planlama (7. tur #4, Aşama 1: görünürlük) -->
+<div class="view" id="view-mip">
+  <div class="section-title">MİP — MALZEME İHTİYAÇ PLANLAMA</div>
+  <div class="section-sub">Yayınlanmış proje seç · Depolardaki stokla karşılaştır · Eksiği gör</div>
+
+  <div class="form-card" style="margin-bottom:16px">
+    <div class="form-row" style="margin-bottom:0">
+      <div class="form-group" style="flex:1;margin-bottom:0"><label>Proje (yayınlanmış ürün ağacı)</label>
+        <select id="mip-project-sel" onchange="renderMipList()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+          <option value="">— Proje seçin —</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:0;align-self:flex-end">
+        <button class="btn btn-ghost btn-sm" onclick="renderMip()" title="Depo ve satın alma verisini yeniden çek">🔄 Yenile</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="mip-summary"></div>
+
+  <div style="background:rgba(41,128,185,.08);border:1px solid rgba(41,128,185,.2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">
+    💡 Depo stoğu <b>projelere ayrılmamış serbest havuzdur</b> — aynı malzemeyi başka bir proje de görüyor olabilir.
+    Depoya rezervasyon emri gönderme (tam/kısmi onay) sonraki aşamada eklenecek.
+  </div>
+
+  <div id="mip-list"></div>
+</div>
+
 <div class="view" id="view-purchasing">
   <div class="section-title">SATIN ALMA PLANLAMASI</div>
   <div class="section-sub">Proje seç · Ürün ağacından aktar veya elle kalem ekle · Toplu sipariş, teklif ve onay</div>
@@ -6058,6 +6087,7 @@ async function switchTab(tab) {
   if(tab==='users')     renderUsers();
   if(tab==='stats')     renderStatsView();
   if(tab==='orders')    renderOrders();
+  if(tab==='mip')       renderMip();
   if(tab==='purchasing') renderPurchasing();
   if(tab==='warehouse') renderWarehouse();
   if(tab==='delivery')  renderDelivery();
@@ -6065,6 +6095,217 @@ async function switchTab(tab) {
   if(tab==='bom')       initBom();
   if(tab==='docs')      initDocs();
   if(tab==='appusers')  renderAppUsers();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MİP — MALZEME İHTİYAÇ PLANLAMA (7. tur #4, Aşama 1: GÖRÜNÜRLÜK)
+// ═══════════════════════════════════════════════════════════════════════════
+// Sorun: ürün ağacı yayınlanınca Tedarik/Hammadde/Sarf parçaları doğrudan satın
+// almaya düşüyor; depoda o malzemeden VAR MI hiç bakılmıyor. Elde 30 somun
+// dururken 50 tane daha sipariş ediliyor.
+//
+// Aşama 1 HİÇBİR YERE YAZMAZ — yalnızca okur: ihtiyaç (ağaç) ile stok (depolar)
+// ve satın alma durumunu yan yana koyar, eksiği ve renkli durumu gösterir.
+// Depoya rezervasyon emri / kısmi onay Aşama 2'de gelecek.
+//
+// DİKKAT: depo stoğu PROJESİZ serbest havuzdur (warehouse_movements'ta proje
+// alanı yok) — aynı stoğu başka bir proje de görüyor olabilir. Kullanıcı kararı:
+// ham stok gösterilir + uyarı yazılır.
+
+const MIP_STATUS = {
+  DONE:      {label:'Tamamlandı',        icon:'✅', color:'#2ecc71'},
+  FROM_STOCK:{label:'Depodan karşılanır', icon:'🏭', color:'#27ae60'},
+  WAITING:   {label:'Sipariş bekleniyor', icon:'⏳', color:'#f5a623'},
+  SUPPLY:    {label:'Tedarik edilecek',   icon:'🛒', color:'#8e44ad'},
+  MISSING:   {label:'Sipariş verilmedi',  icon:'⚠', color:'#e74c3c'}
+};
+
+// Ağaç parçasının etkin değerleri: custom_* birer OVERRIDE'dır, boşsa şablondan
+// (resolved_*) gelir. pbomPublishParts ile AYNI mantık — ikisi senkron kalmalı.
+function mipCodeOf(p){ return p.custom_code || p.resolved_code || null; }
+function mipNameOf(p){ return p.custom_name || p.resolved_name || null; }
+function mipQtyOf(p){
+  const q = p.custom_qty != null ? p.custom_qty : (p.resolved_qty != null ? p.resolved_qty : 1);
+  return Number(q) || 0;
+}
+function mipKindOf(p){ return p.material_kind || p.resolved_material_kind || null; }
+
+// Yayınlanmış proje ağacının SATIN ALINAN parçalarını koda göre gruplar.
+// Aynı kod ağacın farklı dallarında tekrar edebilir → adetler TOPLANIR
+// (pbomPublishParts'taki purGroups deseniyle birebir).
+function mipGroupParts(pbParts){
+  const groups = new Map(); // key → {key, code, name, unit, need}
+  for(const p of pbParts){
+    const code = mipCodeOf(p), name = mipNameOf(p);
+    if(p.is_excluded || !name) continue;
+    if(!PURCHASE_KINDS.includes(mipKindOf(p))) continue; // sadece satın alınanlar
+    const key = mipKey(name, code);
+    if(!key) continue;
+    const g = groups.get(key) || {key, code, name, unit: p.custom_unit || p.resolved_unit || 'adet', need: 0};
+    g.need += mipQtyOf(p);
+    groups.set(key, g);
+  }
+  return [...groups.values()];
+}
+
+// SAF hesap çekirdeği — sunucusuz test edilir (scripts/verify-mip.js).
+// Dönüş: {…grup, stockByWh, stockTotal, ordered, received, planned, missing, status}
+function mipCalcRow(group, warehouses, movements, purchaseItems, projectName){
+  const stockByWh = warehouses
+    .map(w => ({whId: w.id, name: w.name, qty: whStockOf(movements, w.id, group.name, group.code)}))
+    .filter(x => x.qty > 1e-9);
+  const stockTotal = stockByWh.reduce((s, x) => s + x.qty, 0);
+
+  let ordered = 0, received = 0, planned = 0;
+  for(const i of purchaseItems){
+    if(i.project_name !== projectName) continue;
+    if(i.status === 'CANCELLED') continue;
+    if(mipKey(i.name, i.code) !== group.key) continue;
+    const q = Number(i.quantity) || 0;
+    if(i.status === 'ORDERED') ordered += q;
+    else if(i.status === 'RECEIVED' || i.status === 'IN_WAREHOUSE' || i.status === 'IN_STOCK') received += q;
+    else if(i.status === 'PLANNED') planned += q;
+  }
+
+  const missing = Math.max(0, group.need - stockTotal - received);
+
+  // Durum önceliği (ilk eşleşen kazanır)
+  let status;
+  if(received >= group.need && group.need > 0)      status = 'DONE';
+  else if(missing < 1e-9 && stockTotal > 0)         status = 'FROM_STOCK';
+  else if(ordered > 0)                              status = 'WAITING';
+  else if(stockTotal < 1e-9 && missing > 0)         status = 'SUPPLY';
+  else                                              status = 'MISSING';
+
+  return {...group, stockByWh, stockTotal, ordered, received, planned, missing, status};
+}
+
+// "30 A-Depo'dan, 10 B-Depo'dan, 10 satın al" önerisi
+function mipSuggest(row){
+  const parcalar = [];
+  let kalan = row.need - row.received;
+  if(row.received > 0) parcalar.push(`${mipNum(row.received)} mal kabul edildi`);
+  for(const s of row.stockByWh){
+    if(kalan <= 1e-9) break;
+    const al = Math.min(s.qty, kalan);
+    parcalar.push(`${mipNum(al)} ${s.name}'dan`);
+    kalan -= al;
+  }
+  if(kalan > 1e-9) parcalar.push(`${mipNum(kalan)} satın alınacak`);
+  return parcalar.join(' · ') || 'İhtiyaç yok';
+}
+
+function mipNum(v){ return Number(Number(v).toFixed(4)); }
+
+// ─── Render ───
+let _mipRows = [];
+
+async function renderMip(){
+  const [pbs, ws, mv, pi] = await Promise.all([
+    dbGet('project_bom'),
+    dbGet('warehouses'),
+    dbGet('warehouse_movements'),
+    dbGet('purchase_items')
+  ]);
+  if(Array.isArray(pbs)) projectBoms = pbs;
+  if(Array.isArray(ws)) warehouses = ws;
+  if(Array.isArray(mv)) whMovements = mv;
+  if(Array.isArray(pi)) purchaseItems = pi;
+
+  // Proje seçici: yalnızca YAYINLANMIŞ ağacı olan projeler (tekilleştirilmiş)
+  const sel = document.getElementById('mip-project-sel');
+  if(sel){
+    const cur = sel.value;
+    const adlar = [...new Set(projectBoms.filter(p=>p.status==='published').map(p=>p.project_name))]
+      .sort((a,b)=>a.localeCompare(b,'tr'));
+    sel.innerHTML = h`<option value="">— Proje seçin —</option>${adlar.map(a=>h`<option value="${a}">${a}</option>`)}`;
+    if(adlar.includes(cur)) sel.value = cur;
+  }
+  await renderMipList();
+}
+
+async function renderMipList(){
+  const el = document.getElementById('mip-list');
+  const sum = document.getElementById('mip-summary');
+  if(!el) return;
+  const proje = document.getElementById('mip-project-sel')?.value || '';
+
+  if(!proje){
+    if(sum) sum.innerHTML = '';
+    const yayinVar = projectBoms.some(p=>p.status==='published');
+    el.innerHTML = h`<div class="empty-state" style="padding:26px"><span class="emoji">📐</span>${
+      yayinVar ? 'Yukarıdan bir proje seçin' : 'Henüz yayınlanmış ürün ağacı yok — Ürün Ağacı sekmesinden bir ağacı projeye bağlayıp yayınlayın'}</div>`;
+    _mipRows = [];
+    return;
+  }
+
+  // Bu projeye bağlı TÜM yayınlanmış ağaçların parçaları
+  const pbomIds = projectBoms.filter(p=>p.project_name===proje && p.status==='published').map(p=>p.id);
+  let parts = [];
+  for(const id of pbomIds){
+    const rows = await dbGet('project_bom_parts','project_bom_id=eq.'+id);
+    if(Array.isArray(rows)) parts = parts.concat(rows);
+  }
+
+  const gruplar = mipGroupParts(parts);
+  _mipRows = gruplar
+    .map(g => mipCalcRow(g, warehouses, whMovements, purchaseItems, proje))
+    .sort((a,b)=>{
+      const oncelik = {MISSING:0, SUPPLY:1, WAITING:2, FROM_STOCK:3, DONE:4};
+      return (oncelik[a.status]-oncelik[b.status]) || a.name.localeCompare(b.name,'tr');
+    });
+
+  if(sum) sum.innerHTML = mipSummaryHTML(_mipRows);
+
+  if(!_mipRows.length){
+    el.innerHTML = h`<div class="empty-state" style="padding:26px"><span class="emoji">✅</span>Bu projede satın alınacak parça yok (Tedarik / Hammadde / Sarf türü parça bulunamadı)</div>`;
+    return;
+  }
+  el.innerHTML = h`${_mipRows.map(r=>mipRowHTML(r))}`;
+}
+
+function mipSummaryHTML(rows){
+  const say = s => rows.filter(r=>r.status===s).length;
+  const kutu = (etiket, adet, renk) => h`<div style="flex:1;min-width:120px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid ${raw(renk)};border-radius:6px;padding:10px 14px">
+      <div style="font-family:var(--font-mono);font-size:20px;color:${raw(renk)}">${adet}</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">${etiket}</div>
+    </div>`;
+  return h`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    ${kutu('Toplam parça', rows.length, 'var(--accent)')}
+    ${kutu('Sipariş verilmedi', say('MISSING'), MIP_STATUS.MISSING.color)}
+    ${kutu('Tedarik edilecek', say('SUPPLY'), MIP_STATUS.SUPPLY.color)}
+    ${kutu('Sipariş bekleniyor', say('WAITING'), MIP_STATUS.WAITING.color)}
+    ${kutu('Depodan karşılanır', say('FROM_STOCK'), MIP_STATUS.FROM_STOCK.color)}
+    ${kutu('Tamamlandı', say('DONE'), MIP_STATUS.DONE.color)}
+  </div>`;
+}
+
+function mipRowHTML(r){
+  const st = MIP_STATUS[r.status];
+  const dagilim = r.stockByWh.length
+    ? r.stockByWh.map(s=>`${s.name}: ${mipNum(s.qty)}`).join(' · ')
+    : 'Hiçbir depoda yok';
+  return h`<div class="pbom-card" style="border-left:3px solid ${raw(st.color)};margin-bottom:8px">
+    <div class="pbom-card-header">
+      <div style="min-width:0;flex:1">
+        <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${raw(st.color)}55;color:${raw(st.color)};background:${raw(st.color)}15;white-space:nowrap">${st.icon} ${st.label}</span>
+          ${r.code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${r.code}</span>`:''}
+          <b>${r.name}</b>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:4px">
+          🎯 İhtiyaç: <b style="color:var(--text)">${mipNum(r.need)} ${r.unit}</b>
+          &nbsp;·&nbsp; 🏭 Stok: <b style="color:${raw(r.stockTotal>0?'var(--green,#2ecc71)':'var(--muted)')}">${mipNum(r.stockTotal)}</b>
+          ${r.received?h`&nbsp;·&nbsp; 📥 Mal kabul: <b style="color:var(--green,#2ecc71)">${mipNum(r.received)}</b>`:''}
+          ${r.ordered?h`&nbsp;·&nbsp; 📦 Siparişte: <b style="color:#2980b9">${mipNum(r.ordered)}</b>`:''}
+          ${r.planned?h`&nbsp;·&nbsp; 📝 Planlandı: ${mipNum(r.planned)}`:''}
+          ${r.missing?h`&nbsp;·&nbsp; ⚠ Eksik: <b style="color:${raw(MIP_STATUS.MISSING.color)}">${mipNum(r.missing)}</b>`:''}
+        </div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">🗄️ ${dagilim}</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:#2980b9;margin-top:3px">💡 ${mipSuggest(r)}</div>
+      </div>
+    </div>
+  </div>`;
 }
 
 // ═══ TEDARİKÇİ KARTOTEKİ (#12 arkadaş isteği: cari rehber) ═══
@@ -9075,17 +9316,26 @@ async function whmAddMovement(){
   renderWhMovements();
 }
 
-// Bir depodaki tek malzemenin net stoğu (kod varsa kodla, yoksa adla eşleşir)
-function _whItemStock(warehouseId, itemName, itemCode){
-  const key = (itemCode || itemName || '').trim().toLowerCase();
+// Malzeme eşleştirme anahtarı: KOD öncelikli, kod yoksa AD (7. tur #4 kararı).
+// Depo hareketleri, satın alma kalemleri ve ağaç parçaları hep bununla eşleşir.
+function mipKey(name, code){ return (code || name || '').trim().toLowerCase(); }
+
+// Bir depodaki tek malzemenin net stoğu — SAF: hareket listesini parametre alır,
+// böylece sunucusuz test edilebilir (scripts/verify-mip.js grab() ile çıkarır).
+function whStockOf(movements, warehouseId, itemName, itemCode){
+  const key = mipKey(itemName, itemCode);
   let net = 0;
-  for(const m of whMovements){
+  for(const m of movements){
     if(m.warehouse_id !== warehouseId) continue;
-    const mk = (m.item_code || m.item_name || '').trim().toLowerCase();
-    if(mk !== key) continue;
+    if(mipKey(m.item_name, m.item_code) !== key) continue;
     net += (m.movement_type==='IN' ? 1 : -1) * Number(m.quantity || 0);
   }
   return net;
+}
+
+// Bir depodaki tek malzemenin net stoğu (kod varsa kodla, yoksa adla eşleşir)
+function _whItemStock(warehouseId, itemName, itemCode){
+  return whStockOf(whMovements, warehouseId, itemName, itemCode);
 }
 
 // Stok özeti: hareketlerden SUM(IN)−SUM(OUT); ayrı stok tablosu yok
@@ -9275,8 +9525,8 @@ function editAppUserPerms(id) {
   const u = appUsers.find(x => x.id === id);
   if (!u) return;
   const perms = Array.isArray(u.permissions) ? u.permissions : JSON.parse(u.permissions||'[]');
-  const allPerms = ['dashboard','parts','users','stats','orders_view','orders_edit','purchasing','warehouse','planning','scan'];
-  const labels = {dashboard:'📊 Dashboard',parts:'🔧 Parçalar',users:'👷 Personel',stats:'📈 İstatistik',orders_view:'📋 Siparişler (Görüntüle)',orders_edit:'📋 Siparişler (Düzenle)',purchasing:'🛒 Satın Alma',warehouse:'🏭 Depo',delivery:'🚚 İrsaliye',planning:'📅 Planlama',scan:'📷 QR Okutma'};
+  const allPerms = ['dashboard','parts','users','stats','orders_view','orders_edit','mip','purchasing','warehouse','planning','scan'];
+  const labels = {dashboard:'📊 Dashboard',parts:'🔧 Parçalar',users:'👷 Personel',stats:'📈 İstatistik',orders_view:'📋 Siparişler (Görüntüle)',orders_edit:'📋 Siparişler (Düzenle)',mip:'📐 MİP',purchasing:'🛒 Satın Alma',warehouse:'🏭 Depo',delivery:'🚚 İrsaliye',planning:'📅 Planlama',scan:'📷 QR Okutma'};
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';

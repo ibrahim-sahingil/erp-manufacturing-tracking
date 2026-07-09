@@ -534,6 +534,32 @@ chk('ss: seçenek etiketi onerror kaçırıldı', ssl.includes('LB&lt;img') && !
 chk('ss: tırnaklı etiket kaçırıldı', ssl.includes('L2&#39;&quot;&lt;b&gt;'));
 chk('ss: emptyLabel kaçırıldı + ssPick onmousedown (raw) korundu', ssl.includes('— Boş&lt;b&gt; —') && ssl.includes("ssPick('xs',0)"));
 
+// ── MİP satırı / özeti (7. tur #4) ──
+// Parça adı ve kodu ağaçtan gelir; kullanıcı verisi taşır.
+// const ile eval edilirse yerel kapsamda kalır; ayrı eval'lenen fonksiyonlar
+// göremez → global'e atanır (diğer sabitlerle aynı desen).
+const MIP_STATUS_SRC = html.match(/const MIP_STATUS = (\{[\s\S]*?\n\});/);
+global.MIP_STATUS = eval('(' + MIP_STATUS_SRC[1] + ')');
+eval(grab('mipKey'));
+eval(grab('mipNum'));
+eval(grab('mipSuggest'));
+eval(grab('mipRowHTML'));
+eval(grab('mipSummaryHTML'));
+const mipRow = String(mipRowHTML({
+  key:'k', code:'SOM<b>'+EVIL, name:'M12 "Somun"'+EVIL, unit:'ad<i>et',
+  need:50, stockTotal:40, received:0, ordered:0, planned:0, missing:10,
+  stockByWh:[{whId:'A', name:'A-Depo'+EVIL, qty:30},{whId:'B', name:'B-Depo', qty:10}],
+  status:'MISSING'
+}));
+const mipSum = String(mipSummaryHTML([{status:'MISSING'},{status:'DONE'}]));
+console.log('\nmipRowHTML / mipSummaryHTML (MİP):');
+chk('mip: parça adı onerror kaçırıldı', mipRow.includes('M12 &quot;Somun&quot;&lt;img') && !mipRow.includes('Somun'+EVIL));
+chk('mip: kod kaçırıldı', mipRow.includes('SOM&lt;b&gt;&lt;img'));
+chk('mip: birim kaçırıldı', mipRow.includes('ad&lt;i&gt;et'));
+chk('mip: depo adı (dağılım + öneri) kaçırıldı', !mipRow.includes('<img src=x') && mipRow.includes('A-Depo&lt;img'));
+chk('mip: durum rozeti ve renk (raw) korundu', mipRow.includes('#e74c3c') && mipRow.includes('Sipariş verilmedi'));
+chk('mip: özet kutuları sayıları bastı', mipSum.includes('>1<') && mipSum.includes('Tamamlandı'));
+
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);
 }
