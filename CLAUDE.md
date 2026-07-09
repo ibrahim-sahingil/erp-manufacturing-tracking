@@ -140,6 +140,21 @@ MSYS_NO_PATHCONV=1 taskkill /F /IM java.exe   # Git Bash: /F'i F:/ yapmasın
     uçlara erişemiyor mu (403), okuma açık mı, developer yazabiliyor mu.
   - `node scripts/verify-disabled-user.js` (sunucu gerekir) — pasife alınan
     kullanıcının token'ı ANINDA geçersiz mi.
+- **7. tur bekçileri** (2026-07-10):
+  - `node scripts/verify-mip.js` (sunucusuz) — MİP hesap çekirdeği: eşleştirme
+    (kod > ad), tür filtresi, `custom_*`/`resolved_*` override, aynı kodun adet
+    toplamı, beş durum önceliği, sızıntı (başka proje / CANCELLED).
+  - `node scripts/verify-opdef-cascade.js` (sunucu gerekir) — işlem tanımının
+    bölüm alanı + kod değişince ağaç kodlarının yeniden inşası.
+- **Ağaç parçalarında override kuralı:** `project_bom_parts.custom_code`/`custom_qty`
+  birer OVERRIDE'dır; boşsa etkin değer bağlı şablon parçasından türetilir
+  (`ProjectBomPartService.effectiveCode`). **Boş `custom_code`'un üzerine yazma** —
+  parçanın taban kodu yok olur. Okurken `custom_x || resolved_x` deseni kullan
+  (`pbomPublishParts`, `mipCodeOf`).
+- **İşlem kodu soneki:** işlem kodları parça kodunun sonuna sırayla eklenir
+  (`GP-001` + `WLD` + `PNT`). Bir işlem kaldırılır/değişirse kodu `rebuildCodeWithOps`
+  (frontend) / `BomOperationService.rebuildCode` (backend) ile yeniden inşa et —
+  "sonekle bitiyorsa kes" yanlıştır, ortadaki işlemde kalıntı bırakır. İkisi senkron.
 - **Çift tıklama:** yeni bir kaydetme butonu eklerken `btnBusy(id)` helper'ını
   kullan (index.html ~2175). Kilit yoksa ikinci tıklama birinci istek dönmeden
   gider ve MÜKERRER kayıt oluşur; `findSiblingDup` gibi yerel-dizi kontrolleri
