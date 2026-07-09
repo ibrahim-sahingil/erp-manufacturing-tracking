@@ -11622,17 +11622,25 @@ async function openPbomEditor(pbomId) {
       const idMap = {};
       const byLevel = new Map();
       origParts.forEach(p=>{ const l=p.level||0; if(!byLevel.has(l)) byLevel.set(l,[]); byLevel.get(l).push(p); });
+      // (7. tur #1) Şablondaki işlemlerin bölümleri bu projede bir kez oluşturulur;
+      // her parça, işlemine göre doğru bölümle kopyalanır. Eskiden dept_id hep
+      // null geliyordu — işlem tanımındaki bölüm yalnızca ELLE işlem eklerken
+      // uygulanıyordu, yayınlanan ağaç bölümsüz kalıyordu.
+      const deptMap = await ensureProjectDepts(pb.project_name,
+        origParts.map(p => opsDeptName(p.operations)));
       for(const lvl of [...byLevel.keys()].sort((a,b)=>a-b)){
         await Promise.all(byLevel.get(lvl).map(async p=>{
           const newParentId = p.parent_id ? (idMap[p.parent_id]||null) : null;
           const ops = Array.isArray(p.operations)?p.operations:[];
+          const deptAdi = opsDeptName(ops);
           const data = await dbInsert('project_bom_parts',{
             project_bom_id: pbomId, bom_part_id: p.id,
             is_excluded: false,
             custom_name: p.name, custom_code: p.code,
             custom_qty: p.quantity||1, custom_unit: p.unit||'adet',
             custom_weight: p.weight_kg||null, custom_material: p.material||null,
-            dept_id: null, parent_custom_id: newParentId,
+            dept_id: (deptAdi && deptMap.get(deptAdi.toLocaleLowerCase('tr'))) || null,
+            parent_custom_id: newParentId,
             operations: ops, level: p.level||0, sort_order: p.sort_order||0
           });
           if(Array.isArray(data)&&data[0]){ idMap[p.id]=data[0].id; projectBomParts.push(data[0]); }
@@ -11791,7 +11799,14 @@ function pbomeClearPartForm() {
 // kullanıcının kararı gereği OTOMATİK oluşturulur.
 async function ensureProjectDept(projectName, deptName){
   if(!deptName || !projectName) return null;
-  const orderId = await projectNameToOrderId(projectName);
+  let orderId = await projectNameToOrderId(projectName);
+  if(!orderId){
+    // projectNameToOrderId 30 sn'lik referans cache'ine bakar; yeni açılmış bir
+    // proje orada yoksa sessizce null döner ve bölüm HİÇ oluşturulmaz.
+    // Cache'i tazeleyip bir kez daha dene.
+    invalidateRef('orders');
+    orderId = await projectNameToOrderId(projectName);
+  }
   if(!orderId) return null;
   const list = await dbGet('departments','order_id=eq.'+orderId);
   const mevcut = (Array.isArray(list)?list:[]).find(d =>
@@ -11806,6 +11821,29 @@ async function ensureProjectDept(projectName, deptName){
     return created[0].id;
   }
   return null;
+}
+
+// Bir parçanın operations dizisinden bölüm adını türetir: SON işlemden geriye
+// doğru, bölümü tanımlı ilk işlem kazanır (işlem kodları koda sırayla eklenir,
+// son işlem parçanın güncel durumudur).
+function opsDeptName(ops){
+  const list = Array.isArray(ops) ? ops : [];
+  for(let i = list.length - 1; i >= 0; i--){
+    const def = bomOpDefs.find(o => o.code === list[i].code);
+    if(def && def.department_name) return def.department_name;
+  }
+  return null;
+}
+
+// Birden çok bölüm adını TEK seferde bulur/oluşturur (kopyalamada her parça için
+// ayrı ayrı çağırmamak için). Dönüş: bölümAdı(küçük harf) → dept_id
+async function ensureProjectDepts(projectName, deptNames){
+  const out = new Map();
+  for(const ad of [...new Set(deptNames.filter(Boolean))]){
+    const id = await ensureProjectDept(projectName, ad);
+    if(id) out.set(ad.toLocaleLowerCase('tr'), id);
+  }
+  return out;
 }
 
 // Seçili işlem tanımının bölümünü bu projede karşılığı olan bölüm id'sine çevirir.
