@@ -6944,7 +6944,7 @@ function openStockSheetsModal(){
       <span id="ss-dims-prf" style="display:none">
         <input type="number" id="ss-l" placeholder="Boy (mm)" min="0" style="${inp};width:90px">
       </span>
-      <button class="btn btn-primary btn-sm" onclick="ssAdd()">➕ Ekle</button>
+      <button class="btn btn-primary btn-sm" onclick="sheetAdd()">➕ Ekle</button>
     </div>
     <div id="ss-list" style="overflow-y:auto;flex:1;border:1px solid var(--border);border-radius:6px;padding:6px"></div>
     <div style="display:flex;justify-content:flex-end;margin-top:12px">
@@ -6952,10 +6952,13 @@ function openStockSheetsModal(){
     </div>
   </div>`;
   document.body.appendChild(overlay);
-  loadStockSheets().then(ssRenderList);
+  loadStockSheets().then(()=>sheetRenderList());
 }
 
-function ssRenderList(){
+// DİKKAT: adları ss* YAPMA — searchSelect helper'ı (~2300) ss* önekini kullanır;
+// eskiden buradaki ssRenderList onu EZİYOR ve tüm aranabilir kutuların listesi
+// hiç açılmıyordu (5. denetim turu bulgusu). Bu blok sheet* önekinde kalmalı.
+function sheetRenderList(){
   const el = document.getElementById('ss-list');
   if(!el) return;
   if(!stockSheets.length){
@@ -6972,12 +6975,12 @@ function ssRenderList(){
         <b> ${esc(s.name)}</b>
         <span style="color:var(--muted)"> · ${dims}${s.material?' · '+s.material:''}</span>
       </span>
-      <button class="btn btn-ghost btn-sm" onclick="ssDelete('${s.id}')" style="color:var(--red,#e74c3c)">🗑</button>
+      <button class="btn btn-ghost btn-sm" onclick="sheetDelete('${s.id}')" style="color:var(--red,#e74c3c)">🗑</button>
     </div>`;
   }).join('');
 }
 
-async function ssAdd(){
+async function sheetAdd(){
   const kind = document.getElementById('ss-kind').value;
   const name = document.getElementById('ss-name').value.trim();
   if(!name){ toast('Ad zorunlu!','error'); return; }
@@ -6994,18 +6997,18 @@ async function ssAdd(){
   if(!Array.isArray(d)||!d[0]){ toast('Kaydedilemedi!','error'); return; }
   stockSheets.push(d[0]);
   ['ss-name','ss-material','ss-w','ss-h','ss-t','ss-l'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  ssRenderList();
+  sheetRenderList();
   toast('Ölçü eklendi','success');
 }
 
-async function ssDelete(id){
+async function sheetDelete(id){
   const s = stockSheets.find(x=>x.id===id);
   if(!s) return;
   if(!confirm(`"${s.name}" katalogdan silinsin mi?`)) return;
   const ok = await dbDelete('stock_sheets', id);
   if(!ok){ toast('Silinemedi!','error'); return; }
   stockSheets = stockSheets.filter(x=>x.id!==id);
-  ssRenderList();
+  sheetRenderList();
 }
 
 function purFmtMoney(v){ return Number(v).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
