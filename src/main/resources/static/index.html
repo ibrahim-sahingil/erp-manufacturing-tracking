@@ -1252,7 +1252,7 @@
     <button class="btn btn-ghost" onclick="openAddProduct()">+ Yeni Ürün</button>
     <button class="btn btn-ghost" onclick="openMaterialsModal()" title="Malzeme listesi — parçalarda malzeme buradan seçilir">🔩 Malzeme Kartoteki</button>
     <button class="btn btn-ghost" onclick="xlsImportOpen('bom')" title="Basamaklı Excel'den (1, 1.1, 1.1.2...) toplu parça aktar">📥 Excel'den İçe Aktar</button>
-    <button class="btn btn-ghost btn-sm" onclick="deleteCurrentProduct()" style="color:var(--red);border-color:rgba(231,76,60,.3)" id="bom-delete-product-btn" style="display:none">🗑️ Ürünü Sil</button>
+    <button class="btn btn-ghost btn-sm" onclick="deleteCurrentProduct()" id="bom-delete-product-btn" style="color:var(--red);border-color:rgba(231,76,60,.3);display:none">🗑️ Ürünü Sil</button>
   </div>
 
   <div id="bom-content" style="display:none">
@@ -9895,6 +9895,7 @@ async function initBom() {
     await loadBomParts();
     renderBomContent();
   }
+  bomToggleDeleteBtn();
 }
 
 function renderBomProductSelect() {
@@ -10040,10 +10041,19 @@ async function deleteBomOpDef(id) {
 
 async function onBomProductChange() {
   const id = document.getElementById('bom-product-select').value;
-  if(!id) { _activeBomProduct=null; document.getElementById('bom-content').style.display='none'; document.getElementById('bom-tree-view').style.display='none'; return; }
+  if(!id) { _activeBomProduct=null; document.getElementById('bom-content').style.display='none'; document.getElementById('bom-tree-view').style.display='none'; bomToggleDeleteBtn(); return; }
   _activeBomProduct = bomProducts.find(p=>p.id===id);
   await loadBomParts();
   renderBomContent();
+  bomToggleDeleteBtn();
+}
+
+// "Ürünü Sil" düğmesi yalnızca bir ürün seçiliyken görünür. (5. denetim turu:
+// düğmede iki kez style="" vardı, tarayıcı ikinciyi yok sayiyor ve display:none
+// hiç uygulanmıyordu — düğme hep görünüyordu, gizleyen kod da yoktu.)
+function bomToggleDeleteBtn(){
+  const btn = document.getElementById('bom-delete-product-btn');
+  if(btn) btn.style.display = _activeBomProduct ? '' : 'none';
 }
 
 async function loadBomParts() {
@@ -10114,6 +10124,7 @@ async function deleteCurrentProduct() {
   renderBomProductSelect();
   document.getElementById('bom-content').style.display='none';
   document.getElementById('bom-tree-view').style.display='none';
+  bomToggleDeleteBtn();
   toast('Ürün silindi.','success');
 }
 

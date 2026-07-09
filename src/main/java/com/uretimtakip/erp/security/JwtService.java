@@ -65,9 +65,19 @@ public class JwtService {
      * - Token bozulmamis mi? (signature dogru mu?)
      * - Suresi gecmis mi?
      * - Username eslesiyor mu?
+     * - Hesap hala AKTIF mi? (5. denetim turu)
+     *
+     * Aktiflik kontrolu olmadan "pasife alma" bir erisim iptali DEGILDI:
+     * kullanici pasif edilse bile elindeki token suresi dolana kadar (24 saat)
+     * tum API'yi kullanmaya devam ediyordu. JwtAuthFilter kimligi dogrudan
+     * kurdugu icin Spring'in hesap-durumu denetimi de devreye girmiyor.
      */
     public boolean isTokenValid(String token, UserDetails userDetails) {
         try {
+            if (!userDetails.isEnabled()) {
+                log.warn("Pasif hesap token kullanmaya calisti: {}", userDetails.getUsername());
+                return false;
+            }
             final String username = extractUsername(token);
             return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
         } catch (Exception e) {
