@@ -4208,7 +4208,8 @@ function editPd(id) {
 
 async function deletePd(id) {
   if(!confirm('Bu proje tarihini silmek istiyor musunuz?')) return;
-  await dbDelete('project_dates',id);
+  const ok = await dbDelete('project_dates',id);
+  if(!ok) return; // hata toast'ı adapter'dan geldi — "silindi" deme
   projectDates=projectDates.filter(d=>d.id!==id);
   renderGantt(); renderPdList();
   toast('Silindi.','success');
@@ -5721,7 +5722,8 @@ function clearWsForm() {
 
 async function deleteWorkspace(id) {
   if (!confirm('Bu alanı ve atanan personelleri silmek istiyor musunuz?')) return;
-  await dbDelete('workspaces', id);
+  const ok = await dbDelete('workspaces', id);
+  if(!ok) return; // hata toast'ı adapter'dan geldi — "silindi" deme
   workspaces = workspaces.filter(w => w.id !== id);
   wsMembers  = wsMembers.filter(m => m.workspace_id !== id);
   renderWorkspaces();
@@ -5811,7 +5813,8 @@ async function addWsMember() {
 }
 
 async function removeWsMember(memberId, wsId) {
-  await dbDelete('workspace_members', memberId);
+  const ok = await dbDelete('workspace_members', memberId);
+  if(!ok) return; // hata toast'ı adapter'dan geldi — "çıkarıldı" deme
   wsMembers = wsMembers.filter(m => m.id !== memberId);
   if (_activeWsId) renderWsCurrentMembers(_activeWsId);
   renderWorkspaces();
@@ -10161,8 +10164,13 @@ async function saveNewProductCore() {
 
 async function deleteCurrentProduct() {
   if(!_activeBomProduct) return;
-  if(!confirm(`"${_activeBomProduct.name}" ürününü ve tüm parçalarını silmek istiyor musunuz?`)) return;
-  await dbDelete('bom_products', _activeBomProduct.id);
+  // Backend parça/proje bağı varsa REDDEDER (BomProductService guard'ı). Onay
+  // metni eskiden "tüm parçalarını siler" diyordu — yanlış vaat; ayrıca sonuç
+  // kontrol edilmediğinden red durumunda bile "silindi" denip ürün listeden
+  // kalkıyordu (yenileyince geri geliyordu). 5. denetim turu.
+  if(!confirm(`"${_activeBomProduct.name}" ürünü silinsin mi?\n(Ürünün parçaları veya proje bağlantısı varsa önce onları silmelisiniz.)`)) return;
+  const ok = await dbDelete('bom_products', _activeBomProduct.id);
+  if(!ok) return; // hata toast'ı adapter'dan geldi — "silindi" deme
   bomProducts = bomProducts.filter(p=>p.id!==_activeBomProduct.id);
   _activeBomProduct = null; bomParts = [];
   renderBomProductSelect();
