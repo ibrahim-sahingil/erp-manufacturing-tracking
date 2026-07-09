@@ -261,6 +261,8 @@
   .ss-item:hover,.ss-item.hi{background:rgba(245,166,35,.12);color:var(--accent);}
   .ss-empty{color:var(--muted);font-style:italic;}
   .ss-more{padding:6px 12px;font-family:var(--font-mono);font-size:10px;color:var(--muted);}
+  .ss-arrow{position:absolute;right:0;top:0;bottom:0;width:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:11px;user-select:none;}
+  .ss-arrow:hover{color:var(--accent);}
   /* BOM Tree */
   .bom-tree-node{margin:4px 0;}
   .bom-tree-item{display:inline-flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 14px;font-family:var(--font-mono);font-size:12px;white-space:nowrap;}
@@ -1345,11 +1347,11 @@
         </div>
         <div class="form-group" style="margin-bottom:10px">
           <label>Nereye Eklensin?</label>
-          <div style="display:flex;flex-direction:column;gap:4px;font-family:var(--font-mono);font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:8px 12px">
-            <label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="bom-op-mode" value="parent" checked onchange="bomOpModeHint()"> Üste yeni işlemli parça oluştur</label>
-            <label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="bom-op-mode" value="self" onchange="bomOpModeHint()"> İşlemi doğrudan parçaya ekle</label>
-            <label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="bom-op-mode" value="child" onchange="bomOpModeHint()"> Altına yeni işlemli parça ekle</label>
-          </div>
+          <select id="bom-op-mode" onchange="bomOpModeHint()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+            <option value="parent" selected>Üste yeni işlemli parça oluştur</option>
+            <option value="self">İşlemi doğrudan parçaya ekle</option>
+            <option value="child">Altına yeni işlemli parça ekle</option>
+          </select>
         </div>
         <div id="bom-op-hint" style="background:rgba(41,128,185,.08);border:1px solid rgba(41,128,185,.2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:10px">
           💡 İşlem kodu parça kodunun sonuna eklenir (GP-001 + -K → <b style="color:var(--accent)">GP-001-K</b>); yeni parça ÜSTE oluşur, seçilen parça onun altına iner.
@@ -1507,11 +1509,11 @@
       </div>
       <div class="form-group" style="margin-bottom:10px">
         <label>Nereye Eklensin?</label>
-        <div style="display:flex;flex-direction:column;gap:4px;font-family:var(--font-mono);font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:8px 12px">
-          <label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="pbome-op-mode" value="parent" checked onchange="bomOpModeHint('pbome')"> Üste yeni işlemli parça oluştur</label>
-          <label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="pbome-op-mode" value="self" onchange="bomOpModeHint('pbome')"> İşlemi doğrudan parçaya ekle</label>
-          <label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="pbome-op-mode" value="child" onchange="bomOpModeHint('pbome')"> Altına yeni işlemli parça ekle</label>
-        </div>
+        <select id="pbome-op-mode" onchange="bomOpModeHint('pbome')" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+          <option value="parent" selected>Üste yeni işlemli parça oluştur</option>
+          <option value="self">İşlemi doğrudan parçaya ekle</option>
+          <option value="child">Altına yeni işlemli parça ekle</option>
+        </select>
       </div>
       <div id="pbome-op-hint" style="background:rgba(41,128,185,.08);border:1px solid rgba(41,128,185,.2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:10px">
         💡 İşlem kodu parça kodunun sonuna eklenir (GP-001 + -K → <b style="color:var(--accent)">GP-001-K</b>); yeni parça ÜSTE oluşur, seçilen parça onun altına iner.
@@ -2301,20 +2303,26 @@ function dimLabel(w,h,t){
 // eder. Tekrar çağrılınca liste tazelenir, seçim (değer hâlâ listedeyse)
 // korunur. Değer atamak/temizlemek için ssSet(id, value) kullanılır
 // (el.value='' YETMEZ — görünen metin de senkron kalmalı).
-const _ss = {}; // id → {items, onChange, emptyLabel, view, hi}
-function searchSelect(id, {items, placeholder='Yazarak arayın...', onChange=null, emptyLabel=null}){
+const _ss = {}; // id → {items, onChange, emptyLabel, emptyAction, view, hi}
+function searchSelect(id, {items, placeholder='Yazarak arayın...', onChange=null, emptyLabel=null, emptyAction=null}){
   const host = document.getElementById(id+'-ss');
   if(!host) return;
-  _ss[id] = {items, onChange, emptyLabel, view:[], hi:-1};
+  _ss[id] = {items, onChange, emptyLabel, emptyAction, view:[], hi:-1};
   let prev = document.getElementById(id)?.value || '';
   if(prev && !items.some(i=>i.value===prev)) prev='';
   if(!host.dataset.ssInit){
     host.dataset.ssInit='1';
     host.style.position='relative';
-    host.innerHTML = h`<input type="hidden" id="${raw(id)}"><input type="text" id="${raw(id)}-txt" placeholder="${placeholder}" autocomplete="off" style="${raw(INP())}" oninput="ssFilter('${raw(id)}')" onfocus="ssOpen('${raw(id)}')" onkeydown="ssKey('${raw(id)}',event)"><div id="${raw(id)}-list" class="ss-list" style="display:none"></div>`;
+    host.innerHTML = h`<input type="hidden" id="${raw(id)}"><input type="text" id="${raw(id)}-txt" placeholder="${placeholder}" autocomplete="off" style="${raw(INP())};padding-right:32px" oninput="ssFilter('${raw(id)}')" onclick="ssOpen('${raw(id)}')" onfocus="ssOpen('${raw(id)}')" onkeydown="ssKey('${raw(id)}',event)"><span class="ss-arrow" onmousedown="event.preventDefault();ssToggle('${raw(id)}')" title="Listeyi aç">▾</span><div id="${raw(id)}-list" class="ss-list" style="display:none"></div>`;
     document.addEventListener('mousedown', e=>{ if(!host.contains(e.target)) ssClose(id); });
   }
   ssSet(id, prev, {silent:true});
+}
+// ▾ oku: kapalıysa aç (odak ver), açıksa kapat — kutu artık düz metin gibi görünmüyor (6. tur #1)
+function ssToggle(id){
+  const list=document.getElementById(id+'-list'), txt=document.getElementById(id+'-txt');
+  if(list && list.style.display!=='none'){ ssClose(id); }
+  else { if(txt) txt.focus(); ssOpen(id); }
 }
 function ssSet(id, value, {silent=false}={}){
   const st=_ss[id], hid=document.getElementById(id), txt=document.getElementById(id+'-txt');
@@ -2354,8 +2362,16 @@ function ssRenderList(id, q){
   list.innerHTML = h`${st.emptyLabel!=null?h`<div class="ss-item ss-empty" onmousedown="event.preventDefault();ssPick('${raw(id)}',-1)">${st.emptyLabel}</div>`:''}${
     st.view.map((i,ix)=>h`<div class="ss-item" data-ix="${ix}" onmousedown="event.preventDefault();ssPick('${raw(id)}',${ix})">${i.label}</div>`)}${
     hits.length>st.view.length?h`<div class="ss-more">… ${hits.length-st.view.length} sonuç daha — yazarak daraltın</div>`:''}${
-    !hits.length?h`<div class="ss-more">Sonuç yok</div>`:''}`;
+    !hits.length?(st.items.length===0&&st.emptyAction
+      ?h`<div class="ss-item" onmousedown="event.preventDefault();ssEmptyAction('${raw(id)}')">${st.emptyAction.label}</div>`
+      :h`<div class="ss-more">Sonuç yok</div>`):''}`;
   list.style.display='block';
+}
+// Liste TAMAMEN boşken gösterilen yönlendirme satırı tıklandı (6. tur #2)
+function ssEmptyAction(id){
+  const st=_ss[id];
+  ssClose(id);
+  if(st && st.emptyAction && typeof st.emptyAction.action==='function') st.emptyAction.action();
 }
 function ssPick(id, ix){
   const st=_ss[id]; if(!st) return;
@@ -9889,7 +9905,8 @@ function renderBomProductSelect() {
 function renderBomOpDefSelect() {
   searchSelect('bom-op-def-select', {
     items: bomOpDefs.map(op=>({value:op.id, label:op.name+' ('+op.code+')'})),
-    placeholder:'— İşlem seçin (yazarak arayın) —', onChange:onBomOpDefChange
+    placeholder:'— İşlem seçin (yazarak arayın) —', onChange:onBomOpDefChange,
+    emptyAction:{label:'⚠ Henüz işlem tanımı yok — buraya tıklayıp ekleyin', action:openBomOpDefs}
   });
 }
 
@@ -10004,6 +10021,7 @@ async function saveBomOpDef() {
   document.getElementById('opdef-desc').value='';
   renderOpDefsList();
   renderBomOpDefSelect();
+  pbomeRenderOpDefSelect(); // proje editörü açıksa oradaki kutu da tazelensin
   toast(`"${name} (${code})" eklendi!`,'success');
 }
 
@@ -10013,6 +10031,7 @@ async function deleteBomOpDef(id) {
   bomOpDefs = bomOpDefs.filter(o=>o.id!==id);
   renderOpDefsList();
   renderBomOpDefSelect();
+  pbomeRenderOpDefSelect();
   toast('İşlem tanımı silindi.','success');
 }
 
@@ -10386,7 +10405,7 @@ function calcOpTotalTime() {
 //       — removeBomOp soneki geri aldığından ekle/kaldır simetriktir.
 // child: işlemli YENİ parça seçilenin ALTINA eklenir.
 function bomOpModeHint(prefix='bom'){
-  const mode = document.querySelector(`input[name="${prefix}-op-mode"]:checked`)?.value||'parent';
+  const mode = document.getElementById(prefix+'-op-mode')?.value||'parent';
   const el = document.getElementById(prefix==='bom'?'bom-op-hint':'pbome-op-hint');
   if(!el) return;
   el.innerHTML = {
@@ -10401,7 +10420,7 @@ async function addBomOperation() {
   const opName   = document.getElementById('bom-op-name').value.trim();
   const opCode   = document.getElementById('bom-op-code').value.trim().toUpperCase();
   const duration = parseFloat(document.getElementById('bom-op-duration').value) || 0;
-  const mode     = document.querySelector('input[name="bom-op-mode"]:checked')?.value||'parent';
+  const mode     = document.getElementById('bom-op-mode')?.value||'parent';
   if(!partId){ toast('Parça seçin!','error'); return; }
   if(!opName||!opCode){ toast('İşlem adı ve kodu zorunlu!','error'); return; }
 
@@ -11192,7 +11211,8 @@ function pbomeRenderOpPartSelect() {
 function pbomeRenderOpDefSelect() {
   searchSelect('pbome-op-def', {
     items: bomOpDefs.map(op=>({value:op.id, label:op.name+' ('+op.code+')'})),
-    placeholder:'— İşlem seçin (yazarak arayın) —', onChange:pbomeOnOpDefChange
+    placeholder:'— İşlem seçin (yazarak arayın) —', onChange:pbomeOnOpDefChange,
+    emptyAction:{label:'⚠ Henüz işlem tanımı yok — buraya tıklayıp ekleyin', action:openBomOpDefs}
   });
 }
 
@@ -11276,7 +11296,7 @@ async function pbomeAddOp() {
   const opCode  = document.getElementById('pbome-op-code').value.trim().toUpperCase();
   const dur     = parseFloat(document.getElementById('pbome-op-dur').value)||0;
   const desc    = document.getElementById('pbome-op-desc').value.trim();
-  const mode    = document.querySelector('input[name="pbome-op-mode"]:checked')?.value||'parent';
+  const mode    = document.getElementById('pbome-op-mode')?.value||'parent';
   if(!partId){ toast('Parça seçin!','error'); return; }
   if(!opName||!opCode){ toast('İşlem seçin!','error'); return; }
 
@@ -11614,6 +11634,26 @@ let _xlsImport = null; // {target:'bom'|'pbome', rows:[], checked:Set(level_no)}
 function xlsImportOpen(target){
   if(target==='bom' && !_activeBomProduct){ toast('Önce ana ürün seçin!','error'); return; }
   if(target==='pbome' && !_activePbomId){ toast('Düzenleyici aktif değil!','error'); return; }
+  // Ön-modal: örnek şablon dosya seçmeden İNDİRİLEBİLSİN (6. tur #4 —
+  // düğme sadece önizleme modalındaydı, dosya seçmeden ulaşılamıyordu)
+  document.getElementById('xls-import-start-overlay')?.remove();
+  const ov=document.createElement('div'); ov.className='modal-overlay open'; ov.id='xls-import-start-overlay';
+  ov.innerHTML=`<div class="modal" style="width:440px;max-width:95vw;text-align:left">
+    <h3 style="margin-bottom:4px">📥 Excel'den İçe Aktar</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">
+      Örnek şablonu indirip doldurun, sonra dosyayı seçin. Basamak sütunu (1, 1.1, 1.1.2...) hiyerarşiyi belirler.
+    </p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-ghost" onclick="xlsImportTemplate()">📄 Örnek Excel (boş şablon) indir</button>
+      <button class="btn btn-primary" onclick="xlsImportPickFile('${target==='pbome'?'pbome':'bom'}')">📁 Excel dosyası seç ve aktar</button>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('xls-import-start-overlay').remove()">İptal</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+function xlsImportPickFile(target){
+  document.getElementById('xls-import-start-overlay')?.remove();
   const inp=document.createElement('input');
   inp.type='file'; inp.accept='.xlsx,.xlsm,.xls';
   inp.onchange=()=>{ if(inp.files[0]) xlsImportParse(target, inp.files[0]); };
