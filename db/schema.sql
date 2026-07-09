@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict y5vvU6bapOoyhpA571YGQBnrnKElaisQMliQmmWznH66mARuFWBkBOlA9fcaZsS
+\restrict oXaUkJUXlcWBMmRGy7s2AcPYhl6M8iCP3HAnyIxFm9jJFFyW4Sfa4vke5uVZhZY
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -75,8 +75,16 @@ CREATE TABLE public.bom_operations (
     code character varying(50) NOT NULL,
     description text,
     sort_order integer DEFAULT 0,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    department_name character varying(100)
 );
+
+
+--
+-- Name: COLUMN bom_operations.department_name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.bom_operations.department_name IS 'Bu islemin yapildigi bolum adi (or. Kaynak). Projeye uygulanirken ayni isimli departments kaydi bulunur/olusturulur.';
 
 
 --
@@ -1507,5 +1515,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict y5vvU6bapOoyhpA571YGQBnrnKElaisQMliQmmWznH66mARuFWBkBOlA9fcaZsS
+\unrestrict oXaUkJUXlcWBMmRGy7s2AcPYhl6M8iCP3HAnyIxFm9jJFFyW4Sfa4vke5uVZhZY
 

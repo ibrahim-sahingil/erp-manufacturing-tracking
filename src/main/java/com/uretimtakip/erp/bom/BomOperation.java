@@ -42,6 +42,15 @@ public class BomOperation extends BaseEntity {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    /**
+     * (7. tur #1) Islemin yapildigi bolum ADI (or. "Kaynak").
+     * Bolumler PROJEYE OZEL oldugundan (departments.order_id) burada UUID degil
+     * isim tutulur; parcaya uygulanirken projenin ayni isimli bolumu bulunur,
+     * yoksa olusturulur.
+     */
+    @Column(name = "department_name", length = 100)
+    private String departmentName;
+
     @Column(name = "sort_order")
     @Builder.Default
     private Integer sortOrder = 0;

@@ -1,6 +1,8 @@
 package com.uretimtakip.erp.projectbom;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -68,4 +70,23 @@ public interface ProjectBomPartRepository extends JpaRepository<ProjectBomPart, 
     long countByDeptId(UUID deptId);
 
     long countByProjectBomId(UUID projectBomId);
+
+    /**
+     * (7. tur #3) Verilen islem kodunu operations jsonb'sinde barindiran TUM
+     * proje parcalari. Islem tanimi duzenlenince yayinlanmis proje agaclarindaki
+     * kodlar da guncellenir (kullanicinin sectigi kapsam: tum agaclar).
+     */
+    @Query(
+            value = "SELECT * FROM project_bom_parts " +
+                    "WHERE operations @> CAST(:codeJson AS jsonb)",
+            nativeQuery = true
+    )
+    List<ProjectBomPart> findByOperationCodeNative(@Param("codeJson") String codeJson);
+
+    default List<ProjectBomPart> findByOperationCode(String code) {
+        if (code == null || code.contains("\"")) {
+            return List.of();
+        }
+        return findByOperationCodeNative("[{\"code\":\"" + code + "\"}]");
+    }
 }

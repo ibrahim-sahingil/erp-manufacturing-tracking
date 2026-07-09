@@ -10022,12 +10022,25 @@ function openBomOpDefs() {
             style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:8px 10px;outline:none">
         </div>
       </div>
-      <div style="margin-bottom:10px">
-        <label style="font-family:var(--font-mono);font-size:10px;color:var(--muted);display:block;margin-bottom:4px">Açıklama</label>
-        <input type="text" id="opdef-desc" placeholder="İşlem detayı (isteğe bağlı)"
-          style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:8px 10px;outline:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div>
+          <label style="font-family:var(--font-mono);font-size:10px;color:var(--muted);display:block;margin-bottom:4px">Bölüm</label>
+          <input type="text" id="opdef-dept" list="opdef-dept-list" placeholder="Örn: Kaynak"
+            title="Bu işlemin yapıldığı bölüm. İşlem bir parçaya eklendiğinde parçanın bölümü otomatik buraya ayarlanır."
+            style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:8px 10px;outline:none">
+          <datalist id="opdef-dept-list"></datalist>
+        </div>
+        <div>
+          <label style="font-family:var(--font-mono);font-size:10px;color:var(--muted);display:block;margin-bottom:4px">Açıklama</label>
+          <input type="text" id="opdef-desc" placeholder="İşlem detayı (isteğe bağlı)"
+            style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:8px 10px;outline:none">
+        </div>
       </div>
-      <button class="btn btn-primary btn-sm" id="opdef-save-btn" onclick="saveBomOpDef()">+ Ekle</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-primary btn-sm" id="opdef-save-btn" onclick="saveBomOpDef()">+ Ekle</button>
+        <button class="btn btn-ghost btn-sm" id="opdef-cancel-btn" onclick="opDefCancelEdit()" style="display:none">İptal</button>
+        <span id="opdef-edit-hint" style="font-family:var(--font-mono);font-size:10px;color:var(--accent);display:none"></span>
+      </div>
     </div>
 
     <!-- Mevcut tanımlar -->
@@ -10040,9 +10053,26 @@ function openBomOpDefs() {
     </div>
   </div>`;
   document.body.appendChild(overlay);
+  _editingOpDefId = null;
+  refreshOpDeptDatalist();
   renderOpDefsList();
   setTimeout(()=>document.getElementById('opdef-name')?.focus(),100);
 }
+
+// (7. tur #1) Bölüm önerileri: standart bölümler + hâlihazırda kullanılanlar.
+// Bölümler projeye özel kayıtlar olduğundan burada sadece İSİM öneriliyor.
+function refreshOpDeptDatalist(){
+  const dl = document.getElementById('opdef-dept-list');
+  if(!dl) return;
+  const adlar = [...new Set([
+    ...STANDARD_DEPTS,
+    ...bomOpDefs.map(o=>o.department_name).filter(Boolean),
+    ...depts.map(d=>d.name).filter(Boolean)
+  ])].sort((a,b)=>a.localeCompare(b,'tr'));
+  dl.innerHTML = h`${adlar.map(a=>h`<option value="${a}">`)}`;
+}
+
+let _editingOpDefId = null; // düzenlenen işlem tanımı (null → yeni ekleme)
 
 function renderOpDefsList() {
   const el = document.getElementById('opdefs-list');
@@ -10052,15 +10082,50 @@ function renderOpDefsList() {
     return;
   }
   el.innerHTML = h`${bomOpDefs.map(op=>h`
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border-radius:6px;margin-bottom:6px;border:1px solid var(--border)">
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border-radius:6px;margin-bottom:6px;border:1px solid ${raw(op.id===_editingOpDefId?'var(--accent)':'var(--border)')}">
       <div style="flex:1">
         <div style="font-weight:600;font-size:13px">${op.name}
           <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent);background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:4px;padding:1px 7px;margin-left:6px">${op.code}</span>
+          ${op.department_name?h`<span style="font-family:var(--font-mono);font-size:10px;color:#2980b9;background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:1px 7px;margin-left:4px">🏭 ${op.department_name}</span>`:''}
         </div>
         ${op.description?h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:2px">${op.description}</div>`:''}
       </div>
+      <button class="icon-btn" onclick="opDefStartEdit('${raw(op.id)}')" title="Düzenle">✏️</button>
       <button class="icon-btn" onclick="deleteBomOpDef('${raw(op.id)}')" title="Sil" style="color:var(--red)">🗑️</button>
     </div>`)}`;
+}
+
+// (7. tur #3) Düzenleme moduna geç — form mevcut değerlerle dolar.
+function opDefStartEdit(id){
+  const op = bomOpDefs.find(o=>o.id===id);
+  if(!op) return;
+  _editingOpDefId = id;
+  document.getElementById('opdef-name').value = op.name||'';
+  document.getElementById('opdef-code').value = op.code||'';
+  document.getElementById('opdef-dept').value = op.department_name||'';
+  document.getElementById('opdef-desc').value = op.description||'';
+  const btn = document.getElementById('opdef-save-btn');
+  if(btn) btn.textContent = '💾 Güncelle';
+  const cancel = document.getElementById('opdef-cancel-btn');
+  if(cancel) cancel.style.display = '';
+  const hint = document.getElementById('opdef-edit-hint');
+  if(hint){ hint.style.display=''; hint.textContent = `"${op.name}" düzenleniyor`; }
+  renderOpDefsList();
+  document.getElementById('opdef-name').focus();
+}
+
+function opDefCancelEdit(){
+  _editingOpDefId = null;
+  ['opdef-name','opdef-code','opdef-dept','opdef-desc'].forEach(x=>{
+    const el=document.getElementById(x); if(el) el.value='';
+  });
+  const btn = document.getElementById('opdef-save-btn');
+  if(btn) btn.textContent = '+ Ekle';
+  const cancel = document.getElementById('opdef-cancel-btn');
+  if(cancel) cancel.style.display = 'none';
+  const hint = document.getElementById('opdef-edit-hint');
+  if(hint) hint.style.display = 'none';
+  renderOpDefsList();
 }
 
 async function saveBomOpDef() {
@@ -10072,27 +10137,88 @@ async function saveBomOpDef() {
 async function saveBomOpDefCore() {
   const name = document.getElementById('opdef-name').value.trim();
   const code = document.getElementById('opdef-code').value.trim().toUpperCase();
+  const dept = document.getElementById('opdef-dept').value.trim();
+  const desc = document.getElementById('opdef-desc').value.trim();
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
+
+  if(_editingOpDefId) { await opDefUpdate(_editingOpDefId, {name, code, dept, desc}); return; }
+
   if(bomOpDefs.find(o=>o.code===code)){ toast(`"${code}" kodu zaten tanımlı!`,'error'); return; }
   const data = await dbInsert('bom_operations',{
     id:genId(), name, code,
-    description: document.getElementById('opdef-desc').value.trim(),
+    description: desc, department_name: dept||null,
     sort_order: bomOpDefs.length
   });
   if(!Array.isArray(data)||!data[0]){ toast('Kayıt hatası!','error'); return; }
   bomOpDefs.push(data[0]);
-  document.getElementById('opdef-name').value='';
-  document.getElementById('opdef-code').value='';
-  document.getElementById('opdef-desc').value='';
-  renderOpDefsList();
+  opDefCancelEdit(); // formu temizle + listeyi tazele
+  refreshOpDeptDatalist();
   renderBomOpDefSelect();
   pbomeRenderOpDefSelect(); // proje editörü açıksa oradaki kutu da tazelensin
   toast(`"${name} (${code})" eklendi!`,'success');
 }
 
+// (7. tur #3) İşlem tanımını günceller. KOD DEĞİŞİYORSA önce backend'den
+// kullanım sayısı alınır ve kullanıcıya kaç parçanın kodunun değişeceği
+// gösterilir. Kodların yeniden inşası backend'de tek transaction'da yapılır.
+async function opDefUpdate(id, {name, code, dept, desc}) {
+  const op = bomOpDefs.find(o=>o.id===id);
+  if(!op) return;
+  const kodDegisti = op.code !== code;
+
+  if(bomOpDefs.find(o=>o.code===code && o.id!==id)){
+    toast(`"${code}" kodu başka bir işlemde tanımlı!`,'error'); return;
+  }
+
+  if(kodDegisti){
+    let kullanim = null;
+    try {
+      kullanim = await apiFetch('/bom-operations/'+id+'/usage');
+    } catch(e){ toast('Kullanım bilgisi alınamadı: '+e.message,'error'); return; }
+    const sablon = (kullanim && kullanim.bom_parts) || 0;
+    const proje  = (kullanim && kullanim.project_bom_parts) || 0;
+    const toplam = sablon + proje;
+    const mesaj = toplam
+      ? `"${op.code}" → "${code}" değişecek.\n\n` +
+        `${sablon} şablon parçasının ve ${proje} proje parçasının KODU otomatik güncellenecek.\n\n` +
+        `Devam edilsin mi?`
+      : `"${op.code}" → "${code}" değişecek. Bu işlem hiçbir parçada kullanılmıyor.\n\nDevam edilsin mi?`;
+    if(!confirm(mesaj)) return;
+  }
+
+  const ok = await dbUpdate('bom_operations', id, {
+    name, code, description: desc, department_name: dept||null, sort_order: op.sort_order||0
+  });
+  if(!ok) return; // hata toast'ı adapter'dan geldi
+
+  Object.assign(op, {name, code, description: desc, department_name: dept||null});
+  opDefCancelEdit();
+  refreshOpDeptDatalist();
+  renderBomOpDefSelect();
+  pbomeRenderOpDefSelect();
+
+  // Kodlar backend'de değiştiyse açık ağaçları tazele (yerel kopyalar bayat)
+  if(kodDegisti) await refreshOpenBomTrees();
+  toast(`"${name} (${code})" güncellendi.`,'success');
+}
+
+// Açık olan ürün ağacı / proje ağacı editörünü sunucudan tazeler.
+async function refreshOpenBomTrees(){
+  if(_activeBomProduct){
+    await loadBomParts();
+    renderBomContent();
+  }
+  if(_activePbomId){
+    const data = await dbGet('project_bom_parts','project_bom_id=eq.'+_activePbomId+'&order=level.asc,sort_order.asc');
+    if(Array.isArray(data)){ _pbomeParts = data; pbomeRenderContent(); }
+  }
+}
+
 async function deleteBomOpDef(id) {
   if(!confirm('Bu işlem tanımını silmek istiyor musunuz?')) return;
-  await dbDelete('bom_operations',id);
+  const ok = await dbDelete('bom_operations',id);
+  if(!ok) return; // hata toast'ı adapter'dan geldi (ör. parçalarda kullanılıyor)
+  if(_editingOpDefId===id) opDefCancelEdit();
   bomOpDefs = bomOpDefs.filter(o=>o.id!==id);
   renderOpDefsList();
   renderBomOpDefSelect();
@@ -11410,6 +11536,37 @@ function pbomeClearPartForm() {
   bomCodeClearPanel('pbome');
 }
 
+// (7. tur #1) İşlem tanımındaki bölüm ADI'nı bu projenin bölüm kaydına çevirir.
+// Bölümler projeye özeldir (departments.order_id); aynı isimli bölüm yoksa
+// kullanıcının kararı gereği OTOMATİK oluşturulur.
+async function ensureProjectDept(projectName, deptName){
+  if(!deptName || !projectName) return null;
+  const orderId = await projectNameToOrderId(projectName);
+  if(!orderId) return null;
+  const list = await dbGet('departments','order_id=eq.'+orderId);
+  const mevcut = (Array.isArray(list)?list:[]).find(d =>
+    (d.name||'').toLocaleLowerCase('tr') === deptName.toLocaleLowerCase('tr'));
+  if(mevcut) return mevcut.id;
+  const created = await dbInsert('departments', {
+    order_id: orderId, name: deptName,
+    sort_order: (Array.isArray(list)?list.length:0) + 1
+  });
+  if(Array.isArray(created) && created[0]){
+    invalidateRef('departments');
+    return created[0].id;
+  }
+  return null;
+}
+
+// Seçili işlem tanımının bölümünü bu projede karşılığı olan bölüm id'sine çevirir.
+async function pbomeOpDeptId(){
+  const defId = document.getElementById('pbome-op-def')?.value;
+  const def = bomOpDefs.find(o=>o.id===defId);
+  if(!def || !def.department_name) return null;
+  const pb = projectBoms.find(p=>p.id===_activePbomId);
+  return await ensureProjectDept(pb?.project_name, def.department_name);
+}
+
 // ─── İşlem Ekle (5. tur #2: üste / kendine / alta — addBomOperation ikizi) ───
 async function pbomeAddOp() {
   const bitti = btnBusy('pbome-add-op-btn', '⚙ Ekleniyor...');
@@ -11437,13 +11594,17 @@ async function pbomeAddOpCore() {
   const newOp   = {name:opName,code:opCode,desc,duration_per_unit:dur||null,total_duration:dur?dur*qty:null};
   let doneMsg;
 
+  // (7. tur #1) İşlem tanımında bölüm varsa, işlemi taşıyan parçanın bölümü
+  // otomatik oraya ayarlanır (projede yoksa bölüm oluşturulur).
+  const opDeptId = await pbomeOpDeptId();
+
   // Yeni işlemli parça gövdesi (parent/child modları) — bağ alanları modda atanır
   const newPartBody = (parentCustomId, level, sortOrder)=>({
     id:genId(), project_bom_id:_activePbomId, bom_part_id:null, is_excluded:false,
     custom_name:newName, custom_code:newCode,
     custom_qty:qty, custom_unit:part.custom_unit||'adet',
     custom_weight:part.custom_weight||null, custom_material:part.custom_material||null,
-    dept_id:part.dept_id||null, parent_custom_id:parentCustomId,
+    dept_id:opDeptId||part.dept_id||null, parent_custom_id:parentCustomId,
     operations:[newOp], level, sort_order:sortOrder
   });
 
@@ -11453,9 +11614,12 @@ async function pbomeAddOpCore() {
     }
     const ops = Array.isArray(part.operations)?[...part.operations]:JSON.parse(part.operations||'[]');
     ops.push(newOp);
-    const ok = await dbUpdate('project_bom_parts', partId, {operations:ops, custom_code:newCode});
+    const govde = {operations:ops, custom_code:newCode};
+    if(opDeptId) govde.dept_id = opDeptId;
+    const ok = await dbUpdate('project_bom_parts', partId, govde);
     if(!ok) return;
     part.operations=ops; part.custom_code=newCode;
+    if(opDeptId) part.dept_id = opDeptId;
     doneMsg = `⚙ İşlem parçaya eklendi → kod "${newCode}" oldu`;
   } else if(mode==='child'){
     if(findSiblingDup(_pbomeParts, {code:newCode, codeKey:'custom_code', parentKey:'parent_custom_id', parentId:part.id})){

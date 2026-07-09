@@ -46,6 +46,16 @@ public class BomOperationController {
         return ResponseEntity.ok(ApiResponse.success(bomOperationService.getById(id)));
     }
 
+    /**
+     * (7. tur #3) Kod degistirmeden ONCE onizleme: bu islem kac sablon
+     * parcasinda ve kac yayinlanmis proje parcasinda kullaniliyor?
+     */
+    @GetMapping("/{id}/usage")
+    public ResponseEntity<ApiResponse<BomOperationService.OperationUsage>> usage(
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(bomOperationService.usage(id)));
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<BomOperationResponse>> create(
             @Valid @RequestBody BomOperationRequest request) {

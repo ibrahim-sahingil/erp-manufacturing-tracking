@@ -110,6 +110,18 @@ public interface BomPartRepository extends JpaRepository<BomPart, UUID> {
     long countByOperationIdNative(@Param("idJson") String idJson);
 
     /**
+     * (7. tur #3) Verilen islem kodunu operations icinde barindiran TUM parcalar.
+     * Islem tanimi duzenlenince (kod degisince) bu parcalarin hem operations
+     * dizisi hem de kodu guncellenir.
+     */
+    @Query(
+            value = "SELECT * FROM bom_parts " +
+                    "WHERE operations @> CAST(:codeJson AS jsonb)",
+            nativeQuery = true
+    )
+    List<BomPart> findByOperationCodeNative(@Param("codeJson") String codeJson);
+
+    /**
      * Helper method - JPA default method ile JSON string'ini kapsulle.
      * Service buradan cagirir, native query detayini bilmesine gerek yok.
      */
@@ -120,6 +132,13 @@ public interface BomPartRepository extends JpaRepository<BomPart, UUID> {
         }
         String json = "[{\"code\":\"" + code + "\"}]";
         return countByOperationCodeNative(json);
+    }
+
+    default List<BomPart> findByOperationCode(String code) {
+        if (code == null || code.contains("\"")) {
+            return List.of();
+        }
+        return findByOperationCodeNative("[{\"code\":\"" + code + "\"}]");
     }
 
     default long countByOperationId(UUID operationId) {

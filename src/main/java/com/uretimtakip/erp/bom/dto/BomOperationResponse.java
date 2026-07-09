@@ -26,6 +26,8 @@ public class BomOperationResponse {
     private String name;
     private String code;
     private String description;
+    /** (7. tur #1) Islemin bolum adi — JSON'da department_name. */
+    private String departmentName;
     private Integer sortOrder;
     private LocalDateTime createdAt;
 
@@ -35,6 +37,7 @@ public class BomOperationResponse {
                 .name(e.getName())
                 .code(e.getCode())
                 .description(e.getDescription())
+                .departmentName(e.getDepartmentName())
                 .sortOrder(e.getSortOrder())
                 .createdAt(e.getCreatedAt())
                 .build();

@@ -37,5 +37,14 @@ public class BomOperationRequest {
     @Size(max = 5000, message = "Aciklama cok uzun")
     private String description;
 
+    /**
+     * (7. tur #1) Bu islemin yapildigi bolum ADI (or. "Kaynak").
+     * Bolumler projeye ozeldir (departments.order_id), bu yuzden UUID degil
+     * ISIM saklanir; parcaya uygulanirken o projenin ayni isimli bolumu
+     * bulunur, yoksa olusturulur.
+     */
+    @Size(max = 100, message = "Bolum adi en fazla 100 karakter olabilir")
+    private String departmentName;
+
     private Integer sortOrder;
 }
