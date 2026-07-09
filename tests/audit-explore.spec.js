@@ -1,7 +1,11 @@
-// GEÇİCİ KEŞİF TESTİ — 5. denetim turu Faz 2 (canlı gezinme + uç girdi).
-// Amaç hata BULMAK: her sekmeyi gezer, konsol/sayfa/HTTP hatalarını toplar,
-// izole AUDIT-UI ürünü üzerinde form ve uç girdi denemeleri yapar, arkasını
-// temizler. Kalıcı regresyon paketi DEĞİLDİR; tur bitince silinebilir.
+// DUMAN TESTİ — 12 sekmeyi gezer, konsol/sayfa/5xx hatası toplar; izole bir
+// ürün üzerinde form akışlarını ve uç girdileri (boş form, negatif adet, 5000
+// karakter ad, mükerrer kod) dener, arkasını temizler.
+//
+// 5. denetim turunda keşif aracı olarak yazıldı, kalıcılaştırıldı: yeni bir
+// sekme/render eklendiğinde sessiz konsol hatalarını yakalayan tek test budur.
+// Kasıtlı kötü girdilere backend'in 400 dönmesi BEKLENEN davranıştır (beklenen[]
+// listesine düşer, testi kırmaz); gerçek hata = pageerror, 5xx, düşen istek.
 const { test, expect } = require('@playwright/test');
 
 const TABS = ['dashboard','parts','users','stats','orders','purchasing',
