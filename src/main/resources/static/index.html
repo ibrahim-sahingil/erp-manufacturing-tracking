@@ -2174,6 +2174,21 @@ function INP(pad='10px 12px', fs='13px', w='width:100%;'){
   return w+'background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:'+fs+';padding:'+pad+';outline:none';
 }
 
+// İşlem kodları parça kodunun SONUNA sırayla eklenir (GP-001 + WLD + PNT →
+// GP-001WLDPNT). Bir işlem kaldırılırken eskiden yalnızca "kod sonekle bitiyorsa
+// kes" yapılıyordu: ortadaki işlem (WLD) kaldırılınca kod GP-001WLDPNT olarak
+// KALIYORDU — silinen işlemin kodu parçada sonsuza dek kalıyor, ekle/kaldır
+// simetrisi bozuluyordu (7. tur #2). Doğrusu: mevcut TÜM işlem koda soneklerini
+// sondan başlayarak sök, sonra KALAN işlemlerin kodlarını sırayla geri ekle.
+function rebuildCodeWithOps(code, oldOps, newOps){
+  let base = code || '';
+  for(let i = oldOps.length - 1; i >= 0; i--){
+    const c = oldOps[i] && oldOps[i].code;
+    if(c && base.endsWith(c)) base = base.slice(0, -c.length);
+  }
+  return base + newOps.map(o=>o.code||'').join('');
+}
+
 // Çift tıklama koruması (5. denetim turu). Kaydetme butonu await bitene kadar
 // kilitlenmezse ikinci tıklama birinci istek dönmeden gider ve MÜKERRER kayıt
 // oluşur — kod-çakışma kontrolleri (findSiblingDup) yerel diziye baktığından
@@ -10940,11 +10955,11 @@ async function deleteBomPart(id) {
 async function removeBomOp(partId, opIdx) {
   const part = bomParts.find(p=>p.id===partId);
   if(!part) return;
-  const ops = Array.isArray(part.operations) ? [...part.operations] : JSON.parse(part.operations||'[]');
-  const removedCode = ops[opIdx]?.code||'';
+  const oldOps = Array.isArray(part.operations) ? [...part.operations] : JSON.parse(part.operations||'[]');
+  const ops = [...oldOps];
   ops.splice(opIdx,1);
-  // Koddan işlem kodunu çıkar
-  const newCode = part.code.endsWith(removedCode) ? part.code.slice(0,-removedCode.length) : part.code;
+  // Kod yeniden inşa edilir: ortadaki işlem kaldırılsa da kalıntı kalmaz (7. tur #2)
+  const newCode = rebuildCodeWithOps(part.code, oldOps, ops);
   const ok = await dbUpdate('bom_parts',partId,{operations:ops,code:newCode});
   if(!ok) return; // hata toast'ı adapter'dan geldi — yerel durumu bozma
   part.operations=ops; part.code=newCode;
@@ -11705,10 +11720,10 @@ async function pbomeCopyBranch(partId){
 async function pbomeRemoveOp(partId, opIdx) {
   const p=_pbomeParts.find(x=>x.id===partId);
   if(!p) return;
-  const ops=Array.isArray(p.operations)?[...p.operations]:JSON.parse(p.operations||'[]');
-  const removedCode=ops[opIdx]?.code||'';
+  const oldOps=Array.isArray(p.operations)?[...p.operations]:JSON.parse(p.operations||'[]');
+  const ops=[...oldOps];
   ops.splice(opIdx,1);
-  const newCode=p.custom_code.endsWith(removedCode)?p.custom_code.slice(0,-removedCode.length):p.custom_code;
+  const newCode=rebuildCodeWithOps(p.custom_code, oldOps, ops);
   const ok=await dbUpdate('project_bom_parts',partId,{operations:ops,custom_code:newCode});
   if(!ok) return; // hata toast'ı adapter'dan geldi — yerel durumu bozma
   p.operations=ops; p.custom_code=newCode;
