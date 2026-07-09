@@ -1356,7 +1356,7 @@
         <div id="bom-op-hint" style="background:rgba(41,128,185,.08);border:1px solid rgba(41,128,185,.2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:10px">
           💡 İşlem kodu parça kodunun sonuna eklenir (GP-001 + -K → <b style="color:var(--accent)">GP-001-K</b>); yeni parça ÜSTE oluşur, seçilen parça onun altına iner.
         </div>
-        <button class="btn btn-primary btn-sm" onclick="addBomOperation()">⚙ İşlem Ekle</button>
+        <button class="btn btn-primary btn-sm" id="bom-add-op-btn" onclick="addBomOperation()">⚙ İşlem Ekle</button>
       </div>
     </div>
 
@@ -1518,7 +1518,7 @@
       <div id="pbome-op-hint" style="background:rgba(41,128,185,.08);border:1px solid rgba(41,128,185,.2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:10px">
         💡 İşlem kodu parça kodunun sonuna eklenir (GP-001 + -K → <b style="color:var(--accent)">GP-001-K</b>); yeni parça ÜSTE oluşur, seçilen parça onun altına iner.
       </div>
-      <button class="btn btn-primary btn-sm" onclick="pbomeAddOp()">⚙ İşlem Ekle</button>
+      <button class="btn btn-primary btn-sm" id="pbome-add-op-btn" onclick="pbomeAddOp()">⚙ İşlem Ekle</button>
     </div>
   </div>
 
@@ -2172,6 +2172,21 @@ function h(strings, ...vals){
 // font-size, genişlik öneki ('' = genişlik yok).
 function INP(pad='10px 12px', fs='13px', w='width:100%;'){
   return w+'background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:'+fs+';padding:'+pad+';outline:none';
+}
+
+// Çift tıklama koruması (5. denetim turu). Kaydetme butonu await bitene kadar
+// kilitlenmezse ikinci tıklama birinci istek dönmeden gider ve MÜKERRER kayıt
+// oluşur — kod-çakışma kontrolleri (findSiblingDup) yerel diziye baktığından
+// yakalayamaz, dizi henüz güncellenmemiştir. Kanıtlanan örnek: "⚙ İşlem Ekle"
+// çift tıklamada ağaca 2 parça ekliyordu.
+// Kullanım:  const bitti = btnBusy('id'); try{ ... } finally { bitti(); }
+function btnBusy(id, busyText='Kaydediliyor...'){
+  const btn = document.getElementById(id);
+  if(!btn) return ()=>{};
+  if(btn.disabled) return null; // zaten işlemde — çağıran iptal etmeli
+  const oldText = btn.textContent;
+  btn.disabled = true; btn.textContent = busyText;
+  return ()=>{ btn.disabled=false; btn.textContent=oldText; };
 }
 
 // Kardeş-kod ön-kontrolü (4. tur #1: aynı kod farklı dallarda serbest,
@@ -9972,7 +9987,7 @@ function openBomOpDefs() {
         <input type="text" id="opdef-desc" placeholder="İşlem detayı (isteğe bağlı)"
           style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:8px 10px;outline:none">
       </div>
-      <button class="btn btn-primary btn-sm" onclick="saveBomOpDef()">+ Ekle</button>
+      <button class="btn btn-primary btn-sm" id="opdef-save-btn" onclick="saveBomOpDef()">+ Ekle</button>
     </div>
 
     <!-- Mevcut tanımlar -->
@@ -10009,6 +10024,12 @@ function renderOpDefsList() {
 }
 
 async function saveBomOpDef() {
+  const bitti = btnBusy('opdef-save-btn', 'Ekleniyor...');
+  if(!bitti) return;
+  try { await saveBomOpDefCore(); } finally { bitti(); }
+}
+
+async function saveBomOpDefCore() {
   const name = document.getElementById('opdef-name').value.trim();
   const code = document.getElementById('opdef-code').value.trim().toUpperCase();
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
@@ -10088,7 +10109,7 @@ function openAddProduct() {
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="document.getElementById('add-product-overlay').remove()">İptal</button>
-      <button class="btn btn-primary" onclick="saveNewProduct()">💾 Kaydet</button>
+      <button class="btn btn-primary" id="ap-save-btn" onclick="saveNewProduct()">💾 Kaydet</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
@@ -10096,6 +10117,12 @@ function openAddProduct() {
 }
 
 async function saveNewProduct() {
+  const bitti = btnBusy('ap-save-btn');
+  if(!bitti) return;
+  try { await saveNewProductCore(); } finally { bitti(); }
+}
+
+async function saveNewProductCore() {
   const name = document.getElementById('ap-name').value.trim();
   if(!name){ toast('Ürün adı zorunlu!','error'); return; }
   const data = await dbInsert('bom_products',{
@@ -10429,7 +10456,15 @@ function bomOpModeHint(prefix='bom'){
   }[mode];
 }
 
+// Sarmalayıcı: buton kilidi + çekirdek. Çekirdekte çok sayıda erken return
+// olduğundan kilit finally ile geri alınır (çift tıklama koruması).
 async function addBomOperation() {
+  const bitti = btnBusy('bom-add-op-btn', '⚙ Ekleniyor...');
+  if(!bitti) return; // zaten işlemde
+  try { await addBomOperationCore(); } finally { bitti(); }
+}
+
+async function addBomOperationCore() {
   const partId   = document.getElementById('bom-op-part').value;
   const opName   = document.getElementById('bom-op-name').value.trim();
   const opCode   = document.getElementById('bom-op-code').value.trim().toUpperCase();
@@ -11304,6 +11339,12 @@ function pbomeClearPartForm() {
 
 // ─── İşlem Ekle (5. tur #2: üste / kendine / alta — addBomOperation ikizi) ───
 async function pbomeAddOp() {
+  const bitti = btnBusy('pbome-add-op-btn', '⚙ Ekleniyor...');
+  if(!bitti) return;
+  try { await pbomeAddOpCore(); } finally { bitti(); }
+}
+
+async function pbomeAddOpCore() {
   if(!_activePbomId){ toast('Düzenleyici aktif değil!','error'); return; }
   const partId  = document.getElementById('pbome-op-part').value;
   const opName  = document.getElementById('pbome-op-name').value.trim();
