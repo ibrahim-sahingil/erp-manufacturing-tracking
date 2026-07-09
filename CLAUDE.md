@@ -76,6 +76,19 @@ ikinci kişi fikir/test notu sağlar, geliştirme yapmaz.
   Dikkat: h`` içinde boolean interpolasyonu `''` basar — onclick'e boolean
   geçerken `${raw(String(!!v))}` kullan.
 
+## Sunucuyu Yeniden Başlatma (TUZAK — 2026-07-09)
+
+`./mvnw spring-boot:run` bir ALT java süreci fork eder. Maven'i kapatmak (Ctrl+C
+veya görevi durdurmak) bu java'yı ÖLDÜRMEZ; 8080'i tutmaya devam eder ve yeni
+sunucu "Port 8080 was already in use" ile düşer. Bu durumda `mvnw compile` yeni
+`index.html`'i `target/classes`'a kopyaladığından **FRONTEND YENİ ama BACKEND
+ESKİ** olur — testler yanıltıcı sonuç verir (backend düzeltmesi "çalışmıyor"
+görünür). Java'yı mutlaka öldür:
+
+```
+MSYS_NO_PATHCONV=1 taskkill /F /IM java.exe   # Git Bash: /F'i F:/ yapmasın
+```
+
 ## Çalışma Düzeni
 
 - Tek geliştirici → doğrudan `master`'a commit edilir; büyük/riskli işlerde
@@ -103,8 +116,36 @@ ikinci kişi fikir/test notu sağlar, geliştirme yapmaz.
      Kardeşi `node scripts/verify-whxfer.js`: depolar arası aktarım çekirdeğini
      (whXferConfirm loose/tam/kısmi + B6 rollback) in-memory db shim'iyle koşar.
   3. `npx playwright test` (veya `npm run test:e2e`) — gerçek Chromium'da login
-     akışı + XSS render kanıtı (`tests/critical.spec.js`). `@playwright/test`
-     devDependency; `node_modules` gitignore'da, `npx playwright install chromium`
-     ile tarayıcı kurulur. Config çalışan 8080'e bağlanır (webServer başlatmaz).
+     akışı + XSS render kanıtı (`tests/critical.spec.js`), çift tıklama /
+     mükerrer kayıt (`audit-doubleclick`), reddedilen silmede yalan başarı
+     mesajı (`audit-delete-feedback`), sekme turu + uç girdiler
+     (`audit-explore`). `@playwright/test` devDependency; `node_modules`
+     gitignore'da, `npx playwright install chromium` ile tarayıcı kurulur.
+     Config çalışan 8080'e bağlanır (webServer başlatmaz).
+- **5. denetim turunun bekçileri** (2026-07-09) — değişiklik sonrası bunlar da koşsun:
+  - `node scripts/verify-no-dup-fn.js` (sunucusuz) — aynı adlı iki üst-seviye
+    fonksiyon sessizce birbirini EZER. Gerçek örnek: plaka kataloğunun
+    `ssRenderList`'i searchSelect'inkini eziyor, TÜM aranabilir kutuların listesi
+    hiç açılmıyordu. Testlerden kaçmıştı: `grab()` İLK tanımı alır, tarayıcı SONuncuyu
+    çalıştırır. Bu yüzden `ss*` öneki searchSelect'e ait — katalog `sheet*` kullanır.
+  - `node scripts/audit-refs.js` (sunucusuz) — mükerrer HTML id, inline handler'da
+    tanımsız fonksiyon, aynı etikette mükerrer attribute (gerçek örnek: "Ürünü Sil"
+    düğmesinde iki `style=`, ikincisi yok sayılıyordu).
+  - `node scripts/audit-schema.js` (sunucusuz) — `db/schema.sql` ↔ `@Entity` kolon
+    uyumu. `ddl-auto=none` olduğundan uyumsuzluk ÇALIŞMA ANINDA patlar.
+  - `node scripts/audit-orphans.js` (sunucu gerekir, SALT OKUNUR) — canlı veride
+    sahipsiz kayıt: projeye ADIYLA bağlı tablolar (FK yok, K2 riski) + UUID bağları
+    + ağaç bütünlüğü.
+  - `node scripts/verify-authz.js` (sunucu gerekir) — kısıtlı kullanıcı yıkıcı
+    uçlara erişemiyor mu (403), okuma açık mı, developer yazabiliyor mu.
+  - `node scripts/verify-disabled-user.js` (sunucu gerekir) — pasife alınan
+    kullanıcının token'ı ANINDA geçersiz mi.
+- **Çift tıklama:** yeni bir kaydetme butonu eklerken `btnBusy(id)` helper'ını
+  kullan (index.html ~2175). Kilit yoksa ikinci tıklama birinci istek dönmeden
+  gider ve MÜKERRER kayıt oluşur; `findSiblingDup` gibi yerel-dizi kontrolleri
+  bunu yakalayamaz.
+- **Silme sonucu:** `dbDelete`/`dbUpdate` başarısızlıkta `false` döner ve hata
+  toast'ını KENDİ gösterir. Dönüşü mutlaka kontrol et (`const ok = ...; if(!ok) return;`)
+  — yoksa reddedilen silmede UI "silindi" deyip kaydı listeden kaldırır.
 - `esc`/`raw`/`h` mekanizması index.html + e2e-test.js + verify-h-render.js'te
   üç yerde tanımlı; değişirse ÜÇÜNÜ de senkron tut.
