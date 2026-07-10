@@ -9,12 +9,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.uretimtakip.erp.department.Department;
+import com.uretimtakip.erp.department.DepartmentRepository;
+import com.uretimtakip.erp.order.OrderRepository;
+import com.uretimtakip.erp.projectbom.ProjectBom;
 import com.uretimtakip.erp.projectbom.ProjectBomPart;
 import com.uretimtakip.erp.projectbom.ProjectBomPartRepository;
+import com.uretimtakip.erp.projectbom.ProjectBomRepository;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -38,6 +45,9 @@ public class BomOperationService {
     private final BomOperationRepository bomOperationRepository;
     private final BomPartRepository bomPartRepository;
     private final ProjectBomPartRepository projectBomPartRepository;
+    private final ProjectBomRepository projectBomRepository;
+    private final OrderRepository orderRepository;
+    private final DepartmentRepository departmentRepository;
 
     @Transactional(readOnly = true)
     public List<BomOperationResponse> listAll() {
@@ -134,6 +144,20 @@ public class BomOperationService {
             cascadeNameChange(oldCode, newName);
         }
 
+        // (8. tur duzeltme — arkadas raporu) Tanima SONRADAN bolum eklenince/
+        // degisince, bu islemi ZATEN tasiyan proje parcalarinin bolumu de
+        // guncellenir ("islemin bolumu, bolum kisminin oldugu her yere
+        // girilecek" — 7. tur #1). Eskiden bolum yalnizca kopyalama/elle
+        // ekleme ANINDA ataniyordu; mevcut parcalarin Bolum alani bos
+        // kaliyordu. Bolum SILINIRSE (null) parcalara dokunulmaz.
+        // NOT: yayinlanmis URETIM parcalarina (parts.department_id)
+        // dokunulmaz — orada elle atama yapilabiliyor, ezmek riskli.
+        final String oldDept = op.getDepartmentName();
+        final String newDept = trimToNull(request.getDepartmentName());
+        if (newDept != null && !newDept.equals(oldDept)) {
+            cascadeDepartmentChange(newCode, newDept);
+        }
+
         op.setName(newName);
         op.setCode(newCode);
         op.setDescription(request.getDescription());
@@ -181,6 +205,66 @@ public class BomOperationService {
             p.setOperations(replaceOpCode(safeOps(p.getOperations()), code, code, newName));
             projectBomPartRepository.save(p);
         }
+    }
+
+    /**
+     * Islemi tasiyan TUM proje parcalarinin dept_id'sini islemin yeni
+     * bolumune ceker; bolum o projede yoksa OLUSTURULUR (ProjectBomService.
+     * ensureProjectDept ile ayni desen — bolumler projeye ozel kayitlardir).
+     */
+    private void cascadeDepartmentChange(String opCode, String deptName) {
+        Map<UUID, String> projectByPbom = new HashMap<>();  // projectBomId -> projectName
+        Map<String, UUID> deptByProject = new HashMap<>();  // projectName(tr-kucuk) -> deptId
+        for (ProjectBomPart p : projectBomPartRepository.findByOperationCode(opCode)) {
+            String projectName = projectByPbom.computeIfAbsent(p.getProjectBomId(),
+                    id -> projectBomRepository.findById(id)
+                            .map(ProjectBom::getProjectName).orElse(null));
+            if (projectName == null) {
+                continue;
+            }
+            String key = projectName.toLowerCase(Locale.forLanguageTag("tr"));
+            UUID deptId;
+            if (deptByProject.containsKey(key)) {
+                deptId = deptByProject.get(key);
+            } else {
+                deptId = ensureProjectDept(projectName, deptName);
+                deptByProject.put(key, deptId);
+            }
+            if (deptId == null) {
+                continue; // proje kaydi (orders) yok — bolum atanamaz
+            }
+            p.setDeptId(deptId);
+            projectBomPartRepository.save(p);
+        }
+    }
+
+    /** Projenin ayni isimli bolumunu bulur, yoksa olusturur (7. tur #1 deseni). */
+    private UUID ensureProjectDept(String projectName, String deptName) {
+        UUID orderId = orderRepository.findByProjectName(projectName)
+                .map(com.uretimtakip.erp.order.Order::getId)
+                .orElse(null);
+        if (orderId == null) {
+            return null;
+        }
+        String key = deptName.toLowerCase(Locale.forLanguageTag("tr"));
+        List<Department> mevcut = departmentRepository.findByOrderId(orderId);
+        UUID found = mevcut.stream()
+                .filter(d -> d.getName() != null
+                        && d.getName().toLowerCase(Locale.forLanguageTag("tr")).equals(key))
+                .map(Department::getId)
+                .findFirst()
+                .orElse(null);
+        if (found == null) {
+            Department yeni = Department.builder()
+                    .orderId(orderId)
+                    .name(deptName)
+                    .sortOrder(mevcut.size() + 1)
+                    .build();
+            found = departmentRepository.save(yeni).getId();
+            log.info("Islem bolumu projede olusturuldu (opdef cascade): project='{}', dept='{}'",
+                    projectName, deptName);
+        }
+        return found;
     }
 
     private List<Map<String, Object>> safeOps(List<Map<String, Object>> ops) {

@@ -129,6 +129,32 @@ async function call(m, p, b) {
         ozelSonra.body.data.custom_code === taban + 'X' + geriKod + 'PNT',
         ozelSonra.body.data.custom_code);
 
+    // ── (8. tur duzeltme — arkadas raporu) BOLUM SONRADAN eklenince/degisince
+    //    bu islemi ZATEN tasiyan proje parcalarinin dept_id'si de dolmali
+    //    ("islemin bolumu her yere girilecek"). Eskiden yalniz kopyalama/elle
+    //    ekleme aninda ataniyordu; mevcut parcalarin Bolum alani bos kaliyordu.
+    const yeniBolum = 'CASC Bolum ' + sfx;
+    const updD = await call('PUT', '/bom-operations/' + opId,
+      { name: 'CASC Kaynak', code: geriKod, department_name: yeniBolum });
+    chk('bolum degisikligi kabul edildi', updD.ok, updD.msg);
+    const depts = (await call('GET', '/departments')).body.data
+      .filter(d => d.order_id === orderId);
+    const hedefDept = depts.find(d => d.name === yeniBolum);
+    chk('bolum projede otomatik olusturuldu (cascade)', !!hedefDept,
+        JSON.stringify(depts.map(d => d.name)));
+    const pbpD  = (await call('GET', '/project-bom-parts/' + pbpId)).body.data;
+    const ozelD = (await call('GET', '/project-bom-parts/' + ozelId)).body.data;
+    chk('kopya parcanin dept_id backfill edildi', !!hedefDept && pbpD.dept_id === hedefDept.id,
+        JSON.stringify({ dept: pbpD.dept_id }));
+    chk('ozel parcanin dept_id backfill edildi', !!hedefDept && ozelD.dept_id === hedefDept.id,
+        JSON.stringify({ dept: ozelD.dept_id }));
+    // Bolum SILINIRSE parcalara dokunulmaz (null'a cekilmez)
+    await call('PUT', '/bom-operations/' + opId,
+      { name: 'CASC Kaynak', code: geriKod, department_name: null });
+    const pbpD2 = (await call('GET', '/project-bom-parts/' + pbpId)).body.data;
+    chk('bolum silinince parca bolumu KORUNDU', pbpD2.dept_id === (hedefDept && hedefDept.id),
+        JSON.stringify({ dept: pbpD2.dept_id }));
+
     // temizlik sirasi: proje -> sablon
     await call('DELETE', '/project-bom-parts/' + ozelId);
     await call('DELETE', '/project-bom-parts/' + pbpId);

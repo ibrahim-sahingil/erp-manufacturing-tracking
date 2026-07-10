@@ -10858,6 +10858,7 @@ async function opDefUpdate(id, {name, code, dept, desc}) {
   const op = bomOpDefs.find(o=>o.id===id);
   if(!op) return;
   const kodDegisti = op.code !== code;
+  const bolumDegisti = (op.department_name||'') !== (dept||'');
 
   if(bomOpDefs.find(o=>o.code===code && o.id!==id)){
     toast(`"${code}" kodu başka bir işlemde tanımlı!`,'error'); return;
@@ -10890,8 +10891,10 @@ async function opDefUpdate(id, {name, code, dept, desc}) {
   renderBomOpDefSelect();
   pbomeRenderOpDefSelect();
 
-  // Kodlar backend'de değiştiyse açık ağaçları tazele (yerel kopyalar bayat)
-  if(kodDegisti) await refreshOpenBomTrees();
+  // Kod veya bölüm backend'de cascade'lendiyse açık ağaçları tazele
+  // (bölüm eklenince mevcut parçaların dept_id'si backend'de dolduruldu —
+  // 8. tur düzeltmesi: yerel kopyada Bölüm alanı boş görünüyordu)
+  if(kodDegisti || bolumDegisti) await refreshOpenBomTrees();
   toast(`"${name} (${code})" güncellendi.`,'success');
 }
 
