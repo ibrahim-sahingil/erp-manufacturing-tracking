@@ -975,10 +975,20 @@
 
 <!-- KULLANICI YÖNETİMİ (sadece geliştirici) -->
 <!-- SATIN ALMA PLANLAMASI -->
-<!-- MİP — Malzeme İhtiyaç Planlama (7. tur #4, Aşama 1: görünürlük) -->
+<!-- MİP — Malzeme İhtiyaç Planlama (7. tur #4; Aşama 1: görünürlük,
+     Aşama 2: rezervasyon, Aşama 3: kesim planlama Satın Alma'dan taşındı) -->
 <div class="view" id="view-mip">
   <div class="section-title">MİP — MALZEME İHTİYAÇ PLANLAMA</div>
-  <div class="section-sub">Yayınlanmış proje seç · Depolardaki stokla karşılaştır · Eksiği gör</div>
+  <div class="section-sub">İhtiyaç listesi · Depo rezervasyonu · Plaka/profil kesim planlama</div>
+
+  <!-- Alt sekmeler (planning-tab deseni; switchMipTab #view-mip'e scope'ludur) -->
+  <div class="planning-tabs" id="mip-tabs">
+    <button class="planning-tab active" onclick="switchMipTab('list')">📋 İhtiyaç Listesi</button>
+    <button class="planning-tab" onclick="switchMipTab('mrp')">📐 Kesim Planlama</button>
+  </div>
+
+  <!-- İhtiyaç Listesi (Aşama 1-2) -->
+  <div class="planning-section active" id="mip-tab-list">
 
   <div class="form-card" style="margin-bottom:16px">
     <div class="form-row" style="margin-bottom:0">
@@ -1001,6 +1011,23 @@
   </div>
 
   <div id="mip-list"></div>
+
+  </div><!-- /mip-tab-list -->
+
+  <!-- Kesim Planlama (#10 plaka MRP; Aşama 3'te Satın Alma'dan taşındı):
+       havuz → SAC 2D / PROFİL 1D hesap → onay -->
+  <div class="planning-section" id="mip-tab-mrp">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">Satın Alma → Kalemler'de 📐 ile havuza atın · havuzdan seçin · hesaplayın · onaylayın → plaka/profil satın alma kalemi oluşur</span>
+      <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="openStockSheetsModal()">⚙ Ölçü Kataloğu</button>
+    </div>
+    <div class="form-card" id="mrp-pool-card" style="margin-bottom:16px">
+      <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">📐 Planlama Havuzu <span style="text-transform:none">(tüm projeler)</span></div>
+      <div id="mrp-pool"></div>
+    </div>
+    <div class="form-card" id="mrp-params" style="margin-bottom:16px"></div>
+    <div id="mrp-result"></div>
+  </div>
 </div>
 
 <div class="view" id="view-purchasing">
@@ -1012,7 +1039,6 @@
     <button class="planning-tab active" onclick="switchPurchasingTab('items')">📝 Kalemler</button>
     <button class="planning-tab" onclick="switchPurchasingTab('orders')">📦 Toplu Sipariş &amp; Teklif</button>
     <button class="planning-tab" onclick="switchPurchasingTab('receiving')">📥 Mal Kabul</button>
-    <button class="planning-tab" onclick="switchPurchasingTab('mrp')">📐 İhtiyaç Planlama</button>
   </div>
 
   <!-- Kalemler -->
@@ -1088,20 +1114,8 @@
     <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">Proje kartına tıklayın · ⏳ siparişte olanlar "✅ Geldi" ile depoya alınır · 📄 QR'lı mal kabul fişi buradan yazdırılır</div>
     <div id="rcv-list"></div>
   </div>
-
-  <!-- İhtiyaç Planlama (#10 plaka MRP): havuz → SAC 2D / PROFİL 1D hesap → onay -->
-  <div class="planning-section" id="pur-tab-mrp">
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
-      <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">Kalemler sekmesinde 📐 ile havuza atın · havuzdan seçin · hesaplayın · onaylayın → plaka/profil satın alma kalemi oluşur</span>
-      <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="openStockSheetsModal()">⚙ Ölçü Kataloğu</button>
-    </div>
-    <div class="form-card" id="mrp-pool-card" style="margin-bottom:16px">
-      <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">📐 Planlama Havuzu <span style="text-transform:none">(tüm projeler)</span></div>
-      <div id="mrp-pool"></div>
-    </div>
-    <div class="form-card" id="mrp-params" style="margin-bottom:16px"></div>
-    <div id="mrp-result"></div>
-  </div>
+  <!-- İhtiyaç/Kesim Planlama (#10) Aşama 3'te MİP sekmesine taşındı
+       (mip-tab-mrp) — Satın Alma sadece sipariş verir. -->
 </div>
 
 <!-- ÜRETİM DEPOSU -->
@@ -6110,7 +6124,7 @@ async function switchTab(tab) {
   if(tab==='users')     renderUsers();
   if(tab==='stats')     renderStatsView();
   if(tab==='orders')    renderOrders();
-  if(tab==='mip')       renderMip();
+  if(tab==='mip'){ renderMip(); if(document.getElementById('mip-tab-mrp')?.classList.contains('active')) renderMrp(); }
   if(tab==='purchasing') renderPurchasing();
   if(tab==='warehouse') renderWarehouse();
   if(tab==='delivery')  renderDelivery();
@@ -6697,9 +6711,23 @@ function _purActivateTab(tab){
   if(tab==='orders') renderPurchaseOrders();
   if(tab==='items') renderPurchaseList();
   if(tab==='receiving') renderReceiving();
-  if(tab==='mrp') renderMrp();
+  // 'mrp' Aşama 3'te MİP sekmesine taşındı (switchMipTab)
 }
 function switchPurchasingTab(tab){ _purActivateTab(tab); }
+
+// MİP alt sekme geçişi (#view-mip'e scope'lu — planning-tab deseni).
+// 'mrp' (Kesim Planlama) Aşama 3'te Satın Alma'dan buraya taşındı:
+// Satın Alma sadece sipariş verir; havuza atma (📐) hâlâ Satın Alma →
+// Kalemler'de, planlama/onay burada.
+function _mipActivateTab(tab){
+  document.querySelectorAll('#view-mip .planning-tab').forEach(t=>
+    t.classList.toggle('active', (t.getAttribute('onclick')||'').includes("'"+tab+"'")));
+  document.querySelectorAll('#view-mip .planning-section').forEach(s=>
+    s.classList.toggle('active', s.id==='mip-tab-'+tab));
+  if(tab==='list') renderMip();
+  if(tab==='mrp') renderMrp();
+}
+function switchMipTab(tab){ _mipActivateTab(tab); }
 
 // ═══ MAL KABUL (#4 arkadaş isteği) ═══
 // Proje kartları; açılınca o projenin sipariş verilen kalemleri:
@@ -6962,7 +6990,7 @@ async function purTogglePlanning(id){
   const ok = await dbUpdate('purchase_items', id, {needs_planning: val});
   if(!ok){ toast('Güncellenemedi!','error'); return; }
   i.needs_planning = val;
-  toast(val?'📐 Kalem planlama havuzuna atıldı':'Kalem havuzdan çıkarıldı','success');
+  toast(val?'📐 Kalem planlama havuzuna atıldı (MİP → Kesim Planlama)':'Kalem havuzdan çıkarıldı','success');
   renderPurchaseList();
 }
 
@@ -6988,7 +7016,7 @@ async function renderMrp(){
 
   const pool = purchaseItems.filter(i=>i.needs_planning && i.status==='PLANNED' && !i.stock_plan_id);
   if(!pool.length){
-    poolEl.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:12px;text-align:center">Havuz boş — Kalemler sekmesinde 📝 Planlandı kalemlerde 📐 butonuna basın</div>`;
+    poolEl.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:12px;text-align:center">Havuz boş — Satın Alma → Kalemler'de 📝 Planlandı kalemlerde 📐 butonuna basın</div>`;
   } else {
     poolEl.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:8px">
         <button class="btn btn-ghost btn-sm" onclick="document.querySelectorAll('.mrp-chk').forEach(c=>c.checked=true)">Tümünü Seç</button>

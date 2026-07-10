@@ -27,6 +27,40 @@ async function api(page, method, path, body) {
   }, [method, path, body || null]);
 }
 
+test('Aşama 3: Kesim Planlama MİP altında, Satın Alma\'da değil', async ({ page }) => {
+  const hatalar = [];
+  page.on('pageerror', e => hatalar.push('[pageerror] ' + String(e).slice(0, 200)));
+  await login(page);
+
+  // Satın Alma'da artık İhtiyaç Planlama sekmesi YOK
+  await page.evaluate(() => switchTab('purchasing'));
+  await page.waitForTimeout(1200);
+  await expect(page.locator('#purchasing-tabs button', { hasText: 'İhtiyaç Planlama' }))
+    .toHaveCount(0);
+  await expect(page.locator('#view-purchasing #mrp-pool')).toHaveCount(0);
+
+  // MİP'te Kesim Planlama alt sekmesi VAR ve havuz render oluyor
+  await page.evaluate(() => switchTab('mip'));
+  await page.waitForTimeout(1200);
+  const kesimTab = page.locator('#mip-tabs button', { hasText: 'Kesim Planlama' });
+  await expect(kesimTab).toBeVisible();
+  await kesimTab.click();
+  await page.waitForTimeout(1500);
+  await expect(page.locator('#mip-tab-mrp')).toBeVisible();
+  const havuz = await page.locator('#mrp-pool').innerText();
+  console.log('  havuz içeriği:', havuz.replace(/\s+/g, ' ').slice(0, 120));
+  expect(havuz.length, 'havuz render olmalı (boş mesajı veya kalemler)').toBeGreaterThan(0);
+  // Parametre formu (SAC/PROFİL) da kurulmalı — renderMrpParams çalıştı kanıtı
+  await expect(page.locator('#mrp-params #mrp-sac-w')).toBeVisible();
+
+  // İhtiyaç Listesi'ne geri dönüş çalışıyor
+  await page.locator('#mip-tabs button', { hasText: 'İhtiyaç Listesi' }).click();
+  await expect(page.locator('#mip-tab-list')).toBeVisible();
+  await expect(page.locator('#mip-tab-mrp')).toBeHidden();
+
+  expect(hatalar, 'JS hatası olmamalı').toEqual([]);
+});
+
 test('MİP: ihtiyaç ile depo stoğunu karşılaştırır, eksiği ve durumu doğru gösterir', async ({ page }) => {
   const hatalar = [];
   page.on('pageerror', e => hatalar.push('[pageerror] ' + String(e).slice(0, 200)));
