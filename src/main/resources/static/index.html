@@ -1008,6 +1008,7 @@
   <div style="background:rgba(41,128,185,.08);border:1px solid rgba(41,128,185,.2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">
     💡 Depo stoğu <b>projelere ayrılmamış serbest havuzdur</b> — aynı malzemeyi başka bir proje de görüyor olabilir.
     📦 Rezervasyon emri gönderin: depocu sayıma göre tam/kısmi onaylar, onaylanan stoktan düşüp projeye ayrılır, eksik satın almaya düşer.
+    🛒 Yayınlama artık satın almaya kalem <b>düşürmez</b> — stoktan karşılanamayan eksikler buradan "Satın Almaya Gönder" ile gider.
   </div>
 
   <div id="mip-list"></div>
@@ -6181,21 +6182,33 @@ function mipQtyOf(p){
 function mipKindOf(p){ return p.material_kind || p.resolved_material_kind || null; }
 
 // Yayınlanmış proje ağacının SATIN ALINAN parçalarını koda göre gruplar.
-// Aynı kod ağacın farklı dallarında tekrar edebilir → adetler TOPLANIR
-// (pbomPublishParts'taki purGroups deseniyle birebir).
+// Aynı kod ağacın farklı dallarında tekrar edebilir → adetler TOPLANIR.
+// 8. tur: yayınlama artık satın almaya kalem düşürmediğinden bu gruplama
+// satın alınan parçaların TEK kaynağıdır; malzeme + ilk pbp bağı da taşınır
+// (mipBuyConfirm satın alma kalemine yazar — MRP ölçüleri pbp bağından gelir).
 function mipGroupParts(pbParts){
-  const groups = new Map(); // key → {key, code, name, unit, need}
+  const groups = new Map(); // key → {key, code, name, unit, material, pbpId, need}
   for(const p of pbParts){
     const code = mipCodeOf(p), name = mipNameOf(p);
     if(p.is_excluded || !name) continue;
     if(!PURCHASE_KINDS.includes(mipKindOf(p))) continue; // sadece satın alınanlar
     const key = mipKey(name, code);
     if(!key) continue;
-    const g = groups.get(key) || {key, code, name, unit: p.custom_unit || p.resolved_unit || 'adet', need: 0};
+    const g = groups.get(key) || {key, code, name,
+      unit: p.custom_unit || p.resolved_unit || 'adet',
+      material: p.custom_material || p.resolved_material || null,
+      pbpId: p.id || null, need: 0};
     g.need += mipQtyOf(p);
     groups.set(key, g);
   }
   return [...groups.values()];
+}
+
+// Satın almaya gönderilecek öneri miktarı: karşılanmamış eksikten, daha önce
+// gönderilmiş ama henüz sipariş edilmemiş (PLANNED) miktar düşülür —
+// mükerrer gönderim olmasın. SAF (verify-mip.js test eder).
+function mipBuyQty(row){
+  return Math.max(0, mipNum((Number(row.missing)||0) - (Number(row.planned)||0)));
 }
 
 // SAF hesap çekirdeği — sunucusuz test edilir (scripts/verify-mip.js).
@@ -6382,6 +6395,12 @@ function mipRowHTML(r, idx){
   } else if(r.stockTotal > 1e-9 && (r.need - r.received - r.reserved) > 1e-9){
     aksiyon = h`<button class="btn btn-primary btn-sm" onclick="mipReserveModal(${raw(String(Number(idx)))})">📦 Rezervasyon Emri</button>`;
   }
+  // 8. tur: eksikler satın almaya BURADAN gönderilir (yayınlama artık kalem
+  // düşürmez); PLANNED olarak gönderilmiş miktar öneriden düşülür.
+  const alQty = mipBuyQty(r);
+  const alBtn = alQty > 1e-9
+    ? h`<button class="btn btn-ghost btn-sm" onclick="mipBuyModal(${raw(String(Number(idx)))})" title="Stoktan karşılanamayan eksiği satın alma listesine PLANNED kalem olarak gönderir">🛒 Satın Almaya Gönder (${alQty})</button>`
+    : '';
   return h`<div class="pbom-card" style="border-left:3px solid ${raw(st.color)};margin-bottom:8px">
     <div class="pbom-card-header">
       <div style="min-width:0;flex:1">
@@ -6402,9 +6421,61 @@ function mipRowHTML(r, idx){
         <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">🗄️ ${dagilim}</div>
         <div style="font-family:var(--font-mono);font-size:11px;color:#2980b9;margin-top:3px">💡 ${mipSuggest(r)}</div>
       </div>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${aksiyon}</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${aksiyon}${alBtn}</div>
     </div>
   </div>`;
+}
+
+// ─── 8. tur: eksik miktarı satın almaya gönderme (yayınlama düşürmez artık) ───
+function mipBuyModal(idx){
+  const r = _mipRows[idx];
+  if(!r) return;
+  const proje = document.getElementById('mip-project-sel')?.value || '';
+  if(!proje) return;
+  const oneri = mipBuyQty(r);
+  if(oneri <= 1e-9) return;
+  const inp = INP();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'mipbuy-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:420px;text-align:left">
+    <h3 style="margin-bottom:4px">🛒 Satın Almaya Gönder</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${r.code?esc(r.code)+' — ':''}${esc(r.name)} · 📁 ${esc(proje)}<br>Eksik: ${mipNum(r.missing)} ${esc(r.unit||'adet')}${r.planned?' · daha önce gönderilen (planlandı): '+mipNum(r.planned):''}</p>
+    <div class="form-group" style="margin-bottom:10px">
+      <label>Gönderilecek miktar</label>
+      <input type="number" id="mipbuy-qty" value="${oneri}" min="0.001" step="0.001" style="${inp}">
+    </div>
+    <div class="form-group" style="margin-bottom:16px"><label>Not (isteğe bağlı)</label>
+      <input type="text" id="mipbuy-note" style="${inp}"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('mipbuy-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" id="mipbuy-confirm">🛒 Gönder</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#mipbuy-confirm').onclick = ()=>mipBuyConfirm(r, proje);
+  setTimeout(()=>{const el=document.getElementById('mipbuy-qty');if(el){el.focus();el.select();}},100);
+}
+
+async function mipBuyConfirm(r, proje){
+  const qty = parseFloat(document.getElementById('mipbuy-qty')?.value);
+  if(!qty || qty<=0){ toast('Geçerli miktar girin!','error'); return; }
+  const bitti = btnBusy('mipbuy-confirm', '⏳ Gönderiliyor…');
+  if(!bitti) return;
+  try{
+    const not = document.getElementById('mipbuy-note')?.value?.trim() || null;
+    const d = await dbInsert('purchase_items', {
+      project_name: proje, project_bom_part_id: r.pbpId || null,
+      name: r.name, code: r.code || null,
+      quantity: qty, unit: r.unit || 'adet', material: r.material || null,
+      created_by: currentUser?.display_name||currentUser?.username||null,
+      notes: not
+    });
+    if(!Array.isArray(d)||!d[0]) return; // hata toast'ı adapter'dan geldi
+    document.getElementById('mipbuy-overlay')?.remove();
+    toast('🛒 '+mipNum(qty)+' '+(r.unit||'adet')+' satın alma listesine gönderildi (Planlandı)','success');
+    renderMip();
+  } finally { bitti(); }
 }
 
 // ─── Aşama 2: Rezervasyon talebi modalı (MİP tarafı) ───
@@ -12751,13 +12822,16 @@ function pbomeRenderTree() {
 }
 
 // (#7) Yayınlama çekirdeği — türe göre yönlendirme:
-// TEDARIK/HAMMADDE/SARF → satın alma kalemi (parts'a GİRMEZ);
-// YARI_MAMUL/MAMUL/türsüz → üretim (parts, eski davranış).
-// Mükerrer kontrolü: parts proje+kod; purchase_items pbp bağı veya proje+kod.
+// YARI_MAMUL/MAMUL/türsüz → üretim (parts, eski davranış);
+// TEDARIK/HAMMADDE/SARF → HİÇBİR YERE YAZILMAZ, yalnızca sayılır (mipPending).
+// (test.txt #4 / 8. tur kararı): yayınlama artık satın almaya kalem
+// DÜŞÜRMEZ — satın alınan parçalar MİP'te görünür; stoktan karşılanamayan
+// eksik ORADAN gönderilir (mipBuyConfirm) veya rezervasyon kısmi onayında
+// otomatik düşer. Eski davranış tam adetli PLANNED kalem + rezervasyon
+// eksiği ile ÇİFTE SAYIM yaratıyordu.
+// Mükerrer kontrolü: parts proje+kod.
 async function pbomPublishParts(pb, allPbParts, templateParts){
-  const freshPur = await dbGet('purchase_items');
-  if(Array.isArray(freshPur)) purchaseItems = freshPur;
-  const res = { added:0, skipped:0, updated:0, qtyBlocked:0, rounded:0, purAdded:0, purSkipped:0, purUpdated:0, purManual:0, errors:0, linked:0 };
+  const res = { added:0, skipped:0, updated:0, qtyBlocked:0, rounded:0, mipPending:0, errors:0, linked:0 };
   _lastApiError = null;
   const partIdByPbp = {}; // (#8) pbp.id → parts.id (üretime gidenler)
   const pbpById = {};
@@ -12766,26 +12840,28 @@ async function pbomPublishParts(pb, allPbParts, templateParts){
   const codeOf = p => p.custom_code || p.resolved_code || null;
   const nameOf = p => p.custom_name || p.resolved_name || null;
 
-  // (4. tur #1) Aynı kod ağacın farklı dallarında serbest. parts ve satın
-  // almada kod proje içinde TEK satır olduğundan aynı kodlu satırlar
-  // gruplanır, adet TOPLANIR (yeniden yayınlamada adet güncellenir).
-  const prodGroups = new Map(), purGroups = new Map(); // codeLower → {rows, qty}
+  // (4. tur #1) Aynı kod ağacın farklı dallarında serbest. parts'ta kod
+  // proje içinde TEK satır olduğundan aynı kodlu satırlar gruplanır,
+  // adet TOPLANIR (yeniden yayınlamada adet güncellenir).
+  const prodGroups = new Map(); // codeLower → {rows, qty}
+  const mipCodes = new Set();   // satın alınan türler — MİP'e düşenlerin sayısı
   for(const p of allPbParts){
     const code = codeOf(p), name = nameOf(p);
     if(p.is_excluded || !name || !code) continue;
     const kind = p.material_kind || p.resolved_material_kind || null;
+    if(PURCHASE_KINDS.includes(kind)){ mipCodes.add(code.toLowerCase()); continue; }
     const qty = Number(p.custom_qty!=null ? p.custom_qty : (p.resolved_qty!=null ? p.resolved_qty : 1)) || 1;
-    const map = PURCHASE_KINDS.includes(kind) ? purGroups : prodGroups;
-    const g = map.get(code.toLowerCase()) || {rows:[], qty:0};
+    const g = prodGroups.get(code.toLowerCase()) || {rows:[], qty:0};
     g.rows.push(p); g.qty += qty;
-    map.set(code.toLowerCase(), g);
+    prodGroups.set(code.toLowerCase(), g);
   }
+  res.mipPending = mipCodes.size;
 
-  // (B1/B2) parts ve purchase_items'ta kod, proje genelinde TEK satırdır;
-  // hedef adet = bu pbom'un toplamı + aynı projeye bağlı DİĞER yayınlanmış
-  // pbom'ların o koddaki toplamı. Yalnız bu pbom'un toplamı yazılırsa iki
-  // makinede ortak kod her yayında ping-pong yapar.
-  const otherProdQty = new Map(), otherPurQty = new Map(); // codeLower → qty
+  // (B1) parts'ta kod, proje genelinde TEK satırdır; hedef adet = bu pbom'un
+  // toplamı + aynı projeye bağlı DİĞER yayınlanmış pbom'ların o koddaki
+  // toplamı. Yalnız bu pbom'un toplamı yazılırsa iki makinede ortak kod
+  // her yayında ping-pong yapar.
+  const otherProdQty = new Map(); // codeLower → qty
   const sibs = projectBoms.filter(x=>x.project_name===pb.project_name && x.id!==pb.id && x.status==='published');
   for(const sib of sibs){
     const rows = await dbGet('project_bom_parts','project_bom_id=eq.'+sib.id);
@@ -12793,41 +12869,10 @@ async function pbomPublishParts(pb, allPbParts, templateParts){
       const code = sp.custom_code || sp.resolved_code, name = sp.custom_name || sp.resolved_name;
       if(sp.is_excluded || !name || !code) continue;
       const kind = sp.material_kind || sp.resolved_material_kind || null;
+      if(PURCHASE_KINDS.includes(kind)) continue;
       const q = Number(sp.custom_qty!=null ? sp.custom_qty : (sp.resolved_qty!=null ? sp.resolved_qty : 1)) || 1;
-      const m = PURCHASE_KINDS.includes(kind) ? otherPurQty : otherProdQty;
-      m.set(code.toLowerCase(), (m.get(code.toLowerCase())||0) + q);
+      otherProdQty.set(code.toLowerCase(), (otherProdQty.get(code.toLowerCase())||0) + q);
     }
-  }
-
-  for(const g of purGroups.values()){
-    const p = g.rows[0], code = codeOf(p), name = nameOf(p);
-    const target = g.qty + (otherPurQty.get(code.toLowerCase())||0);
-    const purExists = purchaseItems.find(x=>g.rows.some(r=>x.project_bom_part_id===r.id) ||
-      (x.project_name===pb.project_name && (x.code||'').toLowerCase()===code.toLowerCase()));
-    if(purExists){
-      // (B2) Yeniden yayınlamada toplam değiştiyse: PLANNED kalem güncellenir;
-      // sipariş süreci başlamışsa (ORDERED/RECEIVED/...) dokunulmaz, uyarı verilir
-      if(Number(purExists.quantity) !== target){
-        if(purExists.status==='PLANNED'){
-          const ok = await dbUpdate('purchase_items', purExists.id, {quantity: target});
-          if(ok){ purExists.quantity = target; res.purUpdated++; }
-          else res.errors++;
-        } else {
-          res.purManual++;
-          console.warn('Satın alma adedi elle kontrol edilmeli (sipariş süreci başlamış):', code, purExists.quantity+' → '+target);
-        }
-      }
-      res.purSkipped++; continue;
-    }
-    const d = await dbInsert('purchase_items',{
-      project_name: pb.project_name, project_bom_part_id: p.id,
-      name, code,
-      quantity: target, unit: p.custom_unit||p.resolved_unit||'adet',
-      material: p.custom_material||p.resolved_material||null,
-      created_by: currentUser?.display_name||currentUser?.username||null
-    });
-    if(Array.isArray(d)&&d[0]){ purchaseItems.push(d[0]); res.purAdded++; }
-    else { res.errors++; console.error('Satın almaya eklenemedi:', code); }
   }
 
   for(const g of prodGroups.values()){
@@ -12906,14 +12951,12 @@ async function pbomPublishParts(pb, allPbParts, templateParts){
 }
 function pbomPublishMsg(r){
   let msg = `✅ Yayınlandı! ${r.added} parça üretime çıkarıldı`;
-  if(r.purAdded) msg += `, 🛒 ${r.purAdded} kalem satın almaya aktarıldı`;
+  if(r.mipPending) msg += `, 🛒 ${r.mipPending} satın alınan parça MİP'e düştü (sipariş MİP'ten gönderilir)`;
   if(r.linked) msg += `, 🔗 ${r.linked} hiyerarşi bağı kuruldu`;
   if(r.updated) msg += `, 🔢 ${r.updated} parçanın adedi güncellendi`;
   if(r.qtyBlocked) msg += `, ⚠️ ${r.qtyBlocked} parçada adet güncellenmedi (tamamlanan üretim yeni hedefin üstünde)`;
   if(r.rounded) msg += `, ⚠️ ${r.rounded} parçada ondalık adet üretim için tam sayıya (yukarı) yuvarlandı`;
-  if(r.purUpdated) msg += `, 🛒 ${r.purUpdated} satın alma kaleminin adedi güncellendi`;
-  if(r.purManual) msg += `, ⚠️ ${r.purManual} kalemin siparişi verilmiş — adedi elle kontrol edin`;
-  if(r.skipped || r.purSkipped) msg += `, ${r.skipped + r.purSkipped} zaten mevcuttu`;
+  if(r.skipped) msg += `, ${r.skipped} zaten mevcuttu`;
   if(r.errors){ msg += `, ${r.errors} hata`; if(_lastApiError) msg += ` (${_lastApiError})`; }
   return msg;
 }

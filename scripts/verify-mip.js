@@ -55,6 +55,7 @@ eval(grab('mipCalcRow'));
 eval(grab('mipNum'));
 eval(grab('mipSuggest'));
 eval(grab('mipReservePlan'));
+eval(grab('mipBuyQty'));
 
 const WH = [{id: 'A', name: 'A-Depo'}, {id: 'B', name: 'B-Depo'}];
 const mv = (whId, name, code, type, qty) =>
@@ -215,6 +216,20 @@ chk('mal kabul + onceki rezerve dusulur (50-10-30=10)',
     dag3.length === 1 && dag3[0].qty === 10, JSON.stringify(dag3));
 chk('ihtiyac karsilanmissa plan bos',
     mipReservePlan(pRow(30, 0, 30, [{whId: 'A', name: 'A-Depo', qty: 25}])).length === 0);
+
+console.log('\n═══ mipBuyQty: satin almaya gonderme onerisi (8. tur) ═══');
+// Yayinlama artik satin almaya kalem dusurmez; eksik MIP'ten gonderilir.
+// Oneri = eksik - PLANNED (gonderilmis ama siparis edilmemis) — mukerrer olmasin.
+chk('planlanan yokken oneri = eksik', mipBuyQty({missing: 10, planned: 0}) === 10);
+chk('PLANNED oneriden dusulur (10-8=2)', mipBuyQty({missing: 10, planned: 8}) === 2);
+chk('planlanan eksigi asarsa 0 (negatif olmaz)', mipBuyQty({missing: 5, planned: 8}) === 0);
+chk('eksik yoksa 0', mipBuyQty({missing: 0, planned: 0}) === 0);
+// mipGroupParts artik malzeme + ilk pbp bagini tasir (gonderilen kalem
+// MRP olculeri icin pbp'ye baglanir)
+const gMalz = mipGroupParts([{id: 'pbp1', custom_code: 'M-1', custom_name: 'Malz',
+  custom_qty: 1, material_kind: 'TEDARIK', custom_material: 'St-37'}]);
+chk('grup malzeme + pbp bagi tasir', gMalz[0].material === 'St-37' && gMalz[0].pbpId === 'pbp1',
+    JSON.stringify({m: gMalz[0].material, p: gMalz[0].pbpId}));
 
 console.log('\n' + '─'.repeat(60));
 if(fail){ console.log(`❌ ${fail} kontrol BASARISIZ.`); process.exit(1); }

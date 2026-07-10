@@ -46,6 +46,16 @@ function grab(name){
 (0,eval)(grab('rcvDoReceive'));   // 4. tur: kısmi mal kabul çekirdeği
 (0,eval)(grab('mipKey'));         // 7. tur #4: eşleştirme anahtarı (kod önce, yoksa ad)
 (0,eval)(grab('whStockOf'));      // 7. tur #4: saf stok hesabı — _whItemStock buna delege eder
+// 8. tur: yayınlama satın almaya kalem düşürmez; eksik MİP'ten gönderilir.
+// Gönderme çekirdeği (grup → hesap → öneri) burada gerçek fonksiyonlarla koşulur.
+(0,eval)(grab('mipCodeOf'));
+(0,eval)(grab('mipNameOf'));
+(0,eval)(grab('mipQtyOf'));
+(0,eval)(grab('mipKindOf'));
+(0,eval)(grab('mipGroupParts'));
+(0,eval)(grab('mipCalcRow'));
+(0,eval)(grab('mipNum'));
+(0,eval)(grab('mipBuyQty'));
 (0,eval)(grab('_whItemStock'));   // O6: depo net stok hesabı (sevk uyarısının çekirdeği)
 (0,eval)(grab('_unlinkPlanSources')); // E5: plaka iptal/silmede kaynakları havuza döndürme
 
@@ -226,7 +236,10 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const r1 = await pbomPublishParts({project_name:PROJ}, pbps, tpl);
     console.log('  sonuç:', JSON.stringify(r1), '→', pbomPublishMsg(r1));
     check('4 parça üretime (GVD, PLT, PLT2, BRK-tek satır)', r1.added===4, r1.added);
-    check('2 kalem satın almaya (SAC-tek satır, CVT)', r1.purAdded===2, r1.purAdded);
+    // 8. tur: yayınlama satın almaya kalem DÜŞÜRMEZ — 2 parça MİP'e düşer
+    check('satın almaya kalem düşmedi, 2 parça MİP\'e (mipPending)',
+      r1.mipPending===2 && (await dbGet('purchase_items')).filter(i=>i.project_name===PROJ).length===0,
+      JSON.stringify({mipPending:r1.mipPending}));
     check('3 hiyerarşi bağı (PLT→GVD, PLT2→GVD, BRK→PLT)', r1.linked===3, r1.linked);
 
     const partGvd  = parts.find(p=>p.project===PROJ && p.code==='E2E-GVD');
@@ -240,18 +253,45 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     check('BRK tek satır, adet TOPLAMI 2, parent dallardan biri (PLT/PLT2)',
       Number(partBrk?.qty)===2 && [partPlt?.id, partPlt2?.id].includes(partBrk?.parent_part_id),
       `qty=${partBrk?.qty}, parent=${partBrk?.parent_part_id===partPlt?.id?'PLT':(partBrk?.parent_part_id===partPlt2?.id?'PLT2':'?')}`);
+    check('SAC/CVT parts\'a GİRMEDİ', !parts.some(p=>p.project===PROJ&&['E2E-SAC','E2E-CVT'].includes(p.code)));
+
+    console.log('═══ 8.TUR: EKSİK, MİP\'TEN SATIN ALMAYA GÖNDERİLİR ═══');
+    // Gerçek çekirdek: mipGroupParts → mipCalcRow → mipBuyQty → insert
+    // (mipBuyConfirm'in yazdığı kalemle birebir alanlar).
+    const mipGruplar = mipGroupParts(pbps);
+    check('MİP 2 grup görüyor (SAC adet toplamı 2 + CVT 8)',
+      mipGruplar.length===2
+      && mipGruplar.find(g=>g.code==='E2E-SAC')?.need===2
+      && mipGruplar.find(g=>g.code==='E2E-CVT')?.need===8,
+      JSON.stringify(mipGruplar.map(g=>({c:g.code, n:g.need}))));
+    check('grup pbp bağı + malzeme taşıyor (MRP ölçüleri için)',
+      mipGruplar.every(g=>!!g.pbpId), JSON.stringify(mipGruplar.map(g=>!!g.pbpId)));
+    for(const g of mipGruplar){
+      const row = mipCalcRow(g, [], [], [], PROJ);
+      const q = mipBuyQty(row);
+      check('stok yokken öneri = ihtiyaç ('+g.code+')', q===row.need && q===row.missing, q);
+      const d = await dbInsert('purchase_items',{project_name:PROJ,
+        project_bom_part_id:g.pbpId||null, name:g.name, code:g.code,
+        quantity:q, unit:g.unit||'adet', material:g.material||null, created_by:'E2E MİP'});
+      check('kalem gönderildi ('+g.code+')', Array.isArray(d)&&!!d[0], _lastApiError||'');
+    }
+    globalThis.purchaseItems = await dbGet('purchase_items');
     const piSac = purchaseItems.find(i=>i.project_name===PROJ && i.code==='E2E-SAC');
     const piCvt = purchaseItems.find(i=>i.project_name===PROJ && i.code==='E2E-CVT');
     check('SAC satın almada TEK kalem, adet TOPLAMI 2', Number(piSac?.quantity)===2, piSac?.quantity);
     check('CVT kalemi adet 8', Number(piCvt?.quantity)===8, piCvt?.quantity);
-    check('SAC/CVT parts\'a GİRMEDİ', !parts.some(p=>p.project===PROJ&&['E2E-SAC','E2E-CVT'].includes(p.code)));
+    // Mükerrer gönderim koruması: PLANNED kalem öneriden düşer
+    const rowSacSonra = mipCalcRow(mipGruplar.find(g=>g.code==='E2E-SAC'), [], [], purchaseItems, PROJ);
+    check('gönderilen PLANNED öneriden düşer (mipBuyQty 0)', mipBuyQty(rowSacSonra)===0, mipBuyQty(rowSacSonra));
 
     console.log('═══ İKİNCİ YAYINLAMA (idempotens) ═══');
     const r2 = await pbomPublishParts({project_name:PROJ}, pbps, tpl);
     check('hiçbir şey mükerrer oluşmadı',
-      r2.added===0 && r2.purAdded===0 && r2.linked===0 && r2.updated===0
-      && r2.skipped===4 && r2.purSkipped===2,
+      r2.added===0 && r2.linked===0 && r2.updated===0
+      && r2.skipped===4 && r2.mipPending===2,
       JSON.stringify(r2));
+    check('republish satın almaya DOKUNMADI (2 kalem aynen)',
+      (await dbGet('purchase_items')).filter(i=>i.project_name===PROJ).length===2);
 
     console.log('═══ 4.TUR: YENİDEN YAYINLAMADA ADET GÜNCELLEME ═══');
     // BRK'nin bir dalındaki adet 1→2 yapılır → toplam 3 → parts güncellenmeli
@@ -308,19 +348,20 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     await dbUpdate('parts', brkTotal.id, {status:'pending', qty_done:0});
     globalThis.parts = await dbGet('parts');
 
-    console.log('═══ B2: REPUBLISH SATIN ALMA ADEDİ (PLANNED) ═══');
-    // CVT adedi 8→10: republish PLANNED kalemin adedini güncellemeli
+    console.log('═══ B2 (8. turda değişti): REPUBLISH SATIN ALMAYA DOKUNMAZ, FARKI MİP GÖSTERİR ═══');
+    // CVT adedi 8→10: republish kalemi ARTIK güncellemez; fark MİP'te
+    // "Satın Almaya Gönder (2)" önerisi olarak görünür.
     const pbpCvt = pbpsFresh.find(p=>codeOf(p)==='E2E-CVT');
     check('CVT pbp adedi 10 yapıldı', await dbUpdate('project_bom_parts', pbpCvt.id, {custom_qty:10}));
     let pbpsB2 = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm.id);
-    const rB2 = await pbomPublishParts({id:pbm.id, project_name:PROJ}, pbpsB2, tpl);
-    check('PLANNED kalem adedi güncellendi (purUpdated=1, adet 10)',
-      rB2.purUpdated===1 && Number(purchaseItems.find(i=>i.id===piCvt.id)?.quantity)===10,
-      JSON.stringify({purUpdated:rB2.purUpdated, q:purchaseItems.find(i=>i.id===piCvt.id)?.quantity}));
+    await pbomPublishParts({id:pbm.id, project_name:PROJ}, pbpsB2, tpl);
+    globalThis.purchaseItems = await dbGet('purchase_items');
+    check('kalem adedi DEĞİŞMEDİ (8 kaldı)',
+      Number(purchaseItems.find(i=>i.id===piCvt.id)?.quantity)===8,
+      purchaseItems.find(i=>i.id===piCvt.id)?.quantity);
+    const rowCvtB2 = mipCalcRow(mipGroupParts(pbpsB2).find(g=>g.code==='E2E-CVT'), [], [], purchaseItems, PROJ);
+    check('MİP farkı önerir (ihtiyaç 10 − planlandı 8 = 2)', mipBuyQty(rowCvtB2)===2, mipBuyQty(rowCvtB2));
     await dbUpdate('project_bom_parts', pbpCvt.id, {custom_qty:8});
-    pbpsB2 = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm.id);
-    const rB2b = await pbomPublishParts({id:pbm.id, project_name:PROJ}, pbpsB2, tpl);
-    check('adet 8\'e geri döndü', rB2b.purUpdated===1 && Number(purchaseItems.find(i=>i.id===piCvt.id)?.quantity)===8);
 
     console.log('═══ H: İŞ EMRİ BAŞLATMA ENGELİ ═══');
     const wo = await api('POST','/work-orders',{order_id:orderId, status:'planned', notes:'E2E',
@@ -383,14 +424,14 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     let wh = whs.find(w=>w.is_active!==false);
     if(!wh){ wh = (await dbInsert('warehouses',{name:'E2E Depo'}))[0]; created.wh.push(wh.id); }
     check('sipariş ver (ORDERED + termin)', await dbUpdate('purchase_items', piCvt.id, {status:'ORDERED', expected_date:'2026-08-01'}));
-    // (B2) sipariş verilmiş kalemin adedi republish'te EZİLMEZ, uyarı sayılır
+    // 8. tur: sipariş verilmiş kalem republish'te zaten hiç dokunulmaz
     await dbUpdate('project_bom_parts', pbpCvt.id, {custom_qty:12});
     const pbpsB2c = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm.id);
-    const rB2c = await pbomPublishParts({id:pbm.id, project_name:PROJ}, pbpsB2c, tpl);
+    await pbomPublishParts({id:pbm.id, project_name:PROJ}, pbpsB2c, tpl);
     globalThis.purchaseItems = await dbGet('purchase_items');
-    check('ORDERED kalem adedi korundu (purManual=1, adet 8)',
-      rB2c.purManual===1 && Number(purchaseItems.find(i=>i.id===piCvt.id)?.quantity)===8,
-      JSON.stringify({purManual:rB2c.purManual, q:purchaseItems.find(i=>i.id===piCvt.id)?.quantity}));
+    check('ORDERED kalem adedi republish\'te korundu (8)',
+      Number(purchaseItems.find(i=>i.id===piCvt.id)?.quantity)===8,
+      purchaseItems.find(i=>i.id===piCvt.id)?.quantity);
     await dbUpdate('project_bom_parts', pbpCvt.id, {custom_qty:8});
     globalThis.purchaseItems = await dbGet('purchase_items');
     // 8 beklenirken 5 geldi, 1'i iade → 4 depoya girer, 4 beklemede kalır (kalem bölünür)

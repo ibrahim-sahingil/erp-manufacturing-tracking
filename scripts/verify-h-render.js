@@ -543,6 +543,7 @@ global.MIP_STATUS = eval('(' + MIP_STATUS_SRC[1] + ')');
 eval(grab('mipKey'));
 eval(grab('mipNum'));
 eval(grab('mipSuggest'));
+eval(grab('mipBuyQty'));
 eval(grab('mipRowHTML'));
 eval(grab('mipSummaryHTML'));
 const mipRow = String(mipRowHTML({
@@ -562,6 +563,8 @@ chk('mip: durum rozeti ve renk (raw) korundu', mipRow.includes('#e74c3c') && mip
 chk('mip: özet kutuları sayıları bastı', mipSum.includes('>1<') && mipSum.includes('Tamamlandı'));
 // Aşama 2: aksiyon butonu dalları (idx sayısal → attribute güvenli)
 chk('mip: rezervasyon butonu çıktı (stok var + ihtiyaç var)', mipRow.includes('mipReserveModal(0)'));
+// 8. tur: eksik satın almaya MİP'ten gönderilir (missing 10, planned 0 → öneri 10)
+chk('mip: satın almaya gönder butonu çıktı (öneri 10)', mipRow.includes('mipBuyModal(0)') && mipRow.includes('(10)'));
 const mipRowPend = String(mipRowHTML({
   key:'k', code:'C', name:'N', unit:'ad', need:50, stockTotal:40, received:0,
   ordered:0, planned:0, missing:10, reserved:0, pendingReserve:40,
@@ -576,6 +579,7 @@ const mipRowRez = String(mipRowHTML({
 }, 2));
 chk('mip: RESERVED satırda rezerve rozeti + buton yok',
     mipRowRez.includes('Depoya rezerve') && !mipRowRez.includes('mipReserveModal(2)'));
+chk('mip: eksik yokken satın almaya gönder butonu YOK', !mipRowRez.includes('mipBuyModal(2)'));
 
 // ── renderWhReservations (7. tur #4 Aşama 2 — depocu onay listesi) ──
 // Talep eden / proje / malzeme adı / not / kayıp açıklaması kullanıcı verisidir.
