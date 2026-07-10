@@ -116,6 +116,22 @@ test('işlem tanımındaki bölüm: şablondan projeye kopyalanınca parçaya at
     expect(uIslemli.department_id, 'üretim parçası bölümü devralmalı').toBe(bolum.id);
     const uSade = uretim.find(p => (p.code || '').startsWith('DEPTS-'));
     expect(uSade && uSade.department_id, 'işlemsiz parça bölümsüz kalmalı').toBeFalsy();
+
+    // (8. tur taraması) Bölüm SONRADAN gelirse: üretim parçasının bölümü
+    // boşaltılır, yeniden yayınlama BOŞ bölümü doldurmalı (dolu olsa EZMEZDİ).
+    await api(page, 'PUT', '/parts/' + uIslemli.id, { department_id: null });
+    const yayin2 = await page.evaluate(async () => {
+      const pb = projectBoms.find(p => p.id === _activePbomId);
+      const prod = bomProducts.find(p => p.id === pb.bom_product_id);
+      const fresh = await dbGet('project_bom_parts', 'project_bom_id=eq.' + _activePbomId);
+      const tpl = await dbGet('bom_parts', 'product_id=eq.' + prod.id);
+      globalThis.parts = await dbGet('parts');
+      return await pbomPublishParts(pb, fresh, tpl);
+    });
+    console.log('  republish sonucu:', JSON.stringify(yayin2));
+    const uIslemli2 = (await api(page, 'GET', '/parts')).body.data.find(p => p.id === uIslemli.id);
+    console.log('  republish sonrası department_id:', uIslemli2 && uIslemli2.department_id);
+    expect(uIslemli2.department_id, 'republish boş bölümü doldurmalı (fill-only)').toBe(bolum.id);
   } finally {
     for (const p of (await api(page, 'GET', '/parts')).body.data.filter(x => (x.code || '').includes(sfx)))
       await api(page, 'DELETE', '/parts/' + p.id);

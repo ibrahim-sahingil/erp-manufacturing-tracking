@@ -121,6 +121,21 @@ async function call(m, p, b) {
       ]
     });
     const ozelId = ozel.body.data.id;
+
+    // ── (8. tur taramasi) Etkin kod degisince TUREVLER de duzeltilmeli:
+    //    ayni koddaki satin alma kalemi + BEKLEYEN rezervasyonun kod
+    //    snapshot'i. Yoksa MIP eslesmesi kopar, kullanici ikinci kez
+    //    gonderir (cifte siparis) — arkadasin buldugu sinifin kardesi.
+    const etkinEski = taban + yeniKod + 'PNT';
+    const pi = await call('POST', '/purchase-items', { project_name: projeAdi,
+      name: 'CASC Parca', code: etkinEski, quantity: 3, unit: 'adet' });
+    const piId = pi.body.data.id;
+    const whr = await call('POST', '/warehouses', { name: 'CASC Depo ' + sfx });
+    const whrId = whr.body.data.id;
+    const rez = await call('POST', '/warehouse-reservations', { project_name: projeAdi,
+      warehouse_id: whrId, item_name: 'CASC Parca', item_code: etkinEski, requested_qty: 2 });
+    const rezId = rez.body.data.id;
+
     const geriKod = 'YY' + sfx.slice(-3).toUpperCase();
     await call('PUT', '/bom-operations/' + opId, { name: 'CASC Kaynak', code: geriKod });
     const ozelSonra = await call('GET', '/project-bom-parts/' + ozelId);
@@ -128,6 +143,15 @@ async function call(m, p, b) {
     chk('override VARKEN kod yeniden insa edildi',
         ozelSonra.body.data.custom_code === taban + 'X' + geriKod + 'PNT',
         ozelSonra.body.data.custom_code);
+
+    const etkinYeni = taban + geriKod + 'PNT';
+    const piSonra = (await call('GET', '/purchase-items/' + piId)).body.data;
+    chk('satin alma kaleminin kodu cascade ile duzeltildi (MIP eslesmesi kopmaz)',
+        piSonra.code === etkinYeni, piSonra.code);
+    const rezSonra = (await call('GET', '/warehouse-reservations')).body.data
+      .find(x => x.id === rezId);
+    chk('bekleyen rezervasyonun kod snapshot\'i duzeltildi',
+        rezSonra && rezSonra.item_code === etkinYeni, rezSonra && rezSonra.item_code);
 
     // ── (8. tur duzeltme — arkadas raporu) BOLUM SONRADAN eklenince/degisince
     //    bu islemi ZATEN tasiyan proje parcalarinin dept_id'si de dolmali
@@ -155,7 +179,11 @@ async function call(m, p, b) {
     chk('bolum silinince parca bolumu KORUNDU', pbpD2.dept_id === (hedefDept && hedefDept.id),
         JSON.stringify({ dept: pbpD2.dept_id }));
 
-    // temizlik sirasi: proje -> sablon
+    // temizlik sirasi: rezervasyon/kalem/depo -> proje -> sablon
+    // (K1 guard: bagli pi/rezervasyon varken proje silinemez)
+    await call('DELETE', '/warehouse-reservations/' + rezId);
+    await call('DELETE', '/purchase-items/' + piId);
+    await call('DELETE', '/warehouses/' + whrId);
     await call('DELETE', '/project-bom-parts/' + ozelId);
     await call('DELETE', '/project-bom-parts/' + pbpId);
     await call('DELETE', '/project-bom/' + pbomId);

@@ -16,6 +16,10 @@ import com.uretimtakip.erp.projectbom.ProjectBom;
 import com.uretimtakip.erp.projectbom.ProjectBomPart;
 import com.uretimtakip.erp.projectbom.ProjectBomPartRepository;
 import com.uretimtakip.erp.projectbom.ProjectBomRepository;
+import com.uretimtakip.erp.purchasing.PurchaseItem;
+import com.uretimtakip.erp.purchasing.PurchaseItemRepository;
+import com.uretimtakip.erp.warehouse.WarehouseReservation;
+import com.uretimtakip.erp.warehouse.WarehouseReservationRepository;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -48,6 +52,8 @@ public class BomOperationService {
     private final ProjectBomRepository projectBomRepository;
     private final OrderRepository orderRepository;
     private final DepartmentRepository departmentRepository;
+    private final PurchaseItemRepository purchaseItemRepository;
+    private final WarehouseReservationRepository warehouseReservationRepository;
 
     @Transactional(readOnly = true)
     public List<BomOperationResponse> listAll() {
@@ -171,27 +177,90 @@ public class BomOperationService {
         return BomOperationResponse.fromEntity(saved);
     }
 
-    /** Kod degisti: hem operations dizisi hem parca kodu guncellenir. */
+    /**
+     * Kod degisti: hem operations dizisi hem parca kodu guncellenir.
+     *
+     * (8. tur taramasi) Etkin kodu degisen proje parcalarinin TUREVLERI de
+     * duzeltilir: ayni koddaki satin alma kalemleri (purchase_items.code) ve
+     * BEKLEYEN rezervasyonlarin kod snapshot'i (warehouse_reservations,
+     * REQUESTED). Yoksa MIP'in kod-oncelikli eslesmesi kopar: "planlandi"
+     * gorunmez olur, kullanici ayni parcayi IKINCI kez gonderir (cifte
+     * siparis). Sonuclanmis rezervasyon ve hareket defteri TARIHTIR —
+     * snapshot'larina dokunulmaz.
+     */
     private void cascadeCodeChange(String oldCode, String newCode, String newName) {
+        // Sablonlar: bom_part_id -> [eskiKod, yeniKod] (override'siz pbp'lerin
+        // etkin kodu sablondan turer — degisimi buradan izlenir)
+        Map<UUID, String[]> tplCodes = new HashMap<>();
         for (BomPart p : bomPartRepository.findByOperationCode(oldCode)) {
             List<Map<String, Object>> oldOps = safeOps(p.getOperations());
             List<Map<String, Object>> newOps = replaceOpCode(oldOps, oldCode, newCode, newName);
-            p.setCode(rebuildCode(p.getCode(), oldOps, newOps));
+            String eski = p.getCode();
+            p.setCode(rebuildCode(eski, oldOps, newOps));
             p.setOperations(newOps);
             bomPartRepository.save(p);
+            tplCodes.put(p.getId(), new String[]{eski, p.getCode()});
         }
+        Map<UUID, String> projectByPbom = new HashMap<>();
         for (ProjectBomPart p : projectBomPartRepository.findByOperationCode(oldCode)) {
             List<Map<String, Object>> oldOps = safeOps(p.getOperations());
             List<Map<String, Object>> newOps = replaceOpCode(oldOps, oldCode, newCode, newName);
+            String eskiEtkin = null, yeniEtkin = null;
             // DIKKAT: custom_code bir OVERRIDE'dir; bos ise etkin kod bagli sablon
             // parcasindan turetilir (effectiveCode). Bos kodun uzerine yazarsak
             // parcanin taban kodu YOK OLUR ("XZPNT" gibi kokunu kaybetmis kod).
             // Bu durumda sablon zaten yukarida guncellendi; sadece etiketler yenilenir.
             if (p.getCustomCode() != null && !p.getCustomCode().isBlank()) {
-                p.setCustomCode(rebuildCode(p.getCustomCode(), oldOps, newOps));
+                eskiEtkin = p.getCustomCode();
+                p.setCustomCode(rebuildCode(eskiEtkin, oldOps, newOps));
+                yeniEtkin = p.getCustomCode();
+            } else if (p.getBomPartId() != null && tplCodes.containsKey(p.getBomPartId())) {
+                String[] c = tplCodes.get(p.getBomPartId());
+                eskiEtkin = c[0];
+                yeniEtkin = c[1];
             }
             p.setOperations(newOps);
             projectBomPartRepository.save(p);
+
+            if (eskiEtkin != null && yeniEtkin != null && !eskiEtkin.equals(yeniEtkin)) {
+                String projectName = projectByPbom.computeIfAbsent(p.getProjectBomId(),
+                        id -> projectBomRepository.findById(id)
+                                .map(ProjectBom::getProjectName).orElse(null));
+                if (projectName != null) {
+                    propagateEffectiveCode(projectName, eskiEtkin, yeniEtkin);
+                }
+            }
+        }
+    }
+
+    /**
+     * Etkin kodu degisen parcanin ayni koddaki satin alma kalemlerini ve
+     * BEKLEYEN rezervasyonlarini yeni koda ceker (proje kapsaminda,
+     * buyuk/kucuk harf duyarsiz — mipKey ile ayni tr-locale mantigi).
+     */
+    private void propagateEffectiveCode(String projectName, String oldCode, String newCode) {
+        Locale tr = Locale.forLanguageTag("tr");
+        String key = oldCode.toLowerCase(tr);
+        for (PurchaseItem i : purchaseItemRepository
+                .findByProjectNameOrderByCreatedAtAsc(projectName)) {
+            if (i.getCode() != null && i.getCode().toLowerCase(tr).equals(key)
+                    && !"CANCELLED".equals(i.getStatus())) {
+                i.setCode(newCode);
+                purchaseItemRepository.save(i);
+                log.info("Opdef cascade: purchase item kodu {} -> {} (project='{}')",
+                        oldCode, newCode, projectName);
+            }
+        }
+        for (WarehouseReservation r : warehouseReservationRepository
+                .findByStatusOrderByCreatedAtDesc("REQUESTED")) {
+            if (projectName.equals(r.getProjectName())
+                    && r.getItemCode() != null
+                    && r.getItemCode().toLowerCase(tr).equals(key)) {
+                r.setItemCode(newCode);
+                warehouseReservationRepository.save(r);
+                log.info("Opdef cascade: bekleyen rezervasyon kodu {} -> {} (project='{}')",
+                        oldCode, newCode, projectName);
+            }
         }
     }
 

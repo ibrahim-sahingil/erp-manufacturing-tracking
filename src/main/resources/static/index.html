@@ -1908,7 +1908,12 @@ const FIELD_XLATE = {
     },
     async toApi(b) {
       const o = { ...b };
-      if (o.project && !o.order_id) o.order_id = await projectNameToOrderId(o.project);
+      // (8. tur taraması) parts.toApi ile aynı bayat-cache koruması:
+      // yeni projede bölüm sessizce projesiz yazılmasın
+      if (o.project && !o.order_id) {
+        o.order_id = await resolveOrderIdOrRetry(o.project);
+        if (!o.order_id) throw new Error('"' + o.project + '" projesi bulunamadı — bölüm kaydedilmedi. Listeyi yenileyip tekrar deneyin.');
+      }
       delete o.project;
       return o;
     }
@@ -1966,7 +1971,11 @@ const FIELD_XLATE = {
     },
     async toApi(b) {
       const o = { ...b };
-      if (o.project_name && !o.order_id) o.order_id = await projectNameToOrderId(o.project_name);
+      // (8. tur taraması) bayat-cache koruması — parts.toApi deseni
+      if (o.project_name && !o.order_id) {
+        o.order_id = await resolveOrderIdOrRetry(o.project_name);
+        if (!o.order_id) throw new Error('"' + o.project_name + '" projesi bulunamadı — tarih kaydedilmedi. Listeyi yenileyip tekrar deneyin.');
+      }
       delete o.project_name;
       return o;
     }
@@ -1994,7 +2003,11 @@ const FIELD_XLATE = {
     },
     async toApi(b) {
       const o = { ...b };
-      if (o.project_name && !o.order_id) o.order_id = await projectNameToOrderId(o.project_name);
+      // (8. tur taraması) bayat-cache koruması — parts.toApi deseni
+      if (o.project_name && !o.order_id) {
+        o.order_id = await resolveOrderIdOrRetry(o.project_name);
+        if (!o.order_id) throw new Error('"' + o.project_name + '" projesi bulunamadı — iş emri kaydedilmedi. Listeyi yenileyip tekrar deneyin.');
+      }
       if (o.assigned_user && !o.assigned_user_id) o.assigned_user_id = await userKeyToId(o.assigned_user);
       delete o.project_name; delete o.department_name;
       delete o.workspace_name; delete o.assigned_user;
@@ -12910,6 +12923,14 @@ async function pbomPublishParts(pb, allPbParts, templateParts){
     const exists = parts.find(x=>x.project===pb.project_name && (x.code||'').toLowerCase()===code.toLowerCase());
     if(exists){
       g.rows.forEach(r=>{ partIdByPbp[r.id] = exists.id; });
+      // (8. tur taraması) Bölüm ağaca SONRADAN geldiyse (işlem tanımına bölüm
+      // eklenmesi pbp'lere backfill edilir) yeniden yayınlama üretim parçasının
+      // BOŞ bölümünü doldurur — dolu bölüm EZİLMEZ (üretim ekranında elle
+      // atama yapılabiliyor, republish onu kaybettirmemeli).
+      if(!exists.department_id && p.dept_id){
+        const okD = await dbUpdate('parts', exists.id, {department_id: p.dept_id});
+        if(okD) exists.department_id = p.dept_id;
+      }
       // Yeniden yayınlamada proje-geneli toplam değiştiyse güncelle (B1);
       // tamamlanan+fire yeni hedefi aşıyorsa EZME — mesajda bildirilir
       if(Number(exists.qty) !== target){
