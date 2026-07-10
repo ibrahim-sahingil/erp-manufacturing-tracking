@@ -1033,13 +1033,12 @@
 
 <div class="view" id="view-purchasing">
   <div class="section-title">SATIN ALMA PLANLAMASI</div>
-  <div class="section-sub">Proje seç · Ürün ağacından aktar veya elle kalem ekle · Toplu sipariş, teklif ve onay</div>
+  <div class="section-sub">Proje seç · Elle kalem ekle · Toplu sipariş, teklif ve onay — mal kabul Depo'da, ihtiyaç/kesim planlama MİP'te</div>
 
   <!-- Alt sekmeler (planning-tab deseni; switchPurchasingTab #view-purchasing'e scope'ludur) -->
   <div class="planning-tabs" id="purchasing-tabs">
     <button class="planning-tab active" onclick="switchPurchasingTab('items')">📝 Kalemler</button>
     <button class="planning-tab" onclick="switchPurchasingTab('orders')">📦 Toplu Sipariş &amp; Teklif</button>
-    <button class="planning-tab" onclick="switchPurchasingTab('receiving')">📥 Mal Kabul</button>
   </div>
 
   <!-- Kalemler -->
@@ -1110,23 +1109,19 @@
     <div id="po-list"></div>
   </div>
 
-  <!-- Mal Kabul (#4 arkadaş isteği): proje kartları → sipariş verilen kalemler -->
-  <div class="planning-section" id="pur-tab-receiving">
-    <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">Proje kartına tıklayın · ⏳ siparişte olanlar "✅ Geldi" ile depoya alınır · 📄 QR'lı mal kabul fişi buradan yazdırılır</div>
-    <div id="rcv-list"></div>
-  </div>
-  <!-- İhtiyaç/Kesim Planlama (#10) Aşama 3'te MİP sekmesine taşındı
-       (mip-tab-mrp) — Satın Alma sadece sipariş verir. -->
+  <!-- İhtiyaç/Kesim Planlama (#10) MİP'e (mip-tab-mrp), Mal Kabul Depo'ya
+       (wh-tab-receiving) taşındı — Satın Alma sadece sipariş verir (8. tur #3). -->
 </div>
 
 <!-- ÜRETİM DEPOSU -->
 <div class="view" id="view-warehouse">
   <div class="section-title">ÜRETİM DEPOSU</div>
-  <div class="section-sub">Depoya giren malzemeler · Beklenen girişler · Depo yönetimi</div>
+  <div class="section-sub">Depoya giren malzemeler · Mal kabul · Rezervasyon onayı · Depo yönetimi</div>
 
   <!-- Alt sekmeler (planning-tab deseni; switchWarehouseTab #view-warehouse'a scope'ludur) -->
   <div class="planning-tabs" id="warehouse-tabs">
     <button class="planning-tab active" onclick="switchWarehouseTab('view')">📦 Depo Görünümü</button>
+    <button class="planning-tab" onclick="switchWarehouseTab('receiving')">📥 Mal Kabul</button>
     <button class="planning-tab" onclick="switchWarehouseTab('manage')">🗄️ Depo Yönetimi</button>
   </div>
 
@@ -1145,6 +1140,13 @@
     <!-- MİP rezervasyon talepleri (Aşama 2): depocu burada tam/kısmi onaylar -->
     <div id="wh-reservations"></div>
     <div id="whv-content"></div>
+  </div>
+
+  <!-- Mal Kabul (#4 arkadaş isteği; 8. tur #3'te Satın Alma'dan taşındı —
+       malı fiziken teslim alan depocu): proje kartları → siparişteki kalemler -->
+  <div class="planning-section" id="wh-tab-receiving">
+    <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">Proje kartına tıklayın · ⏳ siparişte olanlar "✅ Geldi" ile depoya alınır · 📄 QR'lı mal kabul fişi buradan yazdırılır</div>
+    <div id="rcv-list"></div>
   </div>
 
   <!-- Depo Yönetimi -->
@@ -6247,8 +6249,12 @@ function mipCalcRow(group, warehouses, movements, purchaseItems, projectName, re
 
   // Durum önceliği (ilk eşleşen kazanır). RESERVED, FROM_STOCK'tan ÖNCE
   // sınanmalı — yoksa rezerve edilmiş satır "depodan karşılanır" görünür.
+  // DONE (8. tur #2, arkadaş kararı "ayrım yapmayalım"): ihtiyaç NASIL
+  // karşılanırsa karşılansın — mal kabul + rezerve toplamı yetiyorsa yeşil.
+  // RESERVED yalnızca kalan ihtiyacın stoktan KARŞILANABİLİR olduğu ara
+  // durumda kalır (rezerve var ama toplam henüz ihtiyacı kapatmıyor).
   let status;
-  if(received >= group.need && group.need > 0)      status = 'DONE';
+  if(received + reserved >= group.need && group.need > 0) status = 'DONE';
   else if(missing < 1e-9 && reserved > 0)           status = 'RESERVED';
   else if(missing < 1e-9 && stockTotal > 0)         status = 'FROM_STOCK';
   else if(ordered > 0)                              status = 'WAITING';
@@ -6500,6 +6506,13 @@ function mipReserveModal(idx){
       <label>🗄️ ${esc(p.name)} — kayıtlı stok: ${p.stok}</label>
       <input type="number" class="mipres-qty" data-wh="${esc(p.whId)}" value="${p.qty}" min="0" max="${p.stok}" step="0.001" style="${inp}" oninput="mipReserveCalc()">
     </div>`).join('')}
+    <div class="form-group" style="margin-bottom:10px">
+      <label>Toplama deposu (isteğe bağlı — onaylanan miktar önce oraya aktarılır, sonra projeye ayrılır)</label>
+      <select id="mipres-target" style="${inp}">
+        <option value="">— Aktarım istenmiyor —</option>
+        ${warehouses.filter(w=>w.is_active!==false).map(w=>`<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('')}
+      </select>
+    </div>
     <div class="form-group" style="margin-bottom:10px"><label>Depocuya not (isteğe bağlı)</label>
       <input type="text" id="mipres-note" style="${inp}"></div>
     <div id="mipres-summary" data-kalan="${kalan}" style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px"></div>
@@ -6537,6 +6550,9 @@ async function mipReserveConfirm(r, proje){
       if(k.qty > k.max+1e-9){ toast('Miktar depodaki kayıtlı stoğu aşamaz!','error'); return; }
     }
     const not = document.getElementById('mipres-note')?.value?.trim() || null;
+    // Toplama deposu tüm taleplere uygulanır; kaynakla aynıysa backend NULL'a
+    // indirger (kendi kendine aktarım anlamsız)
+    const hedef = document.getElementById('mipres-target')?.value || null;
     const by = currentUser?.display_name||currentUser?.username||null;
     // Her depo talebi BAĞIMSIZ kayıttır — biri düşerse öncekiler geçerli kalır
     // (rollback gerekmez); kullanıcı hatayı görüp kalanı yeniden gönderir.
@@ -6544,6 +6560,7 @@ async function mipReserveConfirm(r, proje){
     for(const k of kalemler){
       const d = await dbInsert('warehouse_reservations', {
         project_name: proje, warehouse_id: k.whId,
+        target_warehouse_id: hedef,
         item_name: r.name, item_code: r.code||null,
         requested_qty: k.qty, unit: r.unit||'adet',
         requested_by: by, notes: not
@@ -6781,8 +6798,8 @@ function _purActivateTab(tab){
     s.classList.toggle('active', s.id==='pur-tab-'+tab));
   if(tab==='orders') renderPurchaseOrders();
   if(tab==='items') renderPurchaseList();
-  if(tab==='receiving') renderReceiving();
-  // 'mrp' Aşama 3'te MİP sekmesine taşındı (switchMipTab)
+  // 'mrp' MİP'e (switchMipTab), 'receiving' Depo'ya (switchWarehouseTab)
+  // taşındı — Satın Alma sadece sipariş verir (8. tur #3)
 }
 function switchPurchasingTab(tab){ _purActivateTab(tab); }
 
@@ -8408,6 +8425,7 @@ function _whActivateTab(tab){
     s.classList.toggle('active', s.id==='wh-tab-'+tab));
   if(tab==='manage') renderWarehouseManage();
   if(tab==='view') renderWarehouseList();
+  if(tab==='receiving') renderReceiving(); // 8. tur #3: Satın Alma'dan taşındı
 }
 function switchWarehouseTab(tab){ _whActivateTab(tab); }
 
@@ -8433,6 +8451,7 @@ async function renderWarehouse(){
   renderWhReservations();
   renderWarehouseList();
   if(document.getElementById('wh-tab-manage')?.classList.contains('active')) renderWarehouseManage();
+  if(document.getElementById('wh-tab-receiving')?.classList.contains('active')) renderReceiving();
 }
 
 // ─── MİP rezervasyon talepleri (Aşama 2, depocu tarafı) ───
@@ -8450,6 +8469,7 @@ function renderWhReservations(){
     const meta = [
       '📁 '+r.project_name,
       '🗄️ '+(whName(r.warehouse_id)||'—'),
+      r.target_warehouse_id ? '🔁 toplama: '+(whName(r.target_warehouse_id)||'—') : '',
       'istenen: '+mipNum(r.requested_qty)+' '+(r.unit||'adet'),
       r.status==='REQUESTED' ? 'kayıtlı stok: '+mipNum(stok) : (r.approved_qty!=null ? 'onaylanan: '+mipNum(r.approved_qty) : ''),
       r.requested_by ? '👤 '+r.requested_by : '',
@@ -8496,7 +8516,7 @@ function whResApproveModal(id){
   overlay.id = 'wres-overlay';
   overlay.innerHTML = `<div class="modal" style="width:460px;text-align:left">
     <h3 style="margin-bottom:4px">📦 Rezervasyon Onayı</h3>
-    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${r.item_code?esc(r.item_code)+' — ':''}${esc(r.item_name)} · 📁 ${esc(r.project_name)}<br>İstenen: ${mipNum(istenen)} ${esc(r.unit||'adet')} · Kayıtlı stok: ${mipNum(stok)}${r.requested_by?' · 👤 '+esc(r.requested_by):''}</p>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">${r.item_code?esc(r.item_code)+' — ':''}${esc(r.item_name)} · 📁 ${esc(r.project_name)}<br>İstenen: ${mipNum(istenen)} ${esc(r.unit||'adet')} · Kayıtlı stok: ${mipNum(stok)}${r.requested_by?' · 👤 '+esc(r.requested_by):''}${r.target_warehouse_id?'<br>🔁 Toplama istendi: onaylanan miktar <b>'+esc(whName(r.target_warehouse_id)||'—')+'</b> deposuna aktarılıp projeye ayrılır (defterde aktarım izi kalır)':''}</p>
     <div class="form-group" style="margin-bottom:8px">
       <label>Fiziksel sayıma göre onaylanan miktar</label>
       <input type="number" id="wres-qty" value="${maxOnay}" min="0" max="${maxOnay}" step="0.001" style="${inp}" oninput="whResCalc()">
@@ -8850,7 +8870,7 @@ async function whDoTransfer(id, warehouseId){
   toast('🏭 '+(whName(warehouseId)||'Depo')+' deposuna aktarıldı!','success');
   renderWarehouseList();
   renderPurchaseList();
-  if(document.getElementById('pur-tab-receiving')?.classList.contains('active')) renderReceiving();
+  if(document.getElementById('wh-tab-receiving')?.classList.contains('active')) renderReceiving();
 }
 
 async function whUndo(id){
@@ -8872,7 +8892,7 @@ async function whUndo(id){
   toast('↩ Depodan geri alındı','success');
   renderWarehouseList();
   renderPurchaseList();
-  if(document.getElementById('pur-tab-receiving')?.classList.contains('active')) renderReceiving();
+  if(document.getElementById('wh-tab-receiving')?.classList.contains('active')) renderReceiving();
 }
 
 // ═══ DEPOLAR ARASI AKTARIM (4. tur #2) ═══

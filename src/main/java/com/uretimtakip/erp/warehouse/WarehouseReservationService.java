@@ -56,11 +56,20 @@ public class WarehouseReservationService {
         if (!warehouseRepository.existsById(request.getWarehouseId())) {
             throw new ResourceNotFoundException("Warehouse", "id", request.getWarehouseId());
         }
+        // Toplama deposu (istege bagli): kaynakla ayniysa anlamsiz -> NULL'a indirgenir
+        UUID target = request.getTargetWarehouseId();
+        if (target != null && target.equals(request.getWarehouseId())) {
+            target = null;
+        }
+        if (target != null && !warehouseRepository.existsById(target)) {
+            throw new ResourceNotFoundException("Warehouse", "id", target);
+        }
         // Stok on-kontrolu YAPILMAZ: fiziksel sayim kayittan farkli cikabilir,
         // talep her halde depoya dusebilmeli (onay asamasi gercegi soyler).
         WarehouseReservation reservation = WarehouseReservation.builder()
                 .projectName(request.getProjectName().trim())
                 .warehouseId(request.getWarehouseId())
+                .targetWarehouseId(target)
                 .itemName(request.getItemName().trim())
                 .itemCode(blankToNull(request.getItemCode()))
                 .requestedQty(request.getRequestedQty())
@@ -83,11 +92,14 @@ public class WarehouseReservationService {
      *  2. 0 <= approved <= requested (BigDecimal compareTo — equals scale tuzagi).
      *  3. Kismi/red icin shortage_reason zorunlu.
      *  4. approved kayitli stogu asamaz (stok negatife dusmesin).
-     *  5. approved > 0  -> OUT (RESERVATION): projeye mal edilir.
+     *  5. approved > 0  -> OUT (RESERVATION): projeye mal edilir. Toplama
+     *     deposu istendiyse (8. tur #1) once WAREHOUSE_TRANSFER cifti
+     *     (kaynak OUT + hedef IN), RESERVATION OUT'u HEDEF depodan yazilir —
+     *     "hem projeye islensin hem istenirse depolar arasi aktarilsin".
      *  6. eksik > 0     -> PLANNED purchase_items kaydi (satin almaya duser).
-     *  7. write_adjustment && eksik > 0 -> ikinci OUT (RESERVATION_ADJUST),
-     *     miktar = min(eksik, stok - approved): sayimda cikmayan kayit duzeltilir,
-     *     stok hicbir durumda eksiye dusurulmez.
+     *  7. write_adjustment && eksik > 0 -> ikinci OUT (RESERVATION_ADJUST,
+     *     KAYNAK depodan), miktar = min(eksik, stok - approved): sayimda
+     *     cikmayan kayit duzeltilir, stok eksiye dusurulmez.
      */
     @Transactional
     public WarehouseReservationResponse approve(UUID id, WarehouseReservationApproveRequest request) {
@@ -128,9 +140,28 @@ public class WarehouseReservationService {
         String approvedBy = blankToNull(request.getApprovedBy());
 
         if (approved.compareTo(BigDecimal.ZERO) > 0) {
-            saveOutMovement(reservation, approved, "RESERVATION", approvedBy,
-                    "MIP rezervasyonu -> " + reservation.getProjectName()
-                            + (reason != null ? " | " + reason : ""));
+            UUID target = reservation.getTargetWarehouseId();
+            boolean toplama = target != null && !target.equals(reservation.getWarehouseId());
+            String rezervNotu = "MIP rezervasyonu -> " + reservation.getProjectName()
+                    + (reason != null ? " | " + reason : "");
+            if (toplama) {
+                // 8. tur #1: once fiziksel toplama izi (transfer cifti), sonra
+                // projeye ayirma HEDEF depodan. Net stok tum depolarda ayni
+                // (MIP cifte saymaz) ama defter B->A->proje yolunu gosterir.
+                String xferNotu = "Rezervasyon toplamasi: " + warehouseName(reservation.getWarehouseId())
+                        + " -> " + warehouseName(target)
+                        + " (" + reservation.getProjectName() + ")";
+                saveMovement(reservation, reservation.getWarehouseId(), "OUT", approved,
+                        "WAREHOUSE_TRANSFER", approvedBy, xferNotu);
+                saveMovement(reservation, target, "IN", approved,
+                        "WAREHOUSE_TRANSFER", approvedBy, xferNotu);
+                saveMovement(reservation, target, "OUT", approved,
+                        "RESERVATION", approvedBy,
+                        rezervNotu + " (toplama deposu uzerinden)");
+            } else {
+                saveMovement(reservation, reservation.getWarehouseId(), "OUT", approved,
+                        "RESERVATION", approvedBy, rezervNotu);
+            }
         }
 
         BigDecimal shortage = requested.subtract(approved);
@@ -153,7 +184,9 @@ public class WarehouseReservationService {
             if (request.isWriteAdjustment()) {
                 BigDecimal adjust = shortage.min(stock.subtract(approved));
                 if (adjust.compareTo(EPS) > 0) {
-                    saveOutMovement(reservation, adjust, "RESERVATION_ADJUST", approvedBy,
+                    // Duzeltme her zaman KAYNAK depodan: hayalet kayit orada
+                    saveMovement(reservation, reservation.getWarehouseId(), "OUT", adjust,
+                            "RESERVATION_ADJUST", approvedBy,
                             "Envanter duzeltmesi (rezervasyon kaybi, "
                                     + reservation.getProjectName() + "): " + reason);
                 }
@@ -202,14 +235,15 @@ public class WarehouseReservationService {
                 id, reservation.getStatus(), reservation.getItemName());
     }
 
-    private void saveOutMovement(WarehouseReservation r, BigDecimal qty,
-                                 String sourceType, String performedBy, String notes) {
+    private void saveMovement(WarehouseReservation r, UUID warehouseId, String type,
+                              BigDecimal qty, String sourceType, String performedBy,
+                              String notes) {
         WarehouseMovement movement = WarehouseMovement.builder()
-                .warehouseId(r.getWarehouseId())
+                .warehouseId(warehouseId)
                 .reservationId(r.getId())
                 .itemName(r.getItemName())
                 .itemCode(r.getItemCode())
-                .movementType("OUT")
+                .movementType(type)
                 .quantity(qty)
                 .unit(r.getUnit())
                 .sourceType(sourceType)
@@ -217,6 +251,11 @@ public class WarehouseReservationService {
                 .notes(notes)
                 .build();
         warehouseMovementRepository.save(movement);
+    }
+
+    private String warehouseName(UUID id) {
+        return warehouseRepository.findById(id)
+                .map(Warehouse::getName).orElse("?");
     }
 
     /**

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pdWbMbjKGSyHjpStlaCkUW7hRzUdgQw4XKyerupSij2aVJfR2hgxaBSGWfvaISF
+\restrict R4Fl9qBaWF6CeiB1KcxmL4vLlpJP7x2OClzv24kUBxs01sVHGcSlGP60uddGeta
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -542,6 +542,7 @@ CREATE TABLE public.warehouse_reservations (
     approved_at timestamp without time zone,
     notes text,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    target_warehouse_id uuid,
     CONSTRAINT warehouse_reservations_requested_qty_check CHECK ((requested_qty > (0)::numeric)),
     CONSTRAINT warehouse_reservations_status_check CHECK (((status)::text = ANY ((ARRAY['REQUESTED'::character varying, 'APPROVED'::character varying, 'PARTIAL'::character varying, 'REJECTED'::character varying, 'CANCELLED'::character varying])::text[])))
 );
@@ -1480,6 +1481,14 @@ ALTER TABLE ONLY public.warehouse_movements
 
 
 --
+-- Name: warehouse_reservations warehouse_reservations_target_warehouse_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.warehouse_reservations
+    ADD CONSTRAINT warehouse_reservations_target_warehouse_id_fkey FOREIGN KEY (target_warehouse_id) REFERENCES public.warehouses(id) ON DELETE SET NULL;
+
+
+--
 -- Name: warehouse_reservations warehouse_reservations_warehouse_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1579,5 +1588,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pdWbMbjKGSyHjpStlaCkUW7hRzUdgQw4XKyerupSij2aVJfR2hgxaBSGWfvaISF
+\unrestrict R4Fl9qBaWF6CeiB1KcxmL4vLlpJP7x2OClzv24kUBxs01sVHGcSlGP60uddGeta
 

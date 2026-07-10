@@ -35,6 +35,9 @@ public class WarehouseReservationRequest {
     @NotNull(message = "Depo secilmeli")
     private UUID warehouseId;
 
+    /** Toplama deposu (istege bagli): onaylanan miktar once buraya aktarilir. */
+    private UUID targetWarehouseId;
+
     @NotBlank(message = "Malzeme adi bos olamaz")
     @Size(max = 200, message = "Malzeme adi en fazla 200 karakter olabilir")
     private String itemName;

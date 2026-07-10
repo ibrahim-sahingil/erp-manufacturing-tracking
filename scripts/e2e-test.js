@@ -595,6 +595,49 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const iptal2 = await api('POST','/warehouse-reservations/'+wres.id+'/cancel');
     check('sonuçlanmış talep iptal EDİLEMEDİ', !iptal2, _lastApiError);
 
+    console.log('═══ 8.TUR #1: TOPLAMA DEPOSU (transfer çifti + hedeften rezervasyon) ═══');
+    // "Hem projeye işlensin hem istenirse depolar arası aktarılsın":
+    // onay, kaynak→hedef WAREHOUSE_TRANSFER çifti + RESERVATION OUT'unu
+    // HEDEF depodan yazar; net stok her yerde sıfır, defterde toplama izi kalır.
+    const wh2 = (await dbInsert('warehouses',{name:'E2E Toplama Depo'}))[0];
+    created.wh.push(wh2.id);
+    await api('POST','/warehouse-movements',{warehouse_id:wh.id, item_name:'E2E Toplanan',
+      item_code:'E2E-TOP', movement_type:'IN', quantity:10, source_type:'MANUAL'});
+    const wresT = await api('POST','/warehouse-reservations',{project_name:PROJ,
+      warehouse_id:wh.id, target_warehouse_id:wh2.id,
+      item_name:'E2E Toplanan', item_code:'E2E-TOP', requested_qty:10});
+    check('toplama depolu talep oluştu', !!wresT && wresT.target_warehouse_id===wh2.id,
+      wresT && wresT.target_warehouse_id);
+    const onayT = await api('POST','/warehouse-reservations/'+wresT.id+'/approve',
+      {approved_qty:10, approved_by:'E2E Depocu'});
+    check('tam onay APPROVED', !!onayT && onayT.status==='APPROVED', onayT ? onayT.status : _lastApiError);
+    const mvT = (await dbGet('warehouse_movements')).filter(m=>m.reservation_id===wresT.id);
+    const xOut = mvT.find(m=>m.source_type==='WAREHOUSE_TRANSFER' && m.movement_type==='OUT');
+    const xIn  = mvT.find(m=>m.source_type==='WAREHOUSE_TRANSFER' && m.movement_type==='IN');
+    const xRes = mvT.find(m=>m.source_type==='RESERVATION');
+    check('transfer çifti: kaynaktan OUT + hedefe IN (10)',
+      xOut && xOut.warehouse_id===wh.id && Number(xOut.quantity)===10
+      && xIn && xIn.warehouse_id===wh2.id && Number(xIn.quantity)===10,
+      'hareket sayısı='+mvT.length);
+    check('rezervasyon OUT\'u HEDEF depodan yazıldı',
+      xRes && xRes.warehouse_id===wh2.id && xRes.movement_type==='OUT' && Number(xRes.quantity)===10);
+    globalThis.whMovements = await dbGet('warehouse_movements');
+    check('net stok iki depoda da 0 (çifte sayım yok)',
+      _whItemStock(wh.id,'E2E Toplanan','E2E-TOP')===0
+      && _whItemStock(wh2.id,'E2E Toplanan','E2E-TOP')===0);
+    globalThis.whMovements = [];
+    globalThis._lastApiError = null;
+    await api('DELETE','/warehouse-movements/'+xIn.id);
+    check('toplama transfer bacağı da SİLİNEMEZ (rezervasyon yaşıyor)',
+      /silinemez/i.test(_lastApiError||''), _lastApiError);
+    // Kaynakla aynı hedef anlamsız → backend NULL'a indirger
+    const wresAyni = await api('POST','/warehouse-reservations',{project_name:PROJ,
+      warehouse_id:wh.id, target_warehouse_id:wh.id,
+      item_name:'E2E Toplanan', item_code:'E2E-TOP', requested_qty:1});
+    check('kaynakla aynı toplama deposu NULL\'a indirgendi',
+      !!wresAyni && !wresAyni.target_warehouse_id);
+    await api('POST','/warehouse-reservations/'+wresAyni.id+'/cancel');
+
     console.log('═══ K2: PROJE ADI DEĞİŞİNCE STRING TABLOLAR TAŞINIYOR ═══');
     const RENAMED = PROJ+'-ADI';
     const ren = await api('PUT','/orders/'+orderId, {project_name:RENAMED, customer_name:'E2E Müşteri'});

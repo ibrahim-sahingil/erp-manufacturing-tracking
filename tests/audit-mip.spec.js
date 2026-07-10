@@ -27,17 +27,32 @@ async function api(page, method, path, body) {
   }, [method, path, body || null]);
 }
 
-test('Aşama 3: Kesim Planlama MİP altında, Satın Alma\'da değil', async ({ page }) => {
+test('Taşımalar: Kesim Planlama MİP\'te, Mal Kabul Depo\'da — Satın Alma sadece sipariş', async ({ page }) => {
   const hatalar = [];
   page.on('pageerror', e => hatalar.push('[pageerror] ' + String(e).slice(0, 200)));
   await login(page);
 
-  // Satın Alma'da artık İhtiyaç Planlama sekmesi YOK
+  // Satın Alma'da artık İhtiyaç Planlama ve Mal Kabul sekmeleri YOK (8. tur #3)
   await page.evaluate(() => switchTab('purchasing'));
   await page.waitForTimeout(1200);
   await expect(page.locator('#purchasing-tabs button', { hasText: 'İhtiyaç Planlama' }))
     .toHaveCount(0);
+  await expect(page.locator('#purchasing-tabs button', { hasText: 'Mal Kabul' }))
+    .toHaveCount(0);
   await expect(page.locator('#view-purchasing #mrp-pool')).toHaveCount(0);
+  await expect(page.locator('#view-purchasing #rcv-list')).toHaveCount(0);
+
+  // Mal Kabul Depo'da: sekme var, açılınca liste render oluyor
+  await page.evaluate(() => switchTab('warehouse'));
+  await page.waitForTimeout(1500);
+  const rcvTab = page.locator('#warehouse-tabs button', { hasText: 'Mal Kabul' });
+  await expect(rcvTab).toBeVisible();
+  await rcvTab.click();
+  await page.waitForTimeout(1500);
+  await expect(page.locator('#wh-tab-receiving')).toBeVisible();
+  const rcvIcerik = await page.locator('#rcv-list').innerText();
+  console.log('  mal kabul içeriği:', rcvIcerik.replace(/\s+/g, ' ').slice(0, 100));
+  expect(rcvIcerik.length, 'mal kabul listesi render olmalı (boş mesajı veya kartlar)').toBeGreaterThan(0);
 
   // MİP'te Kesim Planlama alt sekmesi VAR ve havuz render oluyor
   await page.evaluate(() => switchTab('mip'));

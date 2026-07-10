@@ -169,9 +169,18 @@ chk('cifte sayim yok: eksik 10 (50 - 10 stok - 30 rezerve)', rRez.missing === 10
 chk('oneri rezerveyi soyler', mipSuggest(rRez).includes('30 depoya rezerve'), mipSuggest(rRez));
 
 // RESERVED durumu FROM_STOCK'tan ONCE: rezerve + stok ihtiyaci kapatiyor
+// (ama rezerve+malKabul toplami HENUZ yetmiyor -> DONE degil)
 const rRez2 = mipCalcRow({...g50, need: 40}, WH, mvRezSonrasi, [], 'PROJE-1', rezOnayli);
 chk('rezerve+stok yeterli -> RESERVED (FROM_STOCK degil)', rRez2.status === 'RESERVED', rRez2.status);
 chk('RESERVED iken eksik 0', rRez2.missing === 0);
+
+// DONE semantigi (8. tur #2 — "ayrim yapmayalim"): ihtiyac NASIL karsilanirsa
+// karsilansin, malKabul + rezerve toplami yetiyorsa yesil DONE.
+const rKarma = mipCalcRow(g50, WH, [], [pi('PROJE-1', 'M12 Somun', 'SOM-12', 'IN_WAREHOUSE', 25)],
+  'PROJE-1', [wres('PROJE-1', 'M12 Somun', 'SOM-12', 'APPROVED', 25, 25)]);
+chk('karma karsilamada DONE (25 mal kabul + 25 rezerve = 50)', rKarma.status === 'DONE', rKarma.status);
+const rTumRez = mipCalcRow({...g50, need: 30}, WH, [], [], 'PROJE-1', rezOnayli);
+chk('tamami rezerveyle karsilaninca da DONE', rTumRez.status === 'DONE', rTumRez.status);
 
 // PARTIAL: yalniz ONAYLANAN miktar sayilir (30 istendi, 15 cikti)
 const rKismi = mipCalcRow(g50, WH, mvRezSonrasi, [],

@@ -24,6 +24,7 @@ public class WarehouseReservationResponse {
     private UUID id;
     private String projectName;
     private UUID warehouseId;
+    private UUID targetWarehouseId;
     private String itemName;
     private String itemCode;
     private BigDecimal requestedQty;
@@ -42,6 +43,7 @@ public class WarehouseReservationResponse {
                 .id(e.getId())
                 .projectName(e.getProjectName())
                 .warehouseId(e.getWarehouseId())
+                .targetWarehouseId(e.getTargetWarehouseId())
                 .itemName(e.getItemName())
                 .itemCode(e.getItemCode())
                 .requestedQty(e.getRequestedQty())

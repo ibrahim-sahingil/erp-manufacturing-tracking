@@ -589,6 +589,7 @@ global.whName=()=>'Depo<i>';
 global.whMovements=[{warehouse_id:'w1', item_name:'Mlz'+EVIL, item_code:'RK<b>', movement_type:'IN', quantity:40}];
 global.whReservations=[
   {id:'res1', status:'REQUESTED', project_name:'RPrj'+EVIL, warehouse_id:'w1',
+   target_warehouse_id:'w2', // 8. tur #1: toplama deposu gösterimi
    item_name:'Mlz'+EVIL, item_code:'RK<b>', requested_qty:30, unit:'ad<i>',
    requested_by:'İsteyen<b>', notes:'RNot<script>', created_at:'2026-07-10T10:00:00'},
   {id:'res2', status:'PARTIAL', project_name:'P2', warehouse_id:'w1',
@@ -608,6 +609,7 @@ chk('wres: kod kaçırıldı', wresL.includes('RK&lt;b&gt;'));
 chk('wres: onay/iptal butonları (raw) korundu', wresL.includes("whResApproveModal('res1')") && wresL.includes("whResCancel('res1')"));
 chk('wres: kayıtlı stok bekleyen satırda gösterildi', wresL.includes('kayıtlı stok: 40'));
 chk('wres: sonuçlanan kısmi onay rozeti', wresL.includes('Kısmi onay') && wresL.includes('onaylanan: 15'));
+chk('wres: toplama deposu gösterildi (whName kaçırılarak)', wresL.includes('🔁 toplama: Depo&lt;i&gt;'));
 
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);

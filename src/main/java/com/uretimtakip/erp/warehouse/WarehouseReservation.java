@@ -30,9 +30,13 @@ import java.util.UUID;
  * Onayda yazilanlar (tek transaction, WarehouseReservationService.approve):
  *   - approved_qty > 0        -> OUT hareketi (source_type=RESERVATION): stok
  *                                projeye mal edilir, serbest havuzdan duser.
+ *   - target_warehouse_id dolu ve kaynaktan farkliysa (8. tur #1 — "istenirse
+ *     su depoya toplansin"): once WAREHOUSE_TRANSFER cifti (kaynak OUT +
+ *     hedef IN), sonra RESERVATION OUT'u HEDEF depodan yazilir. Net stok
+ *     ayni (projeye ayrildi) ama defterde fiziksel toplama izi kalir.
  *   - eksik = requested-approved -> PLANNED purchase_items kaydi (satin almaya).
- *   - write_adjustment isaretli  -> kayip icin ikinci OUT (RESERVATION_ADJUST):
- *                                hayalet stok kaydi gercege cekilir.
+ *   - write_adjustment isaretli  -> kayip icin ikinci OUT (RESERVATION_ADJUST,
+ *                                KAYNAK depodan): hayalet stok gercege cekilir.
  *
  * SILME MODELI: DELETE serbesttir (e2e temizligi + yanlis talep gideri).
  * Bagli hareketlerin reservation_id'si SET NULL olur; hareket notes'u proje +
@@ -48,6 +52,8 @@ import java.util.UUID;
  *   id              uuid          (BaseEntity'den)
  *   project_name    varchar(100)  NOT NULL
  *   warehouse_id    uuid          NOT NULL (FK -> warehouses, ON DELETE RESTRICT)
+ *   target_warehouse_id uuid      NULL (FK -> warehouses, ON DELETE SET NULL —
+ *                                 toplama deposu; 8. tur #1)
  *   item_name       varchar(200)  NOT NULL (snapshot)
  *   item_code       varchar(100)  NULL (snapshot)
  *   requested_qty   numeric(15,4) NOT NULL CHECK (> 0)
@@ -76,6 +82,9 @@ public class WarehouseReservation extends BaseEntity {
 
     @Column(name = "warehouse_id", nullable = false)
     private UUID warehouseId;
+
+    @Column(name = "target_warehouse_id")
+    private UUID targetWarehouseId;
 
     @Column(name = "item_name", nullable = false, length = 200)
     private String itemName;

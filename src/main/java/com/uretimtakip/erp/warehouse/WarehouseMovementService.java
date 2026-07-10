@@ -133,8 +133,11 @@ public class WarehouseMovementService {
                             + "ile cikarin.",
                     "WAREHOUSE_MOVEMENT_LINKED");
         }
-        if (INTERNAL_SOURCES.contains(src)
-                && movement.getReservationId() != null
+        // Rezervasyona bagli TUM hareketler korunur — RESERVATION/ADJUST
+        // cikislarina ek olarak toplama deposunun WAREHOUSE_TRANSFER cifti de
+        // (8. tur #1) yasayan rezervasyon varken silinemez; teki silinirse
+        // stok sessizce kayar. Rezervasyon silinince bag SET NULL olur.
+        if (movement.getReservationId() != null
                 && warehouseReservationRepository.existsById(movement.getReservationId())) {
             throw new BusinessException(
                     "Bu hareket bir depo rezervasyonuna bagli, defterden silinemez. "
