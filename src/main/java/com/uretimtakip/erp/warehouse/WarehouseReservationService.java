@@ -96,7 +96,10 @@ public class WarehouseReservationService {
      *     deposu istendiyse (8. tur #1) once WAREHOUSE_TRANSFER cifti
      *     (kaynak OUT + hedef IN), RESERVATION OUT'u HEDEF depodan yazilir —
      *     "hem projeye islensin hem istenirse depolar arasi aktarilsin".
-     *  6. eksik > 0     -> PLANNED purchase_items kaydi (satin almaya duser).
+     *  6. eksik > 0     -> satin almaya duser: ayni proje+malzemenin siparis
+     *     verilmemis PLANNED kalemi varsa miktari artirilir (9. tur M7 —
+     *     "eksik 42 oldu ama siparis 40'ta kaldi" tutarsizligi), yoksa yeni
+     *     PLANNED purchase_items kaydi acilir.
      *  7. write_adjustment && eksik > 0 -> ikinci OUT (RESERVATION_ADJUST,
      *     KAYNAK depodan), miktar = min(eksik, stok - approved): sayimda
      *     cikmayan kayit duzeltilir, stok eksiye dusurulmez.
@@ -166,20 +169,51 @@ public class WarehouseReservationService {
 
         BigDecimal shortage = requested.subtract(approved);
         if (shortage.compareTo(EPS) > 0) {
-            PurchaseItem purchaseItem = PurchaseItem.builder()
-                    .projectName(reservation.getProjectName())
-                    .name(reservation.getItemName())
-                    .code(reservation.getItemCode())
-                    .quantity(shortage)
-                    .unit(reservation.getUnit())
-                    .createdBy(approvedBy)
-                    .notes("MIP rezervasyon eksigi (talep " + requested.stripTrailingZeros()
-                            .toPlainString() + ", onay " + approved.stripTrailingZeros()
-                            .toPlainString() + "): " + reason)
-                    .build();
-            purchaseItemRepository.save(purchaseItem);
-            log.info("WarehouseReservation shortage -> purchase item: reservation={}, qty={}",
-                    id, shortage);
+            String shortageNote = "MIP rezervasyon eksigi (talep " + requested.stripTrailingZeros()
+                    .toPlainString() + ", onay " + approved.stripTrailingZeros()
+                    .toPlainString() + "): " + reason;
+            // (9. tur M7) Ayni proje+malzeme icin siparis verilmemis PLANNED kalem
+            // varsa miktari ARTIRILIR — onceden her eksik AYRI kucuk kalem aciyordu;
+            // kullanici satin almada "eksik 42 oldu ama siparis 40'ta kaldi" goruyordu.
+            // Dokunulmayanlar: ORDERED ve sonrasi, gruba bagli (purchase_order_id),
+            // plaka planina bagli (stock_plan_id), planlama havuzundaki (needs_planning)
+            // — bunlarin miktarini degistirmek siparis/plan butunlugunu bozar.
+            String key = stockKey(reservation.getItemName(), reservation.getItemCode());
+            PurchaseItem mevcut = null;
+            for (PurchaseItem pi : purchaseItemRepository
+                    .findByProjectNameOrderByCreatedAtAsc(reservation.getProjectName())) {
+                if ("PLANNED".equals(pi.getStatus())
+                        && pi.getPurchaseOrderId() == null
+                        && pi.getStockPlanId() == null
+                        && !Boolean.TRUE.equals(pi.getNeedsPlanning())
+                        && stockKey(pi.getName(), pi.getCode()).equals(key)) {
+                    mevcut = pi; // ASC sirali liste — en yenisi kazanir
+                }
+            }
+            if (mevcut != null) {
+                mevcut.setQuantity(mevcut.getQuantity().add(shortage));
+                String eskiNot = mevcut.getNotes();
+                mevcut.setNotes((eskiNot == null || eskiNot.isBlank() ? "" : eskiNot + "\n")
+                        + "+" + shortage.stripTrailingZeros().toPlainString()
+                        + " — " + shortageNote);
+                purchaseItemRepository.save(mevcut);
+                log.info("WarehouseReservation shortage -> existing PLANNED item increased: "
+                                + "reservation={}, item={}, +{} -> {}",
+                        id, mevcut.getId(), shortage, mevcut.getQuantity());
+            } else {
+                PurchaseItem purchaseItem = PurchaseItem.builder()
+                        .projectName(reservation.getProjectName())
+                        .name(reservation.getItemName())
+                        .code(reservation.getItemCode())
+                        .quantity(shortage)
+                        .unit(reservation.getUnit())
+                        .createdBy(approvedBy)
+                        .notes(shortageNote)
+                        .build();
+                purchaseItemRepository.save(purchaseItem);
+                log.info("WarehouseReservation shortage -> purchase item: reservation={}, qty={}",
+                        id, shortage);
+            }
 
             if (request.isWriteAdjustment()) {
                 BigDecimal adjust = shortage.min(stock.subtract(approved));

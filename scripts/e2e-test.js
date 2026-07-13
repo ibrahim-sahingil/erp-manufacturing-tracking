@@ -595,6 +595,36 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const iptal2 = await api('POST','/warehouse-reservations/'+wres.id+'/cancel');
     check('sonuçlanmış talep iptal EDİLEMEDİ', !iptal2, _lastApiError);
 
+    console.log('═══ 9.TUR M7: EKSİK MEVCUT PLANNED KALEME EKLENİR ("40→42" bug\'ı) ═══');
+    // İkinci eksik AYRI kalem açmamalı: az önce oluşan 15'lik PLANNED kalem
+    // 15+2=17'ye çıkmalı (arkadaş raporu: "eksik 42 oldu ama sipariş 40'ta kaldı").
+    const wres3 = await api('POST','/warehouse-reservations',{project_name:PROJ,
+      warehouse_id:wh.id, item_name:'E2E Rezerv Malzeme', item_code:'E2E-REZ',
+      requested_qty:2, unit:'adet'});
+    const red3 = await api('POST','/warehouse-reservations/'+wres3.id+'/approve',
+      {approved_qty:0, shortage_reason:'Depoda yok — M7 birleşme testi'});
+    check('tam red → REJECTED', !!red3 && red3.status==='REJECTED',
+      red3 ? red3.status : _lastApiError);
+    const m7Pis = (await dbGet('purchase_items')).filter(i=>
+      i.project_name===PROJ && i.code==='E2E-REZ' && i.status==='PLANNED');
+    check('eksik AYNI kaleme eklendi (15+2=17, kalem sayısı 1)',
+      m7Pis.length===1 && Number(m7Pis[0].quantity)===17 && /\+2/.test(m7Pis[0].notes||''),
+      m7Pis.length+' kalem / '+(m7Pis[0] ? m7Pis[0].quantity+' / '+(m7Pis[0].notes||'') : '-'));
+    // Sipariş verilmiş (ORDERED) kaleme DOKUNULMAZ — üçüncü eksik yeni kalem açmalı.
+    await dbUpdate('purchase_items', m7Pis[0].id, {status:'ORDERED'});
+    const wres4 = await api('POST','/warehouse-reservations',{project_name:PROJ,
+      warehouse_id:wh.id, item_name:'E2E Rezerv Malzeme', item_code:'E2E-REZ',
+      requested_qty:3, unit:'adet'});
+    const red4 = await api('POST','/warehouse-reservations/'+wres4.id+'/approve',
+      {approved_qty:0, shortage_reason:'Depoda yok — ORDERED korunur testi'});
+    const m7All = (await dbGet('purchase_items')).filter(i=>
+      i.project_name===PROJ && i.code==='E2E-REZ');
+    const m7Planned = m7All.filter(i=>i.status==='PLANNED');
+    check('ORDERED kaleme dokunulmadı, eksik YENİ PLANNED kalem açtı (3)',
+      !!red4 && m7All.some(i=>i.status==='ORDERED' && Number(i.quantity)===17)
+      && m7Planned.length===1 && Number(m7Planned[0].quantity)===3,
+      JSON.stringify(m7All.map(i=>i.status+':'+i.quantity)));
+
     console.log('═══ 8.TUR #1: TOPLAMA DEPOSU (transfer çifti + hedeften rezervasyon) ═══');
     // "Hem projeye işlensin hem istenirse depolar arası aktarılsın":
     // onay, kaynak→hedef WAREHOUSE_TRANSFER çifti + RESERVATION OUT'unu
