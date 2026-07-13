@@ -218,7 +218,7 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
 
     // pbp'ler: project_bom CREATE sirasinda backend sablondan OTOMATIK kopyalar
     const codeOf = p => p.custom_code || p.resolved_code;
-    const pbps = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm.id);
+    let pbps = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm.id);
     check('8 pbp otomatik kopyalandı', pbps.length===8,
       pbps.length + ' → ' + pbps.map(codeOf).join(','));
     // Hiyerarşi bağları backend 2. pass'te kurulmuş olmalı (parent_custom_id)
@@ -238,6 +238,32 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     check('pbp: çakışmasız taşıma KABUL', !!sacMvOk && sacMvOk.parent_custom_id===pbpCvtRef.id);
     const sacMvBack = await api('PUT','/project-bom-parts/'+pbpSacs[1].id,{parent_custom_id:sacHome});
     check('pbp: geri taşındı', !!sacMvBack && sacMvBack.parent_custom_id===sacHome);
+
+    console.log('═══ 9.TUR M4: YENİ YAYIN ÖNCE KARAR İSTER ═══');
+    // Tedarik kararı artık MİP'te: karar verilmeden publish HİÇBİR yere yazmaz.
+    globalThis.parts = await dbGet('parts');
+    const tplPre = (await dbGet('bom_parts')).filter(b=>b.product_id===prod.id);
+    const r0 = await pbomPublishParts({project_name:PROJ}, pbps, tplPre);
+    check('kararsız yayın hiçbir yere yazmadı (decisionPending=6 kod)',
+      r0.added===0 && r0.mipPending===0 && r0.decisionPending===6
+      && !(await dbGet('parts')).some(p=>p.project===PROJ),
+      JSON.stringify(r0));
+    const oneriler = mipGroupParts(pbps);
+    check('öneriler türden türetildi (SAC/CVT→PURCHASE, GVD→PRODUCE), karar boş',
+      oneriler.find(g=>g.code==='E2E-SAC')?.suggested==='PURCHASE'
+      && oneriler.find(g=>g.code==='E2E-CVT')?.suggested==='PURCHASE'
+      && oneriler.find(g=>g.code==='E2E-GVD')?.suggested==='PRODUCE'
+      && oneriler.every(g=>g.decision===null),
+      JSON.stringify(oneriler.map(g=>g.code+':'+g.suggested)));
+    const kararlar = [];
+    oneriler.forEach(g=>g.pbpIds.forEach(id=>kararlar.push({id, decision:g.suggested})));
+    const kararSonuc = await api('POST','/project-bom-parts/decisions',{items:kararlar, decided_by:'E2E'});
+    check('toplu karar ucu tek istekte 8 pbp yazdı', kararSonuc===8, kararSonuc??_lastApiError);
+    pbps = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm.id);
+    check('kararlar yazıldı + damgalandı (decided_at/by)',
+      pbps.every(p=>['PURCHASE','PRODUCE'].includes(p.procurement_decision))
+      && pbps.every(p=>!!p.decided_at && p.decided_by==='E2E'),
+      JSON.stringify(pbps.map(p=>p.procurement_decision)));
 
     console.log('═══ F+H + 4.TUR: YAYINLA (adet toplama + hiyerarşi) ═══');
     globalThis.parts = await dbGet('parts');
@@ -267,7 +293,7 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     console.log('═══ 8.TUR: EKSİK, MİP\'TEN SATIN ALMAYA GÖNDERİLİR ═══');
     // Gerçek çekirdek: mipGroupParts → mipCalcRow → mipBuyQty → insert
     // (mipBuyConfirm'in yazdığı kalemle birebir alanlar).
-    const mipGruplar = mipGroupParts(pbps);
+    const mipGruplar = mipGroupParts(pbps).filter(g=>g.decision==='PURCHASE'); // (M4) satın alma akışı yalnız PURCHASE kararlılar
     check('MİP 2 grup görüyor (SAC adet toplamı 2 + CVT 8)',
       mipGruplar.length===2
       && mipGruplar.find(g=>g.code==='E2E-SAC')?.need===2
@@ -324,8 +350,13 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
       name:'E2E Braket', code:'E2E-BRK', quantity:5});
     check('ikinci ürün ağacı kuruldu', prod2&&gvd2&&brkX, _lastApiError||'');
     const pbm2 = await api('POST','/project-bom',{project_name:PROJ, bom_product_id:prod2.id, status:'draft', created_by:'E2E'});
-    const pbps2 = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm2.id);
+    let pbps2 = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm2.id);
     const tpl2 = (await dbGet('bom_parts')).filter(b=>b.product_id===prod2.id);
+    // (M4) pbm2 kararları da öneriyle onaylanır (türsüz BRK + MAMUL GVD2 → PRODUCE)
+    const kararlar2 = [];
+    mipGroupParts(pbps2).forEach(g=>g.pbpIds.forEach(id=>kararlar2.push({id, decision:g.suggested})));
+    await api('POST','/project-bom-parts/decisions',{items:kararlar2, decided_by:'E2E'});
+    pbps2 = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm2.id);
     globalThis.projectBoms = [
       {id:pbm.id,  project_name:PROJ, status:'published'},
       {id:pbm2.id, project_name:PROJ, status:'published'}];
@@ -501,7 +532,7 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     // parts.total_qty INTEGER — ondalık BOM adedi eskiden sessizce kesiliyordu.
     // İzole: türsüz ondalık (2.5) parça yayınla → parts qty 3 + rounded uyarısı.
     globalThis.projectBoms = [];
-    const e2fake = [{id:'e2-fake-ondalik', custom_code:'E2E-ONDALIK', custom_name:'E2E Ondalık Parça', custom_qty:2.5, material_kind:null}];
+    const e2fake = [{id:'e2-fake-ondalik', custom_code:'E2E-ONDALIK', custom_name:'E2E Ondalık Parça', custom_qty:2.5, material_kind:null, procurement_decision:'PRODUCE'}];
     const rE2 = await pbomPublishParts({id:'yok', project_name:PROJ}, e2fake, []);
     globalThis.parts = await dbGet('parts');
     const ondalik = parts.find(p=>p.project===PROJ && p.code==='E2E-ONDALIK');

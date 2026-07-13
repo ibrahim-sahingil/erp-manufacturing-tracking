@@ -61,6 +61,11 @@ public class ProjectBomPartResponse {
     private Integer sortOrder;
     private LocalDateTime createdAt;
 
+    /** (9. tur M4) MIP karari: PURCHASE / PRODUCE / null (karar bekliyor). */
+    private String procurementDecision;
+    private String decidedBy;
+    private LocalDateTime decidedAt;
+
     // ============ RESOLVED ALANLAR (coalesce edilmis) ============
     private String resolvedName;
     private String resolvedCode;
@@ -115,6 +120,9 @@ public class ProjectBomPartResponse {
                 .level(e.getLevel())
                 .sortOrder(e.getSortOrder())
                 .createdAt(e.getCreatedAt())
+                .procurementDecision(e.getProcurementDecision())
+                .decidedBy(e.getDecidedBy())
+                .decidedAt(e.getDecidedAt())
                 .build();
 
         // RESOLVED alanlar - custom oncelikli, yoksa sablondan

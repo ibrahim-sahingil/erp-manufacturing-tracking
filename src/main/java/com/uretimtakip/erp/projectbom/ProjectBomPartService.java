@@ -5,6 +5,7 @@ import com.uretimtakip.erp.bom.BomPartRepository;
 import com.uretimtakip.erp.common.exception.BusinessException;
 import com.uretimtakip.erp.common.exception.ResourceNotFoundException;
 import com.uretimtakip.erp.department.DepartmentRepository;
+import com.uretimtakip.erp.projectbom.dto.ProjectBomPartDecisionsRequest;
 import com.uretimtakip.erp.projectbom.dto.ProjectBomPartRequest;
 import com.uretimtakip.erp.projectbom.dto.ProjectBomPartResponse;
 import com.uretimtakip.erp.projectbom.dto.ProjectBomPartUpdateRequest;
@@ -288,6 +289,12 @@ public class ProjectBomPartService {
         if (request.getSortOrder() != null) {
             pbp.setSortOrder(request.getSortOrder());
         }
+        if (request.getProcurementDecision() != null) {
+            // (9. tur M4) Bos string = karari geri al (karar bekliyor durumuna
+            // doner). Karar DEGISTIYSE damgalanir; ayni karar tekrar gelirse
+            // eski damga korunur (kim/ne zaman karar verdi bilgisi kaybolmasin).
+            applyDecision(pbp, request.getProcurementDecision(), request.getDecidedBy());
+        }
 
         // Departman atama/kaldirma: dept_id JSON'da acikca geldiyse islenir
         // (null = departmani kaldir). Gelmediyse dokunulmaz.
@@ -317,6 +324,47 @@ public class ProjectBomPartService {
                 ? bomPartRepository.findById(saved.getBomPartId()).orElse(null)
                 : null;
         return ProjectBomPartResponse.fromEntity(saved, bomPart);
+    }
+
+    /**
+     * (9. tur M4) Karar uygulama cekirdegi: "" = karari geri al (null);
+     * karar DEGISTIYSE decided_at/by damgalanir, ayni karar damgayi korur.
+     */
+    private void applyDecision(ProjectBomPart pbp, String decision, String decidedBy) {
+        String yeni = decision == null || decision.isBlank() ? null : decision;
+        if (yeni != null && !"PURCHASE".equals(yeni) && !"PRODUCE".equals(yeni)) {
+            throw new BusinessException(
+                    "Karar PURCHASE veya PRODUCE olmali: " + yeni,
+                    "PBOM_PART_DECISION_INVALID");
+        }
+        if (!java.util.Objects.equals(yeni, pbp.getProcurementDecision())) {
+            pbp.setProcurementDecision(yeni);
+            pbp.setDecidedAt(yeni != null ? java.time.LocalDateTime.now() : null);
+            pbp.setDecidedBy(yeni != null && decidedBy != null && !decidedBy.isBlank()
+                    ? decidedBy.trim() : null);
+        }
+    }
+
+    /**
+     * (9. tur M4) TOPLU karar: MIP "Tumunu Oneriyle Onayla" 100+ parcada tek
+     * tek PUT atmasin diye TEK transaction'da isler. Donen sayi = karari
+     * gercekten DEGISEN satir sayisi.
+     */
+    @Transactional
+    public int applyDecisions(ProjectBomPartDecisionsRequest request) {
+        int changed = 0;
+        for (ProjectBomPartDecisionsRequest.Item item : request.getItems()) {
+            ProjectBomPart pbp = findEntityById(item.getId());
+            String once = pbp.getProcurementDecision();
+            applyDecision(pbp, item.getDecision(), request.getDecidedBy());
+            if (!java.util.Objects.equals(once, pbp.getProcurementDecision())) {
+                projectBomPartRepository.save(pbp);
+                changed++;
+            }
+        }
+        log.info("ProjectBomPart decisions applied: {} istek, {} degisti",
+                request.getItems().size(), changed);
+        return changed;
     }
 
     /**
