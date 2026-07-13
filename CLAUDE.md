@@ -99,6 +99,11 @@ MSYS_NO_PATHCONV=1 taskkill /F /IM java.exe   # Git Bash: /F'i F:/ yapmasın
   `node` ile script bloğu syntax kontrolü yapılabilir.
 - Backend'de endpoint/alan değişince index.html'deki adapter (TABLE_ENDPOINTS /
   FIELD_XLATE) aynı commit'te güncellenmeli.
+- **CREATE ≠ UPDATE DTO tuzağı (10. tur):** `dbInsert`'e gönderilen alan backend
+  CREATE DTO'sunda yoksa SESSİZCE düşer (hata yok, alan default kalır). Gerçek
+  örnek: `needs_planning` yalnız UpdateRequest'te vardı → MİP "Havuza Aktar"
+  kalemi havuz filtresine hiç girmedi. Yeni alan kullanırken hem
+  `XxxRequest` hem `XxxUpdateRequest` kontrol edilmeli.
 
 ## Test
 
