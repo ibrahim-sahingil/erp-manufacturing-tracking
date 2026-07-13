@@ -95,6 +95,24 @@ async function main(){
   chk('hareket yazılmadı', db.warehouse_movements.length===0);
   chk('kullanıcıya hata gösterildi', /başarısız/.test(global._lastToast));
 
+  // 5) whLooseStockOf (9. tur M6): münferit stok hesabı — "Aktarım Başlat"
+  // listesi ve depo görünümü AYNI yardımcıyı kullanır
+  eval(grab('whLooseStockOf'));
+  const mvs = [
+    {warehouse_id:'w1', purchase_item_id:null, item_name:'Sac', item_code:'S1', unit:'kg', movement_type:'IN', quantity:10},
+    {warehouse_id:'w1', purchase_item_id:null, item_name:'Sac', item_code:'S1', unit:'kg', movement_type:'OUT', quantity:4},
+    {warehouse_id:'w1', purchase_item_id:'pi9', item_name:'Bağlı', item_code:'B1', unit:'adet', movement_type:'IN', quantity:5}, // purchase bağlı → münferit DEĞİL
+    {warehouse_id:'w2', purchase_item_id:null, item_name:'Başka Depo', item_code:'X1', unit:'adet', movement_type:'IN', quantity:3},
+    {warehouse_id:'w1', purchase_item_id:null, item_name:'Sıfırlanan', item_code:'Z1', unit:'adet', movement_type:'IN', quantity:2},
+    {warehouse_id:'w1', purchase_item_id:null, item_name:'Sıfırlanan', item_code:'Z1', unit:'adet', movement_type:'OUT', quantity:2}
+  ];
+  const ls = whLooseStockOf(mvs, 'w1');
+  console.log('whLooseStockOf (münferit stok):');
+  chk('net stok doğru (Sac 6)', ls.length===1 && ls[0].code==='S1' && Math.abs(ls[0].net-6)<1e-9);
+  chk('purchase bağlı hareket münferit sayılmaz', !ls.some(r=>r.code==='B1'));
+  chk('başka deponun stoğu karışmaz', !ls.some(r=>r.code==='X1'));
+  chk('sıfırlanan kalem listelenmez', !ls.some(r=>r.code==='Z1'));
+
   console.log(fail?`\n${fail} HATA ❌`:'\nWHXFER SANITY GEÇTİ ✅');
   process.exit(fail?1:0);
 }

@@ -1164,9 +1164,16 @@
     <!-- Depo kartları -->
     <div id="whm-list" style="margin-bottom:24px"></div>
 
-    <!-- Manuel hareket -->
+    <!-- Manuel hareket / depoya parça ekleme (9. tur M6: katalog seçimi) -->
     <div class="form-card" style="margin-bottom:16px">
-      <div style="font-family:var(--font-display);font-size:18px;letter-spacing:2px;color:var(--accent);margin-bottom:16px">± MANUEL HAREKET</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+        <div style="font-family:var(--font-display);font-size:18px;letter-spacing:2px;color:var(--accent)">± MANUEL HAREKET / DEPOYA PARÇA EKLE</div>
+        <button class="btn btn-ghost" onclick="whXferStart()" title="Kaynak depo + malzeme seçerek depolar arası aktarım başlat">🔁 Aktarım Başlat</button>
+      </div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label>Katalogdan Seç <span style="color:var(--muted);text-transform:none">(opsiyonel — ad/kod/birim otomatik dolar; elle yazım da geçerli)</span></label>
+        <div id="whm-mv-item-ss"></div>
+      </div>
       <div class="form-row">
         <div class="form-group"><label>Depo *</label><select id="whm-mv-wh"></select></div>
         <div class="form-group"><label>Malzeme Adı *</label><input type="text" id="whm-mv-name" placeholder="Örn: M12 civata"></div>
@@ -8789,6 +8796,21 @@ function whvToggleProj(proj){
 }
 
 // ── Depo bazlı görünüm: seçilen deponun içi proje gruplu + münferit ──
+// (9. tur M6) Bir depodaki münferit (purchase_item bağı olmayan) net stok
+// kalemleri — SAF: hareket listesini parametre alır (verify-whxfer deseni),
+// whvWarehouseHTML ve "Aktarım Başlat" akışı AYNI hesabı kullanır.
+function whLooseStockOf(movements, whId){
+  const map = new Map();
+  movements.filter(m=>m.warehouse_id===whId && !m.purchase_item_id).forEach(m=>{
+    const key = (m.item_code || m.item_name || '').trim().toLowerCase() + '|' + (m.unit||'adet');
+    const e = map.get(key) || { name:m.item_name, code:m.item_code, unit:m.unit||'adet', net:0 };
+    e.net += (m.movement_type==='IN' ? 1 : -1) * Number(m.quantity || 0);
+    map.set(key, e);
+  });
+  return [...map.values()].filter(r=>Math.abs(r.net)>1e-9)
+    .sort((a,b)=>a.name.localeCompare(b.name,'tr'));
+}
+
 function whvWarehouseHTML(){
   const whId = document.getElementById('whv-wh-sel')?.value || '';
   if(!whId) return h`<div class="empty-state"><span class="emoji">🗄️</span>Yukarıdan bir depo seçin</div>`;
@@ -8798,15 +8820,7 @@ function whvWarehouseHTML(){
   inWh.forEach(i=>{ const k=i.project_name||'—'; (projGroups[k]=projGroups[k]||[]).push(i); });
 
   // Münferit: purchase_item bağı olmayan hareketlerden net stok (IN - OUT)
-  const map = new Map();
-  whMovements.filter(m=>m.warehouse_id===whId && !m.purchase_item_id).forEach(m=>{
-    const key = (m.item_code || m.item_name || '').trim().toLowerCase() + '|' + (m.unit||'adet');
-    const e = map.get(key) || { name:m.item_name, code:m.item_code, unit:m.unit||'adet', net:0 };
-    e.net += (m.movement_type==='IN' ? 1 : -1) * Number(m.quantity || 0);
-    map.set(key, e);
-  });
-  const loose = [...map.values()].filter(r=>Math.abs(r.net)>1e-9)
-    .sort((a,b)=>a.name.localeCompare(b.name,'tr'));
+  const loose = whLooseStockOf(whMovements, whId);
 
   if(!inWh.length && !loose.length)
     return h`<div class="empty-state"><span class="emoji">🏭</span>Bu depoda malzeme yok</div>`;
@@ -9658,7 +9672,85 @@ async function renderWarehouseManage(){
       warehouses.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('');
     if(warehouses.some(w=>w.id===cur)) fSel.value = cur;
   }
+  // (9. tur M6) Katalogdan parça seçimi: şablon parçaları + üretim parçaları +
+  // daha önce hareket görmüş kalemler, kod öncelikli anahtar ile tekilleştirilir.
+  // Amaç: serbest metinde yanlış yazımın AYRI stok kalemi oluşturmasını önlemek;
+  // serbest metin fallback KORUNUR (seçim sadece inputları doldurur).
+  const bps = await dbGet('bom_parts');
+  const catMap = new Map();
+  const addCat = (name, code, unit)=>{
+    const k = mipKey(name, code);
+    if(!k || catMap.has(k)) return;
+    catMap.set(k, {name: name || code || '', code: code || null, unit: unit || 'adet'});
+  };
+  (Array.isArray(bps)?bps:[]).forEach(b=>addCat(b.name, b.code, b.unit));
+  parts.forEach(p=>addCat(p.name, p.code, 'adet'));
+  whMovements.forEach(m=>addCat(m.item_name, m.item_code, m.unit));
+  _whmCatalog = [...catMap.values()]
+    .sort((a,b)=>(a.code||a.name).localeCompare(b.code||b.name,'tr'));
+  searchSelect('whm-mv-item', {
+    items: _whmCatalog.map((c,i)=>({value:String(i), label:(c.code?c.code+' — ':'')+c.name})),
+    placeholder: 'Katalogda ara (kod veya ad)...',
+    onChange: whmCatalogPick
+  });
   renderWhMovements();
+}
+
+// (9. tur M6) Katalog seçimi inputları doldurur — sonrasında elle düzeltilebilir.
+let _whmCatalog = [];
+function whmCatalogPick(){
+  const idx = document.getElementById('whm-mv-item')?.value;
+  const c = _whmCatalog[Number(idx)];
+  if(idx==='' || !c) return;
+  document.getElementById('whm-mv-name').value = c.name;
+  document.getElementById('whm-mv-code').value = c.code || '';
+  if(c.unit) document.getElementById('whm-mv-unit').value = c.unit;
+}
+
+// (9. tur M6) Genel aktarım girişi: kaynak depo seç → münferit stok kaleminden
+// seç → mevcut aktarım modalı (_whXferOpenModal + whXferConfirm çekirdeği,
+// B6 rollback dahil) aynen kullanılır. Satın almaya bağlı kalemler Depo
+// Görünümü'ndeki kendi 🔁 butonundan aktarılır (kalem bölme mantığı orada).
+let _whxStartItems = [];
+function whXferStart(){
+  const act = warehouses.filter(w=>w.is_active!==false);
+  if(act.length<2){ toast('Aktarım için en az iki aktif depo gerekir!','error'); return; }
+  const inp = INP();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'whxs-overlay';
+  overlay.innerHTML = h`<div class="modal" style="width:440px;text-align:left">
+    <h3 style="margin-bottom:4px">🔁 Aktarım Başlat</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">Kaynak depoyu seçin; deponun münferit stoğundaki malzeme otomatik listelenir. Satın almaya bağlı kalemler Depo Görünümü'ndeki 🔁 butonundan aktarılır.</p>
+    <div class="form-group" style="margin-bottom:10px"><label>Kaynak Depo</label>
+      <select id="whxs-src" style="${raw(INP())}" onchange="whXferStartSrc()">${raw(whOptionsHTML(act))}</select>
+    </div>
+    <div class="form-group" style="margin-bottom:16px"><label>Malzeme (münferit stok)</label><div id="whxs-item-ss"></div></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('whxs-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" onclick="whXferStartGo()">Devam →</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  whXferStartSrc();
+}
+function whXferStartSrc(){
+  const src = document.getElementById('whxs-src')?.value;
+  _whxStartItems = src ? whLooseStockOf(whMovements, src).filter(r=>r.net>0) : [];
+  searchSelect('whxs-item', {
+    items: _whxStartItems.map((r,i)=>({value:String(i),
+      label:(r.code?r.code+' — ':'')+r.name+' · '+Number(r.net.toFixed(4))+' '+r.unit})),
+    placeholder: _whxStartItems.length ? 'Yazarak arayın...' : 'Bu depoda münferit stok yok',
+    onChange: null
+  });
+}
+function whXferStartGo(){
+  const src = document.getElementById('whxs-src')?.value;
+  const idx = document.getElementById('whxs-item')?.value;
+  const r = _whxStartItems[Number(idx)];
+  if(!src || idx==='' || !r){ toast('Malzeme seçin!','error'); return; }
+  document.getElementById('whxs-overlay')?.remove();
+  whXferLoose(src, r.name, r.code||'', r.unit, r.net);
 }
 
 function renderWhmList(){
@@ -9813,6 +9905,7 @@ async function whmAddMovement(){
   document.getElementById('whm-mv-code').value = '';
   document.getElementById('whm-mv-notes').value = '';
   document.getElementById('whm-mv-qty').value = '1';
+  ssSet('whm-mv-item', '', {silent:true}); // (9. tur M6) katalog seçimini sıfırla
   toast('💾 Hareket kaydedildi!','success');
   renderWhmList();
   renderWhMovements();

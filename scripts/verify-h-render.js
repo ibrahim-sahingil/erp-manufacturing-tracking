@@ -356,6 +356,7 @@ global.purchaseItems=[{id:'x1', project_name:"Pj'"+EVIL, status:'IN_WAREHOUSE', 
 global._whvActiveProj="Pj'"+EVIL;
 global.whMovements=[{warehouse_id:'w1', purchase_item_id:null, item_code:'LC<b>', item_name:"Ln'"+EVIL,
   unit:'kg<i>', movement_type:'IN', quantity:2}];
+eval(grab('whLooseStockOf')); // 9. tur M6: münferit stok hesabı ayrı yardımcıya çıktı
 eval(grab('whvProjectHTML'));
 eval(grab('whvWarehouseHTML'));
 const wpv=String(whvProjectHTML());

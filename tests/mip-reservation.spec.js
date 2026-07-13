@@ -115,7 +115,12 @@ test('MİP rezervasyonu: talep → depocu kısmi onayı → stok/satın alma/Mİ
     console.log('  onay modal özeti:', wresOzet);
     expect(wresOzet).toContain('15');
     expect(wresOzet).toContain('satın almaya');
-    await expect(page.locator('#wres-adjust'), 'düzeltme kutusu default işaretli').toBeChecked();
+    // 9. tur M8: tek checkbox yerine 3'lü radio — kısmi onayda varsayılan
+    // "eksik kadar düş"; tam redde (onay 0) varsayılan "kaydı sıfırla".
+    await expect(page.locator('input[name="wres-adj-mode"][value="shortage"]'),
+      'kısmi onayda varsayılan: eksik kadar düş').toBeChecked();
+    const adjOnizleme = await page.locator('#wres-adj-preview').innerText();
+    expect(adjOnizleme, 'düşülecek miktar önizlemesi görünür').toContain('15');
 
     // Açıklamasız onay reddedilmeli (toast, modal açık kalır)
     await page.click('#wres-confirm');
