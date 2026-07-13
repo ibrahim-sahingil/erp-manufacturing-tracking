@@ -6118,6 +6118,10 @@ function applyPermissions() {
 // switchTab'ı yetki kontrolüyle güncelle
 // switchTab yetki kontrolüyle:
 async function switchTab(tab) {
+  // (9. tur M2) Ürün ağacı editörü açıkken HER çıkış yolu kaydet/kaydetme
+  // sorusundan geçer — '← Geri' butonu gibi nav sekmeleri de. Değişiklik
+  // yoksa sessizce devam eder.
+  if (_activePbomId) { pbomeRequestClose(()=>switchTab(tab)); return; }
   // Yetki kontrolü
   if (currentUser) {
     const perms = Array.isArray(currentUser.permissions)
@@ -12257,6 +12261,7 @@ function renderProjectBomList() {
 // ─── Proje Ürün Ağacı Düzenleyici (Tam Ekran View) ───
 let _activePbomId = null;
 let _pbomeParts   = []; // Bu projeye ait tüm parçalar (kopyalanmış)
+let _pbomeSnapshot = null; // (9. tur M2) editöre girişteki durum — "kaydetmeden kapat" bununla geri alınır
 let _pbomeDragSrc = null;
 
 async function openPbomEditor(pbomId) {
@@ -12331,6 +12336,9 @@ async function openPbomEditor(pbomId) {
     projectBomParts.push(...freshData);
   }
   _pbomeParts = projectBomParts.filter(p=>p.project_bom_id===pbomId);
+  // (9. tur M2) Snapshot İLK KOPYALAMADAN SONRA alınır: şablondan kopyalanan
+  // taban "kaydedilmiş" sayılır, "Kaydetmeden Kapat" onu silmez.
+  _pbomeSnapshot = structuredClone(_pbomeParts);
 
   // View'a geç
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
@@ -12340,15 +12348,172 @@ async function openPbomEditor(pbomId) {
   pbomeRenderContent();
 }
 
+// ─── (9. tur M2) Kaydet-Kapat / Kaydetmeden Kapat ───
+// Editör her değişikliği ANINDA yazar (bu mimari korunuyor); "kaydetmeden
+// kapat" girişteki snapshot'a DIFF bazlı geri döner. Neden diff (hepsini
+// sil + yeniden ekle DEĞİL): purchase_items.project_bom_part_id FK'sı
+// ON DELETE SET NULL — toplu silme tüm satın alma bağlarını sessizce koparır.
+// Diff'te dokunulmayan satırların ID'leri korunur.
+
+// SAF fonksiyon — scripts/verify-pbome-revert.js grab() ile sunucusuz test eder.
+function pbomeSnapshotDiff(snap, cur){
+  const FIELDS = ['custom_name','custom_code','custom_qty','custom_unit','custom_material',
+    'custom_weight','material_kind','material_form','custom_width_mm','custom_height_mm',
+    'custom_thickness_mm','custom_length_mm','custom_diameter_mm','operations','dept_id',
+    'parent_custom_id','level','sort_order','is_excluded'];
+  const NUMERIC = new Set(['custom_qty','custom_weight','custom_width_mm','custom_height_mm',
+    'custom_thickness_mm','custom_length_mm','custom_diameter_mm','level','sort_order']);
+  const norm = (f,v)=>{
+    if(f==='operations'){ const a = Array.isArray(v)?v:JSON.parse(v||'[]'); return JSON.stringify(a); }
+    if(f==='is_excluded') return !!v;
+    if(v===undefined||v===null||v==='') return null;
+    return NUMERIC.has(f) ? Number(v) : String(v);
+  };
+  const snapById = new Map((snap||[]).map(p=>[p.id,p]));
+  const curById  = new Map((cur||[]).map(p=>[p.id,p]));
+  const added   = (cur||[]).filter(p=>!snapById.has(p.id));
+  const deleted = (snap||[]).filter(p=>!curById.has(p.id));
+  const changed = [];
+  for(const [id,o] of snapById){
+    const c = curById.get(id);
+    if(!c) continue;
+    const fields = FIELDS.filter(f=>norm(f,o[f])!==norm(f,c[f]));
+    if(fields.length) changed.push({id, fields, oldRow:o, curRow:c});
+  }
+  return {added, deleted, changed};
+}
+
+// Geri alma — sıra kritik (kardeş-kod çakışması + HAS_CHILDREN guard'ı):
+// 1) kodu değişenleri eski koda döndür, 2) eklenenleri sil (yapraktan köke;
+// altında YAŞAYAN çocuk varsa önce köke al), 3) silinenleri geri ekle
+// (kökten yaprağa, idMap ile parent remap — backend gönderilen id'yi yok
+// sayar, yeni id alır), 4) değişenleri eski değere döndür (temizleme
+// semantiği: material/tür/form→'', ölçü→0, dept_id/parent→explicit null;
+// custom_weight null'a döndürülemez — editörde weight düzenlenmediği için
+// kabul edilen boşluk). Best-effort: hata sayılır, devam edilir.
+async function pbomeRevert(diff){
+  let fail = 0;
+  for(const ch of diff.changed){
+    if((ch.oldRow.custom_code||'') !== (ch.curRow.custom_code||'')){
+      const ok = await dbUpdate('project_bom_parts', ch.id, {custom_code: ch.oldRow.custom_code});
+      if(!ok) fail++;
+    }
+  }
+  const addedIds = new Set(diff.added.map(p=>p.id));
+  for(const cur of _pbomeParts){
+    if(!addedIds.has(cur.id) && cur.parent_custom_id && addedIds.has(cur.parent_custom_id)){
+      const ok = await dbUpdate('project_bom_parts', cur.id, {parent_custom_id:null, level:0});
+      if(!ok) fail++;
+    }
+  }
+  for(const p of [...diff.added].sort((a,b)=>(b.level||0)-(a.level||0))){
+    const ok = await dbDelete('project_bom_parts', p.id);
+    if(!ok) fail++;
+  }
+  const idMap = {};
+  const remap = pid => pid ? (idMap[pid] || pid) : null;
+  for(const p of [...diff.deleted].sort((a,b)=>(a.level||0)-(b.level||0))){
+    const body = {
+      project_bom_id: p.project_bom_id, bom_part_id: p.bom_part_id||null,
+      is_excluded: !!p.is_excluded,
+      custom_name: p.custom_name, custom_code: p.custom_code,
+      custom_qty: p.custom_qty||1, custom_unit: p.custom_unit||'adet',
+      custom_weight: p.custom_weight??null, custom_material: p.custom_material??null,
+      material_kind: p.material_kind??null, material_form: p.material_form??null,
+      dept_id: p.dept_id??null, parent_custom_id: remap(p.parent_custom_id),
+      operations: Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]'),
+      level: p.level||0, sort_order: p.sort_order||0
+    };
+    DIM_FIELDS.forEach(f=>{ body['custom_'+f] = p['custom_'+f] ?? null; });
+    const data = await dbInsert('project_bom_parts', body);
+    if(Array.isArray(data)&&data[0]) idMap[p.id]=data[0].id;
+    else fail++;
+  }
+  for(const ch of diff.changed){
+    const o = ch.oldRow;
+    const patch = {
+      custom_name: o.custom_name, custom_code: o.custom_code,
+      custom_qty: o.custom_qty||1, custom_unit: o.custom_unit||'adet',
+      custom_material: o.custom_material ?? '',
+      material_kind: o.material_kind ?? '',
+      material_form: o.material_form ?? '',
+      dept_id: o.dept_id ?? null,
+      parent_custom_id: remap(o.parent_custom_id),
+      operations: Array.isArray(o.operations)?o.operations:JSON.parse(o.operations||'[]'),
+      level: o.level||0, sort_order: o.sort_order||0,
+      is_excluded: !!o.is_excluded
+    };
+    DIM_FIELDS.forEach(f=>{ patch['custom_'+f] = o['custom_'+f] ?? 0; });
+    if(o.custom_weight!=null) patch.custom_weight = o.custom_weight;
+    const ok = await dbUpdate('project_bom_parts', ch.id, patch);
+    if(!ok) fail++;
+  }
+  return fail;
+}
+
+function _pbomeReset(){ _activePbomId=null; _pbomeParts=[]; _pbomeSnapshot=null; }
+
+// Çıkış çekirdeği: değişiklik yoksa sessiz devam; varsa 3 seçenekli modal.
+// proceed = görünüm geçişi (← Geri butonundan view-bom'a dönüş VEYA
+// switchTab'ın hedef sekmesi) — _pbomeReset SONRASI çağrılır.
+function pbomeRequestClose(proceed){
+  const pb = projectBoms.find(p=>p.id===_activePbomId);
+  const diff = pbomeSnapshotDiff(_pbomeSnapshot, _pbomeParts);
+  if(!diff.added.length && !diff.deleted.length && !diff.changed.length){
+    _pbomeReset(); proceed(); return;
+  }
+  document.getElementById('pbome-close-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'pbome-close-overlay';
+  const ozet = [diff.added.length?diff.added.length+' parça eklendi':'',
+                diff.deleted.length?diff.deleted.length+' parça silindi':'',
+                diff.changed.length?diff.changed.length+' parça değişti':''].filter(Boolean).join(' · ');
+  overlay.innerHTML = h`<div class="modal" style="width:470px;text-align:left">
+    <h3 style="margin-bottom:4px">Değişiklikler ne olsun?</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:8px">Bu oturumda: ${ozet}</p>
+    ${diff.deleted.length?h`<p style="font-family:var(--font-mono);font-size:11px;color:#e67e22;margin-bottom:8px">⚠ "Kaydetmeden Kapat" silinen ${diff.deleted.length} parçayı geri ekler; bu parçalara bağlı eski satın alma bağları yenilenmez.</p>`:''}
+    ${pb&&pb.status==='published'?h`<p style="font-family:var(--font-mono);font-size:11px;color:#e67e22;margin-bottom:8px">⚠ Yayınlanmış ağaç — geri alma üretim/MİP kayıtlarını değiştirmez; gerekirse yeniden yayınlayın.</p>`:''}
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-ghost" onclick="document.getElementById('pbome-close-overlay').remove()">Vazgeç</button>
+      <button class="btn btn-ghost" id="pbome-close-discard" title="Girişten sonraki tüm değişiklikler geri alınır">↩ Kaydetmeden Kapat</button>
+      <button class="btn btn-primary" id="pbome-close-save" title="Değişiklikler zaten kayıtlı — kapatılır">💾 Kaydet-Kapat</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#pbome-close-save').onclick = ()=>{
+    document.getElementById('pbome-close-overlay')?.remove();
+    _pbomeReset(); proceed();
+    toast('Değişiklikler kaydedildi ✓','success');
+  };
+  overlay.querySelector('#pbome-close-discard').onclick = async ()=>{
+    const bitti = btnBusy('pbome-close-discard', '↩ Geri alınıyor…');
+    if(!bitti) return;
+    try{
+      const pbomId = _activePbomId;
+      const fail = await pbomeRevert(diff);
+      const fresh = await dbGet('project_bom_parts','project_bom_id=eq.'+pbomId+'&order=level.asc,sort_order.asc,created_at.asc');
+      if(Array.isArray(fresh)){
+        projectBomParts = projectBomParts.filter(p=>p.project_bom_id!==pbomId);
+        projectBomParts.push(...fresh);
+      }
+      document.getElementById('pbome-close-overlay')?.remove();
+      _pbomeReset(); proceed();
+      toast(fail ? '⚠ Geri alma kısmen başarısız ('+fail+' işlem) — liste DB\'den tazelendi'
+                 : '↩ Değişiklikler geri alındı — ağaç ilk açılıştaki haline döndü',
+            fail ? 'error' : 'success');
+    } finally { bitti(); }
+  };
+}
+
 function closePbomEditor() {
-  // Tüm değişiklikler anlık kaydedildi — sadece görünümü kapat
-  _activePbomId=null; _pbomeParts=[];
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById('view-bom').classList.add('active');
-  const bomTab = document.querySelector('.nav-tab[data-tab="bom"]');
-  if(bomTab) bomTab.classList.add('active');
-  renderProjectBomList();
-  toast('Değişiklikler kaydedildi ✓','success');
+  pbomeRequestClose(()=>{
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-bom').classList.add('active');
+    const bomTab = document.querySelector('.nav-tab[data-tab="bom"]');
+    if(bomTab) bomTab.classList.add('active');
+    renderProjectBomList();
+  });
 }
 
 function pbomeRenderContent() {
