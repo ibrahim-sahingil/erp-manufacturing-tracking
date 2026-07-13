@@ -9868,6 +9868,10 @@ async function whXferConfirm(x){
   if(inRow) whMovements.unshift(inRow);
   if(outRow) whMovements.splice(inRow?1:0, 0, outRow);
   renderWarehouseList();
+  // (11. tur canlı tur bulgusu) Aktarım Depo Yönetimi'ndeki 🔁 butonundan da
+  // başlayabiliyor — oradaki stok özeti + hareket geçmişi de tazelensin
+  // (ikisi de null-guard'lı; sekme kapalıysa zararsız)
+  renderWhMovements();
 }
 
 // ═══ İRSALİYE (dahili sevk irsaliyesi + PDF — resmî e-İrsaliye DEĞİL) ═══
@@ -10809,6 +10813,13 @@ function _whmRowMovements(rows){
     && (m.unit||'adet')===r.unit && mipMatches(m.item_name, m.item_code, r.name, r.code)));
 }
 
+// (11. tur canlı tur bulgusu) CSV adında UTC değil YEREL tarih — gece
+// 00-03 arasında dosya adı bir gün geriden geliyordu (toISOString UTC'dir)
+function _whmBugun(){
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
 function _whmCsvCell(v){
   v = v==null ? '' : String(v);
   return /[;"\n\r]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
@@ -10832,7 +10843,7 @@ function whmExportCSV(){
     _whmCsvCell(whName(r.wh)||''), _whmCsvCell(r.code||''), _whmCsvCell(r.name),
     _whmCsvCell(r.unit), String(Number(r.net.toFixed(4))).replace('.',',')
   ].join(';')));
-  _whmDownloadCsv('depo-stok-'+new Date().toISOString().slice(0,10)+'.csv', lines);
+  _whmDownloadCsv('depo-stok-'+_whmBugun()+'.csv', lines);
   toast('⬇ Stok CSV indirildi ('+rows.length+' satır)','success');
 }
 
@@ -10850,7 +10861,7 @@ function whmExportMovCSV(){
     _whmCsvCell(WH_SOURCE_LABELS[m.source_type]||m.source_type||''),
     _whmCsvCell(m.performed_by||''), _whmCsvCell(m.notes||'')
   ].join(';')));
-  _whmDownloadCsv('depo-hareket-'+new Date().toISOString().slice(0,10)+'.csv', lines);
+  _whmDownloadCsv('depo-hareket-'+_whmBugun()+'.csv', lines);
   toast('⬇ Hareket CSV indirildi ('+movs.length+' hareket)','success');
 }
 
