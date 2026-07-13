@@ -142,6 +142,21 @@ const mix = gruplar.find(g => g.code === 'MIX-1');
 chk('dallarda farkli karar -> mixed + decision null', mix && mix.mixed === true && mix.decision === null);
 chk('is_excluded parca elendi', !gruplar.some(g => g.code === 'X-1'));
 
+console.log('\n═══ POOL karari (10. tur M5) ═══');
+const gPool = mipGroupParts([
+  {id:'pp1', custom_code:'PL-1', custom_name:'Plaka', custom_qty:3, material_kind:'HAMMADDE', procurement_decision:'POOL'},
+  {id:'pp2', custom_code:'PL-1', custom_name:'Plaka', custom_qty:2, material_kind:'HAMMADDE', procurement_decision:'POOL'}
+]);
+chk('POOL karari grup uzerinde tasinir + adetler toplanir',
+    gPool.length === 1 && gPool[0].decision === 'POOL' && gPool[0].need === 5,
+    JSON.stringify({d: gPool[0].decision, n: gPool[0].need}));
+chk('POOL grubu karar-bekleyen DEGIL (decision dolu)', gPool[0].decision !== null);
+// Havuza gonderilen kalem PLANNED yazilir -> mipCalcRow 'planned' sayar ->
+// mipBuyQty tekrar gondermez (cifte sayim guvencesi)
+chk('havuz kalemi planned sayilir -> mipBuyQty tekrar gondermez',
+    mipBuyQty(mipCalcRow({key:'pl-1', code:'PL-1', name:'Plaka', unit:'adet', need:3}, WH, [],
+      [pi('PROJE-1', 'Plaka', 'PL-1', 'PLANNED', 3)], 'PROJE-1')) === 0);
+
 console.log('\n═══ mipCalcRow: arkadasin senaryosu (50 ihtiyac, A=30, B=10) ═══');
 const g50 = {key: 'som-12', code: 'SOM-12', name: 'M12 Somun', unit: 'adet', need: 50};
 const r1 = mipCalcRow(g50, WH, hareketler, [], 'PROJE-1');

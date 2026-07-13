@@ -329,12 +329,15 @@ public class ProjectBomPartService {
     /**
      * (9. tur M4) Karar uygulama cekirdegi: "" = karari geri al (null);
      * karar DEGISTIYSE decided_at/by damgalanir, ayni karar damgayi korur.
+     * (10. tur M5) POOL eklendi: sac/profil/mil kesim planlama havuzuna aktar
+     * (tur bilgisi ayri kolonda degil, mevcut material_form'da tasinir).
      */
     private void applyDecision(ProjectBomPart pbp, String decision, String decidedBy) {
         String yeni = decision == null || decision.isBlank() ? null : decision;
-        if (yeni != null && !"PURCHASE".equals(yeni) && !"PRODUCE".equals(yeni)) {
+        if (yeni != null && !"PURCHASE".equals(yeni) && !"PRODUCE".equals(yeni)
+                && !"POOL".equals(yeni)) {
             throw new BusinessException(
-                    "Karar PURCHASE veya PRODUCE olmali: " + yeni,
+                    "Karar PURCHASE, PRODUCE veya POOL olmali: " + yeni,
                     "PBOM_PART_DECISION_INVALID");
         }
         if (!java.util.Objects.equals(yeni, pbp.getProcurementDecision())) {
