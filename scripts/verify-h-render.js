@@ -641,6 +641,8 @@ global.whReservations=[
    item_name:'M2', item_code:null, requested_qty:30, approved_qty:15, unit:'ad',
    shortage_reason:'Kayıp'+EVIL, created_at:'2026-07-09T10:00:00'}
 ];
+eval(grab('mipNameKey')); // (10. tur B2) whStockOf artık mipMatches kullanır
+eval(grab('mipMatches'));
 eval(grab('whStockOf'));
 eval(grab('_whItemStock'));
 eval(grab('renderWhReservations'));

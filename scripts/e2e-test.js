@@ -47,6 +47,8 @@ function grab(name){
 (0,eval)(grab('splitPurchaseItem')); // temizlik turu: kısmi kabul/aktarım ortak bölme çekirdeği
 (0,eval)(grab('rcvDoReceive'));   // 4. tur: kısmi mal kabul çekirdeği
 (0,eval)(grab('mipKey'));         // 7. tur #4: eşleştirme anahtarı (kod önce, yoksa ad)
+(0,eval)(grab('mipNameKey'));     // 10. tur B2: toleranslı eşleşme yardımcıları
+(0,eval)(grab('mipMatches'));     // 10. tur B2: whStockOf/mipCalcRow artık bunu kullanır
 (0,eval)(grab('whStockOf'));      // 7. tur #4: saf stok hesabı — _whItemStock buna delege eder
 // 8. tur: yayınlama satın almaya kalem düşürmez; eksik MİP'ten gönderilir.
 // Gönderme çekirdeği (grup → hesap → öneri) burada gerçek fonksiyonlarla koşulur.

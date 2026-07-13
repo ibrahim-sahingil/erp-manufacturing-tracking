@@ -5142,8 +5142,8 @@ async function renderWorkOrders() {
                   const partDetail = parts.find(x => x.id === p.part_id);
                   const pStatus = partDetail ? statusBadge(partDetail.status) : '<span style="color:var(--muted)">—</span>';
                   return h`<tr>
-                    <td style="font-weight:600">${p.part_name}</td>
-                    <td style="color:var(--accent)">${p.part_code}</td>
+                    <td style="font-weight:600">${p.part_name || (partDetail ? partDetail.name : '(silinmiş parça)')}</td>
+                    <td style="color:var(--accent)">${p.part_code || (partDetail ? partDetail.code : '—')}</td>
                     <td style="text-align:center;color:var(--text)">${p.qty}</td>
                     <td>${raw(pStatus)}</td>
                   </tr>`;
@@ -6262,7 +6262,7 @@ function mipCalcRow(group, warehouses, movements, purchaseItems, projectName, re
   for(const i of purchaseItems){
     if(i.project_name !== projectName) continue;
     if(i.status === 'CANCELLED') continue;
-    if(mipKey(i.name, i.code) !== group.key) continue;
+    if(!mipMatches(i.name, i.code, group.name, group.code)) continue; // (10. tur B2) toleranslı
     const q = Number(i.quantity) || 0;
     if(i.status === 'ORDERED') ordered += q;
     else if(i.status === 'RECEIVED' || i.status === 'IN_WAREHOUSE' || i.status === 'IN_STOCK') received += q;
@@ -6281,7 +6281,7 @@ function mipCalcRow(group, warehouses, movements, purchaseItems, projectName, re
   let rejectInfo = null, _sonSonuc = '';
   for(const r of reservations){
     if(r.project_name !== projectName) continue;
-    if(mipKey(r.item_name, r.item_code) !== group.key) continue;
+    if(!mipMatches(r.item_name, r.item_code, group.name, group.code)) continue; // (10. tur B2)
     if(r.status === 'APPROVED' || r.status === 'PARTIAL') reserved += Number(r.approved_qty) || 0;
     else if(r.status === 'REQUESTED') pendingReserve += Number(r.requested_qty) || 0;
     if(r.status === 'APPROVED' || r.status === 'PARTIAL' || r.status === 'REJECTED'){
@@ -6415,6 +6415,45 @@ async function mipChangeDecision(prodIdx){
     await _mipPostDecisions(g.pbpIds.map(id=>({id, decision:'PURCHASE'})));
   }catch(e){ toast(e.message||'Karar kaydedilemedi!','error'); return; }
   toast('🛒 Karar satın almaya çevrildi: '+g.name,'success');
+  await renderMipList();
+}
+
+// (10. tur B3) SATIN AL kararlı satırda "kararı değiştir" — üretime çevirme.
+// mipChangeDecision'ın aynası (arkadaş: "üretimden satın almaya dönüyoruz ama
+// tam tersi olmuyordu"). Kural: malzemesi sipariş edilmiş / teslim alınmış
+// kalem varsa ENGEL; sipariş grubuna veya kesim planı havuzuna bağlı PLANNED
+// kalem varsa ENGEL (önce bağ çözülmeli); serbest PLANNED kalemler onayla
+// silinir, sonra karar PRODUCE'a çevrilir.
+async function mipChangeDecisionPurchase(idx){
+  const r = _mipRows[idx];
+  if(!r) return;
+  const proje = document.getElementById('mip-project-sel')?.value || '';
+  const kalemler = purchaseItems.filter(i => i.project_name===proje
+    && i.status!=='CANCELLED' && mipMatches(i.name, i.code, r.name, r.code));
+  const islemde = kalemler.filter(i=>i.status!=='PLANNED');
+  if(islemde.length){
+    toast('Malzemesi sipariş edilmiş/teslim alınmış parçanın kararı değiştirilemez — önce satın alma kalemlerini iptal edin ('+islemde.length+' kalem).','error');
+    return;
+  }
+  const bagli = kalemler.filter(i=>i.purchase_order_id || i.stock_plan_id || i.needs_planning);
+  if(bagli.length){
+    toast('Sipariş grubuna veya kesim planına bağlı '+bagli.length+' kalem var — önce gruptan/havuzdan çıkarın.','error');
+    return;
+  }
+  if(kalemler.length){
+    if(!confirm('"'+r.name+'" için '+kalemler.length+' planlı satın alma kalemi SİLİNECEK ve karar üretime çevrilecek. Devam edilsin mi?')) return;
+    for(const i of kalemler){
+      const ok = await dbDelete('purchase_items', i.id);
+      if(!ok) return; // hata toast'ı adapter'dan
+      purchaseItems = purchaseItems.filter(x=>x.id!==i.id);
+    }
+  } else {
+    if(!confirm('"'+r.name+'" kararı üretime çevrilsin mi?')) return;
+  }
+  try{
+    await _mipPostDecisions(r.pbpIds.map(id=>({id, decision:'PRODUCE'})));
+  }catch(e){ toast(e.message||'Karar kaydedilemedi!','error'); return; }
+  toast('🏭 Karar üretime çevrildi: '+r.name,'success');
   await renderMipList();
 }
 
@@ -6634,7 +6673,7 @@ function mipRowHTML(r, idx){
         <div style="font-family:var(--font-mono);font-size:11px;color:#2980b9;margin-top:3px">💡 ${mipSuggest(r)}</div>
         ${r.rejectInfo?h`<div style="font-family:var(--font-mono);font-size:11px;color:#e74c3c;margin-top:3px">⚠ Depo ${r.rejectInfo.status==='REJECTED'?'ret verdi':'kısmi karşıladı ('+mipNum(r.rejectInfo.approved)+'/'+mipNum(r.rejectInfo.requested)+')'}${r.rejectInfo.reason?': '+r.rejectInfo.reason:''}${r.rejectInfo.at?' · '+r.rejectInfo.at.slice(0,16).replace('T',' '):''} — gerekirse tekrar talep gönderilebilir</div>`:''}
       </div>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${aksiyon}${alBtn}</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${aksiyon}${alBtn}<button class="btn btn-ghost btn-sm" onclick="mipChangeDecisionPurchase(${raw(String(Number(idx)))})" title="Satın alma kararını üretime çevir (10. tur B3)">✏️ kararı değiştir</button></div>
     </div>
   </div>`;
 }
@@ -10135,14 +10174,27 @@ async function whmAddMovement(){
 // Depo hareketleri, satın alma kalemleri ve ağaç parçaları hep bununla eşleşir.
 function mipKey(name, code){ return (code || name || '').trim().toLowerCase(); }
 
+// (10. tur B2) Toleranslı eşleşme: katalogda kodu olan malzeme, depoya KODSUZ
+// (yalnız adla) girildiyse mipKey'ler tutmaz ve stok 0 görünürdü. Kural:
+//   1) mipKey eşitse eşleşir (eski davranış aynen korunur),
+//   2) İKİ TARAFTA DA dolu ama FARKLI kod varsa ASLA eşleşmez,
+//   3) en az bir taraf kodsuzsa normalize edilmiş AD eşitliği yeter.
+function mipNameKey(name){ return (name || '').trim().toLowerCase(); }
+function mipMatches(aName, aCode, bName, bCode){
+  if(mipKey(aName, aCode) === mipKey(bName, bCode)) return true;
+  const ac = (aCode || '').trim().toLowerCase(), bc = (bCode || '').trim().toLowerCase();
+  if(ac && bc) return false;               // farklı kodlar birleşmez
+  const an = mipNameKey(aName);
+  return !!an && an === mipNameKey(bName);
+}
+
 // Bir depodaki tek malzemenin net stoğu — SAF: hareket listesini parametre alır,
 // böylece sunucusuz test edilebilir (scripts/verify-mip.js grab() ile çıkarır).
 function whStockOf(movements, warehouseId, itemName, itemCode){
-  const key = mipKey(itemName, itemCode);
   let net = 0;
   for(const m of movements){
     if(m.warehouse_id !== warehouseId) continue;
-    if(mipKey(m.item_name, m.item_code) !== key) continue;
+    if(!mipMatches(m.item_name, m.item_code, itemName, itemCode)) continue;
     net += (m.movement_type==='IN' ? 1 : -1) * Number(m.quantity || 0);
   }
   return net;
@@ -10165,6 +10217,17 @@ function renderWhStock(){
     const e = map.get(key) || { name:m.item_name, code:m.item_code, unit:m.unit||'adet', wh:m.warehouse_id, net:0 };
     e.net += (m.movement_type==='IN' ? 1 : -1) * Number(m.quantity || 0);
     map.set(key, e);
+  }
+  // (10. tur B2) Kodsuz girilen hareket, aynı depoda aynı ada sahip KODLU
+  // grubun içine katılır — mipMatches kuralının stok özetindeki karşılığı.
+  const _kodlu = new Map();
+  for(const e of map.values()){
+    if((e.code||'').trim()) _kodlu.set(e.wh+'|'+mipNameKey(e.name)+'|'+e.unit, e);
+  }
+  for(const [k,e] of [...map.entries()]){
+    if((e.code||'').trim()) continue;
+    const host = _kodlu.get(e.wh+'|'+mipNameKey(e.name)+'|'+e.unit);
+    if(host){ host.net += e.net; map.delete(k); }
   }
   const rows = [...map.values()].filter(r=>Math.abs(r.net)>1e-9)
     .sort((a,b)=>(whName(a.wh)||'').localeCompare(whName(b.wh)||'','tr') || a.name.localeCompare(b.name,'tr'));

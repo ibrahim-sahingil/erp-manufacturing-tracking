@@ -45,6 +45,8 @@ if(!m) throw new Error('PURCHASE_KINDS bulunamadı');
 global.PURCHASE_KINDS = eval(m[1]);
 
 eval(grab('mipKey'));
+eval(grab('mipNameKey'));
+eval(grab('mipMatches'));
 eval(grab('whStockOf'));
 eval(grab('mipCodeOf'));
 eval(grab('mipNameOf'));
@@ -80,6 +82,25 @@ chk('B deposu net 10', whStockOf(hareketler, 'B', 'M12 Somun', 'SOM-12') === 10)
 chk('baska malzeme sizmaz', whStockOf(hareketler, 'A', 'Yok', 'YOK-1') === 0);
 chk('kodsuz esleme ada duser',
     whStockOf([mv('A', 'Conta', null, 'IN', 5)], 'A', 'Conta', null) === 5);
+
+console.log('\n═══ mipMatches: toleransli eslesme (10. tur B2) ═══');
+// Arkadasin hatasi: depoya KODSUZ (yalniz adla) girilen malzeme, katalog
+// koduyla sorgulaninca "Stok 0 - Hicbir depoda yok" gorunuyordu.
+chk('ayni kod eslesir (eski davranis korunur)',
+    mipMatches('M14 Somun', 'SOM-14', 'M14 SOMUN', 'SOM-14') === true);
+chk('kodsuz hareket + kodlu katalog AYNI adla eslesir',
+    mipMatches('M14 Somun', null, 'M14 Somun', 'SOM-14') === true);
+chk('iki FARKLI dolu kod asla eslesmez (ayni ad bile olsa)',
+    mipMatches('M14 Somun', 'SOM-14', 'M14 Somun', 'SOM-99') === false);
+chk('ikisi de kodsuz ayni ad eslesir (normalize)',
+    mipMatches('  Conta ', '', 'conta', null) === true);
+chk('kodsuz + farkli ad eslesmez',
+    mipMatches('A Parcasi', null, 'B Parcasi', 'SOM-14') === false);
+chk('whStockOf: kodsuz IN kaydi katalog koduyla sorgulaninca gorunur',
+    whStockOf([mv('A', 'M14 Somun', null, 'IN', 20)], 'A', 'M14 Somun', 'SOM-14') === 20);
+chk('mipCalcRow: kodsuz depo kaydi stokTotal\'a girer',
+    mipCalcRow({key: 'som-14', code: 'SOM-14', name: 'M14 Somun', unit: 'adet', need: 20},
+      WH, [mv('A', 'M14 Somun', null, 'IN', 20)], [], 'PROJE-1').status === 'FROM_STOCK');
 
 console.log('\n═══ mipGroupParts: karar/oneri (9. tur M4) + override + adet toplama ═══');
 // (M4) TUR FILTRESI KALKTI: gruplama TUM parcalari dondurur; tur yalniz
