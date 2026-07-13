@@ -6810,15 +6810,32 @@ async function _mipPoolApply(groups){
       const calc = mipCalcRow(g, warehouses, whMovements, purchaseItems, proje, whReservations);
       const qty = mipBuyQty(calc);
       if(qty > 1e-9){
+        // pbp bağı backend'de TEKİL (PURCHASE_ITEM_DUPLICATE guard'ı) — parça
+        // daha önce satın almaya gönderildiyse bağsız oluşturulur (arkadaş
+        // hatası: "havuza aktarma çalışmıyor", 10. tur hotfix)
+        const pbpBos = g.pbpId && !purchaseItems.some(x=>x.project_bom_part_id===g.pbpId);
         const d = await dbInsert('purchase_items', {
-          project_name: proje, project_bom_part_id: g.pbpId || null,
+          project_name: proje, project_bom_part_id: pbpBos ? g.pbpId : null,
           name: g.name, code: g.code || null,
           quantity: qty, unit: g.unit || 'adet', material: g.material || null,
           needs_planning: true,
           notes: '📐 MİP havuz kararı' + (tur ? ' ('+tur+')' : ''),
           created_by: currentUser?.display_name||currentUser?.username||null
         });
-        if(Array.isArray(d)&&d[0]) purchaseItems.push(d[0]);
+        if(!Array.isArray(d)||!d[0]){
+          toast('Havuz kalemi oluşturulamadı: '+g.name+' — karar geri alınıyor.','error');
+          try{ await _mipPostDecisions(g.pbpIds.map(id=>({id, decision:''}))); }catch(e){}
+          continue;
+        }
+        const yeni = d[0];
+        purchaseItems.push(yeni);
+        // Create DTO'su needs_planning'i yeni destekliyor (restart'a kadar eski
+        // backend'de düşebilir) — bayrak ayrı PUT ile GARANTİLENİR; yoksa kalem
+        // Kesim Planlama havuz filtresine (needs_planning && PLANNED) girmez.
+        if(!yeni.needs_planning){
+          const ok = await dbUpdate('purchase_items', yeni.id, {needs_planning: true});
+          if(ok) yeni.needs_planning = true;
+        }
       }
       n++;
     }

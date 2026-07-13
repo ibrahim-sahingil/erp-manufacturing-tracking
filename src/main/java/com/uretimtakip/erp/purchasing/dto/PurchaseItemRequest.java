@@ -75,4 +75,11 @@ public class PurchaseItemRequest {
 
     @Size(max = 150, message = "Olusturan en fazla 150 karakter olabilir")
     private String createdBy;
+
+    /**
+     * (10. tur M5 hotfix) MIP "Havuza Aktar" karari kalemi dogrudan kesim
+     * planlama havuzunda olusturur. Bu alan yalniz update DTO'sunda vardi;
+     * create'te sessizce dusuyordu ve kalem havuz filtresine girmiyordu.
+     */
+    private Boolean needsPlanning;
 }

@@ -94,6 +94,8 @@ public class PurchaseItemService {
                 .status(status)
                 .notes(request.getNotes())
                 .createdBy(request.getCreatedBy())
+                // (10. tur M5) MIP havuz karari kalemi dogrudan havuzda olusturur
+                .needsPlanning(Boolean.TRUE.equals(request.getNeedsPlanning()))
                 .build();
 
         PurchaseItem saved = purchaseItemRepository.save(item);
