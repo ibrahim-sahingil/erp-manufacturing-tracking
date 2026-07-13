@@ -6789,8 +6789,12 @@ const PUR_STATUS = {
   CANCELLED:    {label:'İptal',            icon:'✖',  color:'#e74c3c'}
 };
 // Durum başına sonraki adım butonları: [hedefDurum, buton yazısı]
+// (9. tur M5) PLANNED'dan 'Stokta Var' kalktı: stoktan karşılama artık MİP
+// rezervasyon akışının işi (IN_STOCK durumu ve geri-al yolları eski kayıtlar
+// için korunur). 'Sipariş Ver' render'da purOrderModal'a bağlanır (firma/
+// fiyat/termin sorar) — düz durum geçişi değildir.
 const PUR_ACTIONS = {
-  PLANNED:      [['ORDERED','📦 Sipariş Ver'],['IN_STOCK','✅ Stokta Var'],['CANCELLED','✖ İptal']],
+  PLANNED:      [['ORDERED','📦 Sipariş Ver'],['CANCELLED','✖ İptal']],
   ORDERED:      [['RECEIVED','📥 Teslim Alındı'],['PLANNED','↩ Geri Al']],
   RECEIVED:     [['IN_WAREHOUSE','🏭 Depoya Aktar'],['ORDERED','↩ Geri Al']],
   IN_STOCK:     [['IN_WAREHOUSE','🏭 Depoya Aktar'],['PLANNED','↩ Geri Al']],
@@ -7674,7 +7678,9 @@ function renderPurchaseList(){
     const selectable = i.status==='PLANNED' && !i.purchase_order_id;
     // actions/dateTxt/priceTxt HTML dizeleri → raw ile ham geçer (id'ler UUID)
     let actions = (PUR_ACTIONS[i.status]||[]).map(([st,txt])=>
-      `<button class="btn btn-ghost btn-sm" onclick="purSetStatus('${i.id}','${st}')">${txt}</button>`).join('');
+      // (9. tur M5) PLANNED→ORDERED düz durum geçişi değil: sipariş modalı açılır
+      `<button class="btn btn-ghost btn-sm" onclick="${st==='ORDERED'&&i.status==='PLANNED'
+        ? `purOrderModal('${i.id}')` : `purSetStatus('${i.id}','${st}')`}">${txt}</button>`).join('');
     // Gruptaki PLANNED kalemin siparişi grup üzerinden yönetilir
     if(group && i.status==='PLANNED'){
       actions = `<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">sipariş grup üzerinden</span>
@@ -7723,8 +7729,7 @@ function renderPurchaseList(){
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           ${raw(actions)}
           ${['ORDERED','RECEIVED'].includes(i.status)?h`<button class="btn btn-ghost btn-sm" onclick="printGoodsReceiptPDF(['${raw(i.id)}'])" title="QR'lı mal kabul fişi yazdır">📄 Mal Kabul Fişi</button>`:''}
-          ${i.status==='PLANNED' && !i.stock_plan_id ? h`<button class="btn btn-ghost btn-sm" onclick="purTogglePlanning('${raw(i.id)}')" title="${i.needs_planning?'Planlama havuzundan çıkar':'İhtiyaç planlama havuzuna at'}" ${i.needs_planning?raw('style="color:var(--accent);border-color:rgba(245,166,35,.4)"'):''}>📐</button>`:''}
-          <button class="btn btn-ghost btn-sm" onclick="purQuickPrice('${raw(i.id)}')" title="Hızlı fiyat gir">💰</button>
+          ${i.status==='PLANNED' && !i.stock_plan_id && !i.purchase_order_id ? h`<button class="btn btn-ghost btn-sm" onclick="purTogglePlanning('${raw(i.id)}')" title="${i.needs_planning?'Planlama havuzundan çıkar':'MİP kesim planlaması havuzuna at (plaka/profil yerleşimi)'}" ${i.needs_planning?raw('style="color:var(--accent);border-color:rgba(245,166,35,.4)"'):''}>📐</button>`:''}
           <button class="btn btn-ghost btn-sm" onclick="editPurchaseItem('${raw(i.id)}')">✏️</button>
           <button class="btn btn-ghost btn-sm" onclick="deletePurchaseItem('${raw(i.id)}')" style="color:var(--red,#e74c3c);border-color:rgba(231,76,60,.3)">🗑️</button>
         </div>
@@ -7827,45 +7832,90 @@ async function deletePurchaseItem(id){
   renderPurchaseList();
 }
 
-// (#2 arkadaş isteği) Hızlı fiyat girişi: modalı beklemeden tek alanla fiyat yaz
-function purQuickPrice(id){
+// (9. tur M5) Tekil sipariş modalı: "Sipariş Ver" artık düz durum etiketi
+// değiştirmez — toplu siparişteki teklif akışının tekil eşi olarak firma,
+// fiyat, termin ve not alır. Firma sup-datalist'ten önerilir (kartotek),
+// serbest yazım da geçerlidir; kaydedince ensureSupplier kartoteğe ekler.
+// İletişim için AYRI KOLON YOK: kartotek firması eşleşirse bilgisi salt-okunur
+// gösterilir, ek iletişim/şart notu kalem notuna eklenir.
+// ('Hızlı Fiyat' butonu kaldırıldı — fiyat burada veya ✏️ düzenlemede girilir.)
+function purOrderModal(id){
   const i = purchaseItems.find(x=>x.id===id);
-  if(!i) return;
-  document.getElementById('pur-qprice-overlay')?.remove();
+  if(!i || i.status!=='PLANNED') return;
+  document.getElementById('puro-overlay')?.remove();
   const inp = INP('9px 11px');
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
-  overlay.id = 'pur-qprice-overlay';
-  overlay.innerHTML = `<div class="modal" style="width:340px;text-align:left">
-    <h3 style="margin-bottom:4px">💰 Hızlı Fiyat</h3>
-    <p style="margin-bottom:12px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${i.code?esc(i.code)+' — ':''}${esc(i.name)}</p>
-    <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
-      <div><label style="font-size:11px;color:var(--muted)">Birim Fiyat</label><input type="number" id="qp-price" value="${i.unit_price!=null?Number(i.unit_price):''}" min="0" step="0.01" style="${inp}" onkeydown="if(event.key==='Enter')purQuickPriceSave('${i.id}')"></div>
-      <div><label style="font-size:11px;color:var(--muted)">Para</label>
-        <select id="qp-currency" style="${inp}">
-          ${['TRY','EUR','USD'].map(c=>`<option value="${c}" ${(i.currency||'TRY')===c?'selected':''}>${c}</option>`).join('')}
-        </select>
-      </div>
+  overlay.id = 'puro-overlay';
+  overlay.innerHTML = h`<div class="modal" style="width:520px;text-align:left">
+    <h3 style="margin-bottom:4px">📦 Sipariş Ver</h3>
+    <p style="margin-bottom:14px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${i.code?i.code+' — ':''}${i.name} · 📁 ${i.project_name} · ${mipNum(Number(i.quantity)||1)} ${i.unit||'adet'}</p>
+    <div class="form-group" style="margin-bottom:10px">
+      <label>Firma <span style="color:#e74c3c">*</span></label>
+      <input type="text" id="puro-supplier" list="sup-datalist" value="${i.supplier||''}" placeholder="Kartotekten seçin veya yazın" style="${raw(inp)}" oninput="purOrderSupplierInfo()">
+      <div id="puro-sup-info" style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:3px"></div>
     </div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
-      <button class="btn btn-ghost" onclick="document.getElementById('pur-qprice-overlay').remove()">İptal</button>
-      <button class="btn btn-primary" onclick="purQuickPriceSave('${i.id}')">💾 Kaydet</button>
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:10px">
+      <div><label style="font-size:11px;color:var(--muted)">Birim Fiyat</label><input type="number" id="puro-price" value="${i.unit_price!=null?Number(i.unit_price):''}" min="0" step="0.01" style="${raw(inp)}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Para</label>
+        <select id="puro-currency" style="${raw(inp)}">${['TRY','EUR','USD'].map(c=>h`<option value="${raw(c)}" ${(i.currency||'TRY')===c?raw('selected'):''}>${c}</option>`)}</select>
+      </div>
+      <div><label style="font-size:11px;color:var(--muted)">Termin</label><input type="date" id="puro-date" value="${i.expected_date||''}" style="${raw(inp)}"></div>
+    </div>
+    <div class="form-group" style="margin-bottom:16px">
+      <label>Not <span style="color:var(--muted);text-transform:none">(iletişim / şart — kalem notuna eklenir)</span></label>
+      <textarea id="puro-notes" rows="2" style="${raw(inp)};resize:vertical" placeholder="Örn: telefonla teyit edildi, 2 hafta termin"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('puro-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" id="puro-confirm">📦 Sipariş Ver</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
-  setTimeout(()=>{ const el=document.getElementById('qp-price'); if(el){el.focus();el.select();} },100);
+  overlay.querySelector('#puro-confirm').onclick = ()=>purOrderConfirm(id);
+  purOrderSupplierInfo();
+  setTimeout(()=>{ const el=document.getElementById('puro-supplier'); if(el) el.focus(); },100);
 }
 
-async function purQuickPriceSave(id){
-  const p = parseFloat(document.getElementById('qp-price').value);
-  const body = { unit_price: isNaN(p)?null:p, currency: document.getElementById('qp-currency').value||'TRY' };
-  const ok = await dbUpdate('purchase_items', id, body);
-  if(!ok){ toast('Fiyat kaydedilemedi!','error'); return; }
+// Yazılan firma kartotekte varsa iletişim bilgisi gösterilir (textContent — XSS yok)
+function purOrderSupplierInfo(){
+  const el = document.getElementById('puro-sup-info');
+  if(!el) return;
+  const n = (document.getElementById('puro-supplier')?.value||'').trim().toLowerCase();
+  const s = suppliers.find(x=>(x.name||'').trim().toLowerCase()===n);
+  el.textContent = s
+    ? [s.contact_person?'👤 '+s.contact_person:'', s.phone?'☎ '+s.phone:'', s.email?'✉ '+s.email:''].filter(Boolean).join(' · ') || 'Kartotekte kayıtlı (iletişim bilgisi girilmemiş)'
+    : (n ? 'Kartotekte yok — sipariş verilince kartoteğe eklenir' : '');
+}
+
+async function purOrderConfirm(id){
   const i = purchaseItems.find(x=>x.id===id);
-  if(i){ i.unit_price = body.unit_price; i.currency = body.currency; }
-  document.getElementById('pur-qprice-overlay')?.remove();
-  toast('💰 Fiyat kaydedildi','success');
-  renderPurchaseList();
+  if(!i) return;
+  const firma = (document.getElementById('puro-supplier')?.value||'').trim();
+  if(!firma){ toast('Firma girin!','error'); return; }
+  const p = parseFloat(document.getElementById('puro-price')?.value);
+  const notYeni = (document.getElementById('puro-notes')?.value||'').trim();
+  const bitti = btnBusy('puro-confirm', '⏳ Kaydediliyor…');
+  if(!bitti) return;
+  try{
+    const body = {
+      supplier: firma,
+      unit_price: isNaN(p)?null:p,
+      currency: document.getElementById('puro-currency')?.value||'TRY',
+      expected_date: document.getElementById('puro-date')?.value||null,
+      status: 'ORDERED'
+    };
+    if(notYeni) body.notes = (i.notes ? i.notes+'\n' : '') + 'Sipariş notu: ' + notYeni;
+    const ok = await dbUpdate('purchase_items', id, body);
+    if(!ok){ toast('Sipariş kaydedilemedi!','error'); return; }
+    await ensureSupplier(firma);
+    document.getElementById('puro-overlay')?.remove();
+    // ordered_at damgası backend'de atılır — listeyi tazele
+    const fresh = await dbGet('purchase_items','order=created_at.asc');
+    purchaseItems = Array.isArray(fresh) ? fresh : purchaseItems;
+    toast('📦 Sipariş verildi — '+firma, 'success');
+    renderPurchaseList();
+  } finally { bitti(); }
 }
 
 function editPurchaseItem(id){

@@ -77,3 +77,39 @@ test('çift tıklama: kaydetme butonları mükerrer kayıt oluşturmaz', async (
     await api(page, 'DELETE', '/bom-operations/' + opId);
   }
 });
+
+// 9. tur M5: tekil "Sipariş Ver" artık modal — btnBusy kilidi çift tıklamada
+// mükerrer istek/mükerrer kartotek kaydı üretmemeli.
+test('çift tıklama: tekil sipariş modalı mükerrer istek üretmez', async ({ page }) => {
+  await login(page);
+  const sfx = Date.now().toString(36);
+  const PRJ = 'DBLCLK-PUR-' + sfx;
+  const firma = 'DBL Firma ' + sfx;
+  const item = await api(page, 'POST', '/purchase-items',
+    { project_name: PRJ, name: 'DBL Kalem', code: 'DBLK-' + sfx, quantity: 3 });
+  const itemId = item.body.data.id;
+  try {
+    await page.evaluate(() => switchTab('purchasing'));
+    await page.waitForTimeout(1200);
+    await page.evaluate(id => purOrderModal(id), itemId);
+    await expect(page.locator('#puro-overlay')).toBeVisible();
+    await page.fill('#puro-supplier', firma);
+    await page.fill('#puro-price', '12.5');
+    await page.locator('#puro-confirm').click({ clickCount: 2, delay: 10 }).catch(() => {});
+    await page.waitForTimeout(2500);
+    const fresh = (await api(page, 'GET', '/purchase-items')).body.data.find(x => x.id === itemId);
+    expect(fresh.status, 'kalem ORDERED olmalı').toBe('ORDERED');
+    expect(fresh.supplier).toBe(firma);
+    expect(fresh.ordered_at, 'ordered_at damgalanmalı').toBeTruthy();
+    expect(Number(fresh.unit_price)).toBe(12.5);
+    const sups = (await api(page, 'GET', '/suppliers')).body.data.filter(s => s.name === firma);
+    expect(sups.length, 'tedarikçi kartoteğe TEK kez eklenmeli').toBe(1);
+  } finally {
+    for (const x of (await api(page, 'GET', '/purchase-items')).body.data.filter(x => x.project_name === PRJ)) {
+      await api(page, 'PUT', '/purchase-items/' + x.id, { status: 'CANCELLED' });
+      await api(page, 'DELETE', '/purchase-items/' + x.id);
+    }
+    for (const s of (await api(page, 'GET', '/suppliers')).body.data.filter(s => s.name === firma))
+      await api(page, 'DELETE', '/suppliers/' + s.id);
+  }
+});

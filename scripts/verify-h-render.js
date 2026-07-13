@@ -161,7 +161,8 @@ console.log('\nrenderPurchaseList (satın alma):');
 chk('purchase: kod/ad onerror kaçırıldı', pl.includes('K&lt;img') && pl.includes('Ad&lt;img') && !pl.includes('Ad'+EVIL));
 chk('purchase: proje/malzeme/tedarikçi kaçırıldı', pl.includes('Prj&lt;b&gt;') && pl.includes('Mat&lt;script&gt;') && pl.includes('Ted&lt;img'));
 chk('purchase: not kaçırıldı', pl.includes('Not&lt;img'));
-chk('purchase: actions/butonlar (raw) korundu', pl.includes("purSetStatus('p1','ORDERED')") && pl.includes("deletePurchaseItem('p1')") && pl.includes("purToggleSel('p1'"));
+// 9. tur M5: PLANNED'da 'Sipariş Ver' artık purOrderModal açar (düz durum geçişi değil)
+chk('purchase: actions/butonlar (raw) korundu', pl.includes("purOrderModal('p1')") && pl.includes("deletePurchaseItem('p1')") && pl.includes("purToggleSel('p1'"));
 
 // ── renderPurchaseOrders (toplu sipariş grupları) ──
 global.PO_STATUS={DRAFT:{icon:'📝',label:'Taslak',color:'#f5a623'}, ORDERED:{icon:'📦',label:'Sipariş',color:'#2980b9'}};
@@ -284,6 +285,26 @@ console.log('\nshowLog (işlem geçmişi modalı):');
 chk('showLog: parça adı <script> kaçırıldı', _ovl.includes('Ad&lt;script&gt;') && !_ovl.includes('Ad<script>'));
 chk('showLog: kullanıcı/not kaçırıldı', _ovl.includes('U&lt;b&gt;') && _ovl.includes('LNot&lt;img'));
 chk('showLog: adet rozeti (raw) korundu', _ovl.includes('log-qty-done">✅ 2'));
+
+// ── purOrderModal (9. tur M5 — tekil sipariş modalı) ──
+// createElement shim'i querySelector/remove ile genişletilir (modal deseni)
+global.document.createElement=()=>({ className:'', style:{},
+  set innerHTML(v){_ovl=String(v);}, get innerHTML(){return _ovl;},
+  querySelector:()=>({ set onclick(f){} }), remove(){} });
+els['puro-overlay']={ remove(){} };
+global.purchaseItems=[{id:'pp1', status:'PLANNED', code:'PK<b>', name:'PAd'+EVIL,
+  project_name:'Prj<i>', quantity:2, unit:'ad', supplier:'Ted"X',
+  unit_price:null, currency:'TRY', expected_date:null, notes:''}];
+global.suppliers=[];
+eval(grab('mipNum'));
+eval(grab('purOrderModal'));
+eval(grab('purOrderSupplierInfo'));
+_ovl='';
+purOrderModal('pp1');
+console.log('\npurOrderModal (tekil sipariş modalı):');
+chk('puro: kalem adı/kodu kaçırıldı', _ovl.includes('PAd&lt;img') && _ovl.includes('PK&lt;b&gt;') && !_ovl.includes('PAd'+EVIL));
+chk('puro: tedarikçi value kaçırıldı', _ovl.includes('value="Ted&quot;X"'));
+chk('puro: buton/alan yapısı (raw) korundu', _ovl.includes('id="puro-confirm"') && _ovl.includes('list="sup-datalist"'));
 
 // ── renderStatsView + loadStats + renderDetailTable (istatistik) ──
 global.users=[{name:'Onay<b>', dept:'D<i>', role:'usta'}];
