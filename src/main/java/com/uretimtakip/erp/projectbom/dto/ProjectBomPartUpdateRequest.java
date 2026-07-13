@@ -117,8 +117,8 @@ public class ProjectBomPartUpdateRequest {
      * (null = karar bekliyor). Karar degistiginde service decided_at/by damgalar.
      */
     @jakarta.validation.constraints.Pattern(
-            regexp = "^(PURCHASE|PRODUCE)?$",
-            message = "Karar PURCHASE veya PRODUCE olmali")
+            regexp = "^(PURCHASE|PRODUCE|POOL)?$",
+            message = "Karar PURCHASE, PRODUCE veya POOL olmali") // (10. tur M5)
     private String procurementDecision;
 
     @Size(max = 150, message = "Karar veren en fazla 150 karakter olabilir")

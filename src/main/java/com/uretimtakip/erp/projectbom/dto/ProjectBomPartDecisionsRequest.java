@@ -47,8 +47,9 @@ public class ProjectBomPartDecisionsRequest {
         @NotNull(message = "Parca id'si bos olamaz")
         private UUID id;
 
-        @Pattern(regexp = "^(PURCHASE|PRODUCE)?$",
-                message = "Karar PURCHASE veya PRODUCE olmali")
+        // (10. tur M5) POOL = kesim planlama havuzuna aktar
+        @Pattern(regexp = "^(PURCHASE|PRODUCE|POOL)?$",
+                message = "Karar PURCHASE, PRODUCE veya POOL olmali")
         private String decision;
     }
 }
