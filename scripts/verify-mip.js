@@ -58,6 +58,7 @@ eval(grab('mipNum'));
 eval(grab('mipSuggest'));
 eval(grab('mipReservePlan'));
 eval(grab('mipBuyQty'));
+eval(grab('mipGuardMsg')); // (11. tur Y3)
 
 const WH = [{id: 'A', name: 'A-Depo'}, {id: 'B', name: 'B-Depo'}];
 const mv = (whId, name, code, type, qty) =>
@@ -317,6 +318,21 @@ const gMalz = mipGroupParts([{id: 'pbp1', custom_code: 'M-1', custom_name: 'Malz
   custom_qty: 1, material_kind: 'TEDARIK', custom_material: 'St-37'}]);
 chk('grup malzeme + pbp bagi tasir', gMalz[0].material === 'St-37' && gMalz[0].pbpId === 'pbp1',
     JSON.stringify({m: gMalz[0].material, p: gMalz[0].pbpId}));
+
+console.log('\n═══ mipGuardMsg: karar degisikligi engel siniflandirmasi (11. tur Y3) ═══');
+// Arkadas guard mesajini "hata" sanmisti — artik neden + yonlendirme donuyor.
+// Oncelik: islemde (sert) > siparis grubu > kesim plani > havuz bayragi.
+const gk = (ek={}) => ({name:'M14 Somun', code:'SOM-14', status:'PLANNED', ...ek});
+chk('islemde kalem SERT engel ve oncelikli',
+    mipGuardMsg([gk({status:'ORDERED'}), gk({purchase_order_id:'po1'})]).cause === 'ORDERED');
+const gGrup = mipGuardMsg([gk({purchase_order_id:'po9'})]);
+chk('grup bagi -> GROUP + grupId tasinir', gGrup.cause === 'GROUP' && gGrup.grupId === 'po9');
+chk('kesim plani bagi -> PLAN', mipGuardMsg([gk({stock_plan_id:'sp1'})]).cause === 'PLAN');
+chk('yalniz havuz bayragi -> POOL', mipGuardMsg([gk({needs_planning:true})]).cause === 'POOL');
+chk('serbest PLANNED -> engel yok (null)', mipGuardMsg([gk()]) === null);
+chk('mesaj kalem adlarini listeler (ilk 3 + fazlasi)',
+    mipGuardMsg([gk({status:'ORDERED', code:'A1'}), gk({status:'ORDERED', code:'A2'}),
+                 gk({status:'ORDERED', code:'A3'}), gk({status:'ORDERED', code:'A4'})]).msg.includes('A1, A2, A3 +1'));
 
 console.log('\n' + '─'.repeat(60));
 if(fail){ console.log(`❌ ${fail} kontrol BASARISIZ.`); process.exit(1); }

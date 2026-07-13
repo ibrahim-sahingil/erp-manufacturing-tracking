@@ -174,6 +174,15 @@ chk('purchase: not kaçırıldı', pl.includes('Not&lt;img'));
 // 9. tur M5: PLANNED'da 'Sipariş Ver' artık purOrderModal açar (düz durum geçişi değil)
 chk('purchase: actions/butonlar (raw) korundu', pl.includes("purOrderModal('p1')") && pl.includes("deletePurchaseItem('p1')") && pl.includes("purToggleSel('p1'"));
 chk('purchase: fiyat geçmişi butonu çıktı (aynı kodlu eski alış var)', pl.includes("purPriceHistoryModal('p1')"));
+// (11. tur Y1) Teklifle Sipariş: serbest PLANNED kalemde VAR, gruplu/diğer durumda YOK
+chk('purchase: Teklifle Sipariş butonu serbest PLANNED kalemde var', pl.includes("poQuoteSingle('p1')"));
+chk('purchase: Teklifle Sipariş depodaki (IN_WAREHOUSE) kalemde YOK', !pl.includes("poQuoteSingle('p2')"));
+global.purchaseOrders=[{id:'po1', name:'Grup', status:'DRAFT'}];
+global.purchaseItems.push({id:'p9', status:'PLANNED', code:'GK', name:'Gruplu', project_name:'Prj',
+  unit:'ad', quantity:1, purchase_order_id:'po1', needs_planning:false});
+renderPurchaseList();
+chk('purchase: Teklifle Sipariş GRUPLU kalemde YOK', !(store['pur-list']||'').includes("poQuoteSingle('p9')"));
+global.purchaseOrders=[]; global.purchaseItems=global.purchaseItems.filter(x=>x.id!=='p9');
 // _purHistLine: geçmiş satırı XSS-güvenli mi
 const phl=String(_purHistLine(global.purchaseItems[1]));
 chk('purchase: geçmiş satırında tedarikçi/proje kaçırıldı', phl.includes('EskiTed&lt;img') && phl.includes('Eski&lt;b&gt;') && phl.includes('42.5'));
@@ -383,7 +392,9 @@ global.dbGet=async(t)=> t==='purchase_items'
   ? [{id:'pu1', project_name:'PRJ', code:'ZZ', name:'Mal<script>', quantity:1, unit:'ad<i>', status:'PLANNED', project_bom_part_id:null}] : [];
 document.getElementById('wo-project').value='PRJ';
 document.getElementById('wo-dept').value='';
+global.workOrderParts=[]; // (11. tur Y2) rozet senaryosu için sıfırdan
 eval(grab('woMatChip'));
+eval(grab('woRenderPartsGrid')); // (11. tur Y2) render woLoadParts'tan ayrıştı
 eval(grab('woLoadParts'));
 await woLoadParts();
 const wog=store['wo-parts-grid']||'';
@@ -391,6 +402,13 @@ console.log('\nwoLoadParts (iş emri sihirbazı):');
 chk('woLoad: parça adı/kod/malzeme kaçırıldı', wog.includes("Pa&#39;&lt;img") && wog.includes('PC&lt;b&gt;') && wog.includes('M&lt;i&gt;'));
 chk('woLoad: woTogglePart onclick ea tırnak kaçışı', wog.includes("woTogglePart('p1','Pa\\'"));
 chk('woLoad: satın alma satırı kaçırıldı', wog.includes('Mal&lt;script&gt;') && wog.includes('ad&lt;i&gt;'));
+// (11. tur Y2) Yeşil rozet ANINDA: workOrderParts tazelendikten sonra saf
+// re-render (fetch'siz) rozeti göstermeli — "ancak yenileyince geliyordu"
+chk('woGrid: iş emri yokken rozet YOK', !wog.includes('iş emrinde'));
+global.workOrderParts=[{work_order_id:'w1', part_id:'p1'}];
+woRenderPartsGrid();
+chk('woGrid: workOrderParts tazelenince re-render rozeti getirir',
+    (store['wo-parts-grid']||'').includes('✅ iş emrinde'));
 
 // ── whvProjectHTML / whvWarehouseHTML (depo görünümleri) ──
 global.PUR_STATUS={IN_WAREHOUSE:{icon:'🏭',label:'Depoda',color:'#2ecc71'}, ORDERED:{icon:'📦',label:'Sipariş',color:'#2980b9'}, PLANNED:{icon:'📝',label:'Pl',color:'#f5a623'}};

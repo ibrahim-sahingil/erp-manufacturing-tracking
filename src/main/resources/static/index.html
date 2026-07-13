@@ -4789,7 +4789,6 @@ function woOnDeptChange() {
 // HAMMADDE/SARF) en yakın üretim atasının altında bilgi satırı olarak görünür.
 async function woLoadParts() {
   const proj = document.getElementById('wo-project').value;
-  const deptId = document.getElementById('wo-dept').value;
   if (!proj) { toast('Proje seçin!', 'error'); return; }
 
   // Malzeme/BOM bilgisi için taze veri (ağaçta durum çipleri doğru olsun)
@@ -4803,6 +4802,23 @@ async function woLoadParts() {
   if(Array.isArray(pi)) purchaseItems = pi;
   if(Array.isArray(wop)) workOrderParts = wop;
 
+  woRenderPartsGrid();
+  _woSelectedParts.clear();
+  document.getElementById('wo-selected-count').textContent = '';
+  document.getElementById('wo-step2').style.display = 'block';
+  document.getElementById('wo-step3').style.display = 'none';
+}
+
+// (11. tur Y2) Ağaç render'ı fetch'ten AYRIŞTI: saveWorkOrder kaydettikten
+// sonra (loadWorkOrders workOrderParts'ı zaten tazeler) yeniden çağrılır ve
+// yeşil "iş emrinde" rozeti SAYFA YENİLEMEDEN anında görünür (arkadaş isteği).
+// Bellekteki parts/purchaseItems/projectBoms/projectBomParts/workOrderParts
+// kullanılır; proje/bölüm inputlardan okunur.
+function woRenderPartsGrid() {
+  const proj = document.getElementById('wo-project').value;
+  const deptId = document.getElementById('wo-dept').value;
+  if (!proj) return;
+
   const bucket = parts.filter(p => (p.project||'(Proje Yok)') === proj);
   const selectable = p => !deptId || p.department_id === deptId;
   const selCount = bucket.filter(selectable).length;
@@ -4811,6 +4827,7 @@ async function woLoadParts() {
   if (sub) sub.textContent = proj + (deptId ? ' › ' + (depts.find(d=>d.id===deptId)?.name||'') : '') + ' — ' + selCount + ' seçilebilir parça';
 
   const grid = document.getElementById('wo-parts-grid');
+  if (!grid) return;
   if (!bucket.length) {
     grid.style.display = '';
     grid.innerHTML = h`<div class="empty-state" style="grid-column:1/-1"><span class="emoji">📦</span>Bu projede parça bulunamadı</div>`;
@@ -4894,10 +4911,6 @@ async function woLoadParts() {
     };
     grid.innerHTML = h`${roots.map(p=>nodeRow(p,0))}${purLoose.length?h`<div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:14px 0 4px">🛒 Satın alma malzemeleri (ağaç dışı) · ${purLoose.length}</div>${purLoose.map(i=>purRow(i,0))}`:''}`;
   }
-  _woSelectedParts.clear();
-  document.getElementById('wo-selected-count').textContent = '';
-  document.getElementById('wo-step2').style.display = 'block';
-  document.getElementById('wo-step3').style.display = 'none';
 }
 
 // Üretim parçasının kendi malzemesinin satın alma durumu (proje + kod
@@ -5023,6 +5036,10 @@ async function saveWorkOrder() {
   await loadWorkOrders();
   renderWoGantt();
   await renderWorkOrders();
+  // (11. tur Y2) Parça seçim ağacı açıksa yeşil "iş emrinde" rozeti ANINDA
+  // gelsin — loadWorkOrders workOrderParts'ı tazeledi, saf re-render yeter
+  // (arkadaş: "ancak yeniledikten sonra yeşil tik geliyor")
+  if (document.getElementById('wo-step2')?.style.display === 'block') woRenderPartsGrid();
 }
 
 async function loadWorkOrders() {
@@ -6405,22 +6422,42 @@ async function mipChangeDecision(prodIdx){
 // kalem varsa ENGEL; sipariş grubuna veya kesim planı havuzuna bağlı PLANNED
 // kalem varsa ENGEL (önce bağ çözülmeli); serbest PLANNED kalemler onayla
 // silinir, sonra karar PRODUCE'a çevrilir.
+// (11. tur Y3) Karar değişikliğini engelleyen kalemleri SINIFLANDIRIR ve
+// kullanıcıya ne yapacağını söyler — SAF (verify-mip.js test eder).
+// Öncelik: işlemde (sert engel) > sipariş grubu > kesim planı > havuz bayrağı.
+function mipGuardMsg(kalemler){
+  const adlar = arr => { const a=[...new Set(arr.map(i=>i.code||i.name))]; return a.slice(0,3).join(', ')+(a.length>3?' +'+(a.length-3):''); };
+  const islemde = kalemler.filter(i=>i.status!=='PLANNED');
+  if(islemde.length) return {cause:'ORDERED',
+    msg:'Sipariş edilmiş/teslim alınmış: '+adlar(islemde)+' — karar değiştirmek için önce bu kalemleri iptal edin.'};
+  const grup = kalemler.filter(i=>i.purchase_order_id);
+  if(grup.length) return {cause:'GROUP', grupId: grup[0].purchase_order_id,
+    msg: adlar(grup)+' bir sipariş grubunda. Gruba gidip çıkarmak ister misiniz?'};
+  const plan = kalemler.filter(i=>i.stock_plan_id);
+  if(plan.length) return {cause:'PLAN',
+    msg: adlar(plan)+' kesim planına yerleşmiş. Kesim Planlama sekmesine gidilsin mi?'};
+  const havuz = kalemler.filter(i=>i.needs_planning);
+  if(havuz.length) return {cause:'POOL',
+    msg: adlar(havuz)+' planlama havuzunda — önce havuzdan çıkarın (Havuza Aktarılanlar bölümündeki "kararı değiştir" veya kalemdeki 📐).'};
+  return null;
+}
+
+// (11. tur Y3) Engel yönlendirmesi: guard sonucu kullanıcıyı İLGİLİ ekrana
+// götürür (üret-tarafı mipChangeDecision'ın yol gösteren üslubuyla tutarlı)
+function _mipGuardRedirect(g){
+  if(g.cause==='GROUP'){ if(confirm(g.msg)){ switchTab('purchasing'); poGoto(g.grupId); } return; }
+  if(g.cause==='PLAN'){ if(confirm(g.msg)){ switchTab('mip'); switchMipTab('mrp'); } return; }
+  toast(g.msg,'error');
+}
+
 async function mipChangeDecisionPurchase(idx){
   const r = _mipRows[idx];
   if(!r) return;
   const proje = document.getElementById('mip-project-sel')?.value || '';
   const kalemler = purchaseItems.filter(i => i.project_name===proje
     && i.status!=='CANCELLED' && mipMatches(i.name, i.code, r.name, r.code));
-  const islemde = kalemler.filter(i=>i.status!=='PLANNED');
-  if(islemde.length){
-    toast('Malzemesi sipariş edilmiş/teslim alınmış parçanın kararı değiştirilemez — önce satın alma kalemlerini iptal edin ('+islemde.length+' kalem).','error');
-    return;
-  }
-  const bagli = kalemler.filter(i=>i.purchase_order_id || i.stock_plan_id || i.needs_planning);
-  if(bagli.length){
-    toast('Sipariş grubuna veya kesim planına bağlı '+bagli.length+' kalem var — önce gruptan/havuzdan çıkarın.','error');
-    return;
-  }
+  const g = mipGuardMsg(kalemler);
+  if(g){ _mipGuardRedirect(g); return; }
   if(kalemler.length){
     if(!confirm('"'+r.name+'" için '+kalemler.length+' planlı satın alma kalemi SİLİNECEK ve karar üretime çevrilecek. Devam edilsin mi?')) return;
     for(const i of kalemler){
@@ -6485,6 +6522,14 @@ async function renderMip(){
       .sort((a,b)=>a.localeCompare(b,'tr'));
     sel.innerHTML = h`<option value="">— Proje seçin —</option>${adlar.map(a=>h`<option value="${a}">${a}</option>`)}`;
     if(adlar.includes(cur)) sel.value = cur;
+    // (11. tur F5) "MİP'te hiçbir şey gözükmüyor" algısına karşı: son seçilen
+    // proje hatırlanır (oturum boyu); hiç seçim yoksa ve TEK yayınlı proje
+    // varsa otomatik seçilir — kullanıcı boş ekranla karşılaşmaz.
+    if(!sel.value){
+      const son = sessionStorage.getItem('mip_last_proj');
+      if(son && adlar.includes(son)) sel.value = son;
+      else if(adlar.length === 1) sel.value = adlar[0];
+    }
   }
   await renderMipList();
 }
@@ -6494,6 +6539,7 @@ async function renderMipList(){
   const sum = document.getElementById('mip-summary');
   if(!el) return;
   const proje = document.getElementById('mip-project-sel')?.value || '';
+  if(proje) try{ sessionStorage.setItem('mip_last_proj', proje); }catch(e){} // (11. tur F5)
 
   if(!proje){
     if(sum) sum.innerHTML = '';
@@ -6890,11 +6936,10 @@ async function mipChangeDecisionPool(poolIdx){
   const proje = document.getElementById('mip-project-sel')?.value || '';
   const kalemler = purchaseItems.filter(i => i.project_name===proje
     && i.status!=='CANCELLED' && mipMatches(i.name, i.code, g.name, g.code));
-  const bagli = kalemler.filter(i=>i.status!=='PLANNED' || i.purchase_order_id || i.stock_plan_id);
-  if(bagli.length){
-    toast('Havuzdaki malzeme plakaya yerleştirilmiş / sipariş edilmiş ('+bagli.length+' kalem) — önce Kesim Planlama/Satın Alma tarafında çözün.','error');
-    return;
-  }
+  // (11. tur Y3) Sınıflandırılmış guard — POOL nedeni burada ENGEL DEĞİL
+  // (havuz kalemi zaten needs_planning taşır; geri alma tam da onu siler)
+  const guard = mipGuardMsg(kalemler);
+  if(guard && guard.cause!=='POOL'){ _mipGuardRedirect(guard); return; }
   if(!confirm('"'+g.name+'" havuzdan çıkarılsın mı? '+(kalemler.length?kalemler.length+' planlı kalem silinecek, ':'')+'karar tekrar "karar bekliyor" olur.')) return;
   for(const i of kalemler){
     const ok = await dbDelete('purchase_items', i.id);
@@ -8242,6 +8287,9 @@ function renderPurchaseList(){
       // (9. tur M5) PLANNED→ORDERED düz durum geçişi değil: sipariş modalı açılır
       `<button class="btn btn-ghost btn-sm" onclick="${st==='ORDERED'&&i.status==='PLANNED'
         ? `purOrderModal('${i.id}')` : `purSetStatus('${i.id}','${st}')`}">${txt}</button>`).join('');
+    // (11. tur Y1) Teklif toplayarak sipariş: tek kalemlik grup açar (arkadaş:
+    // "sipariş verirken teklif de girmek istiyorum — toplu siparişteki gibi")
+    if(selectable) actions += `<button class="btn btn-ghost btn-sm" onclick="poQuoteSingle('${i.id}')" title="Bu kalem için teklif topla → onayla → sipariş ver (toplu sipariş akışının teklisi)">📑 Teklifle Sipariş</button>`;
     // Gruptaki PLANNED kalemin siparişi grup üzerinden yönetilir
     if(group && i.status==='PLANNED'){
       actions = `<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">sipariş grup üzerinden</span>
@@ -8725,44 +8773,64 @@ function updatePurSelectBar(){
 function poCreateFromSelection(){
   if(!purSelected.size){ toast('Önce kalem seçin!','error'); return; }
   const inp = INP();
-  const defName = 'Toplu Sipariş ' + new Date().toLocaleDateString('tr-TR');
   const selItems = purchaseItems.filter(i=>purSelected.has(i.id));
+  // (11. tur Y1) Tek kalemde tekil-dostu ad/metin: "teklif gireceğim sonra
+  // onaylayacağım — toplu siparişteki gibi TEKLİ kalem için de" (ses 00:30).
+  // Aynı grup makinesi kullanılır (backend ≥1 kalem kabul eder).
+  const tekil = selItems.length === 1;
+  const defName = tekil
+    ? 'Teklif — ' + (selItems[0].code || selItems[0].name)
+    : 'Toplu Sipariş ' + new Date().toLocaleDateString('tr-TR');
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.id = 'po-create-overlay';
   overlay.innerHTML = `<div class="modal" style="width:460px;text-align:left">
-    <h3 style="margin-bottom:4px">📦 Toplu Sipariş Oluştur</h3>
-    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">${selItems.length} kalem gruplanacak; teklifler bu grup üzerinden toplanır.</p>
+    <h3 style="margin-bottom:4px">${tekil?'📑 Teklifle Sipariş':'📦 Toplu Sipariş Oluştur'}</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">${tekil?'Bu kalem için teklifler bu grup üzerinden toplanır; onaylayınca sipariş verilir.':selItems.length+' kalem gruplanacak; teklifler bu grup üzerinden toplanır.'}</p>
     <div class="form-group" style="margin-bottom:12px">
       <label>Grup Adı</label>
-      <input type="text" id="po-create-name" value="${defName}" style="${inp}">
+      <input type="text" id="po-create-name" value="${esc(defName)}" style="${inp}">
     </div>
     <div style="max-height:180px;overflow:auto;font-family:var(--font-mono);font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-bottom:16px">
       ${selItems.map(i=>`<div>• ${i.code?esc(i.code)+' — ':''}${esc(i.name)} <span style="opacity:.7">(${Number(i.quantity||1)} ${esc(i.unit||'adet')} · ${esc(i.project_name)})</span></div>`).join('')}
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="document.getElementById('po-create-overlay').remove()">İptal</button>
-      <button class="btn btn-primary" onclick="poDoCreate()">📦 Oluştur</button>
+      <button class="btn btn-primary" id="po-do-create-btn" onclick="poDoCreate()">${tekil?'📑 Oluştur':'📦 Oluştur'}</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
   setTimeout(()=>{ const el=document.getElementById('po-create-name'); if(el){el.focus();el.select();} },100);
 }
 
+// (11. tur Y1) Tek kalemi teklif akışına sokan giriş: mevcut grup makinesi
+// aynen kullanılır — seçim bu kaleme daraltılır, aynı modal açılır.
+function poQuoteSingle(id){
+  purSelected.clear();
+  purSelected.add(id);
+  updatePurSelectBar();
+  poCreateFromSelection();
+}
+
 async function poDoCreate(){
   const name = document.getElementById('po-create-name').value.trim();
   if(!name){ toast('Grup adı girin!','error'); return; }
-  const data = await dbInsert('purchase_orders', {
-    name,
-    item_ids: [...purSelected],
-    created_by: currentUser?.display_name || currentUser?.username || null
-  });
-  if(!Array.isArray(data)||!data[0]){ toast('Grup oluşturulamadı!','error'); return; }
-  document.getElementById('po-create-overlay')?.remove();
-  purSelected.clear();
-  toast('📦 Toplu sipariş grubu oluşturuldu!','success');
-  await renderPurchasing();
-  _purActivateTab('orders');
+  // (11. tur Y1) Çift tıklama kilidi — kilitsiz ikinci tık mükerrer grup üretirdi
+  const bitti = btnBusy('po-do-create-btn', '⏳ Oluşturuluyor…');
+  if(!bitti) return;
+  try{
+    const data = await dbInsert('purchase_orders', {
+      name,
+      item_ids: [...purSelected],
+      created_by: currentUser?.display_name || currentUser?.username || null
+    });
+    if(!Array.isArray(data)||!data[0]){ toast('Grup oluşturulamadı!','error'); return; }
+    document.getElementById('po-create-overlay')?.remove();
+    purSelected.clear();
+    toast('📦 Sipariş grubu oluşturuldu — teklifleri buradan girin.','success');
+    await renderPurchasing();
+    poGoto(data[0].id); // (11. tur Y1) sekmeyi açar + karta kaydırır
+  } finally { bitti(); }
 }
 
 function poGoto(orderId){
@@ -8790,7 +8858,7 @@ function renderPurchaseOrders(){
   const el = document.getElementById('po-list');
   if(!el) return;
   if(!purchaseOrders.length){
-    el.innerHTML = h`<div class="empty-state"><span class="emoji">📦</span>Henüz toplu sipariş grubu yok<br><span style="font-size:12px;color:var(--muted)">Kalemler sekmesinde 📝 Planlandı kalemleri işaretleyip "Toplu Sipariş Oluştur" deyin</span></div>`;
+    el.innerHTML = h`<div class="empty-state"><span class="emoji">📦</span>Henüz sipariş grubu yok<br><span style="font-size:12px;color:var(--muted)">Kalemler sekmesinde 📝 Planlandı kalemleri işaretleyip "Toplu Sipariş Oluştur" deyin — tek kalem için satırdaki "📑 Teklifle Sipariş" da aynı akışı açar</span></div>`;
     return;
   }
   const inp = INP('8px 10px','12px');
