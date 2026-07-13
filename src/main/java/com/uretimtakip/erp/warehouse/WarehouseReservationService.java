@@ -100,9 +100,12 @@ public class WarehouseReservationService {
      *     verilmemis PLANNED kalemi varsa miktari artirilir (9. tur M7 —
      *     "eksik 42 oldu ama siparis 40'ta kaldi" tutarsizligi), yoksa yeni
      *     PLANNED purchase_items kaydi acilir.
-     *  7. write_adjustment && eksik > 0 -> ikinci OUT (RESERVATION_ADJUST,
-     *     KAYNAK depodan), miktar = min(eksik, stok - approved): sayimda
-     *     cikmayan kayit duzeltilir, stok eksiye dusurulmez.
+     *  7. eksik > 0 iken envanter duzeltmesi (RESERVATION_ADJUST OUT, KAYNAK
+     *     depodan; stok eksiye dusmez):
+     *       zero_stock       -> adjust = stok - approved (kayit SIFIRLANIR,
+     *                           9. tur M8 — "bu malzeme bu depoda hic yok")
+     *       write_adjustment -> adjust = min(eksik, stok - approved)
+     *     Ikisi birden gelirse zero_stock kazanir.
      */
     @Transactional
     public WarehouseReservationResponse approve(UUID id, WarehouseReservationApproveRequest request) {
@@ -215,7 +218,18 @@ public class WarehouseReservationService {
                         id, shortage);
             }
 
-            if (request.isWriteAdjustment()) {
+            if (request.isZeroStock()) {
+                // (9. tur M8) "Bu malzeme bu depoda HIC yok": sayim yapilmis
+                // sayilir, kayit SIFIRLANIR — eksikten buyuk hayalet miktar da
+                // temizlenir; yoksa MIP ayni hayalet stoga tekrar rezervasyon onerir.
+                BigDecimal adjust = stock.subtract(approved);
+                if (adjust.compareTo(EPS) > 0) {
+                    saveMovement(reservation, reservation.getWarehouseId(), "OUT", adjust,
+                            "RESERVATION_ADJUST", approvedBy,
+                            "Envanter sifirlama (depoda yok, "
+                                    + reservation.getProjectName() + "): " + reason);
+                }
+            } else if (request.isWriteAdjustment()) {
                 BigDecimal adjust = shortage.min(stock.subtract(approved));
                 if (adjust.compareTo(EPS) > 0) {
                     // Duzeltme her zaman KAYNAK depodan: hayalet kayit orada

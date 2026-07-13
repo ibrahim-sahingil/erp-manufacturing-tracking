@@ -625,6 +625,30 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
       && m7Planned.length===1 && Number(m7Planned[0].quantity)===3,
       JSON.stringify(m7All.map(i=>i.status+':'+i.quantity)));
 
+    console.log('═══ 9.TUR M8: TAM REDDE KAYIT SIFIRLANIR (zero_stock) ═══');
+    // Depo "hiç yok" dedi: kayıtta 5 görünse de zero_stock ile RESERVATION_ADJUST
+    // OUT kalan kaydın TAMAMINI düşer (eksikten büyük hayalet dahil) → net stok 0.
+    await api('POST','/warehouse-movements',{warehouse_id:wh.id, item_name:'E2E Red Malzeme',
+      item_code:'E2E-RED', movement_type:'IN', quantity:5, source_type:'MANUAL'});
+    const wresZ = await api('POST','/warehouse-reservations',{project_name:PROJ,
+      warehouse_id:wh.id, item_name:'E2E Red Malzeme', item_code:'E2E-RED',
+      requested_qty:2, unit:'adet'});
+    const redZ = await api('POST','/warehouse-reservations/'+wresZ.id+'/approve',
+      {approved_qty:0, shortage_reason:'Sayımda hiç çıkmadı', zero_stock:true,
+       approved_by:'E2E Depocu'});
+    check('zero_stock red → REJECTED', !!redZ && redZ.status==='REJECTED',
+      redZ ? redZ.status : _lastApiError);
+    const zMvs = (await dbGet('warehouse_movements')).filter(m=>m.reservation_id===wresZ.id);
+    const zAdj = zMvs.find(m=>m.source_type==='RESERVATION_ADJUST');
+    check('RESERVATION_ADJUST OUT 5 yazıldı (eksik 2 değil — kayıt sıfırlandı)',
+      !!zAdj && zAdj.movement_type==='OUT' && Number(zAdj.quantity)===5,
+      zAdj ? zAdj.quantity : 'hareket yok');
+    globalThis.whMovements = await dbGet('warehouse_movements');
+    check('net stok 0 (5 giriş − 5 sıfırlama)',
+      _whItemStock(wh.id,'E2E Red Malzeme','E2E-RED')===0,
+      _whItemStock(wh.id,'E2E Red Malzeme','E2E-RED'));
+    globalThis.whMovements = [];
+
     console.log('═══ 8.TUR #1: TOPLAMA DEPOSU (transfer çifti + hedeften rezervasyon) ═══');
     // "Hem projeye işlensin hem istenirse depolar arası aktarılsın":
     // onay, kaynak→hedef WAREHOUSE_TRANSFER çifti + RESERVATION OUT'unu

@@ -208,6 +208,33 @@ chk('baska malzemenin rezervasyonu sayilmaz',
     mipCalcRow(g50, WH, [], [], 'PROJE-1',
       [wres('PROJE-1', 'Baska', 'BSK-9', 'APPROVED', 30, 30)]).reserved === 0);
 
+console.log('\n═══ mipCalcRow: depo ret uyarisi (9. tur M8) ═══');
+// Kural: EN SON sonuclanan talebin cevabi ret / eksikli kismi ise rejectInfo
+// dolu; sonraki tam onay uyariyi gizler. SADECE BILGI — missing'e katilmaz
+// (redde stok dusumu RESERVATION_ADJUST OUT ile gelir, ayrica saymak cifte olur).
+const wresR = (status, reqQty, appQty, reason, at) =>
+  ({project_name: 'PROJE-1', item_name: 'M12 Somun', item_code: 'SOM-12', status,
+    requested_qty: reqQty, approved_qty: appQty, shortage_reason: reason, approved_at: at});
+const rRed = mipCalcRow(g50, WH, hareketler, [], 'PROJE-1',
+  [wresR('REJECTED', 10, 0, 'Depoda yok', '2026-07-13T10:00:00')]);
+chk('REJECTED -> rejectInfo dolu (sebep tasinir)',
+    !!rRed.rejectInfo && rRed.rejectInfo.reason === 'Depoda yok', JSON.stringify(rRed.rejectInfo));
+chk('rejectInfo missing formulunu DEGISTIRMEZ', rRed.missing === 10, rRed.missing);
+const rKisRed = mipCalcRow(g50, WH, hareketler, [], 'PROJE-1',
+  [wresR('PARTIAL', 30, 15, 'Sayimda 15 cikti', '2026-07-13T10:00:00')]);
+chk('sebepli PARTIAL uyari tasir (15/30)',
+    !!rKisRed.rejectInfo && rKisRed.rejectInfo.approved === 15 && rKisRed.rejectInfo.requested === 30,
+    JSON.stringify(rKisRed.rejectInfo));
+const rSonOnay = mipCalcRow(g50, WH, hareketler, [], 'PROJE-1', [
+  wresR('REJECTED', 10, 0, 'Depoda yok', '2026-07-13T10:00:00'),
+  wresR('APPROVED', 10, 10, null, '2026-07-13T11:00:00')]);
+chk('sonraki TAM onay eski reddi gizler', !rSonOnay.rejectInfo, JSON.stringify(rSonOnay.rejectInfo||null));
+const rSonRed = mipCalcRow(g50, WH, hareketler, [], 'PROJE-1', [
+  wresR('APPROVED', 10, 10, null, '2026-07-13T09:00:00'),
+  wresR('REJECTED', 5, 0, 'Bitti', '2026-07-13T12:00:00')]);
+chk('onaydan SONRAKI ret gorunur', !!rSonRed.rejectInfo && rSonRed.rejectInfo.reason === 'Bitti',
+    JSON.stringify(rSonRed.rejectInfo||null));
+
 console.log('\n═══ mipReservePlan: dagitim onerisi ═══');
 const pRow = (need, received, reserved, stockByWh) => ({need, received, reserved, stockByWh});
 const dag1 = mipReservePlan(pRow(50, 0, 0,

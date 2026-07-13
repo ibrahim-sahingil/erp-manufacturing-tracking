@@ -6251,11 +6251,27 @@ function mipCalcRow(group, warehouses, movements, purchaseItems, projectName, re
   // 'reserved' ihtiyacın karşılanmış kısmıdır, stockTotal ile çifte sayılmaz.
   // REQUESTED yalnızca bilgidir (depocu onayı bekler), missing'i DEĞİŞTİRMEZ.
   let reserved = 0, pendingReserve = 0;
+  // (9. tur M8) Depo reddi uyarısı: EN SON sonuçlanan talebin cevabı
+  // ret / eksikli kısmi ise satırda görünür; sonrasında tam onay gelirse
+  // kaybolur. SADECE BİLGİ alanıdır — missing formülüne KATILMAZ (redde
+  // stok düşümü RESERVATION_ADJUST OUT ile geldiği için missing zaten artar;
+  // ayrıca saymak çifte sayım olur).
+  let rejectInfo = null, _sonSonuc = '';
   for(const r of reservations){
     if(r.project_name !== projectName) continue;
     if(mipKey(r.item_name, r.item_code) !== group.key) continue;
     if(r.status === 'APPROVED' || r.status === 'PARTIAL') reserved += Number(r.approved_qty) || 0;
     else if(r.status === 'REQUESTED') pendingReserve += Number(r.requested_qty) || 0;
+    if(r.status === 'APPROVED' || r.status === 'PARTIAL' || r.status === 'REJECTED'){
+      const at = r.approved_at || ''; // ISO — sözlük sırası = zaman sırası
+      if(at >= _sonSonuc){
+        _sonSonuc = at;
+        rejectInfo = (r.status === 'REJECTED' || (r.status === 'PARTIAL' && r.shortage_reason))
+          ? {status: r.status, reason: r.shortage_reason || null, at,
+             requested: Number(r.requested_qty)||0, approved: Number(r.approved_qty)||0}
+          : null;
+      }
+    }
   }
 
   const missing = Math.max(0, group.need - stockTotal - received - reserved);
@@ -6274,7 +6290,7 @@ function mipCalcRow(group, warehouses, movements, purchaseItems, projectName, re
   else if(stockTotal < 1e-9 && missing > 0)         status = 'SUPPLY';
   else                                              status = 'MISSING';
 
-  return {...group, stockByWh, stockTotal, reserved, pendingReserve, ordered, received, planned, missing, status};
+  return {...group, stockByWh, stockTotal, reserved, pendingReserve, ordered, received, planned, missing, status, rejectInfo};
 }
 
 // "30 A-Depo'dan, 10 B-Depo'dan, 10 satın al" önerisi
@@ -6439,6 +6455,7 @@ function mipRowHTML(r, idx){
         </div>
         <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">🗄️ ${dagilim}</div>
         <div style="font-family:var(--font-mono);font-size:11px;color:#2980b9;margin-top:3px">💡 ${mipSuggest(r)}</div>
+        ${r.rejectInfo?h`<div style="font-family:var(--font-mono);font-size:11px;color:#e74c3c;margin-top:3px">⚠ Depo ${r.rejectInfo.status==='REJECTED'?'ret verdi':'kısmi karşıladı ('+mipNum(r.rejectInfo.approved)+'/'+mipNum(r.rejectInfo.requested)+')'}${r.rejectInfo.reason?': '+r.rejectInfo.reason:''}${r.rejectInfo.at?' · '+r.rejectInfo.at.slice(0,16).replace('T',' '):''} — gerekirse tekrar talep gönderilebilir</div>`:''}
       </div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${aksiyon}${alBtn}</div>
     </div>
@@ -8534,15 +8551,27 @@ function whResApproveModal(id){
       <label>Fiziksel sayıma göre onaylanan miktar</label>
       <input type="number" id="wres-qty" value="${maxOnay}" min="0" max="${maxOnay}" step="0.001" style="${inp}" oninput="whResCalc()">
     </div>
-    <div id="wres-summary" data-istenen="${istenen}" style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px"></div>
+    <div id="wres-summary" data-istenen="${istenen}" data-stok="${stok}" style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px"></div>
     <div class="form-group" id="wres-reason-wrap" style="margin-bottom:10px">
       <label>Eksiğin açıklaması <span style="color:#e74c3c">* (kısmi onayda zorunlu)</span></label>
       <textarea id="wres-reason" rows="2" placeholder="Örn: sayımda 15 çıktı — kayıp / envanter yanlış" style="${inp};resize:vertical"></textarea>
     </div>
-    <label id="wres-adj-wrap" style="display:flex;gap:8px;align-items:flex-start;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px;cursor:pointer">
-      <input type="checkbox" id="wres-adjust" checked style="margin-top:2px">
-      <span>Eksik için <b>envanter düzeltme hareketi</b> yaz (kayıtlı stok gerçeğe çekilir; işaretlenmezse hayalet miktar kayıtta kalır)</span>
-    </label>
+    <div id="wres-adj-wrap" style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:16px">
+      <div style="margin-bottom:4px">Envanter kaydı ne olsun? <span style="color:var(--muted)">(9. tur M8 — depo "yok" dediyse kayıt da gerçeği söylesin)</span></div>
+      <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;margin-bottom:3px">
+        <input type="radio" name="wres-adj-mode" value="shortage" style="margin-top:2px" onchange="whResAdjTouched()">
+        <span><b>Eksik kadar düş</b> — kayıtlı stok eksik miktar kadar gerçeğe çekilir</span>
+      </label>
+      <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;margin-bottom:3px">
+        <input type="radio" name="wres-adj-mode" value="zero" style="margin-top:2px" onchange="whResAdjTouched()">
+        <span><b>Bu depoda HİÇ yok — kaydı sıfırla</b> — sayım yapıldı sayılır, hayalet miktarın tamamı düşülür</span>
+      </label>
+      <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer">
+        <input type="radio" name="wres-adj-mode" value="none" style="margin-top:2px" onchange="whResAdjTouched()">
+        <span><b>Kayda dokunma</b> — hayalet miktar kayıtta kalır (MİP tekrar bu stoğu önerir)</span>
+      </label>
+      <div id="wres-adj-preview" style="margin-top:6px;color:#e67e22"></div>
+    </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="document.getElementById('wres-overlay').remove()">Vazgeç</button>
       <button class="btn btn-primary" id="wres-confirm">✅ Sonuçlandır</button>
@@ -8550,21 +8579,45 @@ function whResApproveModal(id){
   </div>`;
   document.body.appendChild(overlay);
   overlay.querySelector('#wres-confirm').onclick = ()=>whResApproveConfirm(id);
+  _wresAdjTouched = false; // yeni modal → varsayılan mod yeniden hesaplanır
   whResCalc();
   setTimeout(()=>{const el=document.getElementById('wres-qty');if(el){el.focus();el.select();}},100);
 }
 
+// Kullanıcı düzeltme modunu elle seçtiyse whResCalc varsayılanı EZMEZ.
+let _wresAdjTouched = false;
+function whResAdjTouched(){ _wresAdjTouched = true; whResCalc(); }
+function whResAdjMode(){
+  return document.querySelector('input[name="wres-adj-mode"]:checked')?.value || 'none';
+}
 function whResCalc(){
   const sum = document.getElementById('wres-summary');
   if(!sum) return;
   const istenen = parseFloat(sum.dataset.istenen)||0;
+  const stok = parseFloat(sum.dataset.stok)||0;
   const onay = parseFloat(document.getElementById('wres-qty')?.value)||0;
   const eksik = Math.max(0, istenen-onay);
   const kismi = eksik>1e-9;
   const rw = document.getElementById('wres-reason-wrap');
   if(rw) rw.style.display = kismi ? '' : 'none';
   const aw = document.getElementById('wres-adj-wrap');
-  if(aw) aw.style.display = kismi ? 'flex' : 'none';
+  if(aw) aw.style.display = kismi ? '' : 'none';
+  // Varsayılan mod (elle seçilmediyse): tam red → kaydı sıfırla (arkadaş
+  // isteği "depo yok deyince stok otomatik düşsün"); kısmi → eksik kadar düş.
+  if(kismi && !_wresAdjTouched){
+    const def = onay<=1e-9 ? 'zero' : 'shortage';
+    const el = document.querySelector('input[name="wres-adj-mode"][value="'+def+'"]');
+    if(el) el.checked = true;
+  }
+  const pv = document.getElementById('wres-adj-preview');
+  if(pv && kismi){
+    const mode = whResAdjMode();
+    const kalanKayit = Math.max(0, stok-onay); // onay OUT'u zaten düşecek
+    const dusulecek = mode==='zero' ? kalanKayit : mode==='shortage' ? Math.min(eksik, kalanKayit) : 0;
+    pv.textContent = dusulecek>1e-9
+      ? '⚠ Kayıttan ayrıca '+mipNum(dusulecek)+' düşülecek → bu depoda kayıtlı '+mipNum(Math.max(0,kalanKayit-dusulecek))+' kalır'
+      : (mode==='none' ? 'Kayıtta '+mipNum(kalanKayit)+' görünmeye devam eder' : 'Düşülecek kayıt yok');
+  }
   sum.innerHTML = `✅ <span style="color:var(--green,#2ecc71)">${Number(onay.toFixed(4))}</span> projeye rezerve edilir (stoktan düşer)`
     + (kismi ? ` · 🛒 <span style="color:#e67e22">${Number(eksik.toFixed(4))}</span> eksik → satın almaya düşer` : '');
 }
@@ -8580,7 +8633,7 @@ async function whResApproveConfirm(id){
   const eksik = Math.max(0, istenen-onay);
   const aciklama = document.getElementById('wres-reason')?.value?.trim() || '';
   if(eksik>1e-9 && !aciklama){ toast('Kısmi onayda / redde açıklama zorunlu (kayıp, envanter yanlış vb.)','error'); return; }
-  const duzelt = !!document.getElementById('wres-adjust')?.checked;
+  const adjMode = whResAdjMode(); // shortage / zero / none (9. tur M8)
   const bitti = btnBusy('wres-confirm', '⏳ Kaydediliyor…');
   if(!bitti) return;
   try{
@@ -8592,7 +8645,8 @@ async function whResApproveConfirm(id){
         body: JSON.stringify({
           approved_qty: onay,
           shortage_reason: eksik>1e-9 ? aciklama : null,
-          write_adjustment: eksik>1e-9 && duzelt,
+          write_adjustment: eksik>1e-9 && adjMode==='shortage',
+          zero_stock: eksik>1e-9 && adjMode==='zero',
           approved_by: currentUser?.display_name||currentUser?.username||null
         })});
     }catch(e){ toast(e.message||'Onay kaydedilemedi!','error'); return; }

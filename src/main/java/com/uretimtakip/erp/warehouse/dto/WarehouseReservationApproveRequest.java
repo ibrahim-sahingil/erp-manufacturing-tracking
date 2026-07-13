@@ -22,6 +22,12 @@ import java.math.BigDecimal;
  * OUT'u (RESERVATION_ADJUST) da yazilsin mi. Frontend default'u ISARETLI —
  * kayit gercege cekilmezse MIP ayni hayalet stoga tekrar rezervasyon onerir.
  *
+ * zero_stock (9. tur M8): "bu malzeme bu depoda HIC yok" — sayim yapilmis
+ * sayilir, o deponun o malzeme kaydi SIFIRLANIR (adjust = stok - onay;
+ * write_adjustment'in min(eksik, ...) formulunden farki: eksikten buyuk
+ * hayalet kayit da temizlenir). Frontend tam redde bunu varsayilan secer.
+ * Ikisi birden gelirse zero_stock kazanir.
+ *
  * Ornek (30 istendi, sayimda 15 cikti):
  *   { "approved_qty": 15, "shortage_reason": "Sayimda 15 cikti - kayip/envanter yanlis",
  *     "write_adjustment": true, "approved_by": "Depocu Ali" }
@@ -41,6 +47,9 @@ public class WarehouseReservationApproveRequest {
 
     /** Kayip icin envanter duzeltme hareketi yazilsin mi (default false; frontend true gonderir). */
     private boolean writeAdjustment;
+
+    /** Depo kaydini sifirla — "bu malzeme bu depoda hic yok" (9. tur M8). */
+    private boolean zeroStock;
 
     @Size(max = 150, message = "Onaylayan en fazla 150 karakter olabilir")
     private String approvedBy;

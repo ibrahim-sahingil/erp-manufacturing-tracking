@@ -594,6 +594,15 @@ const mipRowRez = String(mipRowHTML({
 chk('mip: RESERVED satırda rezerve rozeti + buton yok',
     mipRowRez.includes('Depoya rezerve') && !mipRowRez.includes('mipReserveModal(2)'));
 chk('mip: eksik yokken satın almaya gönder butonu YOK', !mipRowRez.includes('mipBuyModal(2)'));
+// 9. tur M8: depo ret uyarısı — shortage_reason kullanıcı verisidir
+const mipRowRej = String(mipRowHTML({
+  key:'k', code:'C', name:'N', unit:'ad', need:10, stockTotal:0, received:0,
+  ordered:0, planned:0, missing:10, reserved:0, pendingReserve:0,
+  stockByWh:[], status:'SUPPLY',
+  rejectInfo:{status:'REJECTED', reason:'Yok'+EVIL, at:'2026-07-13T10:00:00', requested:10, approved:0}
+}, 3));
+chk('mip: depo ret uyarısı çıktı + sebep kaçırıldı',
+    mipRowRej.includes('Depo ret verdi') && mipRowRej.includes('Yok&lt;img') && !mipRowRej.includes('Yok'+EVIL));
 
 // ── renderWhReservations (7. tur #4 Aşama 2 — depocu onay listesi) ──
 // Talep eden / proje / malzeme adı / not / kayıp açıklaması kullanıcı verisidir.
