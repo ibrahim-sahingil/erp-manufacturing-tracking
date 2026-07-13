@@ -257,22 +257,15 @@ chk('projectCards: proje adı kaçırıldı', pc.includes("Prj&#39;&lt;img") && 
 chk('projectCards: openProject onclick ea tırnak kaçışı', pc.includes("openProject('Prj\\'"));
 chk('projectCards: kart yapısı (raw) korundu', pc.includes('project-mini-bars') && pc.includes('togglePin('));
 
-// ── renderParts / updatePartsFilters / renderPartsFiltered (parça listesi) ──
+// ── renderDeptProjectSel (10. tur M7: Parçalar tabı kalktı, bölüm yönetimi
+//    Planlama'ya taşındı; renderParts/renderPartsFiltered silindi) ──
 global.orders=[{project_name:'OP<b>&'}];
 global.depts=[{id:'d1', project:'OP<b>&', name:'Kaynak<img>'}];
 global.parts=[{name:'PN<b>', code:'pc1', project:'Pr<j>', department:'Dep<t>', department_id:'d1'}];
-global.partRowHTML=(p)=>'<div class="PRH">'+esc(p.name)+'</div>';
-eval(grab('renderParts'));
-eval(grab('updatePartsFilters'));
-eval(grab('renderPartsFiltered'));
-renderParts();
-console.log('\nrenderParts / renderPartsFiltered (parça listesi):');
-chk('parts: sipariş dropdown option kaçırıldı', (store['f-project']||'').includes('<option value="OP&lt;b&gt;&amp;"') && (store['d-project']||'').includes('OP&lt;b&gt;&amp;'));
-chk('parts: bölüm filtre option kaçırıldı', (store['parts-dept-filter']||'').includes('Kaynak&lt;img&gt;'));
-renderPartsFiltered();
-const pfl=store['parts-list']||'';
-chk('partsFiltered: proje/bölüm başlıkları kaçırıldı', pfl.includes('📁 Pr&lt;j&gt;') && pfl.includes('🏭 Dep&lt;t&gt;'));
-chk('partsFiltered: partRowHTML (raw) korundu', pfl.includes('<div class="PRH">'));
+eval(grab('renderDeptProjectSel'));
+renderDeptProjectSel();
+console.log('\nrenderDeptProjectSel (bölüm yönetimi proje seçici):');
+chk('deptProjSel: sipariş dropdown option kaçırıldı', (store['d-project']||'').includes('<option value="OP&lt;b&gt;&amp;"'));
 
 // ── showLog (işlem geçmişi modalı) ──
 global.loadLogs=async()=>[{created_at:'2026-01-01T10:00:00', username:'U<b>', qty_done:2, note:'LNot'+EVIL}];

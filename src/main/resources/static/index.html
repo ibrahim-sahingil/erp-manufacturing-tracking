@@ -503,14 +503,12 @@
   <div class="logo">Üretim<span>Takip</span></div>
   <div class="nav-tabs" id="nav-tabs">
     <button class="nav-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
-    <button class="nav-tab" data-tab="parts" onclick="switchTab('parts')">🔧 Parçalar</button>
     <button class="nav-tab" data-tab="users" onclick="switchTab('users')">👷 Personel</button>
     <button class="nav-tab" data-tab="stats" onclick="switchTab('stats')">📈 İstatistik</button>
     <button class="nav-tab" data-tab="orders" onclick="switchTab('orders')">📋 Siparişler</button>
     <button class="nav-tab" data-tab="mip" onclick="switchTab('mip')">📐 MİP</button>
     <button class="nav-tab" data-tab="purchasing" onclick="switchTab('purchasing')">🛒 Satın Alma</button>
     <button class="nav-tab" data-tab="warehouse" onclick="switchTab('warehouse')">🏭 Depo</button>
-    <button class="nav-tab" data-tab="delivery" onclick="switchTab('delivery')">🚚 İrsaliye</button>
     <button class="nav-tab" data-tab="planning" onclick="switchTab('planning')">📅 Planlama</button>
     <button class="nav-tab" data-tab="bom" onclick="switchTab('bom')">🌳 Ürün Ağacı</button>
     <button class="nav-tab" data-tab="docs" onclick="switchTab('docs')">📁 Teknik Resimler</button>
@@ -543,63 +541,9 @@
   <div id="layer-parts" style="display:none"></div>
 </div>
 
-<!-- PARTS ADMIN -->
-<div class="view" id="view-parts">
-  <div class="section-title">PARÇA YÖNETİMİ</div>
-  <div class="section-sub">Teknik resim ekle · QR kod üret</div>
-  <div class="form-card">
-    <div class="form-row">
-      <div class="form-group"><label>Parça Adı *</label><input type="text" id="f-name" placeholder="Örn: Ön Flanş"></div>
-      <div class="form-group"><label>Parça Kodu *</label><input type="text" id="f-code" placeholder="Örn: PRJ-001-A"></div>
-      <div class="form-group"><label>Teknik Resim No</label><input type="text" id="f-drawing" placeholder="Örn: TR-2024-045"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>Proje *</label><select id="f-project" onchange="updateDeptSelect()"><option value="">— Sipariş seçin —</option></select></div>
-      <div class="form-group"><label>Bölüm *</label>
-        <select id="f-dept">
-          <option value="">— Önce proje girin —</option>
-        </select>
-      </div>
-      <div class="form-group"><label>Toplam Adet</label><input type="number" id="f-qty" placeholder="1" min="1"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>Malzeme</label><input type="text" id="f-material" placeholder="Örn: ST37"></div>
-      <div class="form-group" style="grid-column:span 2"><label>Açıklama</label><input type="text" id="f-desc" placeholder="Ek bilgi..."></div>
-    </div>
-    <div style="margin-top:4px;display:flex;gap:10px">
-      <button class="btn btn-primary" id="add-btn" onclick="addPart()">+ Parça Ekle</button>
-      <button class="btn btn-ghost" onclick="clearForm()">Temizle</button>
-    </div>
-  </div>
-
-  <!-- Bölüm Yönetimi -->
-  <div class="form-card" style="border-color:rgba(245,166,35,.3)">
-    <div style="font-family:var(--font-display);font-size:18px;letter-spacing:2px;color:var(--accent);margin-bottom:16px">🏭 BÖLÜM YÖNETİMİ</div>
-    <div class="form-row">
-      <div class="form-group"><label>Proje *</label><select id="d-project"><option value="">— Sipariş seçin —</option></select></div>
-      <div class="form-group"><label>Bölüm Adı *</label><input type="text" id="d-name" placeholder="Örn: Kaynak, Montaj..."></div>
-      <div class="form-group"><label>Sıra No</label><input type="number" id="d-order" placeholder="1" min="1"></div>
-    </div>
-    <div style="display:flex;gap:10px;margin-bottom:16px">
-      <button class="btn btn-primary btn-sm" onclick="addDept()">+ Bölüm Ekle</button>
-    </div>
-    <!-- Hızlı ekle -->
-    <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Hızlı Ekle (standart bölümler)</div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px" id="quick-dept-btns"></div>
-    <div id="dept-list"></div>
-  </div>
-
-  <div class="search-row">
-    <input type="text" id="parts-search" placeholder="Parça adı veya kodu ara..." oninput="renderParts()">
-    <select class="filter-select" id="parts-project-filter" onchange="updatePartsFilters()">
-      <option value="">Tüm Projeler</option>
-    </select>
-    <select class="filter-select" id="parts-dept-filter" onchange="renderParts()">
-      <option value="">Tüm Bölümler</option>
-    </select>
-  </div>
-  <div id="parts-list"></div>
-</div>
+<!-- (10. tur M7) PARÇALAR tabı kaldırıldı: manuel parça ekleme yayınlanan ürün
+     ağacından otomatik oluşturmayla gereksizleşti; BÖLÜM YÖNETİMİ Planlama →
+     Fabrika Çalışma Alanları'na taşındı. -->
 
 <!-- USERS -->
 <div class="view" id="view-users">
@@ -943,6 +887,23 @@
     <!-- Alan Listesi -->
     <div id="ws-list"></div>
 
+    <!-- Bölüm Yönetimi (10. tur M7: Parçalar tabı kaldırıldı, buraya taşındı) -->
+    <div class="form-card" style="border-color:rgba(245,166,35,.3);margin-top:20px">
+      <div style="font-family:var(--font-display);font-size:18px;letter-spacing:2px;color:var(--accent);margin-bottom:16px">🏭 BÖLÜM YÖNETİMİ</div>
+      <div class="form-row">
+        <div class="form-group"><label>Proje *</label><select id="d-project"><option value="">— Sipariş seçin —</option></select></div>
+        <div class="form-group"><label>Bölüm Adı *</label><input type="text" id="d-name" placeholder="Örn: Kaynak, Montaj..."></div>
+        <div class="form-group"><label>Sıra No</label><input type="number" id="d-order" placeholder="1" min="1"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:16px">
+        <button class="btn btn-primary btn-sm" onclick="addDept()">+ Bölüm Ekle</button>
+      </div>
+      <!-- Hızlı ekle -->
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Hızlı Ekle (standart bölümler)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px" id="quick-dept-btns"></div>
+      <div id="dept-list"></div>
+    </div>
+
     <!-- Personel Atama Modal -->
     <div class="modal-overlay" id="ws-member-modal">
       <div class="modal" style="width:460px;text-align:left">
@@ -1121,9 +1082,11 @@
 
   <!-- Alt sekmeler (planning-tab deseni; switchWarehouseTab #view-warehouse'a scope'ludur) -->
   <div class="planning-tabs" id="warehouse-tabs">
-    <button class="planning-tab active" onclick="switchWarehouseTab('view')">📦 Depo Görünümü</button>
-    <button class="planning-tab" onclick="switchWarehouseTab('receiving')">📥 Mal Kabul</button>
-    <button class="planning-tab" onclick="switchWarehouseTab('manage')">🗄️ Depo Yönetimi</button>
+    <button class="planning-tab active" data-whtab="view" onclick="switchWarehouseTab('view')">📦 Depo Görünümü</button>
+    <button class="planning-tab" data-whtab="receiving" onclick="switchWarehouseTab('receiving')">📥 Mal Kabul</button>
+    <button class="planning-tab" data-whtab="additem" onclick="switchWarehouseTab('additem')">➕ Parça Ekle</button>
+    <button class="planning-tab" data-whtab="manage" onclick="switchWarehouseTab('manage')">🗄️ Depo Yönetimi</button>
+    <button class="planning-tab" data-whtab="delivery" onclick="switchWarehouseTab('delivery')">🚚 İrsaliye</button>
   </div>
 
   <!-- Depo Görünümü (#5 arkadaş isteği: proje bazlı / depo bazlı iki mod) -->
@@ -1165,6 +1128,21 @@
     <!-- Depo kartları -->
     <div id="whm-list" style="margin-bottom:24px"></div>
 
+    <!-- Stok özeti + hareket geçmişi (ortak depo filtresi) -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px">📊 Stok Özeti <span style="text-transform:none;letter-spacing:0">(hareketlerden hesaplanır)</span></div>
+      <select id="whm-mv-filter" onchange="renderWhMovements()" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:6px 10px;outline:none">
+        <option value="">— Tüm depolar —</option>
+      </select>
+    </div>
+    <div id="whm-stock" style="margin-bottom:20px"></div>
+
+    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">📜 Hareket Geçmişi</div>
+    <div id="whm-mv-list"></div>
+  </div>
+
+  <!-- Parça Ekle (10. tur M12: Manuel Hareket Depo Yönetimi'nden ayrı sekmeye taşındı) -->
+  <div class="planning-section" id="wh-tab-additem">
     <!-- Manuel hareket / depoya parça ekleme (9. tur M6: katalog seçimi) -->
     <div class="form-card" style="margin-bottom:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
@@ -1193,18 +1171,53 @@
       </div>
       <button class="btn btn-primary" onclick="whmAddMovement()">💾 Hareketi Kaydet</button>
     </div>
+  </div>
 
-    <!-- Stok özeti + hareket geçmişi (ortak depo filtresi) -->
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-      <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px">📊 Stok Özeti <span style="text-transform:none;letter-spacing:0">(hareketlerden hesaplanır)</span></div>
-      <select id="whm-mv-filter" onchange="renderWhMovements()" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:6px 10px;outline:none">
-        <option value="">— Tüm depolar —</option>
-      </select>
+  <!-- İrsaliye (10. tur M8: üst tabdan Depo alt sekmesine taşındı) -->
+  <div class="planning-section" id="wh-tab-delivery">
+    <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-primary" onclick="dnToggleForm()">➕ Yeni İrsaliye</button>
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">Not: Bu modül dahili sevk irsaliyesidir; resmî e-İrsaliye yerine geçmez.</span>
     </div>
-    <div id="whm-stock" style="margin-bottom:20px"></div>
 
-    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">📜 Hareket Geçmişi</div>
-    <div id="whm-mv-list"></div>
+    <!-- Yeni irsaliye formu (Alıcı Bilgileri — e-irsaliye formuyla uyumlu alanlar) -->
+    <div class="form-card" id="dn-form" style="display:none">
+      <div style="font-family:var(--font-display);font-size:16px;letter-spacing:2px;color:var(--accent);margin-bottom:14px">ALICI BİLGİLERİ</div>
+      <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+        <div class="form-group"><label>Alıcı *</label><input type="text" id="dn-recipient" list="sup-datalist" onchange="dnRecipientAutofill()" placeholder="Firma / kişi adı"></div>
+        <div class="form-group"><label>TCKN/VKN</label><input type="text" id="dn-taxno" placeholder="Vergi/TC no"></div>
+        <div class="form-group"><label>Vergi Dairesi</label><input type="text" id="dn-taxoffice" placeholder="Vergi dairesi"></div>
+      </div>
+      <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+        <div class="form-group"><label>Adres</label><input type="text" id="dn-address" placeholder="Açık adres"></div>
+        <div class="form-group"><label>Şehir</label><input type="text" id="dn-city" placeholder="Şehir"></div>
+        <div class="form-group"><label>İlçe</label><input type="text" id="dn-district" placeholder="İlçe"></div>
+      </div>
+      <div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr">
+        <div class="form-group"><label>İrsaliye Senaryosu</label>
+          <select id="dn-scenario"><option value="TEMEL">Temel</option></select>
+        </div>
+        <div class="form-group"><label>İrsaliye Türü</label>
+          <select id="dn-type"><option value="SEVK">Sevk</option><option value="MATBUDAN">Matbudan</option></select>
+        </div>
+        <div class="form-group"><label>Proje (opsiyonel)</label>
+          <select id="dn-order"><option value="">— Proje yok —</option></select>
+        </div>
+        <div class="form-group"><label>Sevk Tarihi</label><input type="date" id="dn-shipdate"></div>
+        <div class="form-group"><label>Taşıyıcı / Plaka</label><input type="text" id="dn-carrier" placeholder="Opsiyonel"></div>
+      </div>
+      <div class="form-group"><label>Not</label><input type="text" id="dn-notes" placeholder="Opsiyonel açıklama"></div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button class="btn btn-primary" onclick="dnCreate()">💾 İrsaliye Oluştur</button>
+        <button class="btn btn-ghost" onclick="dnToggleForm()">Vazgeç</button>
+      </div>
+    </div>
+
+    <!-- Aktif irsaliye detayı (kalem ekleme burada) -->
+    <div id="dn-detail"></div>
+
+    <!-- İrsaliye listesi -->
+    <div id="dn-list"></div>
   </div>
 </div>
 
@@ -1222,7 +1235,6 @@
     <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">Erişim Yetkileri</div>
     <div class="perm-grid" id="au-perms">
       <div class="perm-item checked" data-perm="dashboard" onclick="togglePerm(this)"><div class="perm-check">✓</div>📊 Dashboard</div>
-      <div class="perm-item" data-perm="parts" onclick="togglePerm(this)"><div class="perm-check"></div>🔧 Parçalar</div>
       <div class="perm-item" data-perm="users" onclick="togglePerm(this)"><div class="perm-check"></div>👷 Personel</div>
       <div class="perm-item" data-perm="stats" onclick="togglePerm(this)"><div class="perm-check"></div>📈 İstatistik</div>
       <div class="perm-item" data-perm="orders_view" onclick="togglePerm(this)"><div class="perm-check"></div>📋 Siparişler (Görüntüle)</div>
@@ -1242,55 +1254,7 @@
   <div id="appusers-list"></div>
 </div>
 
-<!-- İRSALİYE -->
-<div class="view" id="view-delivery">
-  <div class="section-title">İRSALİYELER</div>
-  <div class="section-sub">Sevk irsaliyesi oluştur · Kalemleri depodan seç · Sevk et · PDF yazdır</div>
-
-  <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;align-items:center">
-    <button class="btn btn-primary" onclick="dnToggleForm()">➕ Yeni İrsaliye</button>
-    <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">Not: Bu modül dahili sevk irsaliyesidir; resmî e-İrsaliye yerine geçmez.</span>
-  </div>
-
-  <!-- Yeni irsaliye formu (Alıcı Bilgileri — e-irsaliye formuyla uyumlu alanlar) -->
-  <div class="form-card" id="dn-form" style="display:none">
-    <div style="font-family:var(--font-display);font-size:16px;letter-spacing:2px;color:var(--accent);margin-bottom:14px">ALICI BİLGİLERİ</div>
-    <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-      <div class="form-group"><label>Alıcı *</label><input type="text" id="dn-recipient" list="sup-datalist" onchange="dnRecipientAutofill()" placeholder="Firma / kişi adı"></div>
-      <div class="form-group"><label>TCKN/VKN</label><input type="text" id="dn-taxno" placeholder="Vergi/TC no"></div>
-      <div class="form-group"><label>Vergi Dairesi</label><input type="text" id="dn-taxoffice" placeholder="Vergi dairesi"></div>
-    </div>
-    <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-      <div class="form-group"><label>Adres</label><input type="text" id="dn-address" placeholder="Açık adres"></div>
-      <div class="form-group"><label>Şehir</label><input type="text" id="dn-city" placeholder="Şehir"></div>
-      <div class="form-group"><label>İlçe</label><input type="text" id="dn-district" placeholder="İlçe"></div>
-    </div>
-    <div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr">
-      <div class="form-group"><label>İrsaliye Senaryosu</label>
-        <select id="dn-scenario"><option value="TEMEL">Temel</option></select>
-      </div>
-      <div class="form-group"><label>İrsaliye Türü</label>
-        <select id="dn-type"><option value="SEVK">Sevk</option><option value="MATBUDAN">Matbudan</option></select>
-      </div>
-      <div class="form-group"><label>Proje (opsiyonel)</label>
-        <select id="dn-order"><option value="">— Proje yok —</option></select>
-      </div>
-      <div class="form-group"><label>Sevk Tarihi</label><input type="date" id="dn-shipdate"></div>
-      <div class="form-group"><label>Taşıyıcı / Plaka</label><input type="text" id="dn-carrier" placeholder="Opsiyonel"></div>
-    </div>
-    <div class="form-group"><label>Not</label><input type="text" id="dn-notes" placeholder="Opsiyonel açıklama"></div>
-    <div style="display:flex;gap:10px;margin-top:8px">
-      <button class="btn btn-primary" onclick="dnCreate()">💾 İrsaliye Oluştur</button>
-      <button class="btn btn-ghost" onclick="dnToggleForm()">Vazgeç</button>
-    </div>
-  </div>
-
-  <!-- Aktif irsaliye detayı (kalem ekleme burada) -->
-  <div id="dn-detail"></div>
-
-  <!-- İrsaliye listesi -->
-  <div id="dn-list"></div>
-</div>
+<!-- (10. tur M8) İRSALİYE üst tabı kaldırıldı — Depo → İrsaliye alt sekmesi -->
 
 <!-- BOM -->
 <div class="view" id="view-bom">
@@ -1668,9 +1632,11 @@ const API_BASE_URL = (typeof location !== 'undefined' && location.origin && loca
 // ─── AUTH STATE ───
 let currentUser = null;
 let authToken = sessionStorage.getItem('ut_token') || null;
-const ALL_TABS = ['dashboard','parts','users','stats','orders','planning'];
+// (10. tur M7) 'parts' sekmesi kaldırıldı — eski kullanıcı kayıtlarındaki
+// 'parts' izni zararsızdır (sekme yok, labels haritalarında rozeti kalır).
+const ALL_TABS = ['dashboard','users','stats','orders','planning'];
 const TAB_LABELS = {
-  dashboard:'📊 Dashboard', parts:'🔧 Parçalar', users:'👷 Personel',
+  dashboard:'📊 Dashboard', users:'👷 Personel',
   stats:'📈 İstatistik', orders:'📋 Siparişler', planning:'📅 Planlama'
 };
 
@@ -2573,7 +2539,7 @@ async function init(){
         showLoading();
         applyPermissions();
         await loadAll(); hideLoading();
-        renderDashboard(); renderParts(); renderUsers(); renderDeptList();
+        renderDashboard(); renderDeptProjectSel(); renderUsers(); renderDeptList();
       } catch(e) { failsafeToLogin(e); }
     } else {
       // Beni hatırla kontrolü — kayıtlı token ile otomatik giriş
@@ -2592,7 +2558,7 @@ async function init(){
           showLoading();
           applyPermissions();
           await loadAll(); hideLoading();
-          renderDashboard(); renderParts(); renderUsers(); renderDeptList();
+          renderDashboard(); renderDeptProjectSel(); renderUsers(); renderDeptList();
           return;
         } catch(e) { failsafeToLogin(e); }
       }
@@ -3241,140 +3207,21 @@ function partRowHTML(p, i, showDelete){
     <div class="actions">
       <button class="icon-btn" title="QR" onclick="showQR('${p.id}','${ea(p.name)}','${ea(p.code)}','${ea(p.drawing||'')}')">📷</button>
       <button class="icon-btn" title="Geçmiş" onclick="showLog('${p.id}','${ea(p.name)}')">📋</button>
-      ${showDelete?`<button class="icon-btn" title="Sil" onclick="deletePart('${p.id}')">🗑️</button>`:''}
     </div>
   </div>`;
 }
 
-// ═══ PARTS ADMIN ═══
-function updateDeptSelect(){
-  const project = document.getElementById('f-project').value.trim();
-  const sel = document.getElementById('f-dept');
-  const projDepts = depts.filter(d=>d.project===project);
-  if(!project || !projDepts.length){
-    sel.innerHTML = project ? '<option value="">Bu projede bölüm yok — önce bölüm ekleyin</option>' : '<option value="">— Önce proje seçin —</option>';
-    return;
-  }
-  sel.innerHTML = '<option value="">— Bölüm seçin —</option>' +
-    projDepts.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('');
-}
-
-async function addPart(){
-  const name = document.getElementById('f-name').value.trim();
-  const code = document.getElementById('f-code').value.trim();
-  const project = document.getElementById('f-project').value.trim();
-  const deptId = document.getElementById('f-dept').value;
-  if(!name||!code){ toast('Parça adı ve kodu zorunlu!','error'); return; }
-  if(!project){ toast('Proje zorunlu!','error'); return; }
-  const dup = parts.find(p=>p.project===project && (p.code||'').toLowerCase()===code.toLowerCase());
-  if(dup){ toast(`Bu projede "${dup.code}" kodlu bir parça zaten var: ${dup.name}`,'error'); return; }
-  const dept = depts.find(d=>d.id===deptId);
-  const btn = document.getElementById('add-btn');
-  btn.disabled=true; btn.textContent='Kaydediliyor...';
-  const data = await dbInsert('parts',{
-    id:genId(), name, code,
-    drawing:document.getElementById('f-drawing').value.trim(),
-    material:document.getElementById('f-material').value.trim(),
-    qty:document.getElementById('f-qty').value||'1',
-    project: project||'(Proje Yok)',
-    description:document.getElementById('f-desc').value.trim(),
-    department_id: deptId||null,
-    department: dept?dept.name:null,
-    status:'pending', qty_done:0, qty_pending:0, qty_reject:0
-  });
-  btn.disabled=false; btn.textContent='+ Parça Ekle';
-  if(!Array.isArray(data)||!data[0]){ toast('Kayıt hatası! Supabase bağlantısını kontrol edin.','error'); return; }
-  parts.push(data[0]);
-  clearForm(); renderParts(); renderDashboard();
-  toast('Parça eklendi!','success');
-}
-
-function clearForm(){
-  ['f-name','f-code','f-drawing','f-material','f-qty','f-desc'].forEach(id=>{
-    const el=document.getElementById(id); if(el) el.value='';
-  });
-  const fp=document.getElementById('f-project'); if(fp) fp.value='';
-  document.getElementById('f-dept').innerHTML='<option value="">— Önce proje seçin —</option>';
-}
-
-async function deletePart(id){
-  if(!confirm('Bu parçayı silmek istiyor musunuz?')) return;
-  const ok = await dbDelete('parts',id);
-  if(!ok){ toast('Silinemedi!','error'); return; }
-  parts = parts.filter(p=>p.id!==id);
-  renderParts(); renderDashboard();
-  toast('Parça silindi.','success');
-}
-
-function renderParts(){
-  // Sipariş bazlı proje listesi
-  const orderProjects = orders.map(o=>o.project_name).filter(Boolean).sort();
-
-  // Form dropdown — f-project
-  const fp = document.getElementById('f-project');
-  if(fp){
-    const curFp = fp.value;
-    fp.innerHTML = h`<option value="">— Sipariş seçin —</option>${
-      orderProjects.map(pr=>h`<option value="${pr}"${pr===curFp?raw(' selected'):''}>${pr}</option>`)}`;
-  }
-
-  // Bölüm formu dropdown — d-project
+// (10. tur M7) PARÇALAR tabı ve manuel parça ekleme kaldırıldı — parçalar
+// yayınlanan ürün ağacından otomatik oluşur. partRowHTML Dashboard drill-down
+// için kalır. Bölüm Yönetimi Planlama → Fabrika Çalışma Alanları'na taşındı;
+// d-project doldurma renderParts'tan buraya ayrıştırıldı.
+function renderDeptProjectSel(){
   const dp = document.getElementById('d-project');
-  if(dp){
-    const curDp = dp.value;
-    dp.innerHTML = h`<option value="">— Sipariş seçin —</option>${
-      orderProjects.map(pr=>h`<option value="${pr}"${pr===curDp?raw(' selected'):''}>${pr}</option>`)}`;
-  }
-
-  // Filtre dropdown — parts-project-filter
-  const projects = [...new Set(parts.map(p=>p.project||'(Proje Yok)'))].sort();
-  const pf = document.getElementById('parts-project-filter');
-  const cur = pf.value;
-  pf.innerHTML = h`<option value="">Tüm Projeler</option>${
-    projects.map(pr=>h`<option value="${pr}"${pr===cur?raw(' selected'):''}>${pr}</option>`)}`;
-  updatePartsFilters(true);
-}
-
-function updatePartsFilters(skipRender){
-  const projFilter = document.getElementById('parts-project-filter').value;
-  const df = document.getElementById('parts-dept-filter');
-  const curDept = df.value;
-  const projDepts = projFilter ? depts.filter(d=>d.project===projFilter) : depts;
-  df.innerHTML = h`<option value="">Tüm Bölümler</option>${
-    projDepts.map(d=>h`<option value="${d.id}"${d.id===curDept?raw(' selected'):''}>${d.name}</option>`)}`;
-  if(!skipRender) renderPartsFiltered();
-}
-
-function renderPartsFiltered(){
-  const search = (document.getElementById('parts-search')?.value||'').toLowerCase();
-  const projFilter = document.getElementById('parts-project-filter').value;
-  const deptFilter = document.getElementById('parts-dept-filter').value;
-  const filtered = parts.filter(p=>
-    (!search||p.name.toLowerCase().includes(search)||p.code.toLowerCase().includes(search))&&
-    (!projFilter||(p.project||'(Proje Yok)')===projFilter)&&
-    (!deptFilter||p.department_id===deptFilter)
-  );
-  const list = document.getElementById('parts-list');
-  if(!filtered.length){ list.innerHTML=h`<div class="empty-state"><span class="emoji">📦</span>Parça bulunamadı</div>`; return; }
-
-  // Proje > Bölüm grupla
-  const byProject = {};
-  filtered.forEach(p=>{
-    const k = p.project||'(Proje Yok)';
-    if(!byProject[k]) byProject[k]={};
-    const dk = p.department||'Bölümsüz';
-    if(!byProject[k][dk]) byProject[k][dk]=[];
-    byProject[k][dk].push(p);
-  });
-  list.innerHTML = h`${Object.entries(byProject).map(([proj,byDept])=>h`
-    <div style="margin-bottom:28px">
-      <div class="divider-title">📁 ${proj}</div>
-      ${Object.entries(byDept).map(([dname,plist])=>h`
-        <div style="margin-bottom:16px">
-          <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--accent);letter-spacing:1px;margin-bottom:8px;margin-left:4px">🏭 ${dname} — ${plist.length} parça</div>
-          <div class="parts-grid">${plist.map((p,i)=>raw(partRowHTML(p,i,true)))}</div>
-        </div>`)}
-    </div>`)}`;
+  if(!dp) return;
+  const orderProjects = orders.map(o=>o.project_name).filter(Boolean).sort();
+  const curDp = dp.value;
+  dp.innerHTML = h`<option value="">— Sipariş seçin —</option>${
+    orderProjects.map(pr=>h`<option value="${pr}"${pr===curDp?raw(' selected'):''}>${pr}</option>`)}`;
 }
 
 // ═══ DEPT YÖNETIMI ═══
@@ -3389,7 +3236,6 @@ async function addDept(){
   document.getElementById('d-name').value='';
   document.getElementById('d-order').value='';
   renderDeptList();
-  updateDeptSelect();
   renderDashboard();
   toast('Bölüm eklendi: '+name,'success');
 }
@@ -3402,7 +3248,7 @@ async function addQuickDept(project, name){
   const data = await dbInsert('departments',{id:genId(),project,name,sort_order:order});
   if(!Array.isArray(data)||!data[0]){ toast('Eklenemedi!','error'); return; }
   depts.push(data[0]);
-  renderDeptList(); updateDeptSelect(); renderDashboard();
+  renderDeptList(); renderDashboard();
   toast(name+' eklendi','success');
 }
 
@@ -3417,7 +3263,7 @@ async function deleteDept(id){
   const ok = await dbDelete('departments',id);
   if(!ok) return; // hata backend mesajıyla gösterildi; yerel state bozulmasın
   depts = depts.filter(x=>x.id!==id);
-  renderDeptList(); updateDeptSelect(); renderDashboard();
+  renderDeptList(); renderDashboard();
   toast('Bölüm silindi.','success');
 }
 
@@ -3726,13 +3572,6 @@ function toast(msg,type=''){
   el.textContent=msg; el.className='toast show '+type;
   clearTimeout(el._t); el._t=setTimeout(()=>el.className='toast',3500);
 }
-
-// parts-search oninput bağlantısı
-document.addEventListener('DOMContentLoaded',()=>{
-  const ps=document.getElementById('parts-search');
-  if(ps) ps.addEventListener('input',renderPartsFiltered);
-});
-
 
 // ═══ İSTATİSTİK ═══
 function renderStatsView() {
@@ -4245,7 +4084,7 @@ function switchPlanningTab(tab) {
   event.currentTarget.classList.add('active');
   document.getElementById('plan-' + tab).classList.add('active');
   if(tab === 'project-dates') { renderPdForm(); loadAndRenderPd(); }
-  if(tab === 'workspaces') loadAndRenderWorkspaces();
+  if(tab === 'workspaces'){ loadAndRenderWorkspaces(); renderDeptProjectSel(); renderDeptList(); } // (10. tur M7) Bölüm Yönetimi buraya taşındı
   if(tab === 'work-orders') initWorkOrders();
 }
 
@@ -6049,7 +5888,7 @@ async function doLogin() {
     applyPermissions();
     await loadAll();
     hideLoading();
-    renderDashboard(); renderParts(); renderUsers(); renderDeptList();
+    renderDashboard(); renderDeptProjectSel(); renderUsers(); renderDeptList();
   }
 }
 
@@ -6084,6 +5923,8 @@ function applyPermissions() {
     let canSee = isDev;
     if (!isDev) {
       if (tab === 'orders') canSee = perms.includes('orders_view') || perms.includes('orders_edit') || perms.includes('orders');
+      // (10. tur M8) İrsaliye Depo'nun alt sekmesi: delivery izni de Depo tabını açar
+      else if (tab === 'warehouse') canSee = perms.includes('warehouse') || perms.includes('delivery');
       else canSee = perms.includes(tab);
     }
     btn.style.display = canSee ? '' : 'none';
@@ -6137,6 +5978,7 @@ async function switchTab(tab) {
       if (tab === 'appusers') { toast('Bu bölüme erişim yetkiniz yok!', 'error'); return; }
       let hasAccess = perms.includes(tab);
       if (tab === 'orders') hasAccess = perms.includes('orders_view') || perms.includes('orders_edit') || perms.includes('orders');
+      if (tab === 'warehouse') hasAccess = perms.includes('warehouse') || perms.includes('delivery'); // (10. tur M8)
       if (!hasAccess) { toast('Bu bölüme erişim yetkiniz yok!', 'error'); return; }
     }
   }
@@ -6148,14 +5990,12 @@ async function switchTab(tab) {
               document.getElementById('nav-tab-appusers');
   if (btn) btn.classList.add('active');
   if(tab==='dashboard') await renderDashboard();
-  if(tab==='parts')     renderParts();
   if(tab==='users')     renderUsers();
   if(tab==='stats')     renderStatsView();
   if(tab==='orders')    renderOrders();
   if(tab==='mip'){ renderMip(); if(document.getElementById('mip-tab-mrp')?.classList.contains('active')) renderMrp(); }
   if(tab==='purchasing') renderPurchasing();
-  if(tab==='warehouse') renderWarehouse();
-  if(tab==='delivery')  renderDelivery();
+  if(tab==='warehouse'){ whApplySubTabPerms(); renderWarehouse(); }
   if(tab==='planning')  renderPlanning();
   if(tab==='bom')       initBom();
   if(tab==='docs')      initDocs();
@@ -7002,11 +6842,15 @@ const PUR_STATUS = {
 // rezervasyon akışının işi (IN_STOCK durumu ve geri-al yolları eski kayıtlar
 // için korunur). 'Sipariş Ver' render'da purOrderModal'a bağlanır (firma/
 // fiyat/termin sorar) — düz durum geçişi değildir.
+// (10. tur M1) 'Teslim Alındı' ve 'Depoya Aktar' SATIN ALMADAN KALDIRILDI —
+// mal kabul yalnız Depo → Mal Kabul sekmesinden yapılır (arkadaş isteği).
+// RECEIVED/IN_STOCK eski kayıtlar için yalnız geri-al yolunu korur;
+// IN_WAREHOUSE geri-alı whUndo'ya delege edilir (stok düzeltme yolu).
 const PUR_ACTIONS = {
   PLANNED:      [['ORDERED','📦 Sipariş Ver'],['CANCELLED','✖ İptal']],
-  ORDERED:      [['RECEIVED','📥 Teslim Alındı'],['PLANNED','↩ Geri Al']],
-  RECEIVED:     [['IN_WAREHOUSE','🏭 Depoya Aktar'],['ORDERED','↩ Geri Al']],
-  IN_STOCK:     [['IN_WAREHOUSE','🏭 Depoya Aktar'],['PLANNED','↩ Geri Al']],
+  ORDERED:      [['PLANNED','↩ Geri Al']],
+  RECEIVED:     [['ORDERED','↩ Geri Al']],
+  IN_STOCK:     [['PLANNED','↩ Geri Al']],
   IN_WAREHOUSE: [['RECEIVED','↩ Geri Al']],
   CANCELLED:    [['PLANNED','↩ Geri Al']]
 };
@@ -7937,7 +7781,7 @@ function renderPurchaseList(){
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           ${raw(actions)}
-          ${['ORDERED','RECEIVED'].includes(i.status)?h`<button class="btn btn-ghost btn-sm" onclick="printGoodsReceiptPDF(['${raw(i.id)}'])" title="QR'lı mal kabul fişi yazdır">📄 Mal Kabul Fişi</button>`:''}
+          ${i.status==='ORDERED'?h`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)" title="10. tur M1: teslim alma ve fiş satın almadan kaldırıldı">📥 mal kabul Depo'dan</span>`:''}
           ${i.status==='PLANNED' && !i.stock_plan_id && !i.purchase_order_id ? h`<button class="btn btn-ghost btn-sm" onclick="purTogglePlanning('${raw(i.id)}')" title="${i.needs_planning?'Planlama havuzundan çıkar':'MİP kesim planlaması havuzuna at (plaka/profil yerleşimi)'}" ${i.needs_planning?raw('style="color:var(--accent);border-color:rgba(245,166,35,.4)"'):''}>📐</button>`:''}
           <button class="btn btn-ghost btn-sm" onclick="editPurchaseItem('${raw(i.id)}')">✏️</button>
           <button class="btn btn-ghost btn-sm" onclick="deletePurchaseItem('${raw(i.id)}')" style="color:var(--red,#e74c3c);border-color:rgba(231,76,60,.3)">🗑️</button>
@@ -8001,6 +7845,12 @@ async function purSetStatus(id, status){
   const cur = purchaseItems.find(x=>x.id===id);
   if(status === 'IN_WAREHOUSE') return whTransfer(id);
   if(cur && cur.status === 'IN_WAREHOUSE' && status !== 'IN_WAREHOUSE') return whUndo(id);
+  // (10. tur M1) Teslim alma satın almadan yapılmaz — Depo → Mal Kabul kullanılır.
+  // (Yalnız ORDERED→RECEIVED yönü engellenir; whUndo'nun IN_WAREHOUSE→RECEIVED
+  // geri-al yolu yukarıda zaten whUndo'ya delege edildi.)
+  if(status === 'RECEIVED' && cur && cur.status === 'ORDERED'){
+    toast('Teslim alma Depo → Mal Kabul sekmesinden yapılır.','error'); return;
+  }
   // (E5) İptal edilen plakaya bağlı kaynakları havuza döndür (onaylı)
   if(status === 'CANCELLED'){
     const srcCount = purchaseItems.filter(x=>x.stock_plan_id===id).length;
@@ -8473,7 +8323,7 @@ function renderPurchaseOrders(){
         <button class="btn btn-ghost btn-sm" onclick="poCancel('${o.id}')">✖ İptal</button>`;
     } else if(o.status==='ORDERED'){
       actions = `<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">📦 ${o.ordered_at?new Date(o.ordered_at).toLocaleString('tr-TR'):''}</span>
-        <button class="btn btn-primary btn-sm" onclick="printGoodsReceiptPDF(${JSON.stringify(items.map(x=>x.id)).replace(/"/g,'&quot;')})" title="Gruptaki tüm kalemler için QR'lı mal kabul fişleri">📄 Mal Kabul Fişleri (${items.length})</button>
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)" title="10. tur M1: fiş yazdırma Depo → Mal Kabul'de">📥 mal kabul Depo'dan</span>
         <button class="btn btn-ghost btn-sm" onclick="poUndoOrder('${o.id}')">↩ Siparişi Geri Al</button>`;
     } else {
       actions = `<button class="btn btn-ghost btn-sm" onclick="poDelete('${o.id}')" style="color:#e74c3c">🗑 Sil</button>`;
@@ -8722,8 +8572,33 @@ function _whActivateTab(tab){
   if(tab==='manage') renderWarehouseManage();
   if(tab==='view') renderWarehouseList();
   if(tab==='receiving') renderReceiving(); // 8. tur #3: Satın Alma'dan taşındı
+  if(tab==='additem') renderWhAddItem();   // 10. tur M12: Depo Yönetimi'nden ayrıldı
+  if(tab==='delivery') renderDelivery();   // 10. tur M8: üst tabdan taşındı
 }
 function switchWarehouseTab(tab){ _whActivateTab(tab); }
+
+// (10. tur M8) Depo alt sekme yetkileri: view/receiving/manage 'warehouse',
+// delivery 'delivery' iznine bağlı (Depo tabı ikisinden biriyle görünür).
+// İzinsiz alt sekme butonu gizlenir; aktif sekme izinliye kaydırılır —
+// yalnız-delivery kullanıcı Depo'ya girince doğrudan İrsaliye'ye düşer.
+function whAllowedSubTabs(){
+  if(!currentUser || currentUser.role==='developer') return ['view','receiving','manage','delivery'];
+  const perms = Array.isArray(currentUser.permissions)
+    ? currentUser.permissions : JSON.parse(currentUser.permissions||'[]');
+  const out = [];
+  if(perms.includes('warehouse')) out.push('view','receiving','additem','manage');
+  if(perms.includes('delivery')) out.push('delivery');
+  return out;
+}
+function whApplySubTabPerms(){
+  const allowed = whAllowedSubTabs();
+  document.querySelectorAll('#warehouse-tabs .planning-tab').forEach(b=>{
+    b.style.display = allowed.includes(b.dataset.whtab) ? '' : 'none';
+  });
+  if(!allowed.length) return;
+  const activeTab = document.querySelector('#warehouse-tabs .planning-tab.active')?.dataset.whtab;
+  if(!activeTab || !allowed.includes(activeTab)) _whActivateTab(allowed[0]);
+}
 
 async function renderWarehouse(){
   const [pi, ws, mv, res] = await Promise.all([
@@ -9917,19 +9792,32 @@ async function renderWarehouseManage(){
 
   renderWhmList();
 
-  const act = warehouses.filter(w=>w.is_active!==false);
-  const mvSel = document.getElementById('whm-mv-wh');
-  if(mvSel){
-    mvSel.innerHTML = act.length
-      ? act.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('')
-      : '<option value="">— Önce depo tanımlayın —</option>';
-  }
   const fSel = document.getElementById('whm-mv-filter');
   if(fSel){
     const cur = fSel.value;
     fSel.innerHTML = '<option value="">— Tüm depolar —</option>' +
       warehouses.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('');
     if(warehouses.some(w=>w.id===cur)) fSel.value = cur;
+  }
+  renderWhMovements();
+}
+
+// (10. tur M12) Manuel Hareket / Parça Ekle ayrı alt sekmeye taşındı —
+// depo seçici + katalog kurulumu renderWarehouseManage'den buraya ayrıştı.
+async function renderWhAddItem(){
+  const [ws, mv] = await Promise.all([
+    dbGet('warehouses'),
+    dbGet('warehouse_movements')
+  ]);
+  warehouses  = Array.isArray(ws) ? ws : warehouses;
+  whMovements = Array.isArray(mv) ? mv : whMovements;
+
+  const act = warehouses.filter(w=>w.is_active!==false);
+  const mvSel = document.getElementById('whm-mv-wh');
+  if(mvSel){
+    mvSel.innerHTML = act.length
+      ? act.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('')
+      : '<option value="">— Önce depo tanımlayın —</option>';
   }
   // (9. tur M6) Katalogdan parça seçimi: şablon parçaları + üretim parçaları +
   // daha önce hareket görmüş kalemler, kod öncelikli anahtar ile tekilleştirilir.
@@ -9952,7 +9840,6 @@ async function renderWarehouseManage(){
     placeholder: 'Katalogda ara (kod veya ad)...',
     onChange: whmCatalogPick
   });
-  renderWhMovements();
 }
 
 // (9. tur M6) Katalog seçimi inputları doldurur — sonrasında elle düzeltilebilir.
@@ -10165,7 +10052,7 @@ async function whmAddMovement(){
   document.getElementById('whm-mv-notes').value = '';
   document.getElementById('whm-mv-qty').value = '1';
   ssSet('whm-mv-item', '', {silent:true}); // (9. tur M6) katalog seçimini sıfırla
-  toast('💾 Hareket kaydedildi!','success');
+  toast('💾 Hareket kaydedildi! Stok Özeti: Depo Yönetimi sekmesinde.','success');
   renderWhmList();
   renderWhMovements();
 }
@@ -10403,7 +10290,7 @@ function editAppUserPerms(id) {
   const u = appUsers.find(x => x.id === id);
   if (!u) return;
   const perms = Array.isArray(u.permissions) ? u.permissions : JSON.parse(u.permissions||'[]');
-  const allPerms = ['dashboard','parts','users','stats','orders_view','orders_edit','mip','purchasing','warehouse','planning','scan'];
+  const allPerms = ['dashboard','users','stats','orders_view','orders_edit','mip','purchasing','warehouse','delivery','planning','scan']; // (10. tur M7) parts kalktı; delivery eklendi (önceden eksikti)
   const labels = {dashboard:'📊 Dashboard',parts:'🔧 Parçalar',users:'👷 Personel',stats:'📈 İstatistik',orders_view:'📋 Siparişler (Görüntüle)',orders_edit:'📋 Siparişler (Düzenle)',mip:'📐 MİP',purchasing:'🛒 Satın Alma',warehouse:'🏭 Depo',delivery:'🚚 İrsaliye',planning:'📅 Planlama',scan:'📷 QR Okutma'};
 
   const overlay = document.createElement('div');
