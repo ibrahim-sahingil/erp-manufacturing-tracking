@@ -111,4 +111,16 @@ public class ProjectBomPartUpdateRequest {
 
     @PositiveOrZero(message = "Sira 0 veya pozitif olmali")
     private Integer sortOrder;
+
+    /**
+     * (9. tur M4) MIP karari. Bos string ("") gonderilirse karar GERI ALINIR
+     * (null = karar bekliyor). Karar degistiginde service decided_at/by damgalar.
+     */
+    @jakarta.validation.constraints.Pattern(
+            regexp = "^(PURCHASE|PRODUCE)?$",
+            message = "Karar PURCHASE veya PRODUCE olmali")
+    private String procurementDecision;
+
+    @Size(max = 150, message = "Karar veren en fazla 150 karakter olabilir")
+    private String decidedBy;
 }

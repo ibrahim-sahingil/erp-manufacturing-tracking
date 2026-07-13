@@ -58,11 +58,21 @@ test('MİP rezervasyonu: talep → depocu kısmi onayı → stok/satın alma/Mİ
     await api(page, 'PUT', '/project-bom/' + pbomId,
       { project_name: projeAdi, bom_product_id: prodId, status: 'published' });
 
-    // ── 1) MİP: satır FROM_STOCK, buton görünür ──
+    // ── 1) MİP: karar aşaması (9. tur M4) → sonra satır FROM_STOCK ──
     await page.evaluate(() => switchTab('mip'));
     await page.waitForTimeout(1500);
     await page.selectOption('#mip-project-sel', projeAdi);
     await page.waitForTimeout(1500);
+    // Yeni yayın önce "Karar Bekleyen"e düşer; öneri TEDARIK→Satın Al.
+    // "Tümünü Öneriyle Onayla" gerçek UI üzerinden tıklanır (toplu uç).
+    // (başlıklar CSS text-transform:uppercase ile büyük görünür)
+    const bekleyen = await page.locator('#mip-list').innerText();
+    expect(bekleyen, 'yeni yayın karar bekler').toContain('KARAR BEKLEYEN');
+    expect(bekleyen).toContain('SATIN AL');
+    await page.click('#mip-decide-all-btn');
+    await page.waitForTimeout(2000);
+    const kararSonrasi = await page.locator('#mip-list').innerText();
+    expect(kararSonrasi, 'karar sonrası bekleyen kalmamalı').not.toContain('KARAR BEKLEYEN');
     const once = await page.evaluate(() => _mipRows[0] && ({
       need: _mipRows[0].need, stockTotal: _mipRows[0].stockTotal,
       missing: _mipRows[0].missing, status: _mipRows[0].status }));

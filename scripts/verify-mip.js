@@ -81,30 +81,45 @@ chk('baska malzeme sizmaz', whStockOf(hareketler, 'A', 'Yok', 'YOK-1') === 0);
 chk('kodsuz esleme ada duser',
     whStockOf([mv('A', 'Conta', null, 'IN', 5)], 'A', 'Conta', null) === 5);
 
-console.log('\n═══ mipGroupParts: tur filtresi + override + adet toplama ═══');
+console.log('\n═══ mipGroupParts: karar/oneri (9. tur M4) + override + adet toplama ═══');
+// (M4) TUR FILTRESI KALKTI: gruplama TUM parcalari dondurur; tur yalniz
+// ONERIYI (suggested) besler, akis yonlendirmesi procurement_decision ile.
 const parts = [
-  // ayni kod iki dalda -> 30 + 20 = 50
-  {custom_code: 'SOM-12', custom_name: 'M12 Somun', custom_qty: 30, material_kind: 'TEDARIK'},
-  {custom_code: 'SOM-12', custom_name: 'M12 Somun', custom_qty: 20, material_kind: 'TEDARIK'},
-  // uretim parcasi -> listelenmez
-  {custom_code: 'GVD-1', custom_name: 'Govde', custom_qty: 1, material_kind: 'MAMUL'},
-  // override YOK -> resolved_* kullanilir
-  {custom_code: null, custom_name: null, custom_qty: null,
+  // ayni kod iki dalda -> 30 + 20 = 50 (her ikisi PURCHASE kararli)
+  {id:'p1', custom_code: 'SOM-12', custom_name: 'M12 Somun', custom_qty: 30, material_kind: 'TEDARIK', procurement_decision: 'PURCHASE'},
+  {id:'p2', custom_code: 'SOM-12', custom_name: 'M12 Somun', custom_qty: 20, material_kind: 'TEDARIK', procurement_decision: 'PURCHASE'},
+  // uretim karari
+  {id:'p3', custom_code: 'GVD-1', custom_name: 'Govde', custom_qty: 1, material_kind: 'MAMUL', procurement_decision: 'PRODUCE'},
+  // override YOK -> resolved_* kullanilir; karar YOK -> bekliyor
+  {id:'p4', custom_code: null, custom_name: null, custom_qty: null,
    resolved_code: 'SAC-3', resolved_name: 'Sac 3mm', resolved_qty: 4, resolved_material_kind: 'HAMMADDE'},
   // haric tutulan
-  {custom_code: 'X-1', custom_name: 'Haric', custom_qty: 9, material_kind: 'SARF', is_excluded: true},
-  // turu yok -> listelenmez (eski davranis: uretim)
-  {custom_code: 'TRS-1', custom_name: 'Tursuz', custom_qty: 3, material_kind: null}
+  {id:'p5', custom_code: 'X-1', custom_name: 'Haric', custom_qty: 9, material_kind: 'SARF', is_excluded: true},
+  // turu yok -> oneri PRODUCE, karar bekliyor
+  {id:'p6', custom_code: 'TRS-1', custom_name: 'Tursuz', custom_qty: 3, material_kind: null},
+  // ayni kod dallarinda FARKLI karar -> mixed (yeniden onay ister)
+  {id:'p7', custom_code: 'MIX-1', custom_name: 'Karisik', custom_qty: 1, material_kind: 'SARF', procurement_decision: 'PURCHASE'},
+  {id:'p8', custom_code: 'MIX-1', custom_name: 'Karisik', custom_qty: 1, material_kind: 'SARF', procurement_decision: 'PRODUCE'}
 ];
 const gruplar = mipGroupParts(parts);
-chk('sadece satin alinan turler kaldi (2 grup)', gruplar.length === 2,
+chk('tum parcalar gruplandi (haric tutulan disinda 5 grup)', gruplar.length === 5,
     gruplar.map(g => g.code).join(','));
 const somun = gruplar.find(g => g.code === 'SOM-12');
-chk('ayni kodun adetleri toplandi (30+20=50)', somun && somun.need === 50, somun && somun.need);
+chk('ayni kodun adetleri toplandi (30+20=50) + pbpIds 2 dal',
+    somun && somun.need === 50 && somun.pbpIds.length === 2, somun && somun.need);
+chk('PURCHASE karari grup uzerinde', somun && somun.decision === 'PURCHASE');
 const sac = gruplar.find(g => g.code === 'SAC-3');
 chk('override yokken resolved_* okundu', sac && sac.name === 'Sac 3mm' && sac.need === 4);
+chk('kararsiz grup: decision null + oneri turden (HAMMADDE→PURCHASE)',
+    sac && sac.decision === null && sac.suggested === 'PURCHASE');
+const trs = gruplar.find(g => g.code === 'TRS-1');
+chk('tursuz parca: oneri PRODUCE, karar bekliyor',
+    trs && trs.decision === null && trs.suggested === 'PRODUCE');
+const gvd = gruplar.find(g => g.code === 'GVD-1');
+chk('PRODUCE kararli grup listede (uretilecekler bolumu)', gvd && gvd.decision === 'PRODUCE');
+const mix = gruplar.find(g => g.code === 'MIX-1');
+chk('dallarda farkli karar -> mixed + decision null', mix && mix.mixed === true && mix.decision === null);
 chk('is_excluded parca elendi', !gruplar.some(g => g.code === 'X-1'));
-chk('turu olmayan parca elendi', !gruplar.some(g => g.code === 'TRS-1'));
 
 console.log('\n═══ mipCalcRow: arkadasin senaryosu (50 ihtiyac, A=30, B=10) ═══');
 const g50 = {key: 'som-12', code: 'SOM-12', name: 'M12 Somun', unit: 'adet', need: 50};

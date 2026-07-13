@@ -89,6 +89,11 @@ test('işlem tanımındaki bölüm: şablondan projeye kopyalanınca parçaya at
     expect(pIslemli.dept_id, 'işlemli parça bölüme atanmalı').toBe(bolum.id);
     expect(pSade.dept_id, 'işlemsiz parça bölümsüz kalmalı').toBeFalsy();
 
+    // (9. tur M4) Yayın öncesi karar: her iki parça YARI_MAMUL → PRODUCE
+    // (kararsız parça artık hiçbir yere yazılmaz)
+    await api(page, 'POST', '/project-bom-parts/decisions',
+      { items: pbps.map(p => ({ id: p.id, decision: 'PRODUCE' })), decided_by: 'TEST' });
+
     // Yayınla → üretim parçası bölümü devralmalı.
     // pbomePublish() confirm() sorar; burada yayınlama ÇEKİRDEĞİNİ doğrudan
     // çağırıyoruz (dialog yarışı olmasın).

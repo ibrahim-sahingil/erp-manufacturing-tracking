@@ -1006,9 +1006,10 @@
   <div id="mip-summary"></div>
 
   <div style="background:rgba(41,128,185,.08);border:1px solid rgba(41,128,185,.2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">
+    ⏳ <b>Tedarik kararı burada verilir</b> (9. tur): yayınlanan parçalar önce "Karar Bekleyen"e düşer — parça bazında 🛒 Satın Al / 🏭 Üret seçin (öneri türden gelir) veya tümünü öneriyle onaylayın. Karar verilmeden parça hiçbir akışa girmez.
     💡 Depo stoğu <b>projelere ayrılmamış serbest havuzdur</b> — aynı malzemeyi başka bir proje de görüyor olabilir.
     📦 Rezervasyon emri gönderin: depocu sayıma göre tam/kısmi onaylar, onaylanan stoktan düşüp projeye ayrılır, eksik satın almaya düşer.
-    🛒 Yayınlama artık satın almaya kalem <b>düşürmez</b> — stoktan karşılanamayan eksikler buradan "Satın Almaya Gönder" ile gider.
+    🛒 Yayınlama satın almaya kalem <b>düşürmez</b> — stoktan karşılanamayan eksikler buradan "Satın Almaya Gönder" ile gider; üretilecekler "Üretime Aktar" ile çıkar.
   </div>
 
   <div id="mip-list"></div>
@@ -6207,27 +6208,37 @@ function mipQtyOf(p){
 }
 function mipKindOf(p){ return p.material_kind || p.resolved_material_kind || null; }
 
-// Yayınlanmış proje ağacının SATIN ALINAN parçalarını koda göre gruplar.
+// Yayınlanmış proje ağacının TÜM parçalarını koda göre gruplar (9. tur M4:
+// tür filtresi kalktı — tedarik KARARI artık MİP'te verilir).
 // Aynı kod ağacın farklı dallarında tekrar edebilir → adetler TOPLANIR.
-// 8. tur: yayınlama artık satın almaya kalem düşürmediğinden bu gruplama
-// satın alınan parçaların TEK kaynağıdır; malzeme + ilk pbp bağı da taşınır
-// (mipBuyConfirm satın alma kalemine yazar — MRP ölçüleri pbp bağından gelir).
+// Grup şunları da taşır:
+//   pbpIds    — tüm dalların id'leri (toplu karar güncellemesi bunlara yazar)
+//   suggested — türden gelen ÖNERİ (TEDARIK/HAMMADDE/SARF → PURCHASE, diğer → PRODUCE)
+//   decision  — procurement_decision: 'PURCHASE'/'PRODUCE'; satırlar karışıksa
+//               null + mixed:true (yeniden onay ister); hiç karar yoksa null
+// 8. tur notu geçerli: satın alınan parçaların TEK kaynağı bu gruplama;
+// malzeme + ilk pbp bağı taşınır (mipBuyConfirm MRP ölçüleri için kullanır).
 function mipGroupParts(pbParts){
-  const groups = new Map(); // key → {key, code, name, unit, material, pbpId, need}
+  const groups = new Map();
   for(const p of pbParts){
     const code = mipCodeOf(p), name = mipNameOf(p);
     if(p.is_excluded || !name) continue;
-    if(!PURCHASE_KINDS.includes(mipKindOf(p))) continue; // sadece satın alınanlar
     const key = mipKey(name, code);
     if(!key) continue;
     const g = groups.get(key) || {key, code, name,
       unit: p.custom_unit || p.resolved_unit || 'adet',
       material: p.custom_material || p.resolved_material || null,
-      pbpId: p.id || null, need: 0};
+      pbpId: p.id || null, need: 0, pbpIds: [],
+      suggested: PURCHASE_KINDS.includes(mipKindOf(p)) ? 'PURCHASE' : 'PRODUCE',
+      decision: undefined, mixed: false};
     g.need += mipQtyOf(p);
+    if(p.id) g.pbpIds.push(p.id);
+    const d = p.procurement_decision || null;
+    if(g.decision === undefined) g.decision = d;
+    else if(g.decision !== d){ g.decision = null; g.mixed = true; }
     groups.set(key, g);
   }
-  return [...groups.values()];
+  return [...groups.values()].map(g=>({...g, decision: g.decision===undefined?null:g.decision}));
 }
 
 // Satın almaya gönderilecek öneri miktarı: karşılanmamış eksikten, daha önce
@@ -6341,7 +6352,96 @@ function mipNum(v){ return Number(Number(v).toFixed(4)); }
 
 // ─── Render ───
 let _mipRows = [];
+let _mipPendingRows = []; // (9. tur M4) karar bekleyen gruplar
+let _mipProduceRows = []; // (9. tur M4) üret kararlı gruplar
 let whReservations = []; // rezervasyon talepleri (MİP + depo sekmesi paylaşır)
+
+// ─── (9. tur M4) MİP karar aşaması ───
+// Karar backend'e toplu uçla yazılır (tek transaction); dönüşte liste tazelenir.
+async function _mipPostDecisions(items){
+  await apiFetch('/project-bom-parts/decisions', {method:'POST',
+    body: JSON.stringify({ items,
+      decided_by: currentUser?.display_name || currentUser?.username || null })});
+}
+
+async function mipSetDecision(pendIdx, decision){
+  const g = _mipPendingRows[pendIdx];
+  if(!g) return;
+  try{
+    await _mipPostDecisions(g.pbpIds.map(id=>({id, decision})));
+  }catch(e){ toast(e.message||'Karar kaydedilemedi!','error'); return; }
+  toast((decision==='PURCHASE'?'🛒 Satın al':'🏭 Üret')+' kararı verildi: '+g.name,'success');
+  await renderMipList();
+}
+
+// Tümünü türden gelen öneriyle onayla — 100+ parçada tek istek
+async function mipDecideAll(){
+  if(!_mipPendingRows.length) return;
+  const bitti = btnBusy('mip-decide-all-btn', '⏳ Onaylanıyor…');
+  if(!bitti) return;
+  try{
+    const items = [];
+    _mipPendingRows.forEach(g=>g.pbpIds.forEach(id=>items.push({id, decision:g.suggested})));
+    try{
+      await _mipPostDecisions(items);
+    }catch(e){ toast(e.message||'Kararlar kaydedilemedi!','error'); return; }
+    toast('✅ '+_mipPendingRows.length+' parçanın kararı öneriyle onaylandı','success');
+    await renderMipList();
+  } finally { bitti(); }
+}
+
+// PRODUCE kararlı satırda "kararı değiştir": üretim kaydı işlem görmüşse
+// ENGEL (arkadaş kuralı — M3 tam senkron temizler); işlem görmemişse üretim
+// kaydı silinip karar satın almaya çevrilir.
+async function mipChangeDecision(prodIdx){
+  const g = _mipProduceRows[prodIdx];
+  if(!g) return;
+  const proje = document.getElementById('mip-project-sel')?.value || '';
+  const uretimde = parts.find(x=>x.project===proje && (x.code||'').toLowerCase()===(g.code||'').toLowerCase());
+  if(uretimde){
+    const done = (Number(uretimde.qty_done)||0) + (Number(uretimde.qty_reject)||0);
+    if(done > 0){
+      toast('Üretimi başlamış parçanın kararı değiştirilemez ('+mipNum(done)+' işlendi). Gerekirse üretim ekranından yönetin.','error');
+      return;
+    }
+    if(!confirm('"'+g.name+'" üretime aktarılmış (işlem görmemiş). Karar satın almaya çevrilirse üretim kaydı SİLİNECEK. Devam edilsin mi?')) return;
+    const ok = await dbDelete('parts', uretimde.id);
+    if(!ok) return; // hata toast'ı adapter'dan (iş emri bağı vb.)
+    parts = parts.filter(x=>x.id!==uretimde.id);
+  } else {
+    if(!confirm('"'+g.name+'" kararı satın almaya çevrilsin mi?')) return;
+  }
+  try{
+    await _mipPostDecisions(g.pbpIds.map(id=>({id, decision:'PURCHASE'})));
+  }catch(e){ toast(e.message||'Karar kaydedilemedi!','error'); return; }
+  toast('🛒 Karar satın almaya çevrildi: '+g.name,'success');
+  await renderMipList();
+}
+
+// PRODUCE kararlıları üretime aktarır: ilgili pbom'lar için pbomPublishParts
+// yeniden koşulur (idempotent — mevcutlar atlanır, kararsızlar yazılmaz).
+async function mipProduceTransfer(){
+  const proje = document.getElementById('mip-project-sel')?.value || '';
+  if(!proje) return;
+  const bitti = btnBusy('mip-produce-btn', '⏳ Aktarılıyor…');
+  if(!bitti) return;
+  try{
+    const pubs = projectBoms.filter(p=>p.project_name===proje && p.status==='published');
+    let toplam = {added:0, updated:0, skipped:0, errors:0, decisionPending:0};
+    for(const pb of pubs){
+      const rows = await dbGet('project_bom_parts','project_bom_id=eq.'+pb.id+'&order=created_at.asc');
+      const tpl = await dbGet('bom_parts','product_id=eq.'+pb.bom_product_id);
+      const r = await pbomPublishParts(pb, Array.isArray(rows)?rows:[], Array.isArray(tpl)?tpl:[]);
+      toplam.added += r.added; toplam.updated += r.updated; toplam.skipped += r.skipped;
+      toplam.errors += r.errors; toplam.decisionPending += (r.decisionPending||0);
+    }
+    toast('🏭 Üretime aktarım: '+toplam.added+' yeni, '+toplam.updated+' adet güncellendi, '
+      +toplam.skipped+' zaten üretimde'
+      +(toplam.decisionPending?', ⏳ '+toplam.decisionPending+' parça hâlâ karar bekliyor':'')
+      +(toplam.errors?', ⚠ '+toplam.errors+' hata':''), toplam.errors?'error':'success');
+    await renderMipList();
+  } finally { bitti(); }
+}
 
 async function renderMip(){
   const [pbs, ws, mv, pi, res] = await Promise.all([
@@ -6385,38 +6485,104 @@ async function renderMipList(){
   }
 
   // Bu projeye bağlı TÜM yayınlanmış ağaçların parçaları
+  // (9. tur M4: yerel ad pbParts — global `parts` (üretim) gölgelenmesin,
+  // üretilecekler bölümü "üretimde mi" kontrolünü global listeden yapar)
   const pbomIds = projectBoms.filter(p=>p.project_name===proje && p.status==='published').map(p=>p.id);
-  let parts = [];
+  let pbParts = [];
   for(const id of pbomIds){
     const rows = await dbGet('project_bom_parts','project_bom_id=eq.'+id);
-    if(Array.isArray(rows)) parts = parts.concat(rows);
+    if(Array.isArray(rows)) pbParts = pbParts.concat(rows);
   }
 
-  const gruplar = mipGroupParts(parts);
-  _mipRows = gruplar
+  // (9. tur M4) Üç bölüm: karar bekleyen / satın alınacak / üretilecek.
+  // Rezervasyon-satın alma aksiyonları YALNIZ PURCHASE kararlı satırlarda;
+  // karar verilmemiş satır hiçbir akışa düşmez ("karar bekliyor").
+  const gruplar = mipGroupParts(pbParts);
+  _mipPendingRows = gruplar.filter(g=>!g.decision).sort((a,b)=>a.name.localeCompare(b.name,'tr'));
+  _mipProduceRows = gruplar.filter(g=>g.decision==='PRODUCE').sort((a,b)=>a.name.localeCompare(b.name,'tr'));
+  _mipRows = gruplar.filter(g=>g.decision==='PURCHASE')
     .map(g => mipCalcRow(g, warehouses, whMovements, purchaseItems, proje, whReservations))
     .sort((a,b)=>{
       const oncelik = {MISSING:0, SUPPLY:1, WAITING:2, RESERVED:3, FROM_STOCK:4, DONE:5};
       return (oncelik[a.status]-oncelik[b.status]) || a.name.localeCompare(b.name,'tr');
     });
 
-  if(sum) sum.innerHTML = mipSummaryHTML(_mipRows);
+  if(sum) sum.innerHTML = mipSummaryHTML(_mipRows, _mipPendingRows.length, _mipProduceRows.length);
 
-  if(!_mipRows.length){
-    el.innerHTML = h`<div class="empty-state" style="padding:26px"><span class="emoji">✅</span>Bu projede satın alınacak parça yok (Tedarik / Hammadde / Sarf türü parça bulunamadı)</div>`;
+  if(!gruplar.length){
+    el.innerHTML = h`<div class="empty-state" style="padding:26px"><span class="emoji">✅</span>Bu projenin yayınlanmış ağacında parça yok</div>`;
     return;
   }
-  el.innerHTML = h`${_mipRows.map((r,i)=>mipRowHTML(r,i))}`;
+
+  // ⏳ Karar Bekleyen bölümü
+  const bekleyenHTML = _mipPendingRows.length ? h`
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 8px">
+      <div style="font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#f5a623">⏳ Karar Bekleyen · ${_mipPendingRows.length} parça <span style="color:var(--muted);text-transform:none">(tedarik kararı burada verilir — onaylanmadan satın alma/üretim akışına düşmez)</span></div>
+      <button class="btn btn-primary btn-sm" id="mip-decide-all-btn" onclick="mipDecideAll()" title="Her parçaya türünden gelen öneri uygulanır (🛒/🏭) — tek istekte">✅ Tümünü Öneriyle Onayla (${_mipPendingRows.length})</button>
+    </div>
+    ${_mipPendingRows.map((g,i)=>{
+      const oneri = g.suggested==='PURCHASE' ? '🛒 Satın Al' : '🏭 Üret';
+      return h`<div class="pbom-card" style="border-left:3px solid #f5a623;margin-bottom:8px">
+        <div class="pbom-card-header">
+          <div style="min-width:0;flex:1">
+            <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              ${g.code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${g.code}</span>`:''}
+              <b>${g.name}</b>
+              ${g.mixed?h`<span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid #e74c3c55;color:#e74c3c">⚠ karışık karar — yeniden onaylayın</span>`:''}
+            </div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:4px">
+              🎯 İhtiyaç: <b style="color:var(--text)">${mipNum(g.need)} ${g.unit}</b>
+              ${g.material?h`&nbsp;·&nbsp; 🔩 ${g.material}`:''}
+              &nbsp;·&nbsp; 💡 Öneri: <b style="color:#f5a623">${oneri}</b> <span style="color:var(--muted)">(türden)</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <button class="btn ${raw(g.suggested==='PURCHASE'?'btn-primary':'btn-ghost')} btn-sm" onclick="mipSetDecision(${raw(String(i))},'PURCHASE')">🛒 Satın Al</button>
+            <button class="btn ${raw(g.suggested==='PRODUCE'?'btn-primary':'btn-ghost')} btn-sm" onclick="mipSetDecision(${raw(String(i))},'PRODUCE')">🏭 Üret</button>
+          </div>
+        </div>
+      </div>`;
+    })}` : '';
+
+  // 🛒 Satın Alınacaklar (mevcut hesap/aksiyon akışı aynen)
+  const satinHTML = _mipRows.length ? h`
+    <div style="font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#2980b9;margin:14px 0 8px">🛒 Satın Alınacaklar · ${_mipRows.length} parça</div>
+    ${_mipRows.map((r,i)=>mipRowHTML(r,i))}` : '';
+
+  // 🏭 Üretilecekler (kompakt) + Üretime Aktar
+  const uretHTML = _mipProduceRows.length ? h`
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 8px">
+      <div style="font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#8e44ad">🏭 Üretilecekler · ${_mipProduceRows.length} parça</div>
+      <button class="btn btn-ghost btn-sm" id="mip-produce-btn" onclick="mipProduceTransfer()" title="PRODUCE kararlı parçaları üretime (parts) aktarır — idempotent, mevcutlar atlanır">🏭 Üretime Aktar</button>
+    </div>
+    ${_mipProduceRows.map((g,i)=>{
+      const uretimde = parts.find(x=>x.project===proje && (x.code||'').toLowerCase()===(g.code||'').toLowerCase());
+      return h`<div class="pbom-card" style="border-left:3px solid #8e44ad;margin-bottom:6px;padding:8px 14px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0">
+            ${g.code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${g.code}</span>`:''}
+            <span>${g.name}</span>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${mipNum(g.need)} ${g.unit}</span>
+            ${uretimde?h`<span style="font-family:var(--font-mono);font-size:10px;padding:1px 7px;border-radius:8px;border:1px solid #2ecc7144;color:#2ecc71">✓ üretimde (hedef ${mipNum(Number(uretimde.qty)||0)})</span>`:h`<span style="font-family:var(--font-mono);font-size:10px;color:#f5a623">— henüz üretime aktarılmadı</span>`}
+          </div>
+          <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px" onclick="mipChangeDecision(${raw(String(i))})" title="Kararı satın almaya çevir">✏️ kararı değiştir</button>
+        </div>
+      </div>`;
+    })}` : '';
+
+  el.innerHTML = h`${bekleyenHTML}${satinHTML}${uretHTML}`;
 }
 
-function mipSummaryHTML(rows){
+function mipSummaryHTML(rows, pendingCount = 0, produceCount = 0){
   const say = s => rows.filter(r=>r.status===s).length;
   const kutu = (etiket, adet, renk) => h`<div style="flex:1;min-width:120px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid ${raw(renk)};border-radius:6px;padding:10px 14px">
       <div style="font-family:var(--font-mono);font-size:20px;color:${raw(renk)}">${adet}</div>
       <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">${etiket}</div>
     </div>`;
   return h`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-    ${kutu('Toplam parça', rows.length, 'var(--accent)')}
+    ${pendingCount?kutu('⏳ Karar bekleyen', pendingCount, '#f5a623'):''}
+    ${kutu('Satın alınacak', rows.length, 'var(--accent)')}
+    ${produceCount?kutu('🏭 Üretilecek', produceCount, '#8e44ad'):''}
     ${kutu('Sipariş verilmedi', say('MISSING'), MIP_STATUS.MISSING.color)}
     ${kutu('Tedarik edilecek', say('SUPPLY'), MIP_STATUS.SUPPLY.color)}
     ${kutu('Sipariş bekleniyor', say('WAITING'), MIP_STATUS.WAITING.color)}
@@ -11302,10 +11468,12 @@ function kindOptions(sel){
     .map(([k,l])=>`<option value="${k}" ${sel===k?'selected':''}>${l}</option>`).join('');
 }
 function kindBadge(k){
+  // (9. tur M4) Rozet NÖTR tür etiketi oldu: 🛒/🏭 iması kaldırıldı — "satın
+  // alınır / üretilir" KARARI artık ağaçta değil MİP'te verilir (tür yalnız
+  // MİP'teki öneriyi besler). Karar rozeti MİP ekranında.
   if(!k||!MATERIAL_KINDS[k]) return '';
-  const purch = PURCHASE_KINDS.includes(k);
-  const c = purch ? '#2980b9' : '#8e44ad';
-  return `<span style="font-family:var(--font-mono);font-size:9px;padding:1px 6px;border-radius:8px;border:1px solid ${c}44;color:${c};background:${c}11;white-space:nowrap">${purch?'🛒':'🏭'} ${MATERIAL_KINDS[k]}</span>`;
+  const c = '#7f8c8d';
+  return `<span style="font-family:var(--font-mono);font-size:9px;padding:1px 6px;border-radius:8px;border:1px solid ${c}44;color:${c};background:${c}11;white-space:nowrap">${MATERIAL_KINDS[k]}</span>`;
 }
 
 // ─── Malzeme formu (5. tur arkadaş isteği #4-5) ───
@@ -13243,7 +13411,7 @@ function pbomeRenderTree() {
 // eksiği ile ÇİFTE SAYIM yaratıyordu.
 // Mükerrer kontrolü: parts proje+kod.
 async function pbomPublishParts(pb, allPbParts, templateParts){
-  const res = { added:0, skipped:0, updated:0, qtyBlocked:0, rounded:0, mipPending:0, errors:0, linked:0 };
+  const res = { added:0, skipped:0, updated:0, qtyBlocked:0, rounded:0, mipPending:0, errors:0, linked:0, decisionPending:0 };
   _lastApiError = null;
   const partIdByPbp = {}; // (#8) pbp.id → parts.id (üretime gidenler)
   const pbpById = {};
@@ -13255,19 +13423,27 @@ async function pbomPublishParts(pb, allPbParts, templateParts){
   // (4. tur #1) Aynı kod ağacın farklı dallarında serbest. parts'ta kod
   // proje içinde TEK satır olduğundan aynı kodlu satırlar gruplanır,
   // adet TOPLANIR (yeniden yayınlamada adet güncellenir).
+  // (9. tur M4) Yönlendirme kriteri TÜRDEN KARARA geçti: procurement_decision
+  // 'PRODUCE' → üretim (parts), 'PURCHASE' → MİP sayacı, null → HİÇBİR YERE
+  // yazılmaz (decisionPending — MİP "Karar Bekleyen" bölümünde onay ister).
+  // migration-9 yayınlanmış eski projelere türden türetilmiş karar yazdığından
+  // eski ağaçlar birebir önceki davranışı sürdürür (geriye uyumluluk).
   const prodGroups = new Map(); // codeLower → {rows, qty}
-  const mipCodes = new Set();   // satın alınan türler — MİP'e düşenlerin sayısı
+  const mipCodes = new Set();   // PURCHASE kararlılar — MİP'e düşenlerin sayısı
+  const pendingCodes = new Set();
   for(const p of allPbParts){
     const code = codeOf(p), name = nameOf(p);
     if(p.is_excluded || !name || !code) continue;
-    const kind = p.material_kind || p.resolved_material_kind || null;
-    if(PURCHASE_KINDS.includes(kind)){ mipCodes.add(code.toLowerCase()); continue; }
+    const dec = p.procurement_decision || null;
+    if(dec === 'PURCHASE'){ mipCodes.add(code.toLowerCase()); continue; }
+    if(dec !== 'PRODUCE'){ pendingCodes.add(code.toLowerCase()); continue; } // karar bekliyor
     const qty = Number(p.custom_qty!=null ? p.custom_qty : (p.resolved_qty!=null ? p.resolved_qty : 1)) || 1;
     const g = prodGroups.get(code.toLowerCase()) || {rows:[], qty:0};
     g.rows.push(p); g.qty += qty;
     prodGroups.set(code.toLowerCase(), g);
   }
   res.mipPending = mipCodes.size;
+  res.decisionPending = pendingCodes.size;
 
   // (B1) parts'ta kod, proje genelinde TEK satırdır; hedef adet = bu pbom'un
   // toplamı + aynı projeye bağlı DİĞER yayınlanmış pbom'ların o koddaki
@@ -13280,8 +13456,7 @@ async function pbomPublishParts(pb, allPbParts, templateParts){
     for(const sp of (Array.isArray(rows)?rows:[])){
       const code = sp.custom_code || sp.resolved_code, name = sp.custom_name || sp.resolved_name;
       if(sp.is_excluded || !name || !code) continue;
-      const kind = sp.material_kind || sp.resolved_material_kind || null;
-      if(PURCHASE_KINDS.includes(kind)) continue;
+      if(sp.procurement_decision !== 'PRODUCE') continue; // (M4) yalnız üret kararlılar
       const q = Number(sp.custom_qty!=null ? sp.custom_qty : (sp.resolved_qty!=null ? sp.resolved_qty : 1)) || 1;
       otherProdQty.set(code.toLowerCase(), (otherProdQty.get(code.toLowerCase())||0) + q);
     }
@@ -13372,6 +13547,7 @@ async function pbomPublishParts(pb, allPbParts, templateParts){
 function pbomPublishMsg(r, sync){
   let msg = `✅ Yayınlandı! ${r.added} parça üretime çıkarıldı`;
   if(r.mipPending) msg += `, 🛒 ${r.mipPending} satın alınan parça MİP'e düştü (sipariş MİP'ten gönderilir)`;
+  if(r.decisionPending) msg += `, ⏳ ${r.decisionPending} parça MİP'te karar bekliyor (onaylanınca üretime/satın almaya aktarılır)`;
   if(r.linked) msg += `, 🔗 ${r.linked} hiyerarşi bağı kuruldu`;
   if(r.updated) msg += `, 🔢 ${r.updated} parçanın adedi güncellendi`;
   if(r.qtyBlocked) msg += `, ⚠️ ${r.qtyBlocked} parçada adet güncellenmedi (tamamlanan üretim yeni hedefin üstünde)`;
@@ -13404,8 +13580,7 @@ async function pbomActiveCodes(projectName){
       if(sp.is_excluded || !name || !code) continue;
       const lc = code.toLowerCase();
       all.add(lc);
-      const kind = sp.material_kind || sp.resolved_material_kind || null;
-      if(!PURCHASE_KINDS.includes(kind)) prod.add(lc);
+      if(sp.procurement_decision === 'PRODUCE') prod.add(lc); // (M4) kriter karar oldu
     }
   }
   return {prod, all};

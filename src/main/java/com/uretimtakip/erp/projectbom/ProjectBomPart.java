@@ -57,6 +57,9 @@ import java.util.UUID;
  *   operations        jsonb         DEFAULT '[]'
  *   level             int4          DEFAULT 0
  *   sort_order        int4          DEFAULT 0
+ *   procurement_decision varchar(10) NULL  CHECK (PURCHASE/PRODUCE) — 9. tur M4
+ *   decided_by        varchar(150)  NULL
+ *   decided_at        timestamp     NULL
  *   created_at        timestamp     (BaseEntity'den)
  */
 @Entity
@@ -148,4 +151,20 @@ public class ProjectBomPart extends BaseEntity {
     @Column(name = "sort_order")
     @Builder.Default
     private Integer sortOrder = 0;
+
+    /**
+     * (9. tur M4) Tedarik karari MIP ekraninda verilir: PURCHASE (satin al) /
+     * PRODUCE (uret) / NULL (karar bekliyor — yayinlanan parca hicbir yere
+     * yazilmaz, MIP "Karar Bekleyen" bolumunde gorunur). Turden gelen ONERI
+     * frontend'de hesaplanir; migration-9 yayinlanmis projeleri turden
+     * turetilmis kararla doldurdu (geriye uyumluluk).
+     */
+    @Column(name = "procurement_decision", length = 10)
+    private String procurementDecision;
+
+    @Column(name = "decided_by", length = 150)
+    private String decidedBy;
+
+    @Column(name = "decided_at")
+    private java.time.LocalDateTime decidedAt;
 }

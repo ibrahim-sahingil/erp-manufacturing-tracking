@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict R4Fl9qBaWF6CeiB1KcxmL4vLlpJP7x2OClzv24kUBxs01sVHGcSlGP60uddGeta
+\restrict SAaGLHbVgyNJLMgpHUyvRwkR0aKZnFe9PSDllrCbjLFxH4E4R3LuDlB9bHDaW4U
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -321,8 +321,12 @@ CREATE TABLE public.project_bom_parts (
     custom_length_mm numeric(15,4),
     custom_diameter_mm numeric(15,4),
     material_form character varying(20),
+    procurement_decision character varying(10),
+    decided_by character varying(150),
+    decided_at timestamp without time zone,
     CONSTRAINT project_bom_parts_material_form_chk CHECK (((material_form IS NULL) OR ((material_form)::text = ANY ((ARRAY['SAC'::character varying, 'PROFIL'::character varying, 'MIL'::character varying, 'BORU'::character varying, 'DELRIN'::character varying, 'COK_KOMPONENTLI'::character varying])::text[])))),
-    CONSTRAINT project_bom_parts_material_kind_chk CHECK (((material_kind IS NULL) OR ((material_kind)::text = ANY ((ARRAY['TEDARIK'::character varying, 'HAMMADDE'::character varying, 'YARI_MAMUL'::character varying, 'MAMUL'::character varying, 'SARF'::character varying])::text[]))))
+    CONSTRAINT project_bom_parts_material_kind_chk CHECK (((material_kind IS NULL) OR ((material_kind)::text = ANY ((ARRAY['TEDARIK'::character varying, 'HAMMADDE'::character varying, 'YARI_MAMUL'::character varying, 'MAMUL'::character varying, 'SARF'::character varying])::text[])))),
+    CONSTRAINT project_bom_parts_proc_decision_chk CHECK (((procurement_decision IS NULL) OR ((procurement_decision)::text = ANY ((ARRAY['PURCHASE'::character varying, 'PRODUCE'::character varying])::text[]))))
 );
 
 
@@ -1588,5 +1592,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict R4Fl9qBaWF6CeiB1KcxmL4vLlpJP7x2OClzv24kUBxs01sVHGcSlGP60uddGeta
+\unrestrict SAaGLHbVgyNJLMgpHUyvRwkR0aKZnFe9PSDllrCbjLFxH4E4R3LuDlB9bHDaW4U
 

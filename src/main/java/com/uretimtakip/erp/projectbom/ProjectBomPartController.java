@@ -84,6 +84,17 @@ public class ProjectBomPartController {
         return ResponseEntity.ok(ApiResponse.success("Proje parcasi guncellendi", updated));
     }
 
+    /**
+     * (9. tur M4) TOPLU MIP karari — tek transaction. Frontend'de karsiligi:
+     * mipDecideAll / mipSetDecision (index.html, apiFetch ile dogrudan cagirir).
+     */
+    @PostMapping("/decisions")
+    public ResponseEntity<ApiResponse<Integer>> applyDecisions(
+            @Valid @RequestBody com.uretimtakip.erp.projectbom.dto.ProjectBomPartDecisionsRequest request) {
+        int changed = projectBomPartService.applyDecisions(request);
+        return ResponseEntity.ok(ApiResponse.success(changed + " parcanin karari guncellendi", changed));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         projectBomPartService.delete(id);
