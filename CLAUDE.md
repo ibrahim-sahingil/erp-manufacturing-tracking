@@ -104,6 +104,12 @@ MSYS_NO_PATHCONV=1 taskkill /F /IM java.exe   # Git Bash: /F'i F:/ yapmasın
   örnek: `needs_planning` yalnız UpdateRequest'te vardı → MİP "Havuza Aktar"
   kalemi havuz filtresine hiç girmedi. Yeni alan kullanırken hem
   `XxxRequest` hem `XxxUpdateRequest` kontrol edilmeli.
+- **Enum değeri eklerken ÜÇLÜ güncelleme (10. tur, POOL dersi):** yeni durum/
+  karar değeri DB CHECK constraint'i + service validasyonu + DTO'lardaki
+  `@Pattern` anotasyonlarının ÜÇÜNDE birden açılmalı. POOL'da servis
+  güncellenmişti ama iki DTO @Pattern'i eski kaldı → istek daha servise
+  gelmeden bean validation'da 400 aldı; birim testler yakalayamaz (validation
+  yalnız HTTP katmanında koşar), ancak canlı API smoke yakalar.
 
 ## Test
 
