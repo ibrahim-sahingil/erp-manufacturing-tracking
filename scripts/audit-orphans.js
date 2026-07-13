@@ -104,6 +104,31 @@ function rapor(baslik, sahipsizler, tarif) {
     bomParts.filter(p => p.parent_id && urunOf.has(p.parent_id) && urunOf.get(p.parent_id) !== p.product_id),
     p => `parça "${p.code}" üst parçası başka ürüne ait`);
 
+  console.log('\n── (11. tur F3) Bölüm ↔ proje tutarlılığı ──');
+  // Gerçek vaka: HAS parçası Bloch 30'un "Kaynak" bölümüne bağlanmıştı (aynı
+  // adlı çapraz-proje bölümü) → dashboard HAS Kaynak kartında 0 sayıyordu.
+  // Ham API kayıtları proje adını farklı alanlarda taşıyabilir → order_id
+  // üzerinden de çözülür; ad bulunamayan kayıt es geçilir (yanlış alarm olmasın).
+  const departments = await get('departments');
+  const projeAdiOf = new Map(orders.map(o => [o.id, o.project_name]));
+  const deptProje = new Map(departments.map(d =>
+    [d.id, d.project || d.project_name || projeAdiOf.get(d.order_id) || null]));
+  const partProje = p => p.project || p.project_name || projeAdiOf.get(p.order_id) || null;
+  rapor('parts.department_id → bölüm parçayla aynı projede',
+    parts.filter(p => p.department_id && deptProje.get(p.department_id) && partProje(p) &&
+      deptProje.get(p.department_id) !== partProje(p)),
+    p => `parça "${p.code||p.name}" (${partProje(p)}) → "${deptProje.get(p.department_id)}" projesinin bölümüne bağlı`);
+  const pbomProjeOf = new Map(projectBom.map(b => [b.id, b.project_name]));
+  rapor('project_bom_parts.dept_id → bölüm ağaçla aynı projede',
+    projectBomParts.filter(p => p.dept_id && deptProje.get(p.dept_id) &&
+      pbomProjeOf.get(p.project_bom_id) && deptProje.get(p.dept_id) !== pbomProjeOf.get(p.project_bom_id)),
+    p => `pbom parçası "${p.custom_code||p.id}" (${pbomProjeOf.get(p.project_bom_id)}) → "${deptProje.get(p.dept_id)}" projesinin bölümü`);
+  const woProje = w => w.project_name || projeAdiOf.get(w.order_id) || null;
+  rapor('work_orders.department_id → bölüm iş emriyle aynı projede',
+    workOrders.filter(w => w.department_id && deptProje.get(w.department_id) && woProje(w) &&
+      deptProje.get(w.department_id) !== woProje(w)),
+    w => `iş emri ${w.id} (${woProje(w)}) → "${deptProje.get(w.department_id)}" projesinin bölümü`);
+
   console.log('\n' + '─'.repeat(60));
   if (sorun) { console.log(`❌ Toplam ${sorun} sahipsiz/tutarsız kayıt.`); process.exit(1); }
   console.log('✅ Sahipsiz kayıt yok — referans bütünlüğü sağlam.');

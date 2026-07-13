@@ -250,6 +250,7 @@ global.statusBadge=()=>'<span class="badge">x</span>';
 global._dashWoOpen=new Set(['w1']);
 eval(grab('woWaitingChildren'));
 eval(grab('woStartBlockMsg'));
+eval(grab('woEffectiveDeptIds')); // (11. tur F2) şerit artık bunu kullanır
 eval(grab('deptWoStripHTML'));
 const dws=String(deptWoStripHTML('d1'));
 console.log('\ndeptWoStripHTML (bölüm iş emri şeridi):');
@@ -257,6 +258,21 @@ chk('deptWo: personel/alan/not kaçırıldı', dws.includes('Kişi&lt;img') && d
 chk('deptWo: parça adı (başlık + tablo) kaçırıldı', dws.includes('PAd&lt;img') && dws.includes('PK&lt;b&gt;'));
 chk('deptWo: showQR onclick ea tırnak kaçışı bozulmadı', dws.includes("showQR('p1'") && dws.includes("Çiz\\'im"));
 chk('deptWo: durum butonu / statusBadge (raw) korundu', dws.includes("dashWoSetStatus('w1','inprogress')") && dws.includes('<span class="badge">x</span>'));
+// (11. tur F2) "Tümü" ile verilen İE (department_id NULL) parçasının bölüm
+// şeridinde görünmeli — 10.tur regresyonunun bekçisi
+global.workOrders=[{id:'w2', project_name:'Prj<b>', department_id:null, status:'planned',
+  assigned_user:'Kişi2'+EVIL, workspace_name:null, notes:null, start_datetime:null}];
+global.workOrderParts=[{work_order_id:'w2', part_id:'p2'}];
+global.parts=[{id:'p2', name:'NullPa'+EVIL, code:'NP<b>', drawing:null, status:'pending', qty:2, qty_done:0, qty_reject:0, department_id:'d1'}];
+const dws2=String(deptWoStripHTML('d1'));
+chk('deptWo: NULL-bölümlü İE parçasının bölümünde görünür', dws2.includes("dashWoSetStatus('w2'") && dws2.includes('NullPa&lt;img'));
+chk('deptWo: NULL-bölümlü İE "tüm bölümler" rozeti taşır', dws2.includes('tüm bölümler'));
+chk('deptWo: NULL-bölümlü İE başka bölümde GÖRÜNMEZ', String(deptWoStripHTML('d9'))==='');
+chk('deptWo: parçasız NULL İE yalnız __unassigned__ grubunda', (()=>{
+  global.workOrderParts=[];
+  const bos = String(deptWoStripHTML('d1'))==='' && String(deptWoStripHTML('__unassigned__'))!=='';
+  global.workOrderParts=[{work_order_id:'w2', part_id:'p2'}];
+  return bos; })());
 
 // ── renderProjectCards (proje kartları) ──
 global.parts=[{project:"Prj'"+EVIL, status:'pending', qty:2, qty_done:0, qty_reject:0, created_at:'2026-01-01'}];

@@ -83,6 +83,25 @@ check('nullish/bool → boş dize',
 check('tırnak/ampersand kaçırma',
   h`${'A & "B" \'C\''}`.toString()==='A &amp; &quot;B&quot; &#39;C&#39;');
 
+// (11. tur F2) İş emrinin etkin bölümleri — "Tümü" ile verilen İE'nin
+// (department_id NULL) dashboard'da parçalarının bölümlerinde görünmesinin
+// saf çekirdeği. 10.tur regresyonunun bekçisi.
+(0,eval)(grab('woEffectiveDeptIds'));
+console.log('═══ 11. TUR F2: woEffectiveDeptIds ═══');
+{
+  const pbid = {p1:{id:'p1',department_id:'d1'}, p2:{id:'p2',department_id:'d2'}, p3:{id:'p3',department_id:null}};
+  const wops = [{work_order_id:'w1',part_id:'p1'},{work_order_id:'w1',part_id:'p2'},
+                {work_order_id:'w2',part_id:'p3'},{work_order_id:'w3',part_id:'pYok'}];
+  const s1 = woEffectiveDeptIds({id:'wX', department_id:'dK'}, wops, pbid);
+  check('kendi bölümü varsa yalnız o', s1.size===1 && s1.has('dK'));
+  const s2 = woEffectiveDeptIds({id:'w1', department_id:null}, wops, pbid);
+  check('NULL İE: parçalarının bölümleri (d1+d2)', s2.size===2 && s2.has('d1') && s2.has('d2'));
+  const s3 = woEffectiveDeptIds({id:'w2', department_id:null}, wops, pbid);
+  check('bölümsüz parçalı NULL İE: boş set (→ Bölümsüz kartı)', s3.size===0);
+  const s4 = woEffectiveDeptIds({id:'w3', department_id:null}, wops, pbid);
+  check('parçası silinmiş NULL İE: boş set', s4.size===0);
+}
+
 // ── Shims (frontend adapter'ın minimal karşılığı) ──
 globalThis.currentUser = {display_name:'E2E Test'};
 globalThis._lastApiError = null;

@@ -2762,10 +2762,30 @@ function woMaterialBlockMsg(missing){
   return `⛔ Başlatılamaz — malzemesi depoya gelmemiş: ${list.slice(0,4).join(', ')}${list.length>4?` +${list.length-4}`:''}. Mal kabul Depo → Mal Kabul'den yapılır.`;
 }
 
+// (11. tur F2) İş emrinin ETKİN bölümleri: kendi department_id'si varsa o;
+// yoksa ("Tümü" ile verilen İE'ler — M3 yan etkisi, department_id NULL kalır)
+// PARÇALARININ department_id'lerinden türetilir. Boş set = hiçbir bölüme
+// bağlanamadı → yalnız '__unassigned__' grubunda görünür. SAF — e2e grab'ler.
+function woEffectiveDeptIds(wo, wops, partById){
+  if(wo.department_id) return new Set([wo.department_id]);
+  const s = new Set();
+  wops.filter(wp=>wp.work_order_id===wo.id)
+      .forEach(wp=>{ const p = partById[wp.part_id]; if(p && p.department_id) s.add(p.department_id); });
+  return s;
+}
+
 function deptWoStripHTML(deptId){
+  // (11. tur F2) NULL-bölümlü İE parçalarının bulunduğu HER bölümün şeridinde
+  // görünür — eskiden hiçbir kartta çıkmıyordu ("eskiden daha düzgündü" hatası).
+  const partById = {};
+  parts.forEach(p=>{ partById[p.id] = p; });
   const deptWos = workOrders
-    .filter(w => w.project_name===_activeProject &&
-      (deptId==='__unassigned__' ? !w.department_id : w.department_id===deptId))
+    .filter(w => {
+      if(w.project_name !== _activeProject) return false;
+      if(w.department_id) return deptId !== '__unassigned__' && w.department_id === deptId;
+      const eff = woEffectiveDeptIds(w, workOrderParts, partById);
+      return deptId === '__unassigned__' ? eff.size === 0 : eff.has(deptId);
+    })
     .sort((a,b)=> new Date(a.start_datetime||0) - new Date(b.start_datetime||0));
   if(!deptWos.length) return '';
 
@@ -2790,6 +2810,8 @@ function deptWoStripHTML(deptId){
       fmtDt(w.start_datetime) ? '🕐 '+fmtDt(w.start_datetime)+(fmtDt(w.end_datetime)?' → '+fmtDt(w.end_datetime):'') : '',
       w.assigned_user ? '👷 '+w.assigned_user : '',
       w.workspace_name ? '📍 '+w.workspace_name : '',
+      // (11. tur F2) "Tümü" ile verilen İE her ilgili bölümde görünür — belirt
+      !w.department_id ? '📋 tüm bölümler' : '',
       w.notes ? '🗒 '+w.notes : ''
     ].filter(Boolean).join(' · ');
     // (#8) Planlı iş emrinde bitmemiş alt parça uyarısı
@@ -3137,16 +3159,26 @@ function openProject(name){
       </div>
       <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:6px;border-top:1px solid var(--border);padding-top:6px">
         Toplam: <b style="color:var(--text)">${qd+qr}</b> / ${qt} adet
-        ${(()=>{ const wl = woBadgeCounts(workOrders.filter(w=>w.project_name===name && w.department_id===dept.id));
+        ${(()=>{ // (11. tur F2) rozet şeritle AYNI kuralı kullanır: NULL-bölümlü
+                 // İE parçalarının bulunduğu bölümün rozetinde de sayılır
+                 const pbid = {}; parts.forEach(p=>{ pbid[p.id]=p; });
+                 const wl = woBadgeCounts(workOrders.filter(w=>w.project_name===name &&
+                   (w.department_id===dept.id || (!w.department_id && woEffectiveDeptIds(w, workOrderParts, pbid).has(dept.id)))));
                  return wl ? `<span style="float:right">📋 ${wl}</span>` : ''; })()}
       </div>
     </div>`;
   });
 
-  if(unassigned.length){
+  // (11. tur F2) Emniyet ağı: hiçbir bölüme bağlanamayan (department_id NULL
+  // ve parçaları da bölümsüz/parçasız) iş emirleri kaybolmasın — kart, bölümsüz
+  // PARÇA olmasa bile bu İE'ler varken de çizilir.
+  const _pbid = {}; parts.forEach(p=>{ _pbid[p.id]=p; });
+  const unassignedWos = workOrders.filter(w=>w.project_name===name &&
+    !w.department_id && woEffectiveDeptIds(w, workOrderParts, _pbid).size===0);
+  if(unassigned.length || unassignedWos.length){
     html += `<div class="dept-card" style="--c:var(--muted)" onclick="openDept('__unassigned__','Bölümsüz')">
       <div class="dept-card-name" style="color:var(--muted)">Bölümsüz</div>
-      <div class="dept-card-count">${unassigned.length} parça</div>
+      <div class="dept-card-count">${unassigned.length} parça${unassignedWos.length?` &middot; 📋 ${unassignedWos.length} iş emri`:''}</div>
       <div class="dept-mini-bars"><div style="flex:100;background:var(--border)"></div></div>
     </div>`;
   }
@@ -3186,6 +3218,11 @@ function openDept(deptId, deptName){
   const pctPend= qt ? Math.round(qp/qt*100) : 0;
   const pctRej = qt ? Math.round(qr/qt*100) : 0;
 
+  // (11. tur F2) Şerit BİR kez üretilir: hem gövdede hem boş-durum koşulunda
+  // kullanılır (eskiden iki kez çağrılıyordu; sayım-görünürlük ayrışınca
+  // "kart 1 parça diyor ama içi bomboş" hatasının parçasıydı)
+  const _woStrip = deptWoStripHTML(deptId);
+
   let html = `
     <div class="report-grid" style="margin-bottom:20px">
       <div class="report-card" style="--c:var(--accent)">
@@ -3209,7 +3246,7 @@ function openDept(deptId, deptName){
         <div class="report-progress"><div class="report-progress-fill" style="width:${pctRej}%"></div></div>
       </div>
     </div>
-    ${deptWoStripHTML(deptId)}
+    ${_woStrip}
     ${awaitingPlanningStripHTML(waitingParts,'margin-bottom:24px')}
     ${looseParts.length?`
     <!-- İş emri dışı parçalar (ilerlemesi olan ama iş emrine bağlanmamış eski kayıtlar) -->
@@ -3252,7 +3289,7 @@ function openDept(deptId, deptName){
     <div class="parts-grid" style="margin-bottom:24px">
       ${looseParts.map((p,i)=>partRowHTML(p,i,false)).join('')}
     </div>`:''}
-    ${!deptParts.length && !waitingParts.length && !deptWoStripHTML(deptId) ? `<div class="empty-state"><span class="emoji">📦</span>Bu bölümde henüz parça yok</div>` : ''}`;
+    ${!deptParts.length && !waitingParts.length && !_woStrip ? `<div class="empty-state"><span class="emoji">📦</span>Bu bölümde henüz parça yok</div>` : ''}`;
 
   document.getElementById('layer-parts').innerHTML = html;
 }
@@ -9116,7 +9153,10 @@ function switchWarehouseTab(tab){ _whActivateTab(tab); }
 // İzinsiz alt sekme butonu gizlenir; aktif sekme izinliye kaydırılır —
 // yalnız-delivery kullanıcı Depo'ya girince doğrudan İrsaliye'ye düşer.
 function whAllowedSubTabs(){
-  if(!currentUser || currentUser.role==='developer') return ['view','receiving','manage','delivery'];
+  // (11. tur F1) 'additem' developer listesinde UNUTULMUŞTU — Parça Ekle
+  // sekmesi (arama + aktarım dahil) geliştiriciye görünmüyordu; normal depo
+  // kullanıcısı görüyordu. tests/warehouse-tabs.spec.js bekçisi eklendi.
+  if(!currentUser || currentUser.role==='developer') return ['view','receiving','additem','manage','delivery'];
   const perms = Array.isArray(currentUser.permissions)
     ? currentUser.permissions : JSON.parse(currentUser.permissions||'[]');
   const out = [];
@@ -13563,6 +13603,11 @@ function pbomeRenderList() {
     el.innerHTML=h`<div class="empty-state"><span class="emoji">📦</span>Henüz parça yok. Yukarıdan ekleyin veya ürün ağacından kopyalansın.</div>`;
     return;
   }
+  // (11. tur F3) Bölüm dropdown'ı PROJEYE filtrelenir — global depts listesi
+  // aynı adlı başka projenin bölümünü seçtirebiliyordu (HAS parçası Bloch'un
+  // "Kaynak"ına bağlanmıştı → dashboard'da 0 sayılıyordu)
+  const _pbomePb = projectBoms.find(b=>b.id===_activePbomId);
+  const _pbomeProjDepts = depts.filter(d=>d.project===(_pbomePb?_pbomePb.project_name:''));
   const kidCount = new Map();
   _pbomeParts.forEach(p=>{ if(p.parent_custom_id) kidCount.set(p.parent_custom_id,(kidCount.get(p.parent_custom_id)||0)+1); });
   function buildTree(parentId,level) {
@@ -13606,7 +13651,8 @@ function pbomeRenderList() {
             <select onchange="pbomeSetDept('${raw(p.id)}',this.value)"
               style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:4px 6px;outline:none;max-width:130px">
               <option value="">— Bölüm —</option>
-              ${depts.map(d=>h`<option value="${d.id}"${d.id===p.dept_id?raw(' selected'):''}>${d.name}</option>`)}
+              ${_pbomeProjDepts.map(d=>h`<option value="${d.id}"${d.id===p.dept_id?raw(' selected'):''}>${d.name}</option>`)}
+              ${p.dept_id && !_pbomeProjDepts.some(d=>d.id===p.dept_id)?h`<option value="${p.dept_id}" selected disabled>⚠ ${(depts.find(d=>d.id===p.dept_id)||{}).name||'?'} (başka proje)</option>`:''}
             </select>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditPart('${raw(p.id)}')" title="Ad / kod / malzeme düzenle">📝</button>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeCopyBranch('${raw(p.id)}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">📋</button>
@@ -13623,8 +13669,18 @@ function pbomeRenderList() {
 async function pbomeSetDept(partId, deptId) {
   const p=_pbomeParts.find(x=>x.id===partId);
   if(!p) return;
+  // (11. tur F3) Guard: başka projenin bölümü atanamaz (dropdown filtresini
+  // baypas eden eski açık sekmelere karşı savunma)
+  if(deptId && !_pbomeDeptOk(deptId)){ toast('Bu bölüm başka projeye ait — atama yapılmadı.','error'); pbomeRenderList(); return; }
   p.dept_id=deptId||null;
   await dbUpdate('project_bom_parts',partId,{dept_id:deptId||null});
+}
+
+// (11. tur F3) Seçilen bölüm aktif pbom'un projesine mi ait?
+function _pbomeDeptOk(deptId, pbomId){
+  const pb = projectBoms.find(b=>b.id===(pbomId||_activePbomId));
+  const d = depts.find(x=>x.id===deptId);
+  return !!(pb && d && d.project===pb.project_name);
 }
 
 // Miktar düzenle
@@ -14343,7 +14399,7 @@ async function addPbomCustomPart(pbomId) {
   const unit     = document.getElementById('pbom-custom-unit').value;
   const weight   = parseFloat(document.getElementById('pbom-custom-weight')?.value)||null;
   const material = document.getElementById('pbom-custom-material')?.value.trim()||null;
-  const deptId   = document.getElementById('pbom-custom-dept').value||null;
+  const deptId   = document.getElementById('pbom-custom-dept')?.value||null; // (11. tur F3) eleman HTML'de yok — ölü kod görünümlü; ?. ile TypeError önlendi
   const parentId = document.getElementById('pbom-custom-parent')?.value||null;
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
 
@@ -14450,6 +14506,9 @@ function openPbomCustomEdit(partId, pbomId) {
   const p = projectBomParts.find(x=>x.id===partId);
   if(!p) return;
   const customParts = projectBomParts.filter(x=>x.project_bom_id===pbomId&&!x.bom_part_id&&x.id!==partId);
+  // (11. tur F3) Bölüm listesi projeye filtrelenir (çapraz-proje ataması kapatıldı)
+  const _pcePb = projectBoms.find(b=>b.id===pbomId);
+  const _pceProjDepts = depts.filter(d=>d.project===(_pcePb?_pcePb.project_name:''));
 
   const overlay = document.createElement('div');
   overlay.className='modal-overlay open'; overlay.id='pbom-cedit-overlay';
@@ -14480,7 +14539,8 @@ function openPbomCustomEdit(partId, pbomId) {
       <div class="form-group"><label>Bölüm</label>
         <select id="pce-dept" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 12px;outline:none">
           <option value="">— Bölüm —</option>
-          ${depts.map(d=>`<option value="${d.id}"${d.id===p.dept_id?' selected':''}>${esc(d.name)}</option>`).join('')}
+          ${_pceProjDepts.map(d=>`<option value="${d.id}"${d.id===p.dept_id?' selected':''}>${esc(d.name)}</option>`).join('')}
+          ${p.dept_id && !_pceProjDepts.some(d=>d.id===p.dept_id)?`<option value="${esc(p.dept_id)}" selected disabled>⚠ ${esc((depts.find(d=>d.id===p.dept_id)||{}).name||'?')} (başka proje)</option>`:''}
         </select>
       </div>
       <div class="form-group"><label>Üst Parça</label>
@@ -14506,16 +14566,22 @@ async function savePbomCustomEdit(partId, pbomId) {
   const deptId   = document.getElementById('pce-dept').value||null;
   const parentId = document.getElementById('pce-parent').value||null;
   if(!name||!code){ toast('Ad ve kod zorunlu!','error'); return; }
+  // (11. tur F3) Çapraz-proje bölüm guard'ı (disabled '⚠ başka proje' option'ı
+  // seçili kalarak gönderilirse mevcut değer korunur, yeni yanlış atama olmaz)
+  const _eskiDept = projectBomParts.find(x=>x.id===partId)?.dept_id || null;
+  const _deptFinal = (deptId && deptId!==_eskiDept && !_pbomeDeptOk(deptId, pbomId))
+    ? (toast('Seçilen bölüm başka projeye ait — bölüm değişikliği uygulanmadı.','error'), _eskiDept)
+    : deptId;
 
   const parent = parentId ? projectBomParts.find(x=>x.id===parentId) : null;
   const level  = parent ? (parent.level||0)+1 : 0;
 
   await dbUpdate('project_bom_parts', partId, {
     custom_name:name, custom_code:code, custom_qty:qty, custom_unit:unit,
-    dept_id:deptId, parent_custom_id:parentId||null, level
+    dept_id:_deptFinal, parent_custom_id:parentId||null, level
   });
   const p = projectBomParts.find(x=>x.id===partId);
-  if(p){ p.custom_name=name; p.custom_code=code; p.custom_qty=qty; p.custom_unit=unit; p.dept_id=deptId; p.parent_custom_id=parentId||null; p.level=level; }
+  if(p){ p.custom_name=name; p.custom_code=code; p.custom_qty=qty; p.custom_unit=unit; p.dept_id=_deptFinal; p.parent_custom_id=parentId||null; p.level=level; }
 
   document.getElementById('pbom-cedit-overlay').remove();
   renderPbomCustomParts(pbomId);
