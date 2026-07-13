@@ -38,6 +38,8 @@ function grab(name){
 (0,eval)(grab('const PURCHASE_KINDS').replace('const PURCHASE_KINDS =','globalThis.PURCHASE_KINDS ='));
 (0,eval)(grab('pbomPublishParts'));
 (0,eval)(grab('pbomPublishMsg'));
+(0,eval)(grab('pbomActiveCodes')); // 9. tur M3: tam senkron etkin kod kümesi
+(0,eval)(grab('pbomFullSync'));    // 9. tur M3: ağaçtan çıkarılanların temizliği
 (0,eval)(grab('partWaitingChildren'));
 (0,eval)(grab('woWaitingChildren'));
 (0,eval)(grab('woStartBlockMsg'));
@@ -132,7 +134,14 @@ globalThis.dbUpdate = async (t,id,b)=>{
   const body = t==='parts'?partToApi(b):b;
   return !!(await api('PUT','/'+EP[t]+'/'+id, body));
 };
-globalThis.dbDelete = async (t,id)=> !!(await api('DELETE','/'+EP[t]+'/'+id));
+// DELETE cevabında data:null gelir — api() null döndürür; başarı ölçütü hata
+// OLMAMASIDIR (9. tur M3'te fark edildi: eski `!!api(...)` başarıda da false
+// veriyordu, sonucu önemseyen ilk çağıran pbomFullSync oldu).
+globalThis.dbDelete = async (t,id)=>{
+  globalThis._lastApiError = null;
+  await api('DELETE','/'+EP[t]+'/'+id);
+  return !globalThis._lastApiError;
+};
 globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 
 (async()=>{
@@ -498,6 +507,53 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const ondalik = parts.find(p=>p.project===PROJ && p.code==='E2E-ONDALIK');
     check('ondalık 2.5 → parts qty 3 (yukarı) + rounded=1',
       rE2.rounded===1 && Number(ondalik?.qty)===3, JSON.stringify({rounded:rE2.rounded, qty:ondalik?.qty}));
+
+    console.log('═══ 9.TUR M3: TAM SENKRON (ağaçtan çıkarılanların temizliği) ═══');
+    // Etkin kod kümesi GERÇEK yayınlanmış ağaçlardan kurulur; yetim kayıtlar:
+    // işlem görmemiş üretim → silinir, işlem görmüş → korunur+listelenir,
+    // PLANNED+grupsuz satın alma → CANCELLED, ORDERED → korunur+listelenir.
+    globalThis.PUR_STATUS = {ORDERED:{label:'Sipariş Verildi'}, PLANNED:{label:'Planlandı'}};
+    // e2e yayını doğrudan pbomPublishParts ile yapar (DB'de status draft kalır);
+    // B1 desenindeki gibi yayınlanmış fixture elle kurulur — pbomActiveCodes
+    // ağaç içeriğini DB'den, yayın durumunu bu global listeden okur.
+    globalThis.projectBoms = [
+      {id:pbm.id,  project_name:PROJ, status:'published'},
+      {id:pbm2.id, project_name:PROJ, status:'published'}];
+    const orfTemiz = (await dbInsert('parts',{id:genId(), name:'E2E Yetim Temiz', code:'E2E-ORF1',
+      project:PROJ, qty:2, qty_done:0, qty_pending:2, qty_reject:0, status:'pending'}))[0];
+    const orfIslemli = (await dbInsert('parts',{id:genId(), name:'E2E Yetim İşlemli', code:'E2E-ORF2',
+      project:PROJ, qty:2, qty_done:1, qty_pending:1, qty_reject:0, status:'inprogress'}))[0];
+    const orfPlanned = (await dbInsert('purchase_items',{project_name:PROJ, name:'E2E Yetim Kalem',
+      code:'E2E-ORF3', quantity:4}))[0];
+    const orfOrdered = (await dbInsert('purchase_items',{project_name:PROJ, name:'E2E Yetim Sipariş',
+      code:'E2E-ORF4', quantity:4}))[0];
+    await dbUpdate('purchase_items', orfOrdered.id, {status:'ORDERED'});
+    globalThis.parts = await dbGet('parts');
+    const aktifKodlar = await pbomActiveCodes(PROJ); // ağaçta yaşayan kodlar (kontrol için)
+    const syn = await pbomFullSync({project_name:PROJ});
+    console.log('  senkron sonucu:', JSON.stringify({...syn,
+      keptStarted:syn.keptStarted, keptOrdered:syn.keptOrdered}));
+    globalThis.parts = await dbGet('parts');
+    check('işlem görmemiş yetim üretim parçası SİLİNDİ', !parts.some(p=>p.id===orfTemiz.id) && syn.removedParts>=1,
+      JSON.stringify({removed:syn.removedParts}));
+    check('işlem görmüş yetim parça KORUNDU + listelendi',
+      parts.some(p=>p.id===orfIslemli.id) && syn.keptStarted.includes('E2E-ORF2'),
+      JSON.stringify(syn.keptStarted));
+    const synPis = await dbGet('purchase_items');
+    check('yetim PLANNED kalem iptal edildi (not düşüldü)',
+      synPis.find(i=>i.id===orfPlanned.id)?.status==='CANCELLED'
+      && /tam senkron/i.test(synPis.find(i=>i.id===orfPlanned.id)?.notes||'') && syn.cancelledPurchases>=1,
+      JSON.stringify({s:synPis.find(i=>i.id===orfPlanned.id)?.status, c:syn.cancelledPurchases}));
+    check('ORDERED yetim kalem KORUNDU (uyarı listesinde)',
+      synPis.find(i=>i.id===orfOrdered.id)?.status==='ORDERED'
+      && syn.keptOrdered.some(s=>s.includes('E2E-ORF4')), JSON.stringify(syn.keptOrdered));
+    check('ağaçtaki üretim kodlarına dokunulmadı',
+      [...aktifKodlar.prod].every(c=>parts.some(p=>p.project===PROJ && (p.code||'').toLowerCase()===c)),
+      [...aktifKodlar.prod].join(','));
+    check('sahte ağaçtan yayınlanan E2E-ONDALIK da temizlendi (ağaçta yok, işlemsiz)',
+      !parts.some(p=>p.project===PROJ && p.code==='E2E-ONDALIK'));
+    // temizlik: işlemli yetim parçanın sayaçları sıfırlanmadan silinemez (genel
+    // temizlik bölümü hallediyor); ORDERED yetim de orada CANCELLED+silinir.
 
     console.log('═══ O6: DEPO NET STOK HESABI (_whItemStock) ═══');
     // dnShip eksi-stok uyarısı bu hesaba dayanır: SUM(IN)−SUM(OUT), kod önce

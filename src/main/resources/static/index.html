@@ -13369,7 +13369,7 @@ async function pbomPublishParts(pb, allPbParts, templateParts){
   }
   return res;
 }
-function pbomPublishMsg(r){
+function pbomPublishMsg(r, sync){
   let msg = `✅ Yayınlandı! ${r.added} parça üretime çıkarıldı`;
   if(r.mipPending) msg += `, 🛒 ${r.mipPending} satın alınan parça MİP'e düştü (sipariş MİP'ten gönderilir)`;
   if(r.linked) msg += `, 🔗 ${r.linked} hiyerarşi bağı kuruldu`;
@@ -13378,7 +13378,78 @@ function pbomPublishMsg(r){
   if(r.rounded) msg += `, ⚠️ ${r.rounded} parçada ondalık adet üretim için tam sayıya (yukarı) yuvarlandı`;
   if(r.skipped) msg += `, ${r.skipped} zaten mevcuttu`;
   if(r.errors){ msg += `, ${r.errors} hata`; if(_lastApiError) msg += ` (${_lastApiError})`; }
+  // (9. tur M3) Tam senkron özeti
+  if(sync){
+    if(sync.removedParts) msg += `, 🧹 ${sync.removedParts} ağaçtan çıkarılmış üretim kaydı silindi`;
+    if(sync.cancelledPurchases) msg += `, ✖ ${sync.cancelledPurchases} sipariş verilmemiş satın alma kalemi iptal edildi`;
+    if(sync.keptStarted.length) msg += `, ⚠️ üretimi başlamış ${sync.keptStarted.length} parça korundu: ${sync.keptStarted.slice(0,5).join(', ')}${sync.keptStarted.length>5?'…':''}`;
+    if(sync.keptOrdered.length) msg += `, ⚠️ sipariş süreci başlamış ${sync.keptOrdered.length} kalem korundu`;
+    if(sync.skippedNoCode) msg += `, ${sync.skippedNoCode} kodsuz kayıt tam senkron dışında bırakıldı`;
+    if(sync.errors) msg += `, ⚠️ senkronda ${sync.errors} işlem yapılamadı`;
+  }
   return msg;
+}
+
+// (9. tur M3) Projenin TÜM yayınlanmış ağaçlarındaki etkin kodlar (lowercase).
+// prod = üretime gidenler, all = tümü (satın alınanlar dahil). Üretime gitme
+// kriteri TEK NOKTADA burada: bugün material_kind (PURCHASE_KINDS dışı üretilir);
+// M4'te procurement_decision'a geçecek — pbomFullSync değişmeden kalır.
+async function pbomActiveCodes(projectName){
+  const prod = new Set(), all = new Set();
+  const pubs = projectBoms.filter(x=>x.project_name===projectName && x.status==='published');
+  for(const pub of pubs){
+    const rows = await dbGet('project_bom_parts','project_bom_id=eq.'+pub.id);
+    for(const sp of (Array.isArray(rows)?rows:[])){
+      const code = sp.custom_code || sp.resolved_code, name = sp.custom_name || sp.resolved_name;
+      if(sp.is_excluded || !name || !code) continue;
+      const lc = code.toLowerCase();
+      all.add(lc);
+      const kind = sp.material_kind || sp.resolved_material_kind || null;
+      if(!PURCHASE_KINDS.includes(kind)) prod.add(lc);
+    }
+  }
+  return {prod, all};
+}
+
+// (9. tur M3) Tam senkron: ağaçtan çıkarılmış kayıtların GÜVENLİ temizliği.
+// - Üretim (parts): kodu artık hiçbir yayınlanmış ağacın üretim kümesinde
+//   olmayan ve İŞLEM GÖRMEMİŞ (qty_done+qty_reject==0) parçalar silinir;
+//   işlem görmüşler LİSTELENİR, silinmez. Silme guard'a takılırsa (iş emri
+//   bağı vb.) hata sayılır, parça korunur.
+// - Satın alma: kodu hiçbir yayınlanmış ağaçta olmayan PLANNED + gruba/plana
+//   bağlı olmayan kalemler CANCELLED yapılır; ORDERED ve sonrası ile gruba
+//   bağlılar yalnız uyarı listesine girer. Rezervasyonlara DOKUNULMAZ.
+// - Kodsuz (ad bazlı) kayıtlar temizlenMEZ (eşleşme zayıf) — sayılır.
+async function pbomFullSync(pb){
+  const out = {removedParts:0, keptStarted:[], cancelledPurchases:0, keptOrdered:[], skippedNoCode:0, errors:0};
+  const codes = await pbomActiveCodes(pb.project_name);
+  const removedIds = new Set();
+  for(const x of parts.filter(x=>x.project===pb.project_name)){
+    const lc = (x.code||'').toLowerCase();
+    if(!lc){ out.skippedNoCode++; continue; }
+    if(codes.prod.has(lc)) continue;
+    const done = (Number(x.qty_done)||0) + (Number(x.qty_reject)||0);
+    if(done > 0){ out.keptStarted.push(x.code); continue; }
+    const ok = await dbDelete('parts', x.id); // guard reddederse toast adapter'dan
+    if(ok){ out.removedParts++; removedIds.add(x.id); }
+    else { out.errors++; out.keptStarted.push(x.code); }
+  }
+  if(removedIds.size) parts = parts.filter(x=>!removedIds.has(x.id));
+  const pis = await dbGet('purchase_items','order=created_at.asc');
+  for(const i of (Array.isArray(pis)?pis:[])){
+    if(i.project_name !== pb.project_name || i.status === 'CANCELLED') continue;
+    const lc = (i.code||'').toLowerCase();
+    if(!lc){ out.skippedNoCode++; continue; }
+    if(codes.all.has(lc)) continue;
+    if(i.status==='PLANNED' && !i.purchase_order_id && !i.stock_plan_id){
+      const ok = await dbUpdate('purchase_items', i.id,
+        {status:'CANCELLED', notes:(i.notes?i.notes+'\n':'')+'Tam senkron: ağaçtan çıkarıldı'});
+      if(ok) out.cancelledPurchases++; else out.errors++;
+    } else {
+      out.keptOrdered.push((i.code||i.name)+' ('+(PUR_STATUS[i.status]?.label||i.status)+')');
+    }
+  }
+  return out;
 }
 
 // Yayınla
@@ -13387,14 +13458,56 @@ function pbomPublishMsg(r){
 // insert denemesi olurdu (parts'ı DB unique korur ama iş boşa gider).
 let _publishing = false;
 
-async function openAndPublishPbom(pbomId) {
+// (9. tur M3) confirm() yerine yayınlama modalı: ilk yayında tek onay;
+// yeniden yayında iki mod — (a) sadece yenileri ekle (mevcut idempotent
+// davranış, netçe anlatılır), (b) tam senkronize et (pbomFullSync).
+function pbomPublishModal(pbomId, fromEditor){
   const pb   = projectBoms.find(p=>p.id===pbomId);
   const prod = bomProducts.find(p=>p.id===pb?.bom_product_id);
   if(!pb||!prod){ toast('Bulunamadı!','error'); return; }
+  if(_publishing){ toast('Bir yayınlama zaten sürüyor, lütfen bekleyin…','error'); return; }
+  const republish = pb.status==='published';
+  document.getElementById('pbom-pub-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'pbom-pub-overlay';
+  overlay.innerHTML = h`<div class="modal" style="width:520px;text-align:left">
+    <h3 style="margin-bottom:4px">${republish?'🔄 Yeniden Yayınla':'🚀 Yayınla → Üretime Çıkar'}</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">📁 ${pb.project_name} · 🌳 ${prod.name}${prod.code?' ('+prod.code+')':''}</p>
+    ${republish?h`<div style="font-family:var(--font-mono);font-size:11px;margin-bottom:14px">
+      <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;margin-bottom:8px">
+        <input type="radio" name="pbom-pub-mode" value="add" checked style="margin-top:2px">
+        <span><b>Sadece yenileri ekle</b> — ağaçtaki yeni parçalar üretime/MİP'e eklenir, adetler güncellenir (tamamlanan+fire yeni hedefi aşıyorsa dokunulmaz). <span style="color:var(--green,#2ecc71)">Hiçbir kayıt silinmez; MİP'te yapılmış işlemler (rezervasyon, sipariş, onay) aynen korunur.</span></span>
+      </label>
+      <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer">
+        <input type="radio" name="pbom-pub-mode" value="sync" style="margin-top:2px">
+        <span><b>Tam senkronize et</b> — yukarıdakine ek: ağaçtan çıkarılmış parçaların <b>işlem görmemiş</b> üretim kayıtları silinir; kodu ağaçta olmayan <b>sipariş verilmemiş</b> satın alma kalemleri iptal edilir. <span style="color:#e67e22">Üretimi başlamış / sipariş süreci başlamış kayıtlara dokunulmaz, sonuçta listelenir. Rezervasyonlara dokunulmaz.</span></span>
+      </label>
+    </div>`:h`<p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">Üretilen parçalar üretime çıkarılır; satın alınan türler MİP'e düşer (sipariş MİP'ten gönderilir).</p>`}
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('pbom-pub-overlay').remove()">Vazgeç</button>
+      <button class="btn btn-primary" id="pbom-pub-confirm">${republish?'🔄 Yeniden Yayınla':'🚀 Yayınla'}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#pbom-pub-confirm').onclick = async ()=>{
+    const mode = document.querySelector('input[name="pbom-pub-mode"]:checked')?.value || 'add';
+    const bitti = btnBusy('pbom-pub-confirm', '⏳ Yayınlanıyor…');
+    if(!bitti) return;
+    try{ await _pbomDoPublish(pbomId, fromEditor, republish && mode==='sync'); }
+    finally{ bitti(); document.getElementById('pbom-pub-overlay')?.remove(); }
+  };
+}
 
-  if(!confirm(`"${pb.project_name}" projesine "${prod.name}" ürün ağacını yayınlamak istiyor musunuz?\n\nParçalar otomatik üretime çıkarılacak.`)) return;
+// Ortak yayınlama çekirdeği (eski openAndPublishPbom + pbomePublish gövdesi)
+async function _pbomDoPublish(pbomId, fromEditor, fullSync){
+  const pb   = projectBoms.find(p=>p.id===pbomId);
+  const prod = bomProducts.find(p=>p.id===pb?.bom_product_id);
+  if(!pb||!prod){ toast('Bulunamadı!','error'); return; }
   if(_publishing){ toast('Bir yayınlama zaten sürüyor, lütfen bekleyin…','error'); return; }
   _publishing = true;
+  const publishBtn = fromEditor ? document.getElementById('pbome-publish-btn') : null;
+  if(publishBtn) publishBtn.disabled = true;
   try {
     // Direkt DB'den taze parça verisi çek
     const freshData = await dbGet('project_bom_parts','project_bom_id=eq.'+pbomId+'&order=created_at.asc');
@@ -13412,48 +13525,28 @@ async function openAndPublishPbom(pbomId) {
     if(!r.errors){
       await dbUpdate('project_bom', pbomId, {status:'published', published_at:new Date().toISOString()});
       pb.status='published'; pb.published_at=new Date().toISOString();
-    }
-
-    renderProjectBomList();
-    toast(pbomPublishMsg(r) + (r.errors?' — düzeltip "Tekrar Yayınla"ya basın (yarım yayın kaydedilmedi)':''), r.errors?'error':'success');
-    console.log('Tamamlandı —', r);
-  } finally { _publishing = false; }
-}
-
-async function pbomePublish() {
-  const pb=projectBoms.find(p=>p.id===_activePbomId);
-  const prod=bomProducts.find(p=>p.id===pb?.bom_product_id);
-  if(!pb||!prod){ toast('Bulunamadı!','error'); return; }
-  if(!confirm(`"${pb.project_name}" projesine "${prod.name}" ürün ağacını yayınlamak istiyor musunuz?\n\nParçalar otomatik üretime çıkarılacak.`)) return;
-  if(_publishing){ toast('Bir yayınlama zaten sürüyor, lütfen bekleyin…','error'); return; }
-  _publishing = true;
-  const publishBtn=document.getElementById('pbome-publish-btn');
-  if(publishBtn) publishBtn.disabled = true;
-  try {
-    // Taze veri çek
-    const freshData = await dbGet('project_bom_parts','project_bom_id=eq.'+_activePbomId+'&order=created_at.asc');
-    const allPbParts = Array.isArray(freshData) ? freshData : _pbomeParts;
-
-    console.log('Yayınlanacak parça sayısı:', allPbParts.length);
-
-    // Şablon parçaları: eski satırlarda hiyerarşi bom_parts.parent_id'de (#8)
-    const tplData = await dbGet('bom_parts','product_id=eq.'+prod.id);
-    const r = await pbomPublishParts(pb, allPbParts, Array.isArray(tplData)?tplData:[]);
-
-    // (U7) Hata varsa "published" yapma + butonu gizleme — draft kalsın ki
-    // "Tekrar Yayınla" mümkün olsun (idempotent retry eksikleri tamamlar).
-    if(!r.errors){
-      await dbUpdate('project_bom',_activePbomId,{status:'published',published_at:new Date().toISOString()});
-      pb.status='published'; pb.published_at=new Date().toISOString();
       if(publishBtn) publishBtn.style.display='none';
-      const badge=document.getElementById('pbome-status-badge');
-      if(badge) badge.innerHTML='<span class="pbom-status-published">✅ Yayınlandı</span>';
+      if(fromEditor){
+        const badge=document.getElementById('pbome-status-badge');
+        if(badge) badge.innerHTML='<span class="pbom-status-published">✅ Yayınlandı</span>';
+      }
     }
 
-    toast(pbomPublishMsg(r) + (r.errors?' — düzeltip "Tekrar Yayınla"ya basın (yarım yayın kaydedilmedi)':''), r.errors?'error':'success');
-    console.log('Yayınlama tamamlandı —', r);
+    // (9. tur M3) Tam senkron yayın SORUNSUZ bittiyse koşar (yarım yayın
+    // üstünde temizlik yapılmaz — etkin kod kümesi eksik olurdu)
+    let syncOut = null;
+    if(fullSync && !r.errors) syncOut = await pbomFullSync(pb);
+
+    if(!fromEditor) renderProjectBomList();
+    toast(pbomPublishMsg(r, syncOut) + (r.errors?' — düzeltip "Tekrar Yayınla"ya basın (yarım yayın kaydedilmedi)':''),
+      (r.errors || (syncOut&&syncOut.errors)) ? 'error' : 'success');
+    console.log('Tamamlandı —', r, syncOut||'');
   } finally { _publishing = false; if(publishBtn) publishBtn.disabled = false; }
 }
+
+async function openAndPublishPbom(pbomId) { pbomPublishModal(pbomId, false); }
+
+async function pbomePublish() { pbomPublishModal(_activePbomId, true); }
 
 // ─── Projeye Özel Parça ───
 async function addPbomCustomPart(pbomId) {
