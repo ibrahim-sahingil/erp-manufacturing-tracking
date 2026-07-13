@@ -11470,6 +11470,10 @@ function renderBomList() {
   const sorted = buildSortedTree(null, 0, _bomCollapsed);
   el.innerHTML = h`${sorted.map(({part,level}) => {
     const ops = Array.isArray(part.operations) ? part.operations : JSON.parse(part.operations||'[]');
+    // (9. tur M1) Şablonda bölüm kolonu yok (bölümler projeye özel) ama işlem
+    // tanımından türetilen bölüm adı gösterilebilir — "işlemli parçaların
+    // bölümü gözükmüyor" şikayetinin şablon ayağı.
+    const opsDept = opsDeptName(ops);
     const opsHTML = ops.length ? h`<div class="bom-ops">${ops.map((o,oi)=>{
       const timeStr = o.duration_per_unit ? ` ⏱${o.total_duration?.toFixed(1)||'?'}dk` : '';
       return h`<span class="bom-op-tag">⚙ ${o.name} (${o.code})${timeStr} <button onclick="removeBomOp('${raw(part.id)}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px;margin-left:2px">✕</button></span>`;
@@ -11497,6 +11501,7 @@ function renderBomList() {
           ${part.weight_kg?h`<span>⚖ ${part.weight_kg} kg</span>`:''}
           ${part.material?h`<span>🔩 ${part.material}</span>`:''}
           ${partDimLabel(part)?h`<span>📐 ${partDimLabel(part)}${part.material_form?' · '+MATERIAL_FORMS[part.material_form]:''}</span>`:(part.material_form?h`<span>📐 ${MATERIAL_FORMS[part.material_form]}</span>`:'')}
+          ${opsDept?h`<span style="color:#2980b9" title="Bölüm — işlem tanımından türetilir, projeye kopyalanınca atanır">🏭 ${opsDept}</span>`:''}
         </div>
         ${opsHTML}
       </div>
@@ -12265,13 +12270,22 @@ async function ensureProjectDept(projectName, deptName){
   const list = await dbGet('departments','order_id=eq.'+orderId);
   const mevcut = (Array.isArray(list)?list:[]).find(d =>
     (d.name||'').toLocaleLowerCase('tr') === deptName.toLocaleLowerCase('tr'));
-  if(mevcut) return mevcut.id;
+  if(mevcut){
+    // (9. tur M1) Başka akışta oluşturulmuş bölüm bellekteki depts'te
+    // olmayabilir — render depts.find ile çözdüğünden burada da senkronla.
+    if(!depts.some(d => d.id === mevcut.id)) depts.push(mevcut);
+    return mevcut.id;
+  }
   const created = await dbInsert('departments', {
     order_id: orderId, name: deptName,
     sort_order: (Array.isArray(list)?list.length:0) + 1
   });
   if(Array.isArray(created) && created[0]){
     invalidateRef('departments');
+    // (9. tur M1) Yeni bölümü bellekteki depts'e de ekle — yoksa
+    // pbomeRenderList depts.find(dept_id) boş döner ve satırda bölüm
+    // görünmez (arkadaş raporu: "işlemli parçaların bölümleri gözükmüyor").
+    depts.push(created[0]);
     return created[0].id;
   }
   return null;
