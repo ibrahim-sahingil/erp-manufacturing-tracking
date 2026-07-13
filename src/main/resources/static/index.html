@@ -1027,8 +1027,8 @@
   <div class="form-card" id="pur-add-form" style="display:none;margin-bottom:16px">
     <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:14px">+ Yeni Satın Alma Kalemi</div>
     <div class="form-row">
-      <div class="form-group"><label>Ad *</label><input type="text" id="pur-name" placeholder="Örn: M12 civata"></div>
-      <div class="form-group"><label>Kod</label><input type="text" id="pur-code" placeholder="Örn: CVT-M12"></div>
+      <div class="form-group"><label>Ad *</label><input type="text" id="pur-name" placeholder="Örn: M12 civata" oninput="purPriceHistoryInput()"></div>
+      <div class="form-group"><label>Kod</label><input type="text" id="pur-code" placeholder="Örn: CVT-M12" oninput="purPriceHistoryInput()"></div>
       <div class="form-group"><label>Miktar</label><input type="number" id="pur-qty" placeholder="1" min="0" step="0.01"></div>
       <div class="form-group"><label>Birim</label><input type="text" id="pur-unit" placeholder="adet"></div>
     </div>
@@ -1049,6 +1049,8 @@
         <button class="btn btn-primary" onclick="addPurchaseItem()">🛒 Kalemi Ekle</button>
       </div>
     </div>
+    <!-- (10. tur M11) Ad/kod yazılırken aynı malzemenin geçmiş alış fiyatları -->
+    <div id="pur-price-history" style="display:none;margin-top:6px"></div>
   </div>
 
   <!-- Toplu seçim çubuğu (seçim yokken gizli) -->
@@ -1134,6 +1136,12 @@
       <select id="whm-mv-filter" onchange="renderWhMovements()" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:6px 10px;outline:none">
         <option value="">— Tüm depolar —</option>
       </select>
+      <!-- (10. tur M2c) Dışa aktarım: satır işaretliyse yalnız seçilenler, değilse tümü -->
+      <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="whmExportCSV()" title="Stok özetini Excel'in açtığı CSV olarak indir">⬇ Stok CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="whmExportMovCSV()" title="Seçili malzemelerin hareket geçmişi detaylarını CSV olarak indir">⬇ Hareket CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="whmExportPDF()" title="Stok + hareket geçmişi PDF çıktısı">📄 PDF</button>
+      </div>
     </div>
     <div id="whm-stock" style="margin-bottom:20px"></div>
 
@@ -4645,8 +4653,9 @@ function woOnProjectChange() {
   const proj = document.getElementById('wo-project').value;
   const deptSel = document.getElementById('wo-dept');
   const projDepts = depts.filter(d => d.project === proj);
+  // (10. tur M3) Boş değer zaten "tüm bölümler" filtresiydi; görünür seçenek yapıldı
   deptSel.innerHTML = proj
-    ? '<option value="">— Bölüm seçin —</option>' + projDepts.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')
+    ? '<option value="">🌐 Tümü (tüm bölümler)</option>' + projDepts.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')
     : '<option value="">— Önce proje seçin —</option>';
   _woSelectedParts.clear();
   document.getElementById('wo-step2').style.display = 'none';
@@ -4670,11 +4679,15 @@ async function woLoadParts() {
   if (!proj) { toast('Proje seçin!', 'error'); return; }
 
   // Malzeme/BOM bilgisi için taze veri (ağaçta durum çipleri doğru olsun)
-  const [pi] = await Promise.all([
+  // (10. tur M9) work_order_parts da tazelenir — yeşil "iş emrinde" rozeti
+  // başka oturumun planladığı parçayı da göstersin
+  const [pi, wop] = await Promise.all([
     dbGet('purchase_items','order=created_at.asc'),
+    dbGet('work_order_parts'),
     loadProjectBoms()
   ]);
   if(Array.isArray(pi)) purchaseItems = pi;
+  if(Array.isArray(wop)) workOrderParts = wop;
 
   const bucket = parts.filter(p => (p.project||'(Proje Yok)') === proj);
   const selectable = p => !deptId || p.department_id === deptId;
@@ -4744,6 +4757,9 @@ async function woLoadParts() {
     const nodeRow = (p, depth) => {
       const ok = selectable(p);
       const dept = p.department_id ? depts.find(d=>d.id===p.department_id) : null;
+      // (10. tur M9) İş emrine zaten planlanmış parça yeşil rozetle belli olur
+      // (seçim tiki .wo-part-check'ten AYRI — o tık seçimini gösterir)
+      const inWo = workOrderParts.some(wp=>wp.part_id===p.id);
       const row = h`<div class="wo-part-item" id="wopi-${p.id}"
           ${ok?h`onclick="woTogglePart('${raw(p.id)}','${raw(ea(p.name))}','${raw(ea(p.code))}')"`:''}
           style="margin:3px 0 3px ${depth*22}px;padding:8px 12px;display:flex;gap:10px;align-items:center;${ok?'':'opacity:.45;cursor:default'}">
@@ -4752,6 +4768,7 @@ async function woLoadParts() {
         <div style="min-width:0;flex:1">
           <div class="wo-part-item-name" style="display:inline">${p.name}</div>
           <span class="wo-part-item-code" style="margin-left:8px">${p.code}${p.drawing?' · '+p.drawing:''}</span>
+          ${inWo?h`<span title="Bu parça bir iş emrinde planlı" style="margin-left:8px;font-family:var(--font-mono);font-size:10px;color:#2ecc71;white-space:nowrap">✅ iş emrinde</span>`:''}
           <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">
             ${p.material||''} ${p.qty?'· '+p.qty+' adet':''}
             ${dept?h`· 🏭 ${dept.name}`:''}
@@ -7783,6 +7800,7 @@ function renderPurchaseList(){
           ${raw(actions)}
           ${i.status==='ORDERED'?h`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)" title="10. tur M1: teslim alma ve fiş satın almadan kaldırıldı">📥 mal kabul Depo'dan</span>`:''}
           ${i.status==='PLANNED' && !i.stock_plan_id && !i.purchase_order_id ? h`<button class="btn btn-ghost btn-sm" onclick="purTogglePlanning('${raw(i.id)}')" title="${i.needs_planning?'Planlama havuzundan çıkar':'MİP kesim planlaması havuzuna at (plaka/profil yerleşimi)'}" ${i.needs_planning?raw('style="color:var(--accent);border-color:rgba(245,166,35,.4)"'):''}>📐</button>`:''}
+          ${purPriceHistoryOf(i.name, i.code, i.id).length?h`<button class="btn btn-ghost btn-sm" onclick="purPriceHistoryModal('${raw(i.id)}')" title="Bu malzemenin geçmiş alış fiyatları (10. tur M11)">💰</button>`:''}
           <button class="btn btn-ghost btn-sm" onclick="editPurchaseItem('${raw(i.id)}')">✏️</button>
           <button class="btn btn-ghost btn-sm" onclick="deletePurchaseItem('${raw(i.id)}')" style="color:var(--red,#e74c3c);border-color:rgba(231,76,60,.3)">🗑️</button>
         </div>
@@ -7825,6 +7843,64 @@ async function addPurchaseItem(){
     .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   toast('Kalem eklendi!','success');
   renderPurchaseList();
+}
+
+// ─── (10. tur M11) Fiyat geçmişi: aynı malzemenin önceki alışları ───
+// "Eskiden şu tarihte şu fiyata almışsın" — firmalar bunu çok sorar (ses 04:36).
+// Tüm projelerden, fiyatı girilmiş, iptal olmayan kalemler; en yeni önce.
+// mipMatches (B2) ile kodlu/kodsuz yazım farkları da yakalanır.
+function purPriceHistoryOf(name, code, excludeId){
+  if(!(name||'').trim() && !(code||'').trim()) return [];
+  return purchaseItems
+    .filter(i => i.id!==excludeId && i.unit_price!=null && i.status!=='CANCELLED'
+      && mipMatches(i.name, i.code, name, code))
+    .sort((a,b)=>String(b.ordered_at||b.created_at||'').localeCompare(String(a.ordered_at||a.created_at||'')));
+}
+
+function _purHistLine(i){
+  const t = i.ordered_at || i.created_at;
+  return h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:3px 0;border-bottom:1px dashed var(--border)">
+    📅 ${t?new Date(t).toLocaleDateString('tr-TR'):'—'}
+    · <b style="color:var(--text)">${mipNum(Number(i.unit_price))} ${i.currency||'TRY'}</b>
+    ${i.supplier?h`· 🏢 ${i.supplier}`:''}
+    · ${mipNum(Number(i.quantity)||1)} ${i.unit||'adet'}
+    · 📁 ${i.project_name}
+  </div>`;
+}
+
+// Kalem ekleme formunda ad/kod yazılırken debounce'lı geçmiş fiyat önizlemesi
+let _purHistT = null;
+function purPriceHistoryInput(){
+  clearTimeout(_purHistT);
+  _purHistT = setTimeout(()=>{
+    const el = document.getElementById('pur-price-history');
+    if(!el) return;
+    const name = document.getElementById('pur-name')?.value.trim() || '';
+    const code = document.getElementById('pur-code')?.value.trim() || '';
+    const hist = purPriceHistoryOf(name, code).slice(0,5);
+    if(!hist.length){ el.style.display='none'; el.innerHTML=''; return; }
+    el.style.display = '';
+    el.innerHTML = h`<div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:2px">💰 Geçmiş alışlar (son ${hist.length})</div>${hist.map(i=>_purHistLine(i))}`;
+  }, 400);
+}
+
+function purPriceHistoryModal(id){
+  const it = purchaseItems.find(x=>x.id===id);
+  if(!it) return;
+  const hist = purPriceHistoryOf(it.name, it.code);
+  document.getElementById('purhist-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'purhist-overlay';
+  overlay.innerHTML = h`<div class="modal" style="width:540px;text-align:left;max-height:80vh;overflow:auto">
+    <h3 style="margin-bottom:4px">💰 Fiyat Geçmişi</h3>
+    <p style="margin-bottom:12px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${it.code?it.code+' — ':''}${it.name}</p>
+    ${hist.length?hist.map(i=>_purHistLine(i)):h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">Fiyat girilmiş geçmiş alış yok.</div>`}
+    <div style="display:flex;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost" onclick="document.getElementById('purhist-overlay').remove()">Kapat</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
 }
 
 // (E5) Bir MRP plakası/profili iptal/silinince, ona bağlı kaynak kalemleri
@@ -7903,6 +7979,9 @@ function purOrderModal(id){
   if(!i || i.status!=='PLANNED') return;
   document.getElementById('puro-overlay')?.remove();
   const inp = INP('9px 11px');
+  // (10. tur M11) Aynı malzemenin son alışı fiyat alanının yanında hatırlatılır
+  const sonAlis = purPriceHistoryOf(i.name, i.code, i.id)[0] || null;
+  const sonAlisT = sonAlis ? (sonAlis.ordered_at||sonAlis.created_at) : null;
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.id = 'puro-overlay';
@@ -7921,6 +8000,7 @@ function purOrderModal(id){
       </div>
       <div><label style="font-size:11px;color:var(--muted)">Termin</label><input type="date" id="puro-date" value="${i.expected_date||''}" style="${raw(inp)}"></div>
     </div>
+    ${sonAlis?h`<div style="font-family:var(--font-mono);font-size:10px;color:var(--accent);margin-bottom:10px">💡 Son alış: <b>${mipNum(Number(sonAlis.unit_price))} ${sonAlis.currency||'TRY'}</b>${sonAlisT?' · '+new Date(sonAlisT).toLocaleDateString('tr-TR'):''}${sonAlis.supplier?h` · 🏢 ${sonAlis.supplier}`:''} <span style="color:var(--muted)">(tümü için 💰 butonu)</span></div>`:''}
     <div class="form-group" style="margin-bottom:16px">
       <label>Not <span style="color:var(--muted);text-transform:none">(iletişim / şart — kalem notuna eklenir)</span></label>
       <textarea id="puro-notes" rows="2" style="${raw(inp)};resize:vertical" placeholder="Örn: telefonla teyit edildi, 2 hafta termin"></textarea>
@@ -10092,12 +10172,11 @@ function _whItemStock(warehouseId, itemName, itemCode){
   return whStockOf(whMovements, warehouseId, itemName, itemCode);
 }
 
-// Stok özeti: hareketlerden SUM(IN)−SUM(OUT); ayrı stok tablosu yok
-function renderWhStock(){
-  const el = document.getElementById('whm-stock');
-  if(!el) return;
-  const f = document.getElementById('whm-mv-filter')?.value || '';
-  const list = f ? whMovements.filter(m=>m.warehouse_id===f) : whMovements;
+// (10. tur M2c) Stok özeti satırları — renderWhStock + dışa aktarım (CSV/PDF)
+// ortak çekirdeği. filterWhId boşsa tüm depolar. Kodsuz gruplar aynı ad+depo+
+// birimdeki KODLU gruba katılır (B2 mipMatches kuralının özetteki karşılığı).
+function whStockRows(filterWhId){
+  const list = filterWhId ? whMovements.filter(m=>m.warehouse_id===filterWhId) : whMovements;
   const map = new Map();
   for(const m of list){
     const key = m.warehouse_id + '|' + (m.item_code || m.item_name || '').trim().toLowerCase() + '|' + (m.unit||'adet');
@@ -10105,8 +10184,6 @@ function renderWhStock(){
     e.net += (m.movement_type==='IN' ? 1 : -1) * Number(m.quantity || 0);
     map.set(key, e);
   }
-  // (10. tur B2) Kodsuz girilen hareket, aynı depoda aynı ada sahip KODLU
-  // grubun içine katılır — mipMatches kuralının stok özetindeki karşılığı.
   const _kodlu = new Map();
   for(const e of map.values()){
     if((e.code||'').trim()) _kodlu.set(e.wh+'|'+mipNameKey(e.name)+'|'+e.unit, e);
@@ -10116,8 +10193,19 @@ function renderWhStock(){
     const host = _kodlu.get(e.wh+'|'+mipNameKey(e.name)+'|'+e.unit);
     if(host){ host.net += e.net; map.delete(k); }
   }
-  const rows = [...map.values()].filter(r=>Math.abs(r.net)>1e-9)
+  return [...map.values()].filter(r=>Math.abs(r.net)>1e-9)
     .sort((a,b)=>(whName(a.wh)||'').localeCompare(whName(b.wh)||'','tr') || a.name.localeCompare(b.name,'tr'));
+}
+
+// Dışa aktarım satır anahtarı (checkbox value ↔ satır eşlemesi)
+function _whmRowKey(r){ return r.wh+'|'+((r.code||r.name||'').trim().toLowerCase())+'|'+r.unit; }
+
+// Stok özeti: hareketlerden SUM(IN)−SUM(OUT); ayrı stok tablosu yok
+function renderWhStock(){
+  const el = document.getElementById('whm-stock');
+  if(!el) return;
+  const f = document.getElementById('whm-mv-filter')?.value || '';
+  const rows = whStockRows(f);
   if(!rows.length){
     el.innerHTML = h`<div class="empty-state" style="padding:14px"><span class="emoji">📊</span>Depoda malzeme yok</div>`;
     return;
@@ -10127,6 +10215,7 @@ function renderWhStock(){
     return h`<div class="pbom-card" style="border-left:3px solid ${c};padding:8px 14px">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0">
+          <input type="checkbox" class="whm-exp-chk" value="${_whmRowKey(r)}" title="Dışa aktarım için seç (hiçbiri seçili değilse tümü aktarılır)" style="accent-color:var(--accent)">
           ${r.code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${r.code}</span>`:''}
           <span>${r.name}</span>
           ${!f?h`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">🗄️ ${whName(r.wh)||'—'}</span>`:''}
@@ -10135,6 +10224,121 @@ function renderWhStock(){
       </div>
     </div>`;
   })}`;
+}
+
+// ─── (10. tur M2c) Stok / hareket geçmişi dışa aktarımı — CSV (Excel) + PDF ───
+// Kural: checkbox işaretliyse yalnız seçilenler, hiçbiri işaretli değilse tümü.
+function whmSelectedStockRows(){
+  const f = document.getElementById('whm-mv-filter')?.value || '';
+  const rows = whStockRows(f);
+  const checked = [...document.querySelectorAll('.whm-exp-chk:checked')].map(c=>c.value);
+  return checked.length ? rows.filter(r=>checked.includes(_whmRowKey(r))) : rows;
+}
+
+// Seçili stok satırlarına ait hareketler (B2 toleranslı eşleşmeyle — kodsuz
+// girilmiş hareket, kodlu satır seçilince de gelir)
+function _whmRowMovements(rows){
+  const f = document.getElementById('whm-mv-filter')?.value || '';
+  const list = f ? whMovements.filter(m=>m.warehouse_id===f) : whMovements;
+  return list.filter(m => rows.some(r => m.warehouse_id===r.wh
+    && (m.unit||'adet')===r.unit && mipMatches(m.item_name, m.item_code, r.name, r.code)));
+}
+
+function _whmCsvCell(v){
+  v = v==null ? '' : String(v);
+  return /[;"\n\r]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+}
+
+// Türkçe Excel: BOM + ';' ayraç + CRLF; ondalık virgül
+function _whmDownloadCsv(filename, lines){
+  const blob = new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+function whmExportCSV(){
+  const rows = whmSelectedStockRows();
+  if(!rows.length){ toast('Aktarılacak stok satırı yok.','error'); return; }
+  const lines = [['Depo','Kod','Malzeme','Birim','Net Stok'].join(';')];
+  rows.forEach(r=>lines.push([
+    _whmCsvCell(whName(r.wh)||''), _whmCsvCell(r.code||''), _whmCsvCell(r.name),
+    _whmCsvCell(r.unit), String(Number(r.net.toFixed(4))).replace('.',',')
+  ].join(';')));
+  _whmDownloadCsv('depo-stok-'+new Date().toISOString().slice(0,10)+'.csv', lines);
+  toast('⬇ Stok CSV indirildi ('+rows.length+' satır)','success');
+}
+
+function whmExportMovCSV(){
+  const rows = whmSelectedStockRows();
+  if(!rows.length){ toast('Aktarılacak satır yok.','error'); return; }
+  const movs = _whmRowMovements(rows);
+  if(!movs.length){ toast('Seçilen malzemelerde hareket kaydı yok.','error'); return; }
+  const lines = [['Tarih','Depo','Kod','Malzeme','Hareket','Miktar','Birim','Kaynak','Yapan','Not'].join(';')];
+  movs.forEach(m=>lines.push([
+    _whmCsvCell(m.created_at ? new Date(m.created_at).toLocaleString('tr-TR') : ''),
+    _whmCsvCell(whName(m.warehouse_id)||''), _whmCsvCell(m.item_code||''), _whmCsvCell(m.item_name),
+    m.movement_type==='IN' ? 'Giriş' : 'Çıkış',
+    String(Number(m.quantity||0)).replace('.',','), _whmCsvCell(m.unit||'adet'),
+    _whmCsvCell(WH_SOURCE_LABELS[m.source_type]||m.source_type||''),
+    _whmCsvCell(m.performed_by||''), _whmCsvCell(m.notes||'')
+  ].join(';')));
+  _whmDownloadCsv('depo-hareket-'+new Date().toISOString().slice(0,10)+'.csv', lines);
+  toast('⬇ Hareket CSV indirildi ('+movs.length+' hareket)','success');
+}
+
+// PDF: stok tablosu + seçili malzemelerin hareket geçmişi (print-shell deseni;
+// ayrı doküman olduğundan h`` yerine esc() kullanılır — CLAUDE.md istisnası)
+function whmExportPDF(){
+  const rows = whmSelectedStockRows();
+  if(!rows.length){ toast('Aktarılacak stok satırı yok.','error'); return; }
+  const movs = _whmRowMovements(rows);
+  const printDate = new Date().toLocaleString('tr-TR',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const f = document.getElementById('whm-mv-filter')?.value || '';
+  const kapsam = f ? (whName(f)||'Depo') : 'Tüm depolar';
+  const stokRows = rows.map(r=>`<tr>
+    <td>${esc(whName(r.wh)||'—')}</td><td>${esc(r.code||'—')}</td><td>${esc(r.name)}</td>
+    <td style="text-align:right">${Number(r.net.toFixed(4))} ${esc(r.unit)}</td>
+  </tr>`).join('');
+  const movRows = movs.map(m=>`<tr>
+    <td>${m.created_at?new Date(m.created_at).toLocaleString('tr-TR'):'—'}</td>
+    <td>${esc(whName(m.warehouse_id)||'—')}</td>
+    <td>${esc(m.item_code||'—')}</td><td>${esc(m.item_name)}</td>
+    <td>${m.movement_type==='IN'?'⬇ Giriş':'⬆ Çıkış'}</td>
+    <td style="text-align:right">${Number(m.quantity||0)} ${esc(m.unit||'adet')}</td>
+    <td>${esc(WH_SOURCE_LABELS[m.source_type]||m.source_type||'—')}</td>
+    <td>${esc(m.performed_by||'—')}</td>
+  </tr>`).join('');
+  const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
+<title>Depo Stok Raporu — ${esc(kapsam)}</title>
+<style>
+  @page { size: A4; margin: 15mm 12mm; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size:11px; color:#1a1a1a; }
+  .print-header { border-bottom:3px solid #f5a623; padding-bottom:10px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:flex-end; }
+  .print-logo { font-size:22px; font-weight:900; letter-spacing:2px; color:#f5a623; }
+  .print-meta { font-size:10px; color:#666; text-align:right; }
+  h2 { font-size:13px; margin:16px 0 6px; color:#333; }
+  .wr-tbl { width:100%; border-collapse:collapse; }
+  .wr-tbl th { background:#f7f7f7; text-align:left; font-size:9px; text-transform:uppercase; color:#555; }
+  .wr-tbl th, .wr-tbl td { padding:5px 8px; border:1px solid #ddd; font-size:10px; }
+  @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+</style></head><body>
+  <div class="print-header">
+    <div><div class="print-logo">ÜretimTakip</div><div style="font-size:11px;color:#666;margin-top:4px">Depo Stok Raporu — 🗄️ ${esc(kapsam)}</div></div>
+    <div class="print-meta">Çıktı Tarihi: ${printDate}<br>📊 ${rows.length} kalem · 📜 ${movs.length} hareket</div>
+  </div>
+  <h2>📊 Stok Özeti (${rows.length})</h2>
+  <table class="wr-tbl"><tr><th>Depo</th><th>Kod</th><th>Malzeme</th><th style="text-align:right">Net Stok</th></tr>${stokRows}</table>
+  ${movRows?`<h2>📜 Hareket Geçmişi (${movs.length})</h2>
+  <table class="wr-tbl"><tr><th>Tarih</th><th>Depo</th><th>Kod</th><th>Malzeme</th><th>Hareket</th><th style="text-align:right">Miktar</th><th>Kaynak</th><th>Yapan</th></tr>${movRows}</table>`:''}
+  <div style="margin-top:16px;padding-top:8px;border-top:1px solid #ddd;font-size:9px;color:#999;text-align:center">ÜretimTakip · ${printDate}</div>
+</body></html>`;
+  const w = window.open('','_blank','width=900,height=700');
+  w.document.write(html); w.document.close(); w.focus();
+  setTimeout(()=>{ w.print(); }, 600);
 }
 
 function renderWhMovements(){

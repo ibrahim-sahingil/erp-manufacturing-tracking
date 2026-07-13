@@ -151,9 +151,19 @@ global.PUR_ACTIONS={PLANNED:[['ORDERED','📦 Sipariş Ver']]};
 global.purSelected=new Set();
 global.purchaseOrders=[];
 global.updatePurSelectBar=()=>{};
+// (10. tur M11) fiyat geçmişi: p2 aynı kodlu eski alış — p1 satırında 💰 çıkar
 global.purchaseItems=[{id:'p1', status:'PLANNED', code:'K'+EVIL, name:'Ad'+EVIL, project_name:'Prj<b>',
   unit:'ad<i>', material:'Mat<script>', supplier:'Ted'+EVIL, notes:'Not'+EVIL, quantity:2,
-  unit_price:null, expected_date:null, needs_planning:false}];
+  unit_price:null, expected_date:null, needs_planning:false},
+ {id:'p2', status:'IN_WAREHOUSE', code:'K'+EVIL, name:'Ad'+EVIL, project_name:'Eski<b>',
+  unit:'ad', quantity:5, unit_price:42.5, currency:'TRY', supplier:'EskiTed'+EVIL,
+  created_at:'2026-05-01T10:00:00'}];
+eval(grab('mipNum'));
+eval(grab('mipKey'));      // purPriceHistoryOf → mipMatches → mipKey zinciri
+eval(grab('mipNameKey'));
+eval(grab('mipMatches'));
+eval(grab('purPriceHistoryOf'));
+eval(grab('_purHistLine'));
 eval(grab('renderPurchaseList'));
 renderPurchaseList();
 const pl=store['pur-list']||'';
@@ -163,6 +173,10 @@ chk('purchase: proje/malzeme/tedarikçi kaçırıldı', pl.includes('Prj&lt;b&gt
 chk('purchase: not kaçırıldı', pl.includes('Not&lt;img'));
 // 9. tur M5: PLANNED'da 'Sipariş Ver' artık purOrderModal açar (düz durum geçişi değil)
 chk('purchase: actions/butonlar (raw) korundu', pl.includes("purOrderModal('p1')") && pl.includes("deletePurchaseItem('p1')") && pl.includes("purToggleSel('p1'"));
+chk('purchase: fiyat geçmişi butonu çıktı (aynı kodlu eski alış var)', pl.includes("purPriceHistoryModal('p1')"));
+// _purHistLine: geçmiş satırı XSS-güvenli mi
+const phl=String(_purHistLine(global.purchaseItems[1]));
+chk('purchase: geçmiş satırında tedarikçi/proje kaçırıldı', phl.includes('EskiTed&lt;img') && phl.includes('Eski&lt;b&gt;') && phl.includes('42.5'));
 
 // ── renderPurchaseOrders (toplu sipariş grupları) ──
 global.PO_STATUS={DRAFT:{icon:'📝',label:'Taslak',color:'#f5a623'}, ORDERED:{icon:'📦',label:'Sipariş',color:'#2980b9'}};
