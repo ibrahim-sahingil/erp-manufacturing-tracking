@@ -172,6 +172,53 @@
   .stat-sub{font-size:11px;color:var(--muted);margin-top:6px;}
   .progress-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:16px;}
   .progress-fill{height:100%;background:var(--acc-grad);border-radius:2px;transition:width .5s;}
+  /* ── DASHBOARD HERO (konsept bento) ── */
+  .dash-phead{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:20px;}
+  .dash-phead h1{font-size:24px;font-weight:700;letter-spacing:-.022em;margin:0;}
+  .dash-phead .sub{color:var(--muted);font-size:12.5px;margin-top:4px;}
+  .dash-phead .grow{flex:1;}
+  .hbtn{border:none;cursor:pointer;font-weight:650;font-size:12.5px;border-radius:10px;padding:9px 16px;font-family:inherit;transition:transform .12s ease,box-shadow .12s ease;white-space:nowrap;}
+  .hbtn:hover{transform:translateY(-1px);}
+  .hbtn.pri{background:var(--acc-grad);color:var(--acc-ink);}
+  .hbtn.pri:hover{box-shadow:0 6px 18px color-mix(in srgb,var(--acc-2) 35%,transparent);}
+  .hbtn.sec{background:var(--panel-solid);border:1px solid var(--line);color:var(--ink-2);}
+  .bento{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+  .b-hero{grid-column:span 2;grid-row:span 2;display:flex;flex-direction:column;}
+  @media(max-width:1080px){.bento{grid-template-columns:repeat(2,1fr);}.b-hero{grid-row:auto;}}
+  @media(max-width:640px){.bento{grid-template-columns:1fr;}.b-hero{grid-column:span 1;}}
+  .dchart{width:100%;flex:1;min-height:150px;}
+  .dchart-x{display:flex;justify-content:space-between;padding:2px 4px 0;font-size:9.5px;color:var(--muted);font-weight:650;}
+  .dchart-foot{margin-top:10px;padding-top:10px;border-top:1px solid var(--line-soft);font-size:11.5px;color:var(--muted);}
+  .dchart-foot b{color:var(--text);}
+  .dgrid2{display:grid;grid-template-columns:1.55fr 1fr;gap:16px;margin-bottom:16px;}
+  @media(max-width:1000px){.dgrid2{grid-template-columns:1fr;}}
+  .dept-row{display:flex;align-items:center;gap:14px;padding:9px 2px;border-bottom:1px solid var(--line-soft);}
+  .dept-row:last-child{border-bottom:none;}
+  .dept-row .ring{flex-shrink:0;}
+  .dr-info{flex:1;min-width:0;}
+  .dr-info b{display:block;font-size:13.5px;font-weight:650;}
+  .dr-info span{font-size:11.5px;color:var(--muted);}
+  .st{display:inline-flex;align-items:center;font-size:10.5px;font-weight:700;border-radius:10px;padding:3px 10px;white-space:nowrap;}
+  .st.run{background:var(--ok-soft);color:var(--ok);}
+  .st.plan{background:var(--info-soft);color:var(--info);}
+  .st.wait{background:var(--warn-soft);color:var(--warn);}
+  .st.lock{background:var(--err-soft);color:var(--err);}
+  .worow{display:flex;align-items:center;gap:12px;padding:9px 2px;border-bottom:1px solid var(--line-soft);}
+  .worow:last-child{border-bottom:none;}
+  .wic{width:34px;height:34px;border-radius:9px;background:var(--acc-soft);color:var(--accent);font-size:11px;font-weight:800;display:grid;place-items:center;flex-shrink:0;}
+  .wr-info{flex:1;min-width:0;}
+  .wr-info b{display:block;font-size:12.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .wr-info span{font-size:11px;color:var(--muted);}
+  .wbar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:5px;}
+  .wbar i{display:block;height:100%;background:var(--acc-grad);border-radius:2px;}
+  .feed2{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;}
+  @media(max-width:900px){.feed2{grid-template-columns:1fr;}}
+  .fi{display:flex;gap:10px;padding:7px 2px;align-items:flex-start;}
+  .fdot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0;}
+  .ft{font-size:12px;color:var(--ink-2);line-height:1.45;min-width:0;}
+  .ft b{color:var(--text);}
+  .ft time{display:block;font-size:10px;color:var(--muted);margin-top:1px;}
+  .dash-empty{color:var(--muted);font-size:12px;padding:18px 0;text-align:center;}
   /* PROJECT CARDS */
   .project-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;margin-bottom:28px;}
   .project-card{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
@@ -708,12 +755,11 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
     </div>
   </div>
 
-<!-- DASHBOARD -->
+<!-- DASHBOARD (tasarım 2026: konsept bento hero + mevcut proje→bölüm→parça katmanları) -->
 <div class="view active" id="view-dashboard">
-  <div class="section-title">DURUM PANELİ</div>
-  <div class="section-sub">Proje → Bölüm → Parçalar</div>
-  <div class="stats-row" id="stats-row"></div>
+  <div id="dash-hero"></div>
 
+  <div class="sect-label" style="margin-bottom:10px">📁 PROJELER <span style="font-weight:400;text-transform:none;letter-spacing:0">— detay için karta tıklayın (proje → bölüm → parça)</span></div>
   <!-- Breadcrumb -->
   <div class="breadcrumb" id="breadcrumb"></div>
 
@@ -3177,40 +3223,172 @@ function awaitingPlanningStripHTML(waitingParts, style){
     + `</div>`;
 }
 
-function renderStats(){
-  // Planlama bekleyen parçalar üst istatistiklere katılmaz (detaysız özet)
+// ─── DASHBOARD HERO (tasarım 2026 — konsept dashboard ekranı) ───
+// Eski 4'lü stat şeridinin yerini konsept bento'su aldı: selamlama + üretim
+// akışı grafiği (son 7 gün, canlı loglardan) + 4 KPI + Bugün Atölyede (bölüm
+// halkaları + aktif iş emirleri) + son hareketler. ESKİ BİLGİLER KORUNDU:
+// toplam parça/adet, planlama bekleyen, malzemesi yolda, ret adedi KPI alt
+// satırlarında yaşıyor. Fonksiyon adı aynı kaldı (renderDashboard çağırıyor).
+async function renderStats(){
+  const el = document.getElementById('dash-hero');
+  if(!el) return;
+
+  // Selamlama + tarih
+  const now=new Date(); const hr=now.getHours();
+  const greet = hr<6?'İyi geceler':hr<12?'Günaydın':hr<18?'İyi günler':'İyi akşamlar';
+  const fname = ((currentUser&&(currentUser.display_name||currentUser.username))||'').split(' ')[0];
+  const dateTxt = now.toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  // Temel sayılar (eski stat şeridinin hesapları)
   const waitingParts=parts.filter(isPartAwaitingPlanning);
   const waitMat=waitingParts.filter(partHasMaterialOnWay).length;
   const waitRest=waitingParts.length-waitMat;
   const active=parts.filter(p=>!isPartAwaitingPlanning(p));
-  const total=active.length;
-  const done=active.filter(p=>p.status==='done').length;
   const pend=active.filter(p=>p.status==='pending').length;
-  const rej=active.filter(p=>p.status==='reject').length;
   const qd=active.reduce((s,p)=>s+(parseInt(p.qty_done)||0),0);
   const qr=active.reduce((s,p)=>s+(parseInt(p.qty_reject)||0),0);
   const qt=active.reduce((s,p)=>s+(parseInt(p.qty)||0),0);
-  // Bekliyor = toplam sipariş adeti - yapılan - reddedilen
-  const qp = Math.max(0, qt - qd - qr);
-  // Adet bazlı yüzde
+  const qp=Math.max(0, qt-qd-qr);
   const pct=qt?Math.round(qd/qt*100):0;
-  document.getElementById('stats-row').innerHTML=`
-    <div class="stat-card" style="--c:var(--accent)">
-      <div class="stat-label">Toplam Parça</div><div class="stat-value">${total}</div>
-      <div class="stat-sub">${qt} adet · Tüm projeler${waitMat?` · 🛒 ${waitMat} malzemesi hazır/siparişte`:''}${waitRest?` · ⏳ ${waitRest} parça planlama bekliyor`:''}</div>
-      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+  const projCount=[...new Set(parts.map(p=>p.project||'(Proje Yok)'))].length;
+  const openWos=workOrders.filter(w=>w.status==='planned'||w.status==='inprogress');
+  const inprogWos=workOrders.filter(w=>w.status==='inprogress').length;
+  const pi=Array.isArray(purchaseItems)?purchaseItems:[];
+  const inWh=pi.filter(i=>i.status==='IN_WAREHOUSE'||i.status==='IN_STOCK').length;
+  const onWay=pi.filter(i=>i.status==='ORDERED'||i.status==='RECEIVED').length;
+
+  // Son 7 gün üretim akışı (canlı loglardan — gte adapter desteği tasarım turunda eklendi)
+  const from=new Date(now); from.setDate(now.getDate()-6);
+  let logs7=[];
+  try{ logs7=await dbGet('logs',`created_at=gte.${from.toISOString().slice(0,10)}T00:00:00&order=created_at.desc`);}catch(e){}
+  if(!Array.isArray(logs7)) logs7=[];
+  const days=[]; for(let i=6;i>=0;i--){const d=new Date(now); d.setDate(now.getDate()-i); days.push(d);}
+  const series=days.map(d=>{const k=d.toISOString().slice(0,10);
+    return logs7.filter(l=>String(l.created_at).slice(0,10)===k).reduce((s,l)=>s+(parseInt(l.qty_done)||0),0);});
+  const smax=Math.max(1,...series);
+  const px=i=>Math.round((30+i*(470/6))*10)/10, py=v=>Math.round((130-(v/smax)*105)*10)/10;
+  const linePts=series.map((v,i)=>px(i)+','+py(v)).join(' ');
+  const total7=series.reduce((s,v)=>s+v,0);
+
+  // Bölümler (ad bazlı birleşik) — halka yüzdesi = tamamlanan/planlanan adet
+  const dList=Array.isArray(depts)?depts:[];
+  const dAgg={};
+  active.forEach(p=>{
+    if(!p.department_id) return;
+    const d=dList.find(x=>x.id===p.department_id); if(!d||!d.name) return;
+    const k=d.name.trim();
+    dAgg[k]=dAgg[k]||{q:0,done:0,n:0};
+    dAgg[k].q+=parseInt(p.qty)||0; dAgg[k].done+=parseInt(p.qty_done)||0; dAgg[k].n++;
+  });
+  const deptRows=Object.entries(dAgg).map(([name,d])=>({name, ...d,
+    pct: d.q?Math.round(d.done/d.q*100):0})).sort((a,b)=>b.n-a.n).slice(0,6);
+  const CIRC=163.4; // 2πr, r=26
+
+  // Aktif iş emirleri (en yeni 5) — ilerleme bağlı parçaların adetlerinden
+  const woProg=w=>{
+    const ids=new Set(workOrderParts.filter(x=>x.work_order_id===w.id).map(x=>x.part_id));
+    const ps=parts.filter(p=>ids.has(p.id));
+    const q=ps.reduce((s,p)=>s+(parseInt(p.qty)||0),0);
+    return {n:ids.size, pct: q?Math.round(ps.reduce((s,p)=>s+(parseInt(p.qty_done)||0),0)/q*100):0};
+  };
+  const woRows=openWos.slice().sort((a,b)=>new Date(b.start_datetime||0)-new Date(a.start_datetime||0)).slice(0,5);
+
+  // Son hareketler (son 8 log)
+  const feed=logs7.slice(0,8).map(l=>{
+    const p=parts.find(x=>x.id===l.part_id);
+    const d=new Date(l.created_at);
+    const isToday=String(l.created_at).slice(0,10)===now.toISOString().slice(0,10);
+    return { name:p?p.name:'(silinmiş parça)', proj:p&&p.project?p.project:'',
+      user:l.username||'', note:l.note||'',
+      qd:parseInt(l.qty_done)||0, qr:parseInt(l.qty_reject)||0, qpn:parseInt(l.qty_pending)||0,
+      t:(isToday?'bugün ':d.toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit'})+' ')+d.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}) };
+  });
+
+  const stPill=(d)=> d.q&&d.done>=d.q ? h`<span class="st run">tamam</span>`
+    : d.done>0 ? h`<span class="st plan">devam</span>` : h`<span class="st wait">bekliyor</span>`;
+
+  el.innerHTML = h`
+    <div class="dash-phead">
+      <div>
+        <h1>${greet}${fname?', '+fname:''}</h1>
+        <div class="sub">${dateTxt} · ${projCount} proje, ${openWos.length} açık iş emri${waitRest?` · ⏳ ${waitRest} parça planlama bekliyor`:''}${waitMat?` · 🛒 ${waitMat} parçanın malzemesi hazır/siparişte`:''}</div>
+      </div>
+      <div class="grow"></div>
+      <button class="hbtn sec" onclick="switchTab('stats')">📈 İstatistik</button>
+      <button class="hbtn pri" onclick="switchTab('planning')">+ Yeni İş Emri</button>
     </div>
-    <div class="stat-card" style="--c:var(--green)">
-      <div class="stat-label">✅ Tamamlandı</div><div class="stat-value">${done}</div>
-      <div class="stat-sub">${qd} adet · %${pct}</div>
+    <div class="bento">
+      <div class="schart b-hero">
+        <div class="sc-title">Üretim Akışı <span>son 7 gün · tamamlanan adet</span></div>
+        <svg class="dchart" viewBox="0 0 520 150" preserveAspectRatio="none">
+          <defs><linearGradient id="dashAg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--acc)" stop-opacity=".28"/>
+            <stop offset="100%" stop-color="var(--acc)" stop-opacity="0"/>
+          </linearGradient></defs>
+          ${raw([0.25,0.5,0.75].map(f=>`<line x1="30" y1="${130-105*f}" x2="500" y2="${130-105*f}" stroke="var(--line-soft)" stroke-width="1"/>`).join(''))}
+          <polygon points="${raw('30,135 '+linePts+' 500,135')}" fill="url(#dashAg)"/>
+          <polyline points="${raw(linePts)}" fill="none" stroke="var(--acc)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+          ${raw(series.length?`<circle cx="${px(6)}" cy="${py(series[6])}" r="3.4" fill="var(--acc)"/>`:'')}
+        </svg>
+        <div class="dchart-x">${days.map(d=>h`<span>${d.toLocaleDateString('tr-TR',{weekday:'short'})}</span>`)}</div>
+        <div class="dchart-foot">7 günde <b class="num">${total7}</b> adet tamamlandı · toplam ilerleme <b class="num">${qd}/${qt}</b> adet (%${pct})</div>
+      </div>
+      <div class="stat-card" style="--c:var(--accent)">
+        <div class="stat-label">Aktif Proje</div><div class="stat-value">${projCount}</div>
+        <div class="stat-sub">${parts.length} parça · ${qt} adet toplam</div>
+      </div>
+      <div class="stat-card" style="--c:var(--info)">
+        <div class="stat-label">Açık İş Emri</div><div class="stat-value">${openWos.length}</div>
+        <div class="stat-sub">${inprogWos} devam ediyor · ${openWos.length-inprogWos} planlı</div>
+      </div>
+      <div class="stat-card" style="--c:var(--yellow)">
+        <div class="stat-label">Bekleyen Parça</div><div class="stat-value">${pend+waitingParts.length}</div>
+        <div class="stat-sub">${qp}/${qt} adet bekliyor${qr?` · ❌ ${qr} adet ret`:''}</div>
+      </div>
+      <div class="stat-card" style="--c:var(--green)">
+        <div class="stat-label">Depodaki Kalem</div><div class="stat-value">${inWh}</div>
+        <div class="stat-sub">${onWay?`🚚 ${onWay} mal kabulü yolda`:'kalem depoda kayıtlı'}</div>
+      </div>
     </div>
-    <div class="stat-card" style="--c:var(--yellow)">
-      <div class="stat-label">⏳ Bekliyor</div><div class="stat-value">${pend}</div>
-      <div class="stat-sub">${qp} adet bekliyor</div>
+    <div class="sect-label" style="margin-bottom:12px">🏭 BUGÜN ATÖLYEDE</div>
+    <div class="dgrid2">
+      <div class="schart">
+        <div class="sc-title">Bölümler <span>tamamlanan / planlanan adet</span></div>
+        ${deptRows.length?deptRows.map(d=>h`
+          <div class="dept-row">
+            <svg class="ring" width="52" height="52" viewBox="0 0 60 60">
+              <circle cx="30" cy="30" r="26" fill="none" stroke="var(--border)" stroke-width="5"/>
+              <circle cx="30" cy="30" r="26" fill="none" stroke="var(--acc)" stroke-width="5" stroke-linecap="round"
+                stroke-dasharray="${raw(String(CIRC))}" stroke-dashoffset="${raw(String(Math.round(CIRC*(1-Math.min(100,d.pct)/100)*10)/10))}"
+                transform="rotate(-90 30 30)"/>
+              <text x="30" y="34" text-anchor="middle" font-size="12" font-weight="700" fill="var(--text)">%${d.pct}</text>
+            </svg>
+            <div class="dr-info"><b>${d.name}</b><span>${d.n} parça · ${d.done}/${d.q} adet</span></div>
+            ${stPill(d)}
+          </div>`):h`<div class="dash-empty">Bölüme atanmış parça yok</div>`}
+      </div>
+      <div class="schart">
+        <div class="sc-title">Aktif İş Emirleri <span>${openWos.length} kayıt</span></div>
+        ${woRows.length?woRows.map(w=>{const pr=woProg(w);return h`
+          <div class="worow">
+            <div class="wic">İE</div>
+            <div class="wr-info">
+              <b>${w.project_name||'(Proje Yok)'}</b>
+              <span>${pr.n} parça${w.assigned_user?` · 👷 ${w.assigned_user}`:''}${w.workspace_name?` · 📍 ${w.workspace_name}`:''}</span>
+              <div class="wbar"><i style="width:${raw(String(pr.pct))}%"></i></div>
+            </div>
+            ${w.status==='inprogress'?h`<span class="st run">devam</span>`:h`<span class="st plan">planlı</span>`}
+          </div>`}):h`<div class="dash-empty">Açık iş emri yok</div>`}
+      </div>
     </div>
-    <div class="stat-card" style="--c:var(--red)">
-      <div class="stat-label">❌ Reddedildi</div><div class="stat-value">${rej}</div>
-      <div class="stat-sub">${qr} adet reddedildi</div>
+    <div class="schart" style="margin-bottom:24px">
+      <div class="sc-title">Son Hareketler <span>son 7 gün</span></div>
+      ${feed.length?h`<div class="feed2">${feed.map(f=>h`
+        <div class="fi">
+          <i class="fdot" style="background:${raw(f.qr?'var(--err)':f.qd?'var(--ok)':'var(--warn)')}"></i>
+          <div class="ft"><b>${f.name}</b>${f.proj?` — ${f.proj}`:''} · ${[f.qd?`✅ ${f.qd}`:'',f.qpn?`⏳ ${f.qpn}`:'',f.qr?`❌ ${f.qr}`:''].filter(Boolean).join(' ')} adet
+            <time>${f.t}${f.user?` · ${f.user}`:''}${f.note?` · 📝 ${f.note}`:''}</time></div>
+        </div>`)}</div>`:h`<div class="dash-empty">Son 7 günde üretim hareketi yok</div>`}
     </div>`;
 }
 

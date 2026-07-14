@@ -721,6 +721,30 @@ chk('stsum: tamamlanan KPI basıldı', ss.includes('>4</div>'));
 chk('stsum: hafta çubukları inline height aldı', ss.includes('class="bars"') && ss.includes('height:100%'));
 chk('stsum: ay seçici + CSV butonu (raw) korundu', ss.includes('stsum-month') && ss.includes('stsumCsv()'));
 
+// ── renderStats (dashboard hero — tasarım 2026) ──
+global.currentUser={display_name:'Dev<b>'};
+global.PUR_MAT_ONWAY=new Set(['ORDERED','RECEIVED','IN_WAREHOUSE','IN_STOCK']);
+global.workOrders=[{id:'w1', status:'inprogress', project_name:'WPrj'+EVIL, assigned_user:'Usta<b>', workspace_name:'Alan<i>', start_datetime:'2026-07-14T08:00:00'}];
+global.workOrderParts=[{work_order_id:'w1', part_id:'dp1'}];
+global.depts=[{id:'d1', name:'Böl'+EVIL}];
+global.purchaseItems=[{status:'IN_WAREHOUSE'},{status:'ORDERED'}];
+global.parts=[{id:'dp1', name:'DParça'+EVIL, project:'DPrj<script>y</script>', department_id:'d1', status:'pending', qty:10, qty_done:4, qty_reject:0}];
+global.dbGet=async(t)=> t==='logs'
+  ? [{part_id:'dp1', username:'DUser<i>', qty_done:3, qty_pending:0, qty_reject:1, note:'dn<b>', created_at:new Date().toISOString().slice(0,10)+'T09:00:00'}] : [];
+eval(grab('partHasMaterialOnWay'));
+eval(grab('renderStats'));
+await renderStats();
+const dh=store['dash-hero']||'';
+console.log('\nrenderStats (dashboard hero):');
+chk('dash: kullanıcı adı kaçırıldı (selamlama)', dh.includes('Dev&lt;b&gt;') && !dh.includes('Dev<b>'));
+chk('dash: iş emri projesi onerror kaçırıldı', dh.includes('WPrj&lt;img') && !dh.includes('WPrj'+EVIL));
+chk('dash: iş emri personel/alan kaçırıldı', dh.includes('Usta&lt;b&gt;') && dh.includes('Alan&lt;i&gt;'));
+chk('dash: bölüm adı kaçırıldı', dh.includes('Böl&lt;img'));
+chk('dash: akış parça adı/kullanıcı/not kaçırıldı', dh.includes('DParça&lt;img') && dh.includes('DUser&lt;i&gt;') && dh.includes('dn&lt;b&gt;'));
+chk('dash: SVG grafik (raw) korundu', dh.includes('<polyline') && dh.includes('dashAg'));
+chk('dash: halka/ilerleme çubuğu (raw) korundu', dh.includes('stroke-dasharray') && dh.includes('class="wbar"'));
+chk('dash: nav butonları (raw) korundu', dh.includes("switchTab('planning')") && dh.includes("switchTab('stats')"));
+
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);
 }
