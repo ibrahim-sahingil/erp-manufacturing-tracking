@@ -376,27 +376,32 @@
   /* ORDERS */
   .order-item-row{display:grid;grid-template-columns:1fr 1fr 80px 32px;gap:8px;margin-bottom:8px;align-items:center;}
   @media(max-width:600px){.order-item-row{grid-template-columns:1fr 60px 28px;}.oir-hide{display:none;}}
-  .order-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 24px;margin-bottom:14px;transition:border .2s;}
+  .order-card{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;padding:20px 24px;margin-bottom:14px;transition:border-color .2s,box-shadow .2s;}
+  .order-card:hover{border-color:var(--acc-line);box-shadow:var(--hover-shadow);}
+  .pstats{display:flex;gap:22px;margin:4px 0 10px;flex-wrap:wrap;}
+  .ps b{display:block;font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .ps span{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:650;}
+  .pfoot{display:flex;font-size:11.5px;color:var(--muted);margin-bottom:12px;}
   .order-card:hover{border-color:var(--accent);}
   .order-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
-  .order-card-title{font-family:var(--font-display);font-size:22px;letter-spacing:2px;color:var(--accent);}
-  .order-card-customer{font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-top:2px;}
-  .order-status-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-family:var(--font-mono);font-size:11px;font-weight:600;white-space:nowrap;}
-  .osb-active{background:rgba(46,204,113,.15);color:var(--green);border:1px solid rgba(46,204,113,.3);}
-  .osb-pending{background:rgba(243,156,18,.12);color:var(--yellow);border:1px solid rgba(243,156,18,.3);}
-  .osb-completed{background:var(--info-soft);color:var(--info);border:1px solid transparent;}
-  .osb-cancelled{background:rgba(127,140,141,.12);color:var(--muted);border:1px solid rgba(127,140,141,.3);}
+  .order-card-title{font-size:17px;font-weight:700;letter-spacing:-.01em;color:var(--ink);}
+  .order-card-customer{font-size:12px;color:var(--muted);margin-top:2px;}
+  .order-status-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:12px;font-size:10.5px;font-weight:700;white-space:nowrap;}
+  .osb-active{background:var(--ok-soft);color:var(--ok);}
+  .osb-pending{background:var(--warn-soft);color:var(--warn);}
+  .osb-completed{background:var(--info-soft);color:var(--info);}
+  .osb-cancelled{background:color-mix(in srgb,var(--mut) 13%,transparent);color:var(--muted);}
   .order-meta-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:14px;}
-  .order-meta-item{background:var(--surface2);border-radius:6px;padding:8px 12px;}
-  .order-meta-item label{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px;letter-spacing:1px;}
-  .order-meta-item span{font-family:var(--font-mono);font-size:12px;font-weight:600;}
+  .order-meta-item{background:var(--surface2);border-radius:9px;padding:8px 12px;}
+  .order-meta-item label{font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px;letter-spacing:.08em;}
+  .order-meta-item span{font-size:12.5px;font-weight:600;}
   .order-items-table{width:100%;border-collapse:collapse;margin-bottom:10px;}
-  .order-items-table th{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 10px;border-bottom:1px solid var(--border);letter-spacing:1px;}
-  .order-items-table td{font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text);}
+  .order-items-table th{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 10px;border-bottom:1px solid var(--line-soft);letter-spacing:.08em;}
+  .order-items-table td{font-size:12.5px;padding:8px 10px;border-bottom:1px solid var(--line-soft);color:var(--text);}
   .order-items-table tr:last-child td{border-bottom:none;}
-  .order-card-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
-  .order-price{font-family:var(--font-display);font-size:26px;color:var(--accent);}
-  .order-price-sub{font-family:var(--font-mono);font-size:10px;color:var(--muted);}
+  .order-card-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line-soft);}
+  .order-price{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent);}
+  .order-price-sub{font-size:10.5px;color:var(--muted);}
   .order-actions{display:flex;gap:8px;}
   /* PLANNING */
   .planning-tabs{display:flex;gap:4px;margin-bottom:24px;border-bottom:1px solid var(--border);padding-bottom:0;flex-wrap:wrap;}
@@ -797,32 +802,39 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 
 <!-- ORDERS -->
 <div class="view" id="view-orders">
-  <div class="section-title">SİPARİŞ FORMLARI</div>
-  <div class="section-sub">Proje siparişlerini oluştur ve yönet</div>
+  <!-- tasarım 2026: konsept phead + form varsayılan kapalı (+ Yeni Sipariş açar) -->
+  <div class="dash-phead">
+    <div>
+      <h1>Siparişler</h1>
+      <div class="sub" id="orders-sub">Proje siparişlerini oluştur ve yönet</div>
+    </div>
+    <div class="grow"></div>
+    <button class="hbtn pri" id="order-form-toggle" onclick="toggleOrderForm()">+ Yeni Sipariş</button>
+  </div>
 
-  <!-- YENİ SİPARİŞ FORMU -->
-  <div class="form-card" id="order-form-card">
-    <div style="font-family:var(--font-display);font-size:20px;letter-spacing:2px;color:var(--accent);margin-bottom:20px">+ YENİ SİPARİŞ</div>
+  <!-- YENİ SİPARİŞ FORMU (toggleOrderForm ile açılır; yetkisize hiç görünmez) -->
+  <div class="form-card" id="order-form-card" style="display:none">
+    <div style="font-size:16px;font-weight:700;margin-bottom:20px">+ Yeni Sipariş</div>
 
-    <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">📁 Proje Bilgileri</div>
+    <div class="sect-label" style="margin-bottom:10px">📁 Proje Bilgileri</div>
     <div class="form-row">
       <div class="form-group"><label>Proje Adı *</label><input type="text" id="o-project" placeholder="Örn: PRJ-2024-A"></div>
       <div class="form-group"><label>Konum / Tesis</label><input type="text" id="o-location" placeholder="Örn: İstanbul, Fabrika-3"></div>
       <div class="form-group"><label>Teslim Süresi (Gün) *</label><input type="number" id="o-days" placeholder="Örn: 30" min="1"></div>
     </div>
 
-    <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px;margin-top:4px">👤 Müşteri Bilgileri</div>
+    <div class="sect-label" style="margin-bottom:10px;margin-top:4px">👤 Müşteri Bilgileri</div>
     <div class="form-row">
       <div class="form-group"><label>Müşteri Adı *</label><input type="text" id="o-customer" placeholder="Örn: ABC Sanayi A.Ş."></div>
       <div class="form-group"><label>E-posta</label><input type="email" id="o-email" placeholder="info@firma.com"></div>
       <div class="form-group"><label>Telefon</label><input type="tel" id="o-phone" placeholder="+90 555 000 00 00"></div>
     </div>
 
-    <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px;margin-top:4px">🔧 Sipariş Kalemleri</div>
+    <div class="sect-label" style="margin-bottom:10px;margin-top:4px">🔧 Sipariş Kalemleri</div>
     <div id="order-items-list"></div>
     <button class="btn btn-ghost btn-sm" onclick="addOrderItem()" style="margin-bottom:16px">+ Kalem Ekle</button>
 
-    <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px;margin-top:4px">💰 Fiyat & Onay</div>
+    <div class="sect-label" style="margin-bottom:10px;margin-top:4px">💰 Fiyat & Onay</div>
     <div class="form-row">
       <div class="form-group"><label>Proje Fiyatı</label>
         <div style="display:flex;gap:8px">
@@ -857,7 +869,7 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 
   <!-- SİPARİŞ LİSTESİ -->
   <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-    <input type="text" id="order-search" placeholder="Proje veya müşteri ara..." oninput="renderOrders()" style="flex:1;min-width:180px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 14px;outline:none">
+    <input type="text" id="order-search" placeholder="🔍 Proje veya müşteri ara..." oninput="renderOrders()" style="flex:1;min-width:180px;background:var(--panel-solid);border:1px solid var(--line);border-radius:10px;color:var(--text);font-family:inherit;font-size:13px;padding:10px 14px;outline:none">
     <select class="filter-select" id="order-status-filter" onchange="renderOrders()">
       <option value="">Tüm Durumlar</option>
       <option value="active">Aktif</option>
@@ -4653,6 +4665,17 @@ async function loadOrders() {
   orders = Array.isArray(data) ? data : [];
 }
 
+// (tasarım 2026) Yeni sipariş formu varsayılan kapalı; buton veya editOrder açar
+let _orderFormOpen = false;
+function toggleOrderForm(open){
+  _orderFormOpen = (typeof open==='boolean') ? open : !_orderFormOpen;
+  const formCard = document.getElementById('order-form-card');
+  if(formCard) formCard.style.display = _orderFormOpen ? 'block' : 'none';
+  const btn = document.getElementById('order-form-toggle');
+  if(btn) btn.textContent = _orderFormOpen ? '✕ Formu Kapat' : '+ Yeni Sipariş';
+  if(_orderFormOpen && formCard) formCard.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
 async function renderOrders() {
   // Düzenleme yetkisi kontrolü
   const canEdit = !currentUser || currentUser.role === 'developer' ||
@@ -4661,9 +4684,15 @@ async function renderOrders() {
       return p.includes('orders_edit') || p.includes('orders');
     })();
 
-  // Yeni sipariş formunu göster/gizle
+  // Yeni sipariş formu: yetkisize hiç görünmez; yetkiliye toggle ile açılır
+  // (tasarım 2026 — konsept gibi form varsayılan kapalı, "+ Yeni Sipariş" açar)
   const formCard = document.getElementById('order-form-card');
-  if(formCard) formCard.style.display = canEdit ? 'block' : 'none';
+  if(formCard) formCard.style.display = (canEdit && _orderFormOpen) ? 'block' : 'none';
+  const formToggle = document.getElementById('order-form-toggle');
+  if(formToggle){
+    formToggle.style.display = canEdit ? '' : 'none';
+    formToggle.textContent = _orderFormOpen ? '✕ Formu Kapat' : '+ Yeni Sipariş';
+  }
 
   // Onaylayan personel dropdown güncelle
   const sel = document.getElementById('o-approved');
@@ -4678,6 +4707,15 @@ async function renderOrders() {
   // satın alma kalemleri (iptaller hariç, para birimi bazında toplanır)
   const freshPi = await dbGet('purchase_items');
   if(Array.isArray(freshPi)) purchaseItems = freshPi;
+
+  // Başlık altı özet (konsept phead sub'ı — gerçek sayılar)
+  const subEl = document.getElementById('orders-sub');
+  if(subEl){
+    const nAct = orders.filter(o=>o.status==='active').length;
+    subEl.textContent = orders.length
+      ? `${orders.length} sipariş · ${nAct} aktif · ${parts.length} üretim parçası`
+      : 'Proje siparişlerini oluştur ve yönet';
+  }
 
   const search = (document.getElementById('order-search')?.value||'').toLowerCase();
   const statusF = document.getElementById('order-status-filter')?.value||'';
@@ -4722,6 +4760,18 @@ async function renderOrders() {
       }
     });
     const matStr = Object.entries(matTotals).map(([c,t])=>purFmtMoney(t)+' '+c).join(' + ');
+    // (tasarım 2026 — konsept pcard) proje istatistikleri + ilerleme + termin
+    const projParts = parts.filter(p=>p.project===o.project_name);
+    const pQt = projParts.reduce((s,p)=>s+(parseInt(p.qty)||0),0);
+    const pQd = projParts.reduce((s,p)=>s+(parseInt(p.qty_done)||0),0);
+    const pPct = pQt?Math.round(pQd/pQt*100):0;
+    const nWo = workOrders.filter(w=>w.project_name===o.project_name).length;
+    let terminStr='', terminLate=false;
+    if(o.delivery_days && o.created_at){
+      const t=new Date(o.created_at); t.setDate(t.getDate()+parseInt(o.delivery_days));
+      terminLate = t<new Date() && o.status==='active';
+      terminStr = t.toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric'});
+    }
     return h`<div class="order-card${pinned?' pinned':''}" style="position:relative">
       <button class="pin-btn${pinned?' active':''}" onclick="togglePin('order','${raw(o.id)}',event)" title="${pinned?'Sabitlemeyi kaldır':'Sabitle'}">📌</button>
       <div class="order-card-header" style="padding-right:32px">
@@ -4729,8 +4779,19 @@ async function renderOrders() {
           <div class="order-card-title">${o.project_name||'—'}</div>
           <div class="order-card-customer">👤 ${o.customer_name||'—'} ${o.customer_email?h`· ${o.customer_email}`:''} ${o.customer_phone?h`· ${o.customer_phone}`:''}</div>
         </div>
-        <span class="order-status-badge ${st.cls}"><span class="dot" style="background:currentColor"></span>${st.lbl}</span>
+        <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          ${terminStr?h`<span style="font-size:11px;color:var(--muted)">Termin: <b class="num" style="color:${raw(terminLate?'var(--err)':'var(--text)')}">${terminStr}</b></span>`:''}
+          <span class="order-status-badge ${st.cls}"><span class="dot" style="background:currentColor"></span>${st.lbl}</span>
+        </span>
       </div>
+      ${projParts.length?h`<div class="pstats">
+        <div class="ps"><b class="num">${projParts.length}</b><span>parça</span></div>
+        <div class="ps"><b class="num">${pQt}</b><span>adet</span></div>
+        <div class="ps"><b class="num">${nWo}</b><span>iş emri</span></div>
+        <div class="ps"><b class="num">${matStr||'—'}</b><span>malzeme</span></div>
+      </div>
+      <div class="wbar" style="margin-bottom:4px"><i style="width:${raw(String(pPct))}%"></i></div>
+      <div class="pfoot"><span class="num">%${pPct} tamamlandı · ${pQd}/${pQt} adet</span></div>`:''}
       <div class="order-meta-grid">
         <div class="order-meta-item"><label>📍 Konum</label><span>${o.location||'—'}</span></div>
         <div class="order-meta-item"><label>⏱ Teslim Süresi</label><span>${o.delivery_days?o.delivery_days+' Gün':'—'}</span></div>
@@ -4849,6 +4910,7 @@ function editOrder(id) {
   const items = Array.isArray(o.items)?o.items:(typeof o.items==='string'?JSON.parse(o.items||'[]'):[]);
   items.forEach(it=>addOrderItem(it.name,it.desc,it.qty));
   document.getElementById('o-save-btn').textContent='💾 Güncelle';
+  toggleOrderForm(true); // düzenlemede form kapalıysa açılır (tasarım 2026)
   document.getElementById('order-form-card').scrollIntoView({behavior:'smooth'});
 }
 
