@@ -26,6 +26,7 @@ global._hval = v => (v==null||v===false||v===true)?'':(v&&v.__html)?v.toString()
 global.h = (strings,...vals)=>{ let out=strings[0]; for(let i=0;i<vals.length;i++) out+=_hval(vals[i])+strings[i+1]; return raw(out); };
 // Temizlik turu helper'ları — render fonksiyonları içinden çağrılıyor
 eval(grab('INP'));
+eval(grab('ico')); // tasarım 2026: render'lar SVG ikon yardımcısını çağırır
 
 const store={};
 // Elementler id başına önbelleklenir ki test .value atayabilsin (stat-start vb.)

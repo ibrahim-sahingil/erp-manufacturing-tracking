@@ -709,7 +709,7 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
           style="padding-right:44px">
         <button onclick="togglePasswordVisibility()" id="pw-toggle"
           style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:4px;line-height:1"
-          title="Şifreyi göster/gizle">👁</button>
+          title="Şifreyi göster/gizle"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;flex-shrink:0"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg></button>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
@@ -760,8 +760,8 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
         <div class="user-badge-name" id="user-badge-name">—</div>
         <div class="user-badge-role" id="user-badge-role">—</div>
       </div>
-      <button class="logout-btn" onclick="openChangePassword()" title="Şifre Değiştir" style="font-size:12px">🔑</button>
-      <button class="logout-btn" onclick="doLogout()" title="Çıkış Yap">⏏</button>
+      <button class="logout-btn" onclick="openChangePassword()" title="Şifre Değiştir" style="font-size:12px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;flex-shrink:0"><circle cx="8" cy="15" r="4"/><path d="M11 12L20 3M16 7l3 3M13 10l2 2"/></svg></button>
+      <button class="logout-btn" onclick="doLogout()" title="Çıkış Yap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;flex-shrink:0"><path d="M14 4h6v16h-6M10 8l-4 4 4 4M6 12h11"/></svg></button>
     </div>
   </div>
 </header>
@@ -787,7 +787,7 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 <div class="view active" id="view-dashboard">
   <div id="dash-hero"></div>
 
-  <div class="sect-label" style="margin-bottom:10px">📁 PROJELER <span style="font-weight:400;text-transform:none;letter-spacing:0">— detay için karta tıklayın (proje → bölüm → parça)</span></div>
+  <div class="sect-label" style="margin-bottom:10px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;flex-shrink:0"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg> PROJELER <span style="font-weight:400;text-transform:none;letter-spacing:0">— detay için karta tıklayın (proje → bölüm → parça)</span></div>
   <!-- Breadcrumb -->
   <div class="breadcrumb" id="breadcrumb"></div>
 
@@ -843,25 +843,25 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
   <div class="form-card" id="order-form-card" style="display:none">
     <div style="font-size:16px;font-weight:700;margin-bottom:20px">+ Yeni Sipariş</div>
 
-    <div class="sect-label" style="margin-bottom:10px">📁 Proje Bilgileri</div>
+    <div class="sect-label" style="margin-bottom:10px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;flex-shrink:0"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg> Proje Bilgileri</div>
     <div class="form-row">
       <div class="form-group"><label>Proje Adı *</label><input type="text" id="o-project" placeholder="Örn: PRJ-2024-A"></div>
       <div class="form-group"><label>Konum / Tesis</label><input type="text" id="o-location" placeholder="Örn: İstanbul, Fabrika-3"></div>
       <div class="form-group"><label>Teslim Süresi (Gün) *</label><input type="number" id="o-days" placeholder="Örn: 30" min="1"></div>
     </div>
 
-    <div class="sect-label" style="margin-bottom:10px;margin-top:4px">👤 Müşteri Bilgileri</div>
+    <div class="sect-label" style="margin-bottom:10px;margin-top:4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;flex-shrink:0"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c1.4-3.4 4-5 7-5s5.6 1.6 7 5"/></svg> Müşteri Bilgileri</div>
     <div class="form-row">
       <div class="form-group"><label>Müşteri Adı *</label><input type="text" id="o-customer" placeholder="Örn: ABC Sanayi A.Ş."></div>
       <div class="form-group"><label>E-posta</label><input type="email" id="o-email" placeholder="info@firma.com"></div>
       <div class="form-group"><label>Telefon</label><input type="tel" id="o-phone" placeholder="+90 555 000 00 00"></div>
     </div>
 
-    <div class="sect-label" style="margin-bottom:10px;margin-top:4px">🔧 Sipariş Kalemleri</div>
+    <div class="sect-label" style="margin-bottom:10px;margin-top:4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;flex-shrink:0"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2 2M4.9 19.1L7 17M17 7l2-2"/></svg> Sipariş Kalemleri</div>
     <div id="order-items-list"></div>
     <button class="btn btn-ghost btn-sm" onclick="addOrderItem()" style="margin-bottom:16px">+ Kalem Ekle</button>
 
-    <div class="sect-label" style="margin-bottom:10px;margin-top:4px">💰 Fiyat & Onay</div>
+    <div class="sect-label" style="margin-bottom:10px;margin-top:4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;flex-shrink:0"><circle cx="9" cy="9" r="6"/><path d="M15.5 6.6A6 6 0 1117.4 15"/></svg> Fiyat &amp; Onay</div>
     <div class="form-row">
       <div class="form-group"><label>Proje Fiyatı</label>
         <div style="display:flex;gap:8px">
@@ -889,14 +889,14 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
       <div class="form-group"><label>Notlar</label><textarea id="o-notes" rows="2" placeholder="Ek bilgi, özel koşullar..."></textarea></div>
     </div>
     <div style="margin-top:16px;display:flex;gap:10px">
-      <button class="btn btn-primary" id="o-save-btn" onclick="saveOrder()">💾 Sipariş Kaydet</button>
+      <button class="btn btn-primary" id="o-save-btn" onclick="saveOrder()">Sipariş Kaydet</button>
       <button class="btn btn-ghost" onclick="clearOrderForm()">Temizle</button>
     </div>
   </div>
 
   <!-- SİPARİŞ LİSTESİ -->
   <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-    <input type="text" id="order-search" placeholder="🔍 Proje veya müşteri ara..." oninput="renderOrders()" style="flex:1;min-width:180px;background:var(--panel-solid);border:1px solid var(--line);border-radius:10px;color:var(--text);font-family:inherit;font-size:13px;padding:10px 14px;outline:none">
+    <input type="text" id="order-search" placeholder="Proje veya müşteri ara..." oninput="renderOrders()" style="flex:1;min-width:180px;background:var(--panel-solid);border:1px solid var(--line);border-radius:10px;color:var(--text);font-family:inherit;font-size:13px;padding:10px 14px;outline:none">
     <select class="filter-select" id="order-status-filter" onchange="renderOrders()">
       <option value="">Tüm Durumlar</option>
       <option value="active">Aktif</option>
@@ -919,9 +919,9 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 
   <!-- Alt sekmeler -->
   <div class="planning-tabs" id="planning-tabs">
-    <button class="planning-tab active" onclick="switchPlanningTab('project-dates')">🗓 Proje Tarih Planlama</button>
-    <button class="planning-tab" onclick="switchPlanningTab('work-orders')">📄 İş Emirleri Planlama</button>
-    <button class="planning-tab" onclick="switchPlanningTab('workspaces')">🏭 Fabrika Çalışma Alanları</button>
+    <button class="planning-tab active" onclick="switchPlanningTab('project-dates')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;flex-shrink:0"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg> Proje Tarih Planlama</button>
+    <button class="planning-tab" onclick="switchPlanningTab('work-orders')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;flex-shrink:0"><path d="M6 3h8l4 4v14H6V3z"/><path d="M14 3v4h4M9 13h6M9 17h4"/></svg> İş Emirleri Planlama</button>
+    <button class="planning-tab" onclick="switchPlanningTab('workspaces')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;flex-shrink:0"><path d="M3 21V9l6 4V9l6 4V4h6v17H3z"/></svg> Fabrika Çalışma Alanları</button>
   </div>
 
   <!-- Proje Tarih Planlama -->
@@ -967,7 +967,7 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
         </div>
       </div>
       <div style="display:flex;gap:10px;margin-top:4px">
-        <button class="btn btn-primary" id="pd-save-btn" onclick="saveProjDate()">💾 Kaydet</button>
+        <button class="btn btn-primary" id="pd-save-btn" onclick="saveProjDate()">Kaydet</button>
         <button class="btn btn-ghost" onclick="clearPdForm()">Temizle</button>
       </div>
     </div>
@@ -1063,7 +1063,7 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
         </div>
       </div>
       <div style="display:flex;gap:10px;margin-top:14px">
-        <button class="btn btn-primary" id="wo-save-btn" onclick="saveWorkOrder()">💾 İş Emri Kaydet</button>
+        <button class="btn btn-primary" id="wo-save-btn" onclick="saveWorkOrder()">İş Emri Kaydet</button>
         <button class="btn btn-ghost" onclick="woBack(2)">← Geri</button>
       </div>
     </div>
@@ -1160,7 +1160,7 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 
     <!-- Bölüm Yönetimi (10. tur M7: Parçalar tabı kaldırıldı, buraya taşındı) -->
     <div class="form-card" style="border-color:rgba(245,166,35,.3);margin-top:20px">
-      <div style="font-family:var(--font-display);font-size:18px;letter-spacing:2px;color:var(--accent);margin-bottom:16px">🏭 BÖLÜM YÖNETİMİ</div>
+      <div class="sect-label" style="margin-bottom:16px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M3 21V9l6 4V9l6 4V4h6v17H3z"/></svg> BÖLÜM YÖNETİMİ</div>
       <div class="form-row">
         <div class="form-group"><label>Proje *</label><select id="d-project"><option value="">— Sipariş seçin —</option></select></div>
         <div class="form-group"><label>Bölüm Adı *</label><input type="text" id="d-name" placeholder="Örn: Kaynak, Montaj..."></div>
@@ -1996,7 +1996,7 @@ async function notifRefresh(){
     badge.textContent = items.length;
     panel.innerHTML = items.length
       ? h`${items.map(it=>h`<button class="ni" onclick="notifGo(event,'${raw(it.tab)}')"><i style="background:${raw(it.dot)}"></i><div>${it.html}<time>${it.cat}</time></div></button>`)}`
-      : h`<div style="padding:14px;text-align:center;color:var(--muted);font-size:12px">🎉 Bekleyen bildirim yok</div>`;
+      : h`<div style="padding:14px;text-align:center;color:var(--muted);font-size:12px">Bekleyen bildirim yok ✓</div>`;
     // Kenar çubuğu rozetleri (konsept: MİP karar + Depo talep sayıları)
     const setNavBdg = (tab, n) => {
       const btn = document.querySelector(`.nav-tab[data-tab="${tab}"]`);
@@ -2650,6 +2650,50 @@ function rebuildCodeWithOps(code, oldOps, newOps){
 // oluşur — kod-çakışma kontrolleri (findSiblingDup) yerel diziye baktığından
 // yakalayamaz, dizi henüz güncellenmemiştir. Kanıtlanan örnek: "⚙ İşlem Ekle"
 // çift tıklamada ağaca 2 parça ekliyordu.
+// ─── İKON SİSTEMİ (tasarım 2026) ───
+// Emoji yerine kenar çubuğuyla aynı ailede ince çizgili SVG ikonlar.
+// Kullanım: h`` içinde ${raw(ico('calendar'))}, düz şablonda ${ico('calendar')}.
+// stroke:currentColor → renk metinden/temadan gelir. Hepsi 24 viewBox.
+function ico(n, s=14){
+  const P = {
+    calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+    clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+    pin:'<path d="M12 21s-6.5-5.4-6.5-10a6.5 6.5 0 0113 0C18.5 15.6 12 21 12 21z"/><circle cx="12" cy="11" r="2.2"/>',
+    user:'<circle cx="12" cy="8" r="3.4"/><path d="M5 20c1.4-3.4 4-5 7-5s5.6 1.6 7 5"/>',
+    users:'<circle cx="9" cy="8.5" r="2.8"/><path d="M3.5 19c1-2.8 3.1-4.2 5.5-4.2s4.5 1.4 5.5 4.2"/><circle cx="17" cy="9.5" r="2.3"/><path d="M17.5 14.6c1.8.5 3 1.7 3.5 3.6"/>',
+    factory:'<path d="M3 21V9l6 4V9l6 4V4h6v17H3z"/>',
+    box:'<path d="M3 8l9-5 9 5v8l-9 5-9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+    truck:'<rect x="2" y="7" width="11" height="8" rx="1"/><path d="M13 10h4l3 3v2h-3"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="16.5" cy="17.5" r="1.6"/>',
+    cart:'<path d="M3 4h2l2.4 11h10.2L21 8H7"/><circle cx="9.5" cy="19.5" r="1.4"/><circle cx="16.5" cy="19.5" r="1.4"/>',
+    folder:'<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>',
+    file:'<path d="M6 3h8l4 4v14H6V3z"/><path d="M14 3v4h4M9 13h6M9 17h4"/>',
+    note:'<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 013 3L8 19l-4 1z"/>',
+    save:'<path d="M5 3h11l3 3v15H5V3z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/>',
+    search:'<circle cx="11" cy="11" r="6.5"/><path d="M16.5 16.5L21 21"/>',
+    download:'<path d="M12 3v11M7 10l5 5 5-5M4 20h16"/>',
+    printer:'<path d="M7 8V3h10v5M5 8h14a2 2 0 012 2v6h-4v5H7v-5H3v-6a2 2 0 012-2z"/><path d="M7 16h10"/>',
+    edit:'<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 013 3L8 19l-4 1z"/><path d="M13.5 7.5l3 3"/>',
+    trash:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/><path d="M10 11v5M14 11v5"/>',
+    key:'<circle cx="8" cy="15" r="4"/><path d="M11 12L20 3M16 7l3 3M13 10l2 2"/>',
+    logout:'<path d="M14 4h6v16h-6M10 8l-4 4 4 4M6 12h11"/>',
+    home:'<path d="M4 11l8-7 8 7v9h-5v-6H9v6H4v-9z"/>',
+    chart:'<path d="M4 20V11M10 20V5M16 20v-7M21 20H3"/>',
+    list:'<path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
+    check:'<path d="M4 12.5l5 5L20 6.5"/>',
+    x:'<path d="M6 6l12 12M18 6L6 18"/>',
+    alert:'<path d="M12 3l10 18H2L12 3z"/><path d="M12 10v5M12 18.2v.3"/>',
+    gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2 2M4.9 19.1L7 17M17 7l2-2"/>',
+    coins:'<circle cx="9" cy="9" r="6"/><path d="M15.5 6.6A6 6 0 1117.4 15"/>',
+    eye:'<path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/>',
+    eyeoff:'<path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/><path d="M4 4l16 16"/>',
+    link:'<path d="M10 14a5 5 0 007.07 0l2.1-2.1a5 5 0 00-7.07-7.07L11 5.9M14 10a5 5 0 00-7.07 0l-2.1 2.1a5 5 0 007.07 7.07L13 19.1"/>',
+    camera:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7l1.5-3h5L16 7"/><circle cx="12" cy="13" r="3.4"/>',
+    push:'<path d="M9 3h6l1 7 3 3H5l3-3 1-7z"/><path d="M12 13v8"/>',
+    clipboard:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4"/>'
+  };
+  return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;flex-shrink:0">${P[n]||P.box}</svg>`;
+}
+
 // Kullanım:  const bitti = btnBusy('id'); try{ ... } finally { bitti(); }
 function btnBusy(id, busyText='Kaydediliyor...'){
   const btn = document.getElementById(id);
@@ -3027,7 +3071,7 @@ async function togglePin(type, key, event){
   } else {
     const data = await dbInsert('user_pins',{id:genId(), user_id:currentUser.id, pin_type:type, pin_key:key});
     if(Array.isArray(data)&&data[0]) userPins.push(data[0]);
-    toast('Sabitlendi! 📌','success');
+    toast('Sabitlendi!','success');
   }
   // İlgili bölümü yenile
   if(type==='project') renderProjectCards();
@@ -3060,13 +3104,13 @@ async function renderDashboard(){
 }
 
 // İş emri rozet yardımcıları (dashboard katmanları için)
-const WO_COLORS = { planned:'#f5a623', inprogress:'#2980b9', done:'#2ecc71', cancelled:'#e74c3c' };
+const WO_COLORS = { planned:'var(--accent)', inprogress:'var(--info)', done:'var(--green)', cancelled:'var(--red)' };
 function woBadgeCounts(list){
   const c = { planned:0, inprogress:0 };
   list.forEach(w=>{ if(c[w.status]!==undefined) c[w.status]++; });
   const parts = [];
-  if(c.planned)    parts.push(`<span style="color:${WO_COLORS.planned}">📅 ${c.planned} planlı</span>`);
-  if(c.inprogress) parts.push(`<span style="color:${WO_COLORS.inprogress}">🔄 ${c.inprogress} devam</span>`);
+  if(c.planned)    parts.push(`<span style="color:${WO_COLORS.planned}">${c.planned} planlı</span>`);
+  if(c.inprogress) parts.push(`<span style="color:${WO_COLORS.inprogress}">${c.inprogress} devam</span>`);
   return parts.join(' · ');
 }
 
@@ -3188,7 +3232,7 @@ function deptWoStripHTML(deptId){
   const fmtDt = v => v ? new Date(v).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : null;
   const ACTIONS = {
     planned:    [['inprogress','▶ Başlat']],
-    inprogress: [['done','✅ Tamamla'],['planned','↩ Geri Al']],
+    inprogress: [['done','Tamamla'],['planned','↩ Geri Al']],
     done:       [['inprogress','↩ Geri Al']],
     cancelled:  [['planned','↩ Planla']]
   };
@@ -3208,7 +3252,7 @@ function deptWoStripHTML(deptId){
       w.assigned_user ? '👷 '+w.assigned_user : '',
       w.workspace_name ? '📍 '+w.workspace_name : '',
       // (11. tur F2) "Tümü" ile verilen İE her ilgili bölümde görünür — belirt
-      !w.department_id ? '📋 tüm bölümler' : '',
+      !w.department_id ? 'tüm bölümler' : '',
       w.notes ? '🗒 '+w.notes : ''
     ].filter(Boolean).join(' · ');
     // (#8) Planlı iş emrinde bitmemiş alt parça uyarısı
@@ -3225,9 +3269,9 @@ function deptWoStripHTML(deptId){
       <div class="report-table">
         <div class="report-table-header">
           <div>Parça</div>
-          <div style="text-align:center">✅</div>
-          <div style="text-align:center" class="rtc-hide">⏳</div>
-          <div style="text-align:center" class="rtc-hide">❌</div>
+          <div style="text-align:center;color:var(--green)">${raw(ico('check',12))}</div>
+          <div style="text-align:center;color:var(--yellow)" class="rtc-hide">${raw(ico('clock',12))}</div>
+          <div style="text-align:center;color:var(--red)" class="rtc-hide">${raw(ico('x',12))}</div>
           <div style="text-align:center">Durum</div>
           <div>İlerleme / QR</div>
         </div>
@@ -3254,8 +3298,8 @@ function deptWoStripHTML(deptId){
                   <div style="flex:${br};background:var(--red)"></div>
                 </div>
               </div>
-              <button class="icon-btn" title="QR göster" onclick="showQR('${raw(pd.id)}','${raw(ea(pd.name))}','${raw(ea(pd.code))}','${raw(ea(pd.drawing||''))}')">📷</button>
-              <button class="icon-btn" title="Geçmiş" onclick="showLog('${raw(pd.id)}','${raw(ea(pd.name))}')">📋</button>
+              <button class="icon-btn" title="QR göster" onclick="showQR('${raw(pd.id)}','${raw(ea(pd.name))}','${raw(ea(pd.code))}','${raw(ea(pd.drawing||''))}')">${raw(ico('camera',13))}</button>
+              <button class="icon-btn" title="Geçmiş" onclick="showLog('${raw(pd.id)}','${raw(ea(pd.name))}')">${raw(ico('list',13))}</button>
             </div>
           </div>`;
         })}
@@ -3266,7 +3310,7 @@ function deptWoStripHTML(deptId){
       <div class="pbom-card-header">
         <div style="min-width:0">
           <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            📋 İş Emri
+            ${raw(ico('clipboard',13))} İş Emri
             <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${color}44;color:${color};background:${color}11">${st}</span>
             ${partNames?h`<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${partNames}</span>`:''}
           </div>
@@ -3283,7 +3327,7 @@ function deptWoStripHTML(deptId){
   });
 
   return h`<div style="margin-bottom:24px">
-    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">📋 İş Emirleri (${deptWos.length})</div>
+    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:10px">${raw(ico('clipboard',11))} İş Emirleri (${deptWos.length})</div>
     ${rows}
   </div>`;
 }
@@ -3352,8 +3396,8 @@ function awaitingPlanningStripHTML(waitingParts, style){
   const strip=(icon,txt,color,border,bg)=>
     `<div style="background:${bg};border:1px dashed ${border};border-radius:8px;padding:12px 16px;font-family:var(--font-mono);font-size:12px;color:${color}">${icon} ${txt}</div>`;
   return `<div style="display:grid;gap:8px;${style||''}">`
-    + (mat ? strip('🛒',`${mat} parça · Malzemesi hazır/siparişte — üretim planlaması bekleniyor`,'#2980b9','rgba(41,128,185,.35)','rgba(41,128,185,.07)') : '')
-    + (rest? strip('⏳',`${rest} parça · Satın alma veya üretim planlaması bekleniyor`,'var(--yellow)','rgba(245,166,35,.35)','rgba(245,166,35,.07)') : '')
+    + (mat ? strip(ico('cart',12),`${mat} parça · Malzemesi hazır/siparişte — üretim planlaması bekleniyor`,'#2980b9','rgba(41,128,185,.35)','rgba(41,128,185,.07)') : '')
+    + (rest? strip(ico('clock',12),`${rest} parça · Satın alma veya üretim planlaması bekleniyor`,'var(--yellow)','rgba(245,166,35,.35)','rgba(245,166,35,.07)') : '')
     + `</div>`;
 }
 
@@ -3445,10 +3489,10 @@ async function renderStats(){
     <div class="dash-phead">
       <div>
         <h1>${greet}${fname?', '+fname:''}</h1>
-        <div class="sub">${dateTxt} · ${projCount} proje, ${openWos.length} açık iş emri${waitRest?` · ⏳ ${waitRest} parça planlama bekliyor`:''}${waitMat?` · 🛒 ${waitMat} parçanın malzemesi hazır/siparişte`:''}</div>
+        <div class="sub">${dateTxt} · ${projCount} proje, ${openWos.length} açık iş emri${waitRest?` · ${waitRest} parça planlama bekliyor`:''}${waitMat?` · ${waitMat} parçanın malzemesi hazır/siparişte`:''}</div>
       </div>
       <div class="grow"></div>
-      <button class="hbtn sec" onclick="dashWeeklyReport()">📄 Haftalık Rapor</button>
+      <button class="hbtn sec" onclick="dashWeeklyReport()">${raw(ico('file',13))} Haftalık Rapor</button>
       <button class="hbtn pri" onclick="switchTab('planning')">+ Yeni İş Emri</button>
     </div>
     <div class="bento">
@@ -3477,14 +3521,14 @@ async function renderStats(){
       </div>
       <div class="stat-card" style="--c:var(--yellow)">
         <div class="stat-label">Bekleyen Parça</div><div class="stat-value">${pend+waitingParts.length}</div>
-        <div class="stat-sub">${qp}/${qt} adet bekliyor${qr?` · ❌ ${qr} adet ret`:''}</div>
+        <div class="stat-sub">${qp}/${qt} adet bekliyor${qr?` · ${qr} adet ret`:''}</div>
       </div>
       <div class="stat-card" style="--c:var(--green)">
         <div class="stat-label">Depodaki Kalem</div><div class="stat-value">${inWh}</div>
-        <div class="stat-sub">${onWay?`🚚 ${onWay} mal kabulü yolda`:'kalem depoda kayıtlı'}</div>
+        <div class="stat-sub">${onWay?`${onWay} mal kabulü yolda`:'kalem depoda kayıtlı'}</div>
       </div>
     </div>
-    <div class="sect-label" style="margin-bottom:12px">🏭 BUGÜN ATÖLYEDE</div>
+    <div class="sect-label" style="margin-bottom:12px">${raw(ico('factory',12))} BUGÜN ATÖLYEDE</div>
     <div class="dgrid2">
       <div class="schart">
         <div class="sc-title">Bölümler <span>tamamlanan / planlanan adet</span></div>
@@ -3508,7 +3552,7 @@ async function renderStats(){
             <div class="wic">İE</div>
             <div class="wr-info">
               <b>${w.code?w.code+' · ':''}${w.project_name||'(Proje Yok)'}</b>
-              <span>${pr.n} parça${w.assigned_user?` · 👷 ${w.assigned_user}`:''}${w.workspace_name?` · 📍 ${w.workspace_name}`:''}</span>
+              <span>${pr.n} parça${w.assigned_user?` · ${w.assigned_user}`:''}${w.workspace_name?` · ${w.workspace_name}`:''}</span>
               <div class="wbar"><i style="width:${raw(String(pr.pct))}%"></i></div>
             </div>
             ${w.status==='inprogress'?h`<span class="st run">devam</span>`:h`<span class="st plan">planlı</span>`}
@@ -3520,8 +3564,8 @@ async function renderStats(){
       ${feed.length?h`<div class="feed2">${feed.map(f=>h`
         <div class="fi">
           <i class="fdot" style="background:${raw(f.qr?'var(--err)':f.qd?'var(--ok)':'var(--warn)')}"></i>
-          <div class="ft"><b>${f.name}</b>${f.proj?` — ${f.proj}`:''} · ${[f.qd?`✅ ${f.qd}`:'',f.qpn?`⏳ ${f.qpn}`:'',f.qr?`❌ ${f.qr}`:''].filter(Boolean).join(' ')} adet
-            <time>${f.t}${f.user?` · ${f.user}`:''}${f.note?` · 📝 ${f.note}`:''}</time></div>
+          <div class="ft"><b>${f.name}</b>${f.proj?` — ${f.proj}`:''} · ${[f.qd?`${f.qd} yapıldı`:'',f.qpn?`${f.qpn} bekliyor`:'',f.qr?`${f.qr} ret`:''].filter(Boolean).join(' · ')}
+            <time>${f.t}${f.user?` · ${f.user}`:''}${f.note?h` · ${raw(ico('note',10))} ${f.note}`:''}</time></div>
         </div>`)}</div>`:h`<div class="dash-empty">Son 7 günde üretim hareketi yok</div>`}
     </div>`;
 }
@@ -3613,7 +3657,7 @@ async function dashWeeklyReport(){
 </style></head><body>
 <button class="noprint" onclick="window.print()" style="padding:8px 16px;cursor:pointer">🖨 Yazdır</button>
 <div class="print-header">
-  <div><div class="print-logo">ÜretimTakip</div><div style="font-size:11px;color:#666;margin-top:4px">Haftalık Üretim Raporu — 📅 ${esc(fmt(from))} – ${esc(fmt(now))}</div></div>
+  <div><div class="print-logo">ÜretimTakip</div><div style="font-size:11px;color:#666;margin-top:4px">Haftalık Üretim Raporu — ${esc(fmt(from))} – ${esc(fmt(now))}</div></div>
   <div class="print-meta">Yazdırma: ${esc(printDate)}</div>
 </div>
 <div class="sumgrid">
@@ -3624,15 +3668,15 @@ async function dashWeeklyReport(){
   <div class="sumbox"><b>${openWos.length}</b><span>Açık iş emri</span></div>
   <div class="sumbox"><b>${inWh}</b><span>Depodaki kalem</span></div>
 </div>
-<h2>📈 Gün Gün Üretim</h2>
+<h2>Gün Gün Üretim</h2>
 <table><tr><th>Tarih</th><th>Gün</th><th style="text-align:right">Tamamlanan</th><th style="text-align:right">Ret</th><th style="text-align:right">İşlem</th></tr>${dayRows}</table>
-<h2>🏭 Bölüm İlerlemesi (anlık)</h2>
+<h2>Bölüm İlerlemesi (anlık)</h2>
 ${deptRows?`<table><tr><th>Bölüm</th><th style="text-align:right">Parça</th><th style="text-align:right">Tamamlanan / Planlanan</th><th style="text-align:right">İlerleme</th></tr>${deptRows}</table>`:'<div style="color:#888">Bölüme atanmış parça yok.</div>'}
-<h2>👷 Personel Performansı (7 gün)</h2>
+<h2>Personel Performansı (7 gün)</h2>
 ${userRows?`<table><tr><th>Personel</th><th style="text-align:right">Yapılan</th><th style="text-align:right">Bekleyen</th><th style="text-align:right">Ret</th><th style="text-align:right">İşlem</th></tr>${userRows}</table>`:'<div style="color:#888">Bu hafta işlem kaydı yok.</div>'}
-<h2>🔩 En Çok Üretilen Parçalar (7 gün)</h2>
+<h2>En Çok Üretilen Parçalar (7 gün)</h2>
 ${topRows?`<table><tr><th>Parça</th><th>Kod</th><th>Proje</th><th style="text-align:right">Adet</th><th style="text-align:right">Fire</th></tr>${topRows}</table>`:'<div style="color:#888">Bu hafta üretim kaydı yok.</div>'}
-<h2>📋 Açık İş Emirleri</h2>
+<h2>Açık İş Emirleri</h2>
 ${woRows?`<table><tr><th>Kod</th><th>Proje</th><th>Personel</th><th>Alan</th><th>Durum</th><th style="text-align:right">İlerleme</th></tr>${woRows}</table>`:'<div style="color:#888">Açık iş emri yok.</div>'}
 </body></html>`;
   const win=window.open('','_blank');
@@ -3644,7 +3688,7 @@ function renderBreadcrumb(){
   const bc = document.getElementById('breadcrumb');
   // (tasarım 2026) kökte breadcrumb gizli — üstteki PROJELER başlığıyla mükerrerdi
   bc.style.display = _activeProject ? 'flex' : 'none';
-  bc.innerHTML = h`<button class="breadcrumb-btn" onclick="renderDashboard()">🏠 Projeler</button>${
+  bc.innerHTML = h`<button class="breadcrumb-btn" onclick="renderDashboard()">${raw(ico('home',12))} Projeler</button>${
     _activeProject ? h`<span class="breadcrumb-sep">›</span>${
       _activeDept ? h`<button class="breadcrumb-btn" onclick="openProject('${raw(ea(_activeProject))}')">${_activeProject}</button>`
                   : h`<span class="breadcrumb-current">${_activeProject}</span>`}` : ''}${
@@ -3657,7 +3701,7 @@ function renderProjectCards(){
   parts.forEach(p=>{ const k=p.project||'(Proje Yok)'; if(!projects[k])projects[k]=[]; projects[k].push(p); });
   const el = document.getElementById('layer-projects');
   if(!Object.keys(projects).length){
-    el.innerHTML=h`<div class="empty-state"><span class="emoji">📁</span>Henüz proje eklenmedi</div>`;
+    el.innerHTML=h`<div class="empty-state">${raw(ico('folder',36))}Henüz proje eklenmedi</div>`;
     return;
   }
 
@@ -3670,7 +3714,7 @@ function renderProjectCards(){
 
   const pinnedCount = entries.filter(([name])=>isPinned('project',name)).length;
 
-  el.innerHTML = h`${pinnedCount>0 ? raw('<div class="pinned-label">📌 Sabitlenmiş Projeler</div>') : ''}<div class="project-cards">${entries.map(([name,plist])=>{
+  el.innerHTML = h`${pinnedCount>0 ? raw('<div class="pinned-label">'+ico('push',11)+' Sabitlenmiş Projeler</div>') : ''}<div class="project-cards">${entries.map(([name,plist])=>{
     const waitCnt = plist.filter(isPartAwaitingPlanning).length;
     const act = plist.filter(p=>!isPartAwaitingPlanning(p));
     const d=act.filter(x=>x.status==='done').length;
@@ -3693,11 +3737,11 @@ function renderProjectCards(){
     const firstDateStr = firstDate ? firstDate.toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
     const woLine = woBadgeCounts(workOrders.filter(w=>(w.project_name||'(Proje Yok)')===name));
     return h`<div class="project-card${pinned?' pinned':''}" onclick="openProject('${raw(ea(name))}')">
-      <button class="pin-btn${pinned?' active':''}" onclick="togglePin('project','${raw(ea(name))}',event)" title="${pinned?'Sabitlemeyi kaldır':'Sabitle'}">📌</button>
+      <button class="pin-btn${pinned?' active':''}" onclick="togglePin('project','${raw(ea(name))}',event)" title="${pinned?'Sabitlemeyi kaldır':'Sabitle'}">${raw(ico('push',15))}</button>
       <div class="project-card-name">${name}</div>
       <div class="project-card-count">${t?h`${t} parça &middot; %${qdp} tamamlandı <span style="font-size:10px;opacity:.6">(adet bazlı)</span>`:'Üretimde parça yok'}</div>
-      ${woLine?h`<div style="font-family:var(--font-mono);font-size:10px;margin-top:2px">📋 ${raw(woLine)}</div>`:''}
-      ${waitCnt?h`<div style="font-family:var(--font-mono);font-size:10px;color:var(--yellow);margin-top:2px">⏳ ${waitCnt} parça · satın alma / üretim planlaması bekliyor</div>`:''}
+      ${woLine?h`<div style="font-family:var(--font-mono);font-size:10px;margin-top:2px">${raw(ico('clipboard',10))} ${raw(woLine)}</div>`:''}
+      ${waitCnt?h`<div style="font-family:var(--font-mono);font-size:10px;color:var(--yellow);margin-top:2px">${waitCnt} parça · satın alma / üretim planlaması bekliyor</div>`:''}
       <div class="project-mini-bars">
         <div class="pmb-done" style="flex:${qdp}"></div>
         <div class="pmb-pending" style="flex:${qpp}"></div>
@@ -3711,7 +3755,7 @@ function renderProjectCards(){
       </div>
       <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:6px;border-top:1px solid var(--border);padding-top:6px;display:flex;justify-content:space-between">
         <span>Toplam: <b style="color:var(--text)">${qd+qr}</b> / ${qt} adet</span>
-        <span>📅 ${firstDateStr}</span>
+        <span>${raw(ico('calendar',11))} ${firstDateStr}</span>
       </div>
     </div>`;
   })}</div>`;
@@ -3747,17 +3791,17 @@ function openProject(name){
         <div class="report-progress"><div class="report-progress-fill" style="width:${pct}%"></div></div>
       </div>
       <div class="report-card" style="--c:var(--green)">
-        <div class="report-card-label">✅ Yapıldı</div><div class="report-card-value">${done}</div>
+        <div class="report-card-label">Yapıldı</div><div class="report-card-value">${done}</div>
         <div class="report-card-sub">Adet: ${projParts.reduce((s,p)=>s+(parseInt(p.qty_done)||0),0)}</div>
         <div class="report-progress"><div class="report-progress-fill" style="width:${pct}%"></div></div>
       </div>
       <div class="report-card" style="--c:var(--yellow)">
-        <div class="report-card-label">⏳ Bekliyor</div><div class="report-card-value">${pend}</div>
+        <div class="report-card-label">Bekliyor</div><div class="report-card-value">${pend}</div>
         <div class="report-card-sub">Adet: ${Math.max(0, projParts.reduce((s,p)=>s+(parseInt(p.qty)||0),0) - projParts.reduce((s,p)=>s+(parseInt(p.qty_done)||0),0) - projParts.reduce((s,p)=>s+(parseInt(p.qty_reject)||0),0))}</div>
         <div class="report-progress"><div class="report-progress-fill" style="width:${total?Math.round(pend/total*100):0}%"></div></div>
       </div>
       <div class="report-card" style="--c:var(--red)">
-        <div class="report-card-label">❌ Reddedildi</div><div class="report-card-value">${rej}</div>
+        <div class="report-card-label">Reddedildi</div><div class="report-card-value">${rej}</div>
         <div class="report-card-sub">Adet: ${projParts.reduce((s,p)=>s+(parseInt(p.qty_reject)||0),0)}</div>
         <div class="report-progress"><div class="report-progress-fill" style="width:${total?Math.round(rej/total*100):0}%"></div></div>
       </div>
@@ -3876,17 +3920,17 @@ function openDept(deptId, deptName){
         <div class="report-progress"><div class="report-progress-fill" style="width:${pct}%"></div></div>
       </div>
       <div class="report-card" style="--c:var(--green)">
-        <div class="report-card-label">✅ Yapıldı</div><div class="report-card-value">${done}</div>
+        <div class="report-card-label">Yapıldı</div><div class="report-card-value">${done}</div>
         <div class="report-card-sub">${qd} adet · %${pct}</div>
         <div class="report-progress"><div class="report-progress-fill" style="width:${pct}%"></div></div>
       </div>
       <div class="report-card" style="--c:var(--yellow)">
-        <div class="report-card-label">⏳ Bekliyor</div><div class="report-card-value">${pend}</div>
+        <div class="report-card-label">Bekliyor</div><div class="report-card-value">${pend}</div>
         <div class="report-card-sub">${qp} adet · %${pctPend}</div>
         <div class="report-progress"><div class="report-progress-fill" style="width:${pctPend}%"></div></div>
       </div>
       <div class="report-card" style="--c:var(--red)">
-        <div class="report-card-label">❌ Reddedildi</div><div class="report-card-value">${rej}</div>
+        <div class="report-card-label">Reddedildi</div><div class="report-card-value">${rej}</div>
         <div class="report-card-sub">${qr} adet · %${pctRej}</div>
         <div class="report-progress"><div class="report-progress-fill" style="width:${pctRej}%"></div></div>
       </div>
@@ -3899,9 +3943,9 @@ function openDept(deptId, deptName){
     <div class="report-table" style="margin-bottom:24px">
       <div class="report-table-header">
         <div>Parça</div>
-        <div style="text-align:center">✅</div>
-        <div style="text-align:center" class="rtc-hide">⏳</div>
-        <div style="text-align:center" class="rtc-hide">❌</div>
+        <div style="text-align:center;color:var(--green)">${raw(ico('check',12))}</div>
+        <div style="text-align:center;color:var(--yellow)" class="rtc-hide">${raw(ico('clock',12))}</div>
+        <div style="text-align:center;color:var(--red)" class="rtc-hide">${raw(ico('x',12))}</div>
         <div style="text-align:center">Durum</div>
         <div>İlerleme</div>
       </div>
@@ -4351,7 +4395,7 @@ function renderStatsView() {
 
   el.innerHTML = h`
     <div id="stats-summary"></div>
-    <div class="sect-label" style="margin-bottom:12px">🔍 DETAYLI ANALİZ <span style="font-weight:400;text-transform:none;letter-spacing:0">— tarih aralığı, proje ve personel bazında</span></div>
+    <div class="sect-label" style="margin-bottom:12px">${raw(ico('search',12))} DETAYLI ANALİZ <span style="font-weight:400;text-transform:none;letter-spacing:0">— tarih aralığı, proje ve personel bazında</span></div>
     <div class="stats-filter-bar">
       <div>
         <label>Başlangıç Tarihi</label>
@@ -4375,9 +4419,9 @@ function renderStatsView() {
           ${users.map(u=>h`<option value="${u.name}">${u.name}</option>`)}
         </select>
       </div>
-      <button class="btn btn-primary" onclick="loadStats()">🔍 Filtrele</button>
+      <button class="btn btn-primary" onclick="loadStats()">${raw(ico('search',13))} Filtrele</button>
     </div>
-    <div id="stats-result"><div class="empty-state"><span class="emoji">📈</span>Filtreleyerek sonuçları görüntüleyin</div></div>
+    <div id="stats-result"><div class="empty-state">${raw(ico('chart',36))}Filtreleyerek sonuçları görüntüleyin</div></div>
   `;
   renderStatsSummary();
 }
@@ -4481,12 +4525,12 @@ async function renderStatsSummary(){
 
   box.innerHTML = h`
     <div class="stsum-head">
-      <span class="sect-label">📊 AYLIK ÖZET</span>
+      <span class="sect-label">${raw(ico('chart',12))} AYLIK ÖZET</span>
       <div class="grow"></div>
       <select id="stsum-month" onchange="renderStatsSummary()">
         ${months.map(mo=>raw(`<option value="${mo.v}"${mo.v===ym?' selected':''}>${mo.t}</option>`))}
       </select>
-      <button class="btn btn-ghost btn-sm" onclick="stsumCsv()">⬇ CSV</button>
+      <button class="btn btn-ghost btn-sm" onclick="stsumCsv()">${raw(ico('download',12))} CSV</button>
     </div>
     <div class="stats-row" style="margin-bottom:16px">
       <div class="stat-card" style="--c:var(--green)">
@@ -4527,7 +4571,7 @@ async function renderStatsSummary(){
           :h`<div style="color:var(--muted);font-size:12px;padding:20px 0;text-align:center">Bölüme atanmış parça yok</div>`}
       </div>
     </div>
-    <div class="sect-label" style="margin-bottom:10px">🏭 EN ÇOK ÜRETİLEN PARÇALAR <span style="font-weight:400;text-transform:none;letter-spacing:0">— bu ay</span></div>
+    <div class="sect-label" style="margin-bottom:10px">${raw(ico('box',12))} EN ÇOK ÜRETİLEN PARÇALAR <span style="font-weight:400;text-transform:none;letter-spacing:0">— bu ay</span></div>
     <div class="stats-table" style="margin-bottom:28px">
       <div class="stats-table-header" style="grid-template-columns:1fr 140px 120px 130px 70px 70px">
         <div>Parça</div><div>Kod</div><div>Proje</div><div>Bölüm</div><div style="text-align:center">Adet</div><div style="text-align:center">Fire</div>
@@ -4585,7 +4629,7 @@ async function loadStats() {
 
   const logs = await dbGet('logs', query);
   if(!Array.isArray(logs) || !logs.length) {
-    el.innerHTML = h`<div class="empty-state"><span class="emoji">🔍</span>Bu tarih aralığında kayıt bulunamadı</div>`;
+    el.innerHTML = h`<div class="empty-state">${raw(ico('search',36))}Bu tarih aralığında kayıt bulunamadı</div>`;
     return;
   }
 
@@ -4601,7 +4645,7 @@ async function loadStats() {
     : logs;
 
   if(!filteredLogs.length) {
-    el.innerHTML = h`<div class="empty-state"><span class="emoji">🔍</span>Seçilen projede kayıt bulunamadı</div>`;
+    el.innerHTML = h`<div class="empty-state">${raw(ico('search',36))}Seçilen projede kayıt bulunamadı</div>`;
     return;
   }
 
@@ -4680,26 +4724,26 @@ async function loadStats() {
         <div class="stat-sub">${sorted.length} personel</div>
       </div>
       <div class="stat-card" style="--c:var(--green)">
-        <div class="stat-label">✅ Yapılan Adet</div><div class="stat-value">${totalDone}</div>
+        <div class="stat-label">Yapılan Adet</div><div class="stat-value">${totalDone}</div>
         <div class="stat-sub">%${totalAll?Math.round(totalDone/totalAll*100):0}</div>
       </div>
       <div class="stat-card" style="--c:var(--yellow)">
-        <div class="stat-label">⏳ Bekleyen Adet</div><div class="stat-value">${totalPend}</div>
+        <div class="stat-label">Bekleyen Adet</div><div class="stat-value">${totalPend}</div>
         <div class="stat-sub">%${totalAll?Math.round(totalPend/totalAll*100):0}</div>
       </div>
       <div class="stat-card" style="--c:var(--red)">
-        <div class="stat-label">❌ Ret Adet</div><div class="stat-value">${totalReject}</div>
+        <div class="stat-label">Ret Adet</div><div class="stat-value">${totalReject}</div>
         <div class="stat-sub">%${totalAll?Math.round(totalReject/totalAll*100):0}</div>
       </div>
     </div>
 
     <!-- Personel kartları -->
-    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:12px">👷 Personel Performansı <span style="color:var(--muted);font-size:10px;font-weight:400">— Karta tıklayarak işlem detaylarını filtreleyin</span></div>
+    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:12px">${raw(ico('users',12))} Personel Performansı <span style="color:var(--muted);font-size:10px;font-weight:400">— Karta tıklayarak işlem detaylarını filtreleyin</span></div>
     <div class="personnel-cards">${cards}</div>
 
     <!-- Detay tablosu -->
     <div id="detail-table-header" style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:12px;display:flex;align-items:center;gap:12px">
-      <span id="detail-table-title">📋 İşlem Detayları (${filteredLogs.length} kayıt)</span>
+      <span id="detail-table-title">${raw(ico('list',12))} İşlem Detayları (${filteredLogs.length} kayıt)</span>
       <button id="detail-clear-btn" onclick="filterTableByUser(null)" style="display:none;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);font-family:var(--font-mono);font-size:10px;padding:3px 10px;cursor:pointer">✕ Filtreyi Kaldır</button>
     </div>
     <div id="detail-table-wrap"></div>`;
@@ -4722,7 +4766,7 @@ function renderDetailTable(logs, partsMap) {
       <div style="font-family:var(--font-display);font-size:18px;color:var(--yellow);text-align:center" class="stc-hide">${qp}</div>
       <div style="font-family:var(--font-display);font-size:18px;color:var(--red);text-align:center" class="stc-hide">${qr}</div>
       <div style="text-align:center">${raw(statusBadge(l.status))}</div>
-      <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${dt}${l.note?h`<br>📝 ${l.note}`:''}</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${dt}${l.note?h`<br>${raw(ico('note',10))} ${l.note}`:''}</div>
     </div>`;
   });
 
@@ -4732,9 +4776,9 @@ function renderDetailTable(logs, partsMap) {
     <div class="stats-table-header">
       <div>Parça</div>
       <div style="text-align:center">Personel</div>
-      <div style="text-align:center">✅</div>
-      <div style="text-align:center" class="stc-hide">⏳</div>
-      <div style="text-align:center" class="stc-hide">❌</div>
+      <div style="text-align:center;color:var(--green)">${raw(ico('check',12))}</div>
+      <div style="text-align:center;color:var(--yellow)" class="stc-hide">${raw(ico('clock',12))}</div>
+      <div style="text-align:center;color:var(--red)" class="stc-hide">${raw(ico('x',12))}</div>
       <div style="text-align:center">Durum</div>
       <div>Tarih / Not</div>
     </div>
@@ -4754,7 +4798,7 @@ function filterTableByUser(name) {
   if(!name) {
     // Filtreyi kaldır
     if(clearBtn) clearBtn.style.display = 'none';
-    if(titleEl) titleEl.textContent = `📋 İşlem Detayları (${logs.length} kayıt)`;
+    if(titleEl) titleEl.innerHTML = `${ico('list',12)} İşlem Detayları (${logs.length} kayıt)`;
     renderDetailTable(logs, partsMap);
     return;
   }
@@ -4769,7 +4813,7 @@ function filterTableByUser(name) {
   const qp = filtered.reduce((s,l)=>s+(parseInt(l.qty_pending)||0),0);
   const qr = filtered.reduce((s,l)=>s+(parseInt(l.qty_reject)||0),0);
 
-  if(titleEl) titleEl.textContent = `📋 ${name} — ${filtered.length} işlem · ✅ ${qd} · ⏳ ${qp} · ❌ ${qr}`;
+  if(titleEl) titleEl.innerHTML = `${ico('user',12)} ${esc(name)} — ${filtered.length} işlem · ${qd} yapıldı · ${qp} bekliyor · ${qr} ret`;
   if(clearBtn) clearBtn.style.display = 'inline-block';
 
   // Tabloya scroll
@@ -4856,12 +4900,12 @@ async function renderOrders() {
   const list = document.getElementById('orders-list');
   if(!list) return;
   if(!filtered.length) {
-    list.innerHTML = h`<div class="empty-state"><span class="emoji">📋</span>Henüz sipariş eklenmedi</div>`;
+    list.innerHTML = h`<div class="empty-state">${raw(ico('clipboard',36))}Henüz sipariş eklenmedi</div>`;
     return;
   }
 
   const pinnedOrders = filtered.filter(o => isPinned('order', o.id));
-  list.innerHTML = h`${pinnedOrders.length > 0 ? raw('<div class="pinned-label">📌 Sabitlenmiş Siparişler</div>') : ''}${filtered.map(o => {
+  list.innerHTML = h`${pinnedOrders.length > 0 ? raw('<div class="pinned-label">'+ico('push',11)+' Sabitlenmiş Siparişler</div>') : ''}${filtered.map(o => {
     const items = Array.isArray(o.items) ? o.items : (typeof o.items==='string'?JSON.parse(o.items||'[]'):[]);
     const statusMap = { active:{cls:'osb-active',lbl:'Aktif'}, pending:{cls:'osb-pending',lbl:'Beklemede'}, completed:{cls:'osb-completed',lbl:'Tamamlandı'}, cancelled:{cls:'osb-cancelled',lbl:'İptal'} };
     const st = statusMap[o.status] || statusMap.active;
@@ -4896,11 +4940,11 @@ async function renderOrders() {
       terminStr = t.toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric'});
     }
     return h`<div class="order-card${pinned?' pinned':''}" style="position:relative">
-      <button class="pin-btn${pinned?' active':''}" onclick="togglePin('order','${raw(o.id)}',event)" title="${pinned?'Sabitlemeyi kaldır':'Sabitle'}">📌</button>
+      <button class="pin-btn${pinned?' active':''}" onclick="togglePin('order','${raw(o.id)}',event)" title="${pinned?'Sabitlemeyi kaldır':'Sabitle'}">${raw(ico('push',15))}</button>
       <div class="order-card-header" style="padding-right:32px">
         <div>
           <div class="order-card-title">${o.project_name||'—'}</div>
-          <div class="order-card-customer">👤 ${o.customer_name||'—'} ${o.customer_email?h`· ${o.customer_email}`:''} ${o.customer_phone?h`· ${o.customer_phone}`:''}</div>
+          <div class="order-card-customer">${raw(ico('user',11))} ${o.customer_name||'—'} ${o.customer_email?h`· ${o.customer_email}`:''} ${o.customer_phone?h`· ${o.customer_phone}`:''}</div>
         </div>
         <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           ${terminStr?h`<span style="font-size:11px;color:var(--muted)">Termin: <b class="num" style="color:${raw(terminLate?'var(--err)':'var(--text)')}">${terminStr}</b></span>`:''}
@@ -4916,22 +4960,22 @@ async function renderOrders() {
       <div class="wbar" style="margin-bottom:4px"><i style="width:${raw(String(pPct))}%"></i></div>
       <div class="pfoot"><span class="num">%${pPct} tamamlandı · ${pQd}/${pQt} adet</span></div>`:''}
       <div class="order-meta-grid">
-        <div class="order-meta-item"><label>📍 Konum</label><span>${o.location||'—'}</span></div>
-        <div class="order-meta-item"><label>⏱ Teslim Süresi</label><span>${o.delivery_days?o.delivery_days+' Gün':'—'}</span></div>
-        <div class="order-meta-item"><label>✅ Onaylayan</label><span>${o.approved_by||'—'}</span></div>
-        <div class="order-meta-item"><label>📅 Tarih</label><span>${createdAt}</span></div>
+        <div class="order-meta-item"><label>${raw(ico('pin',10))} Konum</label><span>${o.location||'—'}</span></div>
+        <div class="order-meta-item"><label>${raw(ico('clock',10))} Teslim Süresi</label><span>${o.delivery_days?o.delivery_days+' Gün':'—'}</span></div>
+        <div class="order-meta-item"><label>${raw(ico('check',10))} Onaylayan</label><span>${o.approved_by||'—'}</span></div>
+        <div class="order-meta-item"><label>${raw(ico('calendar',10))} Tarih</label><span>${createdAt}</span></div>
       </div>
       ${itemsHTML}
-      ${o.notes?h`<div style="background:var(--surface2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-bottom:10px">📝 ${o.notes}</div>`:''}
+      ${o.notes?h`<div style="background:var(--surface2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-bottom:10px">${raw(ico('note',11))} ${o.notes}</div>`:''}
       <div class="order-card-footer">
         <div>
           <div class="order-price">${priceStr}</div>
           <div class="order-price-sub">Proje Fiyatı</div>
-          ${matStr?h`<div class="order-price-sub" style="margin-top:4px">💰 Malzeme bedeli: <b style="color:var(--accent)">${matStr}</b></div>`:''}
+          ${matStr?h`<div class="order-price-sub" style="margin-top:4px">${raw(ico('coins',11))} Malzeme bedeli: <b style="color:var(--accent)">${matStr}</b></div>`:''}
         </div>
         <div class="order-actions">
-          <button class="btn btn-ghost btn-sm" onclick="editOrder('${raw(o.id)}')" style="${canEdit?'':'display:none'}">✏️ Düzenle</button>
-          <button class="btn btn-ghost btn-sm" onclick="deleteOrder('${raw(o.id)}')" style="color:var(--red);border-color:rgba(231,76,60,.3);${canEdit?'':'display:none'}">🗑️ Sil</button>
+          <button class="btn btn-ghost btn-sm" onclick="editOrder('${raw(o.id)}')" style="${canEdit?'':'display:none'}">${raw(ico('edit',12))} Düzenle</button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteOrder('${raw(o.id)}')" style="color:var(--red);border-color:transparent;${canEdit?'':'display:none'}">${raw(ico('trash',12))} Sil</button>
         </div>
       </div>
     </div>`;
@@ -5005,7 +5049,7 @@ async function saveOrder() {
     if(ok) orders.unshift(data[0]);
   }
 
-  btn.disabled=false; btn.textContent='💾 Sipariş Kaydet';
+  btn.disabled=false; btn.textContent='Sipariş Kaydet';
   if(!ok){ toast('Kayıt hatası!','error'); return; }
   toast(_editOrderId ? 'Sipariş güncellendi.' : 'Sipariş kaydedildi!', 'success');
   clearOrderForm();
@@ -5032,7 +5076,7 @@ function editOrder(id) {
   _orderItemCount=0;
   const items = Array.isArray(o.items)?o.items:(typeof o.items==='string'?JSON.parse(o.items||'[]'):[]);
   items.forEach(it=>addOrderItem(it.name,it.desc,it.qty));
-  document.getElementById('o-save-btn').textContent='💾 Güncelle';
+  document.getElementById('o-save-btn').textContent='Güncelle';
   toggleOrderForm(true); // düzenlemede form kapalıysa açılır (tasarım 2026)
   document.getElementById('order-form-card').scrollIntoView({behavior:'smooth'});
 }
@@ -5073,7 +5117,7 @@ function clearOrderForm() {
   const ap = document.getElementById('o-approved'); if(ap) ap.value='';
   document.getElementById('order-items-list').innerHTML='';
   _orderItemCount=0;
-  const btn=document.getElementById('o-save-btn'); if(btn) btn.textContent='💾 Sipariş Kaydet';
+  const btn=document.getElementById('o-save-btn'); if(btn) btn.textContent='Sipariş Kaydet';
 }
 
 // ═══ PLANLAMA ═══
@@ -5132,7 +5176,7 @@ async function saveProjDate() {
     ok = Array.isArray(data)&&!!data[0];
     if(ok) projectDates.push(data[0]);
   }
-  btn.disabled=false; btn.textContent='💾 Kaydet';
+  btn.disabled=false; btn.textContent='Kaydet';
   if(!ok){ toast('Kayıt hatası!','error'); return; }
   toast(_editPdId?'Güncellendi!':'Proje tarihi eklendi!','success');
   clearPdForm(); renderGantt(); renderPdList();
@@ -5141,7 +5185,7 @@ async function saveProjDate() {
 function clearPdForm() {
   _editPdId=null;
   ['pd-project','pd-start','pd-end'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-  const btn=document.getElementById('pd-save-btn'); if(btn) btn.textContent='💾 Kaydet';
+  const btn=document.getElementById('pd-save-btn'); if(btn) btn.textContent='Kaydet';
 }
 
 function editPd(id) {
@@ -5151,7 +5195,7 @@ function editPd(id) {
   document.getElementById('pd-project').value = d.project_name;
   document.getElementById('pd-start').value   = d.start_date;
   document.getElementById('pd-end').value     = d.end_date;
-  document.getElementById('pd-save-btn').textContent='💾 Güncelle';
+  document.getElementById('pd-save-btn').textContent='Güncelle';
   document.getElementById('pd-form-card').scrollIntoView({behavior:'smooth'});
 }
 
@@ -5227,7 +5271,7 @@ async function renderPdList() {
     const revs  = revisions.filter(r=>r.project_date_id===d.id);
     const revsHTML = revs.length ? h`
       <div class="pd-revisions">
-        <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:6px">🔄 Revize Geçmişi (${revs.length})</div>
+        <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:6px">${ico('clock',11)} Revize Geçmişi (${revs.length})</div>
         ${revs.map(r=>h`<div class="pd-rev-item">
           <span style="color:var(--muted);min-width:110px">${new Date(r.created_at).toLocaleDateString('tr-TR')}</span>
           <span style="color:var(--yellow)">${r.old_start} → ${r.old_end}</span>
@@ -5888,7 +5932,7 @@ async function saveWorkOrder() {
     })
   ]);
 
-  if (!Array.isArray(woData)||!woData[0]) { toast('Kayıt hatası!','error'); btn.disabled=false; btn.textContent='💾 İş Emri Kaydet'; return; }
+  if (!Array.isArray(woData)||!woData[0]) { toast('Kayıt hatası!','error'); btn.disabled=false; btn.textContent='İş Emri Kaydet'; return; }
 
   // Parçaları kaydet ve dönen veriyi workOrderParts'a ekle
   const selected = parts.filter(p => _woSelectedParts.has(p.id));
@@ -5903,7 +5947,7 @@ async function saveWorkOrder() {
   partInserts.forEach(d => { if(Array.isArray(d)&&d[0]) workOrderParts.push(d[0]); });
   workOrders.unshift(woData[0]);
 
-  btn.disabled = false; btn.textContent = '💾 İş Emri Kaydet';
+  btn.disabled = false; btn.textContent = 'İş Emri Kaydet';
   toast('İş emri oluşturuldu! Aynı listeden yeni seçim yapabilirsiniz.', 'success');
 
   // Secimi temizle ama proje/bolum ve parca listesi ekranda kalsin —
@@ -6054,24 +6098,24 @@ async function renderWorkOrders() {
           ${isChecked ? '✓' : ''}
         </div>
         <div class="wo-info-grid">
-          <div class="wo-info-item"><span class="wo-info-label">🏭 Çalışma Alanı</span><span class="wo-info-value">${esc(w.workspace_name||'—')}</span></div>
-          <div class="wo-info-item"><span class="wo-info-label">👤 Personel</span><span class="wo-info-value">${esc(w.assigned_user||'—')}</span></div>
-          <div class="wo-info-item"><span class="wo-info-label">📅 Başlangıç</span><span class="wo-info-value">${dt}</span></div>
-          <div class="wo-info-item"><span class="wo-info-label">📦 Toplam Parça</span><span class="wo-info-value">${wParts.length} kalem</span></div>
+          <div class="wo-info-item"><span class="wo-info-label">${ico('factory',10)} Çalışma Alanı</span><span class="wo-info-value">${esc(w.workspace_name||'—')}</span></div>
+          <div class="wo-info-item"><span class="wo-info-label">${ico('user',10)} Personel</span><span class="wo-info-value">${esc(w.assigned_user||'—')}</span></div>
+          <div class="wo-info-item"><span class="wo-info-label">${ico('calendar',10)} Başlangıç</span><span class="wo-info-value">${dt}</span></div>
+          <div class="wo-info-item"><span class="wo-info-label">${ico('box',10)} Toplam Parça</span><span class="wo-info-value">${wParts.length} kalem</span></div>
         </div>
         ${partsTableHTML}
         ${w.notes?`<div style="background:var(--surface2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-bottom:10px">📝 ${esc(w.notes)}</div>`:''}
         ${revHTML}
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-          <button class="btn btn-ghost btn-sm" onclick="openWoReviseModal('${w.id}','${ea(w.project_name)}','${w.status}','${ea(w.assigned_user||'')}','${ea(w.workspace_name||'')}','${w.start_datetime||''}')">🔄 Revize</button>
-          <button class="btn btn-ghost btn-sm" onclick="deleteWorkOrder('${w.id}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">🗑️ Sil</button>
+          <button class="btn btn-ghost btn-sm" onclick="openWoReviseModal('${w.id}','${ea(w.project_name)}','${w.status}','${ea(w.assigned_user||'')}','${ea(w.workspace_name||'')}','${w.start_datetime||''}')">${ico('edit',12)} Revize</button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteWorkOrder('${w.id}')" style="color:var(--red);border-color:transparent">${ico('trash',12)} Sil</button>
         </div>
       </div>`;
     }).join('');
 
     return `<div style="margin-bottom:28px">
       <div style="font-family:var(--font-display);font-size:20px;letter-spacing:2px;color:var(--accent);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
-        📁 ${esc(projName)}
+        ${ico('folder',15)} ${esc(projName)}
         <span style="font-family:var(--font-mono);font-size:12px;color:var(--muted);font-weight:400">${woList.length} iş emri</span>
       </div>
       ${cards}
@@ -6412,7 +6456,7 @@ function renderWoGantt() {
 
   if (!wsWithOrders.length) {
     el.innerHTML = `<div style="padding:40px;text-align:center;font-family:var(--font-mono);font-size:13px;color:var(--muted)">
-      🏭 Henüz çalışma alanına atanmış iş emri yok.<br>İş emirleri oluştururken çalışma alanı seçin.
+      Henüz çalışma alanına atanmış iş emri yok.<br>İş emirleri oluştururken çalışma alanı seçin.
     </div>`;
     const d = document.getElementById('wo-gantt-range-display');
     if (d) d.textContent = '';
@@ -6610,7 +6654,7 @@ let _activeWsId = null;
 
 const WS_TYPE_LABELS = { area:'Çalışma Alanı', machine:'Makine', line:'Üretim Hattı', zone:'Bölge' };
 const WS_TYPE_CSS    = { area:'ws-type-area', machine:'ws-type-machine', line:'ws-type-line', zone:'ws-type-zone' };
-const WS_TYPE_ICONS  = { area:'🏭', machine:'⚙️', line:'🔗', zone:'📍' };
+const WS_TYPE_ICONS  = { area:ico('factory',15), machine:ico('gear',15), line:ico('link',15), zone:ico('pin',15) };
 
 async function loadAndRenderWorkspaces() {
   const [wsData, memData] = await Promise.all([
@@ -6635,13 +6679,13 @@ function renderWorkspaces() {
   if (!list) return;
 
   if (!filtered.length) {
-    list.innerHTML = h`<div class="empty-state"><span class="emoji">🏭</span>Henüz çalışma alanı / makine eklenmedi</div>`;
+    list.innerHTML = h`<div class="empty-state">${raw(ico('factory',36))}Henüz çalışma alanı / makine eklenmedi</div>`;
     return;
   }
 
   list.innerHTML = h`<div class="ws-grid">${filtered.map(w => {
     const members = wsMembers.filter(m => m.workspace_id === w.id);
-    const icon = WS_TYPE_ICONS[w.type] || '🏭';
+    const icon = WS_TYPE_ICONS[w.type] || ico('factory',15);
     const typeLbl = WS_TYPE_LABELS[w.type] || w.type;
     const typeCss = WS_TYPE_CSS[w.type] || 'ws-type-area';
 
@@ -6655,12 +6699,12 @@ function renderWorkspaces() {
             </div>
             <button class="icon-btn" style="width:26px;height:26px;font-size:11px" onclick="removeWsMember('${raw(m.id)}','${raw(w.id)}')">✕</button>
           </div>`)}`
-      : h`<div class="ws-empty-members">👤 Henüz personel atanmadı</div>`;
+      : h`<div class="ws-empty-members">${raw(ico('user',12))} Henüz personel atanmadı</div>`;
 
     return h`<div class="ws-card">
       <div class="ws-card-header">
         <div>
-          <div class="ws-card-title">${icon} ${w.name}</div>
+          <div class="ws-card-title">${raw(icon)} ${w.name}</div>
           ${w.description ? h`<div class="ws-card-desc">${w.description}</div>` : ''}
         </div>
         <span class="ws-type-badge ${typeCss}">${typeLbl}</span>
@@ -6808,8 +6852,8 @@ function togglePasswordVisibility() {
   const input = document.getElementById('login-password');
   const btn   = document.getElementById('pw-toggle');
   if (!input) return;
-  if (input.type === 'password') { input.type = 'text'; btn.textContent = '🙈'; }
-  else { input.type = 'password'; btn.textContent = '👁'; }
+  if (input.type === 'password') { input.type = 'text'; btn.innerHTML = ico('eyeoff',16); }
+  else { input.type = 'password'; btn.innerHTML = ico('eye',16); }
 }
 
 // Beni hatırla — sayfa açılınca kayıtlı bilgileri yükle
@@ -6976,7 +7020,7 @@ function applyPermissions() {
     devTab.className = 'nav-tab';
     devTab.id = 'nav-tab-appusers';
     devTab.dataset.tab = 'appusers';
-    devTab.textContent = '🔑 Kullanıcılar';
+    devTab.innerHTML = ico('key',16)+'<span>Kullanıcılar</span>';
     devTab.onclick = () => switchTab('appusers');
     navTabs.appendChild(devTab);
   } else if (!isDev && devTab) {
@@ -8099,7 +8143,7 @@ function supEdit(id){
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
       <button class="btn btn-ghost" onclick="document.getElementById('sup-edit-overlay').remove()">İptal</button>
-      <button class="btn btn-primary" onclick="supSave(${id?`'${id}'`:'null'})">💾 Kaydet</button>
+      <button class="btn btn-primary" onclick="supSave(${id?`'${id}'`:'null'})">Kaydet</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
@@ -9522,7 +9566,7 @@ function editPurchaseItem(id){
     <div style="margin-top:10px"><label style="font-size:11px;color:var(--muted)">Not</label><input type="text" id="pe-notes" value="${esc(i.notes)}" style="${inp}"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
       <button class="btn btn-ghost" onclick="document.getElementById('pur-edit-overlay').remove()">İptal</button>
-      <button class="btn btn-primary" onclick="savePurchaseEdit('${i.id}')">💾 Kaydet</button>
+      <button class="btn btn-primary" onclick="savePurchaseEdit('${i.id}')">Kaydet</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
@@ -11518,7 +11562,7 @@ function whmEditWarehouse(id){
       </div>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
         <button class="btn btn-ghost" onclick="document.getElementById('whm-edit-overlay').remove()">İptal</button>
-        <button class="btn btn-primary" onclick="whmSaveEdit('${id}')">💾 Kaydet</button>
+        <button class="btn btn-primary" onclick="whmSaveEdit('${id}')">Kaydet</button>
       </div>
     </div>`;
     document.body.appendChild(overlay);
@@ -11983,7 +12027,7 @@ function editAppUserPerms(id) {
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
       <button class="btn btn-ghost" onclick="document.getElementById('perm-overlay').remove()">İptal</button>
-      <button class="btn btn-primary" onclick="saveAppUserPerms('${id}')">💾 Kaydet</button>
+      <button class="btn btn-primary" onclick="saveAppUserPerms('${id}')">Kaydet</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
@@ -12054,7 +12098,7 @@ function adminChangePassword(id, displayName) {
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="document.getElementById('admin-pw-overlay').remove()">İptal</button>
-      <button class="btn btn-primary" onclick="submitAdminPwChange('${id}')">💾 Kaydet</button>
+      <button class="btn btn-primary" onclick="submitAdminPwChange('${id}')">Kaydet</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
@@ -12107,7 +12151,7 @@ function openChangePassword() {
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="document.getElementById('user-pw-overlay').remove()">İptal</button>
-      <button class="btn btn-primary" onclick="submitUserPwChange()">💾 Kaydet</button>
+      <button class="btn btn-primary" onclick="submitUserPwChange()">Kaydet</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
@@ -12530,7 +12574,7 @@ function docsEditParts(docId){
     <div style="overflow:auto;flex:1">${raw(docsPartRowsHTML(new Set(d.part_ids||[])))}</div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
       <button class="btn btn-ghost" onclick="document.getElementById('docs-edit-overlay').remove()">İptal</button>
-      <button class="btn btn-primary" onclick="docsSaveParts('${raw(docId)}')">💾 Kaydet</button>
+      <button class="btn btn-primary" onclick="docsSaveParts('${raw(docId)}')">Kaydet</button>
     </div>
   </div>`;
   document.body.appendChild(ov);
@@ -12804,7 +12848,7 @@ function opDefStartEdit(id){
   document.getElementById('opdef-dept').value = op.department_name||'';
   document.getElementById('opdef-desc').value = op.description||'';
   const btn = document.getElementById('opdef-save-btn');
-  if(btn) btn.textContent = '💾 Güncelle';
+  if(btn) btn.textContent = 'Güncelle';
   const cancel = document.getElementById('opdef-cancel-btn');
   if(cancel) cancel.style.display = '';
   const hint = document.getElementById('opdef-edit-hint');
@@ -12977,7 +13021,7 @@ function openAddProduct() {
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="document.getElementById('add-product-overlay').remove()">İptal</button>
-      <button class="btn btn-primary" id="ap-save-btn" onclick="saveNewProduct()">💾 Kaydet</button>
+      <button class="btn btn-primary" id="ap-save-btn" onclick="saveNewProduct()">Kaydet</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
@@ -13671,7 +13715,7 @@ function editBomQty(partId) {
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="document.getElementById('bom-qty-overlay').remove()">İptal</button>
-      <button class="btn btn-primary" onclick="saveBomQty('${partId}')">💾 Kaydet</button>
+      <button class="btn btn-primary" onclick="saveBomQty('${partId}')">Kaydet</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
@@ -13733,7 +13777,7 @@ function editBomPart(partId) {
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="document.getElementById('bom-edit-overlay').remove()">İptal</button>
-      <button class="btn btn-primary" onclick="saveBomPartEdit('${partId}')">💾 Kaydet</button>
+      <button class="btn btn-primary" onclick="saveBomPartEdit('${partId}')">Kaydet</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
@@ -14271,7 +14315,7 @@ function pbomeRequestClose(proceed){
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap">
       <button class="btn btn-ghost" onclick="document.getElementById('pbome-close-overlay').remove()">Vazgeç</button>
       <button class="btn btn-ghost" id="pbome-close-discard" title="Girişten sonraki tüm değişiklikler geri alınır">↩ Kaydetmeden Kapat</button>
-      <button class="btn btn-primary" id="pbome-close-save" title="Değişiklikler zaten kayıtlı — kapatılır">💾 Kaydet-Kapat</button>
+      <button class="btn btn-primary" id="pbome-close-save" title="Değişiklikler zaten kayıtlı — kapatılır">Kaydet-Kapat</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
@@ -14680,7 +14724,7 @@ function pbomeEditQty(partId) {
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="document.getElementById('pbome-qty-overlay').remove()">İptal</button>
-      <button class="btn btn-primary" onclick="pbomeSaveQty('${partId}')">💾 Kaydet</button>
+      <button class="btn btn-primary" onclick="pbomeSaveQty('${partId}')">Kaydet</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
@@ -14737,7 +14781,7 @@ function pbomeEditPart(partId) {
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="document.getElementById('pbome-edit-overlay').remove()">İptal</button>
-      <button class="btn btn-primary" onclick="pbomeSavePartEdit('${partId}')">💾 Kaydet</button>
+      <button class="btn btn-primary" onclick="pbomeSavePartEdit('${partId}')">Kaydet</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
@@ -15527,7 +15571,7 @@ function openPbomCustomEdit(partId, pbomId) {
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="document.getElementById('pbom-cedit-overlay').remove()">İptal</button>
-      <button class="btn btn-primary" onclick="savePbomCustomEdit('${partId}','${pbomId}')">💾 Kaydet</button>
+      <button class="btn btn-primary" onclick="savePbomCustomEdit('${partId}','${pbomId}')">Kaydet</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
