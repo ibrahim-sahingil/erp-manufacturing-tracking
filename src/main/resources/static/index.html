@@ -635,6 +635,8 @@
   .delta{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;border-radius:9px;padding:2px 8px;}
   .delta.up{background:var(--ok-soft);color:var(--ok);}
   .delta.dn{background:var(--err-soft);color:var(--err);}
+  .delta.in{background:var(--info-soft);color:var(--info);}
+  .delta.nd{background:color-mix(in srgb,var(--mut) 12%,transparent);color:var(--muted);}
   .stsum-ptag{font-size:10px;font-weight:700;color:var(--accent);background:var(--acc-soft);border-radius:8px;padding:2px 8px;}
   .personnel-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:28px;}
   .personnel-card{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;padding:20px;position:relative;overflow:hidden;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;}
@@ -4484,11 +4486,18 @@ async function renderStatsSummary(){
   const doneDelta = pvDone ? Math.round((done-pvDone)/pvDone*100) : null;
   const fire = (done+rej) ? (rej/(done+rej)*100) : 0;
   const pvFire = (pvDone+pvRej) ? (pvRej/(pvDone+pvRej)*100) : null;
-  // Ort. iş emri süresi: tamamlanmış İE'lerin başlangıç→bitiş ortalaması (gün)
-  const woDone=(Array.isArray(workOrders)?workOrders:[]).filter(w=>w.status==='done'&&w.start_datetime&&w.end_datetime);
-  const woAvg=woDone.length? woDone.reduce((t,w)=>t+(new Date(w.end_datetime)-new Date(w.start_datetime)),0)/woDone.length/86400000 : null;
-  const spendItems=(Array.isArray(purchaseItems)?purchaseItems:[]).filter(pi=>pi.ordered_at && String(pi.ordered_at).slice(0,7)===ym && pi.unit_price);
-  const spend=spendItems.reduce((s,pi)=>s+(parseFloat(pi.unit_price)||0)*(parseFloat(pi.quantity)||0),0);
+  // Ort. iş emri süresi: seçili ayda TAMAMLANMIŞ İE'lerin başlangıç→bitiş ortalaması
+  // (bitişi olmayan done kayıtlar süre hesabına giremez — dürüst gösterim)
+  const woAll=(Array.isArray(workOrders)?workOrders:[]).filter(w=>w.status==='done'&&w.start_datetime&&w.end_datetime);
+  const woInMonth=mm=>woAll.filter(w=>String(w.end_datetime).slice(0,7)===mm);
+  const avgOf=list=>list.length? list.reduce((t,w)=>t+(new Date(w.end_datetime)-new Date(w.start_datetime)),0)/list.length/86400000 : null;
+  const woDone=woInMonth(ym), pvWoDone=woInMonth(pvYm);
+  const woAvg=avgOf(woDone), pvWoAvg=avgOf(pvWoDone);
+  const spendOf=mm=>(Array.isArray(purchaseItems)?purchaseItems:[]).filter(pi=>pi.ordered_at && String(pi.ordered_at).slice(0,7)===mm && pi.unit_price);
+  const spendItems=spendOf(ym), pvSpendItems=spendOf(pvYm);
+  const sumSpend=a=>a.reduce((s,pi)=>s+(parseFloat(pi.unit_price)||0)*(parseFloat(pi.quantity)||0),0);
+  const spend=sumSpend(spendItems), pvSpend=sumSpend(pvSpendItems);
+  const spendDelta = pvSpend ? Math.round((spend-pvSpend)/pvSpend*100) : null;
   const spendTxt = spend>=1000 ? (spend/1000).toLocaleString('tr-TR',{maximumFractionDigits:1})+' bin' : spend.toLocaleString('tr-TR',{maximumFractionDigits:0});
 
   // ── Haftalık üretim (ayın takvim haftaları, Pzt bazlı) ──
@@ -4547,10 +4556,20 @@ async function renderStatsSummary(){
   window._stsum = { ym, done, rej, fire, spend, people, ops:L.length, weeks, top,
     donut:{dDone,dProd,dWait,dRej}, effs };
 
+  // Aya-göre kıyas HER KPI'da görünür: veri yoksa dürüst "geçen ay veri yok" çipi
+  const ndChip = h`<span class="delta nd">geçen ay veri yok</span>`;
   const deltaBadge=(v,goodDown)=>{
-    if(v===null||!isFinite(v)) return '';
-    const up=v>=0, good=goodDown?!up:up;
+    if(v===null||!isFinite(v)) return ndChip;
+    if(v===0) return h`<span class="delta in">geçen ayla aynı</span>`;
+    const up=v>0, good=goodDown?!up:up;
     return h`<span class="delta ${raw(good?'up':'dn')}">${up?'↑':'↓'} %${Math.abs(v)} geçen aya göre</span>`;
+  };
+  const durBadge=(cur,prev)=>{
+    if(cur==null||prev==null) return ndChip;
+    const d=cur-prev;
+    if(Math.abs(d)<0.05) return h`<span class="delta in">geçen ayla aynı</span>`;
+    const good=d<0; // süre kısaldıysa iyileşme
+    return h`<span class="delta ${raw(good?'up':'dn')}">${good?'↓':'↑'} ${Math.abs(d).toLocaleString('tr-TR',{maximumFractionDigits:1})} gün ${good?'iyileşme':'artış'}</span>`;
   };
 
   box.innerHTML = h`
@@ -4569,15 +4588,15 @@ async function renderStatsSummary(){
       </div>
       <div class="stat-card">
         <div class="stat-label">Ort. İş Emri Süresi</div><div class="stat-value">${woAvg!=null?h`${woAvg.toLocaleString('tr-TR',{maximumFractionDigits:1})}<span class="un"> gün</span>`:'—'}</div>
-        <div class="stat-sub">${woDone.length?h`${woDone.length} tamamlanan iş emrinden`:'tamamlanan iş emri yok'}</div>
+        <div class="stat-sub">${durBadge(woAvg,pvWoAvg)}${woDone.length?h`${woDone.length} iş emri bu ay`:'bitişli iş emri yok'}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Fire / Red</div><div class="stat-value"><span class="un">%</span>${fire.toLocaleString('tr-TR',{maximumFractionDigits:1})}</div>
-        <div class="stat-sub">${pvFire===null?h`${rej} adet ret`:deltaBadge(Math.round(fire-pvFire),true)}</div>
+        <div class="stat-sub">${deltaBadge(pvFire===null?null:Math.round(fire-pvFire),true)}${rej} adet ret</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Malzeme Harcaması</div><div class="stat-value" style="font-size:28px"><span class="un">₺</span>${raw(String(spendTxt).replace(' bin','<span class="un">bin</span>'))}</div>
-        <div class="stat-sub">${spendItems.length} sipariş kalemi</div>
+        <div class="stat-sub">${deltaBadge(spendDelta,true)}${spendItems.length} sipariş kalemi</div>
       </div>
     </div>
     <div class="sgrid">
