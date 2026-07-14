@@ -179,13 +179,14 @@
   .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
   .btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
   .btn-sm{padding:6px 14px;font-size:11px;}
-  .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;}
+  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px;}
   @media(max-width:700px){.stats-row{grid-template-columns:repeat(2,1fr);}}
   .stat-card{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;padding:16px 18px;position:relative;overflow:hidden;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;}
-  .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--c,var(--accent));}
+  /* tasarım 2026: konsept KPI dili — renk şeridi yok, değer mürekkep, renk delta rozetinde */
   .stat-card:hover{transform:translateY(-2px);box-shadow:var(--hover-shadow);border-color:var(--line);}
   .stat-label{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
-  .stat-value{font-size:34px;font-weight:620;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--c,var(--accent));line-height:1;}
+  .stat-value{font-size:34px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--ink);line-height:1;}
+  .stat-value .un{font-size:55%;font-weight:650;color:var(--ink-2);margin:0 1px;}
   .stat-sub{font-size:11px;color:var(--muted);margin-top:6px;}
   .progress-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:16px;}
   .progress-fill{height:100%;background:var(--acc-grad);border-radius:2px;transition:width .5s;}
@@ -300,7 +301,7 @@
   .report-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;position:relative;overflow:hidden;}
   .report-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--c,var(--accent));}
   .report-card-label{font-family:var(--font-mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;font-weight:650;color:var(--muted);margin-bottom:6px;}
-  .report-card-value{font-weight:700;font-size:30px;color:var(--c,var(--accent));line-height:1;}
+  .report-card-value{font-weight:700;font-size:28px;font-variant-numeric:tabular-nums;color:var(--ink);line-height:1;}
   .report-card-sub{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:4px;}
   .report-progress{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:12px;}
   .report-progress-fill{height:100%;background:var(--c,var(--accent));border-radius:2px;transition:width .5s;}
@@ -417,7 +418,7 @@
   .order-items-table td{font-size:12.5px;padding:8px 10px;border-bottom:1px solid var(--line-soft);color:var(--text);}
   .order-items-table tr:last-child td{border-bottom:none;}
   .order-card-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line-soft);}
-  .order-price{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent);}
+  .order-price{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink);}
   .order-price-sub{font-size:10.5px;color:var(--muted);}
   .order-actions{display:flex;gap:8px;}
   /* PLANNING */
@@ -4554,7 +4555,7 @@ async function renderStatsSummary(){
       <select id="stsum-month" onchange="renderStatsSummary()">
         ${months.map(mo=>raw(`<option value="${mo.v}"${mo.v===ym?' selected':''}>${mo.t}</option>`))}
       </select>
-      <button class="btn btn-ghost btn-sm" onclick="stsumCsv()">${raw(ico('download',12))} CSV</button>
+      <button class="btn btn-primary btn-sm" onclick="stsumCsv()">${raw(ico('download',12))} CSV</button>
     </div>
     <div class="stats-row" style="margin-bottom:16px">
       <div class="stat-card" style="--c:var(--green)">
@@ -4562,7 +4563,7 @@ async function renderStatsSummary(){
         <div class="stat-sub">${deltaBadge(doneDelta,false)}${doneDelta===null?h`${L.length} işlem kaydı`:''}</div>
       </div>
       <div class="stat-card" style="--c:var(--red)">
-        <div class="stat-label">Fire / Red</div><div class="stat-value">%${fire.toLocaleString('tr-TR',{maximumFractionDigits:1})}</div>
+        <div class="stat-label">Fire / Red</div><div class="stat-value"><span class="un">%</span>${fire.toLocaleString('tr-TR',{maximumFractionDigits:1})}</div>
         <div class="stat-sub">${pvFire===null?h`${rej} adet ret`:deltaBadge(Math.round(fire-pvFire),true)}</div>
       </div>
       <div class="stat-card" style="--c:var(--accent)">
@@ -4570,7 +4571,7 @@ async function renderStatsSummary(){
         <div class="stat-sub">${people} personel çalıştı</div>
       </div>
       <div class="stat-card" style="--c:var(--info)">
-        <div class="stat-label">Malzeme Harcaması</div><div class="stat-value" style="font-size:26px">₺${spendTxt}</div>
+        <div class="stat-label">Malzeme Harcaması</div><div class="stat-value" style="font-size:28px"><span class="un">₺</span>${raw(String(spendTxt).replace(' bin','<span class="un">bin</span>'))}</div>
         <div class="stat-sub">${spendItems.length} sipariş kalemi</div>
       </div>
     </div>
