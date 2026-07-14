@@ -65,10 +65,11 @@ test('MİP rezervasyonu: talep → depocu kısmi onayı → stok/satın alma/Mİ
     await page.waitForTimeout(1500);
     // Yeni yayın önce "Karar Bekleyen"e düşer; öneri TEDARIK→Satın Al.
     // "Tümünü Öneriyle Onayla" gerçek UI üzerinden tıklanır (toplu uç).
-    // (başlıklar CSS text-transform:uppercase ile büyük görünür)
+    // (tasarım 2026: butonlarda text-transform:uppercase kalktı — harf
+    //  duyarsız karşılaştır, CSS'e yaslanma)
     const bekleyen = await page.locator('#mip-list').innerText();
-    expect(bekleyen, 'yeni yayın karar bekler').toContain('KARAR BEKLEYEN');
-    expect(bekleyen).toContain('SATIN AL');
+    expect(bekleyen.toUpperCase(), 'yeni yayın karar bekler').toContain('KARAR BEKLEYEN');
+    expect(bekleyen.toUpperCase()).toContain('SATIN AL');
     await page.click('#mip-decide-all-btn');
     await page.waitForTimeout(2000);
     const kararSonrasi = await page.locator('#mip-list').innerText();
