@@ -77,7 +77,7 @@ chk('scan: log notu <script> kaçırıldı', scan.includes('not&lt;script&gt;'))
 chk('scan: kod & < > kaçırıldı', scan.includes('C&amp;&lt;D&gt;'));
 chk('scan: user option value kaçırıldı', scan.includes('<option value="Kişi&lt;b&gt;">'));
 chk('scan: kart/buton yapısı (raw) korundu', scan.includes('class="scan-card"') && scan.includes("submitScan('p1')"));
-chk('scan: log badge (raw) korundu', scan.includes('log-qty-badge log-qty-done') && scan.includes('✅ 2'));
+chk('scan: log badge (raw) korundu', scan.includes('log-qty-badge log-qty-done') && scan.includes('log-qty-done">2'));
 
 // ── renderReceive (QR mal kabul) ──
 global.PUR_STATUS={PLANNED:{icon:'📝',label:'Planlandı'}, IN_WAREHOUSE:{icon:'🏭',label:'Depoda'}, CANCELLED:{icon:'✖',label:'İptal'}};
@@ -93,7 +93,7 @@ chk('receive: kalem adı onerror kaçırıldı', !rcv.includes('Kalem'+EVIL) && 
 chk('receive: tedarikçi onerror kaçırıldı', rcv.includes('Ted&lt;img'));
 chk('receive: malzeme <script> kaçırıldı', rcv.includes('Mat&lt;script&gt;'));
 chk('receive: depo option adı kaçırıldı', rcv.includes('<option value="w1">Depo&lt;b&gt;'));
-chk('receive: yapı/buton (raw) korundu', rcv.includes('📦 QR Mal Kabul') && rcv.includes("receiveConfirm('i1')"));
+chk('receive: yapı/buton (raw) korundu', rcv.includes('QR Mal Kabul') && rcv.includes("receiveConfirm('i1')"));
 
 // ── renderOrders (sipariş kartları) ──
 global.currentUser={role:'developer'};
@@ -321,7 +321,7 @@ await showLog('p1','Ad<script>');
 console.log('\nshowLog (işlem geçmişi modalı):');
 chk('showLog: parça adı <script> kaçırıldı', _ovl.includes('Ad&lt;script&gt;') && !_ovl.includes('Ad<script>'));
 chk('showLog: kullanıcı/not kaçırıldı', _ovl.includes('U&lt;b&gt;') && _ovl.includes('LNot&lt;img'));
-chk('showLog: adet rozeti (raw) korundu', _ovl.includes('log-qty-done">✅ 2'));
+chk('showLog: adet rozeti (raw) korundu', _ovl.includes('log-qty-done">2'));
 
 // ── purOrderModal (9. tur M5 — tekil sipariş modalı) ──
 // createElement shim'i querySelector/remove ile genişletilir (modal deseni)
@@ -414,7 +414,7 @@ chk('woGrid: iş emri yokken rozet YOK', !wog.includes('iş emrinde'));
 global.workOrderParts=[{work_order_id:'w1', part_id:'p1'}];
 woRenderPartsGrid();
 chk('woGrid: workOrderParts tazelenince re-render rozeti getirir',
-    (store['wo-parts-grid']||'').includes('✅ iş emrinde'));
+    (store['wo-parts-grid']||'').includes('iş emrinde'));
 
 // ── whvProjectHTML / whvWarehouseHTML (depo görünümleri) ──
 global.PUR_STATUS={IN_WAREHOUSE:{icon:'🏭',label:'Depoda',color:'#2ecc71'}, ORDERED:{icon:'📦',label:'Sipariş',color:'#2980b9'}, PLANNED:{icon:'📝',label:'Pl',color:'#f5a623'}};
@@ -470,7 +470,7 @@ renderBomTreeSvg();
 const bts=store['bom-tree-container']||'';
 console.log('\nrenderBomTreeSvg (ürün ağacı):');
 chk('bomTree: parça adı/kodu/malzemesi kaçırıldı', bts.includes('BN&lt;img') && bts.includes('BC&lt;b&gt;') && bts.includes('M&lt;script&gt;'));
-chk('bomTree: operasyon adı kaçırıldı', bts.includes('⚙Op&lt;b&gt;(OC&lt;i&gt;)'));
+chk('bomTree: operasyon adı kaçırıldı', bts.includes('Op&lt;b&gt;(OC&lt;i&gt;)'));
 chk('bomTree: kök ürün adı kaçırıldı', bts.includes('P&lt;i&gt; — Prod&lt;b&gt;'));
 
 // ── renderBomList (şablon parça listesi — 9. tur M1: türetilmiş bölüm rozeti) ──
@@ -483,7 +483,7 @@ eval(grab('renderBomList'));
 renderBomList();
 const bl=store['bom-parts-list']||'';
 console.log('\nrenderBomList (şablon parça listesi):');
-chk('bomList: türetilmiş bölüm rozeti kaçırıldı', bl.includes('🏭 Böl&lt;img') && !bl.includes('Böl'+EVIL));
+chk('bomList: türetilmiş bölüm rozeti kaçırıldı', bl.includes('Böl&lt;img') && !bl.includes('Böl'+EVIL));
 chk('bomList: parça adı/kodu/malzemesi kaçırıldı', bl.includes('BN&lt;img') && bl.includes('BC&lt;b&gt;') && bl.includes('M&lt;script&gt;'));
 chk('bomList: kindBadge + butonlar (raw) korundu', bl.includes('<span class="KB">k</span>') && bl.includes("editBomPart('b1')"));
 
@@ -514,7 +514,7 @@ eval(grab('pbomeRenderTree')); // 5. tur #6: render pbomeShowTree'den ayrıldı
 pbomeRenderList();
 const pel=store['pbome-parts-list']||'';
 console.log('\npbomeRenderList / pbomeShowTree (proje BOM editörü):');
-chk('pbomeList: kod/ad/malzeme/operasyon kaçırıldı', pel.includes('QC&lt;b&gt;') && pel.includes('QN&lt;img') && pel.includes('QM&lt;script&gt;') && pel.includes('⚙On&lt;b&gt;(Oc&lt;i&gt;)'));
+chk('pbomeList: kod/ad/malzeme/operasyon kaçırıldı', pel.includes('QC&lt;b&gt;') && pel.includes('QN&lt;img') && pel.includes('QM&lt;script&gt;') && pel.includes('On&lt;b&gt;(Oc&lt;i&gt;)'));
 chk('pbomeList: bölüm dropdown/rozeti kaçırıldı', pel.includes('Dept&lt;img&gt;'));
 chk('pbomeList: kindBadge + butonlar (raw) korundu', pel.includes('<span class="KB">k</span>') && pel.includes("pbomeEditQty('q1')") && pel.includes("pbomeSetDept('q1'"));
 pbomeShowTree();
@@ -703,7 +703,7 @@ chk('wres: kod kaçırıldı', wresL.includes('RK&lt;b&gt;'));
 chk('wres: onay/iptal butonları (raw) korundu', wresL.includes("whResApproveModal('res1')") && wresL.includes("whResCancel('res1')"));
 chk('wres: kayıtlı stok bekleyen satırda gösterildi', wresL.includes('kayıtlı stok: 40'));
 chk('wres: sonuçlanan kısmi onay rozeti', wresL.includes('Kısmi onay') && wresL.includes('onaylanan: 15'));
-chk('wres: toplama deposu gösterildi (whName kaçırılarak)', wresL.includes('🔁 toplama: Depo&lt;i&gt;'));
+chk('wres: toplama deposu gösterildi (whName kaçırılarak)', wresL.includes('toplama: Depo&lt;i&gt;'));
 
 // ── renderStatsSummary (İstatistik aylık özet — tasarım 2026) ──
 global.workOrderParts=[];
