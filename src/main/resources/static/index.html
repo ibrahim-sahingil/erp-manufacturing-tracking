@@ -113,6 +113,18 @@
   .nav-tab.active::before{content:"";position:absolute;left:-12px;top:6px;bottom:6px;width:3px;background:var(--acc-grad);border-radius:0 3px 3px 0;}
   .nav-tab.active svg{color:var(--acc);opacity:1;}
   .side-spacer{flex:1;min-height:14px;}
+  /* Menü altı kullanıcı kartı (konsept .me) — kenar çubuğu her temada koyu, renkler sabit */
+  .side-me{border-top:1px solid rgba(255,255,255,.06);margin-top:8px;padding-top:8px;}
+  .side-me .user-badge{background:none;border:none;border-radius:9px;padding:6px 8px;width:100%;}
+  .side-me .user-badge-name{color:#d6dae1;}
+  .side-me .user-badge-role{color:#6d7686;}
+  .side-me .user-badge-info{flex:1;min-width:0;}
+  .side-me .logout-btn{color:#8a93a3;}
+  .side-me .logout-btn:hover{color:var(--err);}
+  @media(max-width:900px){
+    .side-me .user-badge{flex-direction:column;gap:6px;padding:6px 0;}
+    .side-me .user-badge-info{display:none;}
+  }
   .main{flex:1;min-width:0;}
   .top{height:58px;display:flex;align-items:center;gap:14px;padding:0 26px;border-bottom:1px solid var(--line-soft);background:color-mix(in srgb,var(--bg) 70%,transparent);backdrop-filter:blur(14px);position:sticky;top:0;z-index:100;}
   .top .grow{flex:1;}
@@ -516,6 +528,40 @@
   .stats-filter-bar label{font-size:10.5px;font-weight:700;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;letter-spacing:.1em;}
   .stats-filter-bar input,.stats-filter-bar select{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:9px 12px;outline:none;transition:border .2s,box-shadow .2s;font-family:inherit;}
   .stats-filter-bar input:focus,.stats-filter-bar select:focus{border-color:var(--acc-line);box-shadow:0 0 0 3px var(--acc-soft);}
+  /* ── İSTATİSTİK AYLIK ÖZET (konsept v-stat) ── */
+  .sect-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
+  .stsum-head{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+  .stsum-head .grow{flex:1;}
+  .stsum-head select{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:12.5px;font-weight:600;padding:7px 10px;outline:none;cursor:pointer;}
+  .stsum-head select:focus{border-color:var(--acc-line);box-shadow:0 0 0 3px var(--acc-soft);}
+  .sgrid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:16px;margin-bottom:24px;}
+  @media(max-width:1000px){.sgrid{grid-template-columns:1fr;}}
+  .schart{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;padding:16px 18px;}
+  .sc-title{font-size:13.5px;font-weight:700;margin-bottom:14px;}
+  .sc-title span{font-size:10.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-left:6px;}
+  .bars{display:flex;align-items:flex-end;gap:10px;height:130px;padding:0 4px;}
+  .bars .b{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end;}
+  .bars .b i{width:100%;max-width:34px;border-radius:6px 6px 3px 3px;background:var(--acc-grad);opacity:.9;min-height:3px;}
+  .bars .b.dim i{background:var(--border);opacity:1;}
+  .bars .b span{font-size:9.5px;color:var(--muted);font-weight:650;}
+  .donut{width:130px;height:130px;border-radius:50%;position:relative;margin:8px auto;}
+  .donut::after{content:'';position:absolute;inset:17px;border-radius:50%;background:var(--panel-solid);}
+  .donut .dc{position:absolute;inset:17px;z-index:1;display:grid;place-items:center;text-align:center;}
+  .donut .dc b{font-size:21px;font-weight:780;display:block;}
+  .donut .dc span{font-size:9.5px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-weight:700;}
+  .dlegend{display:flex;flex-direction:column;gap:5px;margin-top:12px;font-size:11.5px;color:var(--ink-2);}
+  .dlegend>div{display:flex;align-items:center;}
+  .dlegend i{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:7px;flex-shrink:0;}
+  .dlegend .dlq{margin-left:auto;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;}
+  .effrow{margin-bottom:11px;}
+  .effrow .en{display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:4px;}
+  .effrow .en b{color:var(--ink-2);font-weight:700;font-variant-numeric:tabular-nums;}
+  .effbar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+  .effbar i{display:block;height:100%;background:var(--acc-grad);border-radius:3px;}
+  .delta{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;border-radius:8px;padding:2px 7px;}
+  .delta.up{background:var(--ok-soft);color:var(--ok);}
+  .delta.dn{background:var(--err-soft);color:var(--err);}
+  .stsum-ptag{font-size:10px;font-weight:700;color:var(--accent);background:var(--acc-soft);border-radius:8px;padding:2px 8px;}
   .personnel-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:28px;}
   .personnel-card{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;padding:20px;position:relative;overflow:hidden;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;}
   .personnel-card:hover{border-color:var(--acc-line);transform:translateY(-2px);box-shadow:var(--hover-shadow);} .personnel-card{cursor:pointer;} .personnel-card.selected{border-color:var(--acc-line);box-shadow:0 0 0 2px var(--acc-soft);}
@@ -638,6 +684,18 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
     <button class="nav-tab" data-tab="users" onclick="switchTab('users')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c1.4-3.4 4-5 7-5s5.6 1.6 7 5"/></svg><span>Personel</span></button>
   </div>
   <div class="side-spacer"></div>
+  <!-- Kullanıcı kartı menü altında (konsept .me) — id'ler applyPermissions/testlerin sözleşmesi -->
+  <div class="side-me">
+    <div class="user-badge" id="user-badge" style="display:none">
+      <div class="user-badge-avatar" id="user-badge-avatar">?</div>
+      <div class="user-badge-info">
+        <div class="user-badge-name" id="user-badge-name">—</div>
+        <div class="user-badge-role" id="user-badge-role">—</div>
+      </div>
+      <button class="logout-btn" onclick="openChangePassword()" title="Şifre Değiştir" style="font-size:12px">🔑</button>
+      <button class="logout-btn" onclick="doLogout()" title="Çıkış Yap">⏏</button>
+    </div>
+  </div>
 </header>
 <div class="main">
   <div class="top" id="topbar">
@@ -647,15 +705,6 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
       <button class="vb" data-var="light" onclick="setTheme('light')" title="Fildişi — açık + bronz"><i style="background:linear-gradient(135deg,#fdfcf9,#e0d5be);box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)"></i><span>Fildişi</span></button>
       <button class="vb" data-var="steel" onclick="setTheme('steel')" title="Çelik Gece — koyu + buz mavisi"><i style="background:linear-gradient(135deg,#6fc6ff,#2f8de0)"></i><span>Çelik</span></button>
       <button class="vb" data-var="forest" onclick="setTheme('forest')" title="Yeşil Atölye — açık + yeşil"><i style="background:linear-gradient(135deg,#34b878,#157a4b)"></i><span>Yeşil</span></button>
-    </div>
-    <div class="user-badge" id="user-badge" style="display:none">
-      <div class="user-badge-avatar" id="user-badge-avatar">?</div>
-      <div>
-        <div class="user-badge-name" id="user-badge-name">—</div>
-        <div class="user-badge-role" id="user-badge-role">—</div>
-      </div>
-      <button class="logout-btn" onclick="openChangePassword()" title="Şifre Değiştir" style="font-size:12px">🔑</button>
-      <button class="logout-btn" onclick="doLogout()" title="Çıkış Yap">⏏</button>
     </div>
   </div>
 
@@ -1971,6 +2020,12 @@ function parsePgQuery(q) {
       out.filters.push({ field: key, op: 'notnull' });
     } else if (val === 'is.null') {
       out.filters.push({ field: key, op: 'isnull' });
+    } else if (/^(gte|lte|gt|lt)\./.test(val)) {
+      // ÖNCEDEN EKSİKTİ (tasarım turu 2026-07-14): gte/lte desteklenmediğinden
+      // created_at=gte.X sorguları 'eq' sanılıp HİÇ kayıt döndürmüyordu —
+      // İstatistik tarih filtresi Supabase göçünden beri bu yüzden boştu.
+      const op = val.slice(0, val.indexOf('.'));
+      out.filters.push({ field: key, op, value: val.slice(op.length + 1) });
     } else {
       out.filters.push({ field: key, op: 'eq', value: val });
     }
@@ -1985,6 +2040,11 @@ function applyPgQuery(rows, parsed) {
     if (f.op === 'in')      return f.value.some(x => String(v) === String(x));
     if (f.op === 'notnull') return v !== null && v !== undefined;
     if (f.op === 'isnull')  return v === null || v === undefined;
+    // ISO tarih/sayı dizgileri sözlük sırasıyla doğru karşılaştırılır
+    if (f.op === 'gte') return v != null && String(v) >= String(f.value);
+    if (f.op === 'lte') return v != null && String(v) <= String(f.value);
+    if (f.op === 'gt')  return v != null && String(v) >  String(f.value);
+    if (f.op === 'lt')  return v != null && String(v) <  String(f.value);
     return true;
   }));
   if (parsed.order.length) {
@@ -2658,8 +2718,11 @@ async function init(){
   if(pid){
     // QR tarama — önce kullanıcı girişi kontrol et
     document.getElementById('nav-tabs').style.display='none';
-    // (tasarım 2026) scan modunda kenar çubuğu rayı komple gizlenir (telefonda yer kazanımı)
+    // (tasarım 2026) scan modunda kenar çubuğu rayı komple gizlenir (telefonda yer
+    // kazanımı); kullanıcı rozeti kaybolmasın diye üst çubuğa taşınır.
     const sideEl = document.querySelector('.side'); if(sideEl) sideEl.style.display='none';
+    const ubEl = document.getElementById('user-badge'), tbEl = document.getElementById('topbar');
+    if(ubEl && tbEl) tbEl.appendChild(ubEl);
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     document.getElementById('view-scan').classList.add('active');
     // Session'da kullanıcı var mı? (Veri cekmeden ONCE kontrol edilmeli —
@@ -2679,8 +2742,10 @@ async function init(){
   } else if(rid){
     // QR MAL KABUL — satın alma kaleminin depoya girişi (arkadaş notu #4)
     document.getElementById('nav-tabs').style.display='none';
-    // (tasarım 2026) scan modunda kenar çubuğu rayı komple gizlenir
+    // (tasarım 2026) scan modunda kenar çubuğu rayı komple gizlenir; rozet üst çubuğa
     const sideEl2 = document.querySelector('.side'); if(sideEl2) sideEl2.style.display='none';
+    const ubEl2 = document.getElementById('user-badge'), tbEl2 = document.getElementById('topbar');
+    if(ubEl2 && tbEl2) tbEl2.appendChild(ubEl2);
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     document.getElementById('view-scan').classList.add('active');
     const savedQr = sessionStorage.getItem('ut_user');
@@ -3857,6 +3922,8 @@ function renderStatsView() {
   const today = now.toISOString().slice(0,10);
 
   el.innerHTML = h`
+    <div id="stats-summary"></div>
+    <div class="sect-label" style="margin-bottom:12px">🔍 DETAYLI ANALİZ <span style="font-weight:400;text-transform:none;letter-spacing:0">— tarih aralığı, proje ve personel bazında</span></div>
     <div class="stats-filter-bar">
       <div>
         <label>Başlangıç Tarihi</label>
@@ -3884,6 +3951,192 @@ function renderStatsView() {
     </div>
     <div id="stats-result"><div class="empty-state"><span class="emoji">📈</span>Filtreleyerek sonuçları görüntüleyin</div></div>
   `;
+  renderStatsSummary();
+}
+
+// ─── İSTATİSTİK AYLIK ÖZETİ (tasarım 2026 — konsept v-stat ekranı) ───
+// Konseptteki yönetim özeti GERÇEK veriden hesaplanır: KPI'lar + haftalık üretim
+// çubukları + parça durum donut'u + bölüm verimliliği + en çok üretilen parçalar.
+// Mevcut filtreli analiz akışına DOKUNMAZ, üstüne eklenir.
+async function renderStatsSummary(){
+  const box = document.getElementById('stats-summary');
+  if(!box) return;
+  // Seçili ay (yeniden render'da korunur); varsayılan: içinde bulunulan ay
+  const prevSel = document.getElementById('stsum-month');
+  const ym = prevSel ? prevSel.value : new Date().toISOString().slice(0,7);
+  const [y,m] = ym.split('-').map(Number);
+  const daysIn = new Date(y, m, 0).getDate();
+  const mStart = `${ym}-01`, mEnd = `${ym}-${String(daysIn).padStart(2,'0')}`;
+  const pv = new Date(y, m-2, 1); // önceki ay (delta için)
+  const pvYm = `${pv.getFullYear()}-${String(pv.getMonth()+1).padStart(2,'0')}`;
+  const pvDays = new Date(pv.getFullYear(), pv.getMonth()+1, 0).getDate();
+
+  const [logs, pvLogs] = await Promise.all([
+    dbGet('logs', `created_at=gte.${mStart}T00:00:00&created_at=lte.${mEnd}T23:59:59`),
+    dbGet('logs', `created_at=gte.${pvYm}-01T00:00:00&created_at=lte.${pvYm}-${String(pvDays).padStart(2,'0')}T23:59:59`)
+  ]);
+  const L = Array.isArray(logs)?logs:[], PL = Array.isArray(pvLogs)?pvLogs:[];
+
+  // ── KPI'lar ──
+  const sum = (a,f)=>a.reduce((s,x)=>s+(parseInt(x[f])||0),0);
+  const done=sum(L,'qty_done'), rej=sum(L,'qty_reject');
+  const pvDone=sum(PL,'qty_done'), pvRej=sum(PL,'qty_reject');
+  const people=[...new Set(L.map(l=>l.username))].length;
+  const doneDelta = pvDone ? Math.round((done-pvDone)/pvDone*100) : null;
+  const fire = (done+rej) ? (rej/(done+rej)*100) : 0;
+  const pvFire = (pvDone+pvRej) ? (pvRej/(pvDone+pvRej)*100) : null;
+  const spendItems=(Array.isArray(purchaseItems)?purchaseItems:[]).filter(pi=>pi.ordered_at && String(pi.ordered_at).slice(0,7)===ym && pi.unit_price);
+  const spend=spendItems.reduce((s,pi)=>s+(parseFloat(pi.unit_price)||0)*(parseFloat(pi.quantity)||0),0);
+  const spendTxt = spend>=1000 ? (spend/1000).toLocaleString('tr-TR',{maximumFractionDigits:1})+' bin' : spend.toLocaleString('tr-TR',{maximumFractionDigits:0});
+
+  // ── Haftalık üretim (ayın takvim haftaları, Pzt bazlı) ──
+  const firstDow=(new Date(y,m-1,1).getDay()+6)%7; // Pzt=0
+  const weeks=[]; L.forEach(l=>{
+    const day=parseInt(String(l.created_at).slice(8,10),10);
+    const wi=Math.floor((day-1+firstDow)/7);
+    weeks[wi]=(weeks[wi]||0)+(parseInt(l.qty_done)||0);
+  });
+  const wCount=Math.ceil((daysIn+firstDow)/7);
+  for(let i=0;i<wCount;i++) weeks[i]=weeks[i]||0;
+  const wMax=Math.max(1,...weeks);
+
+  // ── Parça durum dağılımı (anlık görünüm — dashboard renderStats ile aynı mantık) ──
+  const activeP=parts.filter(p=>!isPartAwaitingPlanning(p));
+  const waitingP=parts.length-activeP.length;
+  const dDone=activeP.filter(p=>p.status==='done').length;
+  const dRej=activeP.filter(p=>p.status==='reject').length;
+  const dProd=activeP.filter(p=>p.status==='pending'&&(parseInt(p.qty_done)||0)>0).length;
+  const dWait=activeP.filter(p=>p.status==='pending'&&!(parseInt(p.qty_done)||0)).length+waitingP;
+  const dTotal=dDone+dProd+dWait+dRej;
+  let acc2=0; const seg=n=>{const a=acc2;acc2+=dTotal?n/dTotal*100:0;return `${a}% ${acc2}%`;};
+  const donutCss = dTotal
+    ? `conic-gradient(var(--ok) ${seg(dDone)}, var(--info) ${seg(dProd)}, var(--warn) ${seg(dWait)}, var(--err) ${seg(dRej)})`
+    : `conic-gradient(var(--border) 0% 100%)`;
+
+  // ── Bölüm verimliliği (tamamlanan / planlanan adet) ──
+  // Bölüm kayıtları proje bazlı (aynı ad birden çok projede) → AD bazında birleştirilir
+  const dList=Array.isArray(depts)?depts:[];
+  const effAgg={};
+  activeP.forEach(p=>{
+    if(!p.department_id) return;
+    const d=dList.find(x=>x.id===p.department_id);
+    if(!d||!d.name) return;
+    const k=d.name.trim();
+    effAgg[k]=effAgg[k]||{q:0,done:0};
+    effAgg[k].q+=parseInt(p.qty)||0;
+    effAgg[k].done+=parseInt(p.qty_done)||0;
+  });
+  const effs=Object.entries(effAgg).filter(([,e])=>e.q>0)
+    .map(([name,e])=>({name, pct:Math.round(e.done/e.q*100)}))
+    .sort((a,b)=>b.pct-a.pct).slice(0,6);
+
+  // ── En çok üretilen parçalar (bu ay, log bazlı) ──
+  const byPart={}; L.forEach(l=>{ const k=l.part_id; byPart[k]=byPart[k]||{done:0,rej:0};
+    byPart[k].done+=parseInt(l.qty_done)||0; byPart[k].rej+=parseInt(l.qty_reject)||0; });
+  const top=Object.entries(byPart).map(([pid,s])=>({p:parts.find(x=>x.id===pid),...s}))
+    .filter(t=>t.p&&t.done>0).sort((a,b)=>b.done-a.done).slice(0,5);
+  const deptName=id=>{const d=(Array.isArray(depts)?depts:[]).find(x=>x.id===id);return d?d.name:'—';};
+
+  // Ay seçici: son 12 ay
+  const months=[]; for(let i=0;i<12;i++){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-i);
+    const v=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    months.push({v, t:d.toLocaleDateString('tr-TR',{month:'long',year:'numeric'})}); }
+
+  window._stsum = { ym, done, rej, fire, spend, people, ops:L.length, weeks, top,
+    donut:{dDone,dProd,dWait,dRej}, effs };
+
+  const deltaBadge=(v,goodDown)=>{
+    if(v===null||!isFinite(v)) return '';
+    const up=v>=0, good=goodDown?!up:up;
+    return h`<span class="delta ${raw(good?'up':'dn')}">${up?'↑':'↓'} %${Math.abs(v)} geçen aya göre</span>`;
+  };
+
+  box.innerHTML = h`
+    <div class="stsum-head">
+      <span class="sect-label">📊 AYLIK ÖZET</span>
+      <div class="grow"></div>
+      <select id="stsum-month" onchange="renderStatsSummary()">
+        ${months.map(mo=>raw(`<option value="${mo.v}"${mo.v===ym?' selected':''}>${mo.t}</option>`))}
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="stsumCsv()">⬇ CSV</button>
+    </div>
+    <div class="stats-row" style="margin-bottom:16px">
+      <div class="stat-card" style="--c:var(--green)">
+        <div class="stat-label">Tamamlanan Adet</div><div class="stat-value">${done}</div>
+        <div class="stat-sub">${deltaBadge(doneDelta,false)}${doneDelta===null?h`${L.length} işlem kaydı`:''}</div>
+      </div>
+      <div class="stat-card" style="--c:var(--red)">
+        <div class="stat-label">Fire / Red</div><div class="stat-value">%${fire.toLocaleString('tr-TR',{maximumFractionDigits:1})}</div>
+        <div class="stat-sub">${pvFire===null?h`${rej} adet ret`:deltaBadge(Math.round(fire-pvFire),true)}</div>
+      </div>
+      <div class="stat-card" style="--c:var(--accent)">
+        <div class="stat-label">İşlem Sayısı</div><div class="stat-value">${L.length}</div>
+        <div class="stat-sub">${people} personel çalıştı</div>
+      </div>
+      <div class="stat-card" style="--c:var(--info)">
+        <div class="stat-label">Malzeme Harcaması</div><div class="stat-value" style="font-size:26px">₺${spendTxt}</div>
+        <div class="stat-sub">${spendItems.length} sipariş kalemi</div>
+      </div>
+    </div>
+    <div class="sgrid">
+      <div class="schart">
+        <div class="sc-title">Haftalık Üretim <span>adet</span></div>
+        <div class="bars">${weeks.map((w,i)=>h`<div class="b${raw(w?'':' dim')}"><i style="height:${raw(String(Math.round(w/wMax*100)))}%" title="${w} adet"></i><span>H${i+1}</span></div>`)}</div>
+      </div>
+      <div class="schart">
+        <div class="sc-title">Parça Durum Dağılımı</div>
+        <div class="donut" style="background:${raw(donutCss)}"><div class="dc"><b>${dTotal}</b><span>Parça</span></div></div>
+        <div class="dlegend">
+          <div><i style="background:var(--ok)"></i>Tamamlandı<span class="dlq">${dDone}</span></div>
+          <div><i style="background:var(--info)"></i>Üretimde<span class="dlq">${dProd}</span></div>
+          <div><i style="background:var(--warn)"></i>Bekliyor<span class="dlq">${dWait}</span></div>
+          <div><i style="background:var(--err)"></i>Reddedildi<span class="dlq">${dRej}</span></div>
+        </div>
+      </div>
+      <div class="schart">
+        <div class="sc-title">Bölüm Verimliliği <span>tamamlanan / planlanan</span></div>
+        ${effs.length?effs.map(e=>h`<div class="effrow"><div class="en">${e.name}<b>%${e.pct}</b></div><div class="effbar"><i style="width:${raw(String(Math.min(100,e.pct)))}%"></i></div></div>`)
+          :h`<div style="color:var(--muted);font-size:12px;padding:20px 0;text-align:center">Bölüme atanmış parça yok</div>`}
+      </div>
+    </div>
+    <div class="sect-label" style="margin-bottom:10px">🏭 EN ÇOK ÜRETİLEN PARÇALAR <span style="font-weight:400;text-transform:none;letter-spacing:0">— bu ay</span></div>
+    <div class="stats-table" style="margin-bottom:28px">
+      <div class="stats-table-header" style="grid-template-columns:1fr 140px 120px 130px 70px 70px">
+        <div>Parça</div><div>Kod</div><div>Proje</div><div>Bölüm</div><div style="text-align:center">Adet</div><div style="text-align:center">Fire</div>
+      </div>
+      ${top.length?top.map(t=>h`<div class="stats-table-row" style="grid-template-columns:1fr 140px 120px 130px 70px 70px">
+        <div style="font-weight:600;font-size:13px">${t.p.name}</div>
+        <div style="font-size:11.5px;color:var(--muted)">${t.p.code||'—'}</div>
+        <div><span class="stsum-ptag">${t.p.project||'—'}</span></div>
+        <div style="font-size:12px;color:var(--muted)">${deptName(t.p.department_id)}</div>
+        <div style="text-align:center;font-weight:700;color:var(--green)" class="num">${t.done}</div>
+        <div style="text-align:center;font-weight:700;color:${raw(t.rej?'var(--red)':'var(--muted)')}" class="num">${t.rej}</div>
+      </div>`):raw('<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Bu ay üretim kaydı yok</div>')}
+    </div>`;
+}
+
+// Aylık özet CSV dışa aktarımı (depo modülündeki _whm yardımcıları yeniden kullanılır)
+function stsumCsv(){
+  const s = window._stsum;
+  if(!s){ toast('Önce özet yüklenmeli','error'); return; }
+  const c = _whmCsvCell;
+  const lines = [
+    ['Aylık Özet', s.ym].map(c).join(';'),
+    '',
+    ['Tamamlanan adet', s.done].map(c).join(';'),
+    ['Ret adet', s.rej].map(c).join(';'),
+    ['Fire %', s.fire.toFixed(1)].map(c).join(';'),
+    ['İşlem sayısı', s.ops].map(c).join(';'),
+    ['Personel sayısı', s.people].map(c).join(';'),
+    ['Malzeme harcaması (TL)', s.spend.toFixed(2)].map(c).join(';'),
+    '',
+    ['Hafta', 'Üretim (adet)'].map(c).join(';'),
+    ...s.weeks.map((w,i)=>['H'+(i+1), w].map(c).join(';')),
+    '',
+    ['Parça','Kod','Proje','Adet','Fire'].map(c).join(';'),
+    ...s.top.map(t=>[t.p.name, t.p.code||'', t.p.project||'', t.done, t.rej].map(c).join(';'))
+  ];
+  _whmDownloadCsv('istatistik-ozet-'+s.ym+'.csv', lines);
 }
 
 async function loadStats() {

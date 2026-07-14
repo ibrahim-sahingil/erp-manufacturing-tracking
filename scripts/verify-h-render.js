@@ -341,6 +341,7 @@ chk('puro: buton/alan yapısı (raw) korundu', _ovl.includes('id="puro-confirm"'
 // ── renderStatsView + loadStats + renderDetailTable (istatistik) ──
 global.users=[{name:'Onay<b>', dept:'D<i>', role:'usta'}];
 global.parts=[{project:'Pr<j>'}];
+global.renderStatsSummary=()=>{}; // stub — gerçek fonksiyon kendi senaryosunda test edilir
 eval(grab('renderStatsView'));
 renderStatsView();
 const sv=store['stats-content']||'';
@@ -698,6 +699,27 @@ chk('wres: onay/iptal butonları (raw) korundu', wresL.includes("whResApproveMod
 chk('wres: kayıtlı stok bekleyen satırda gösterildi', wresL.includes('kayıtlı stok: 40'));
 chk('wres: sonuçlanan kısmi onay rozeti', wresL.includes('Kısmi onay') && wresL.includes('onaylanan: 15'));
 chk('wres: toplama deposu gösterildi (whName kaçırılarak)', wresL.includes('🔁 toplama: Depo&lt;i&gt;'));
+
+// ── renderStatsSummary (İstatistik aylık özet — tasarım 2026) ──
+global.workOrderParts=[];
+global.depts=[{id:'d1', name:'Böl'+EVIL}];
+global.purchaseItems=[{ordered_at:'2026-07-03T10:00:00', unit_price:'10', quantity:'3', status:'ORDERED'}];
+global.parts=[{id:'sp1', name:'Parça'+EVIL, code:'K&<D>', project:'Prj<script>x</script>', department_id:'d1', status:'pending', qty:10, qty_done:5, qty_reject:0}];
+global.dbGet=async(t,q)=> (t==='logs' && q.includes('2026-07'))
+  ? [{part_id:'sp1', username:'U<i>', qty_done:4, qty_reject:1, created_at:'2026-07-08T09:00:00'}] : [];
+document.getElementById('stsum-month').value='2026-07'; // shim: ay seçici değeri sabitle
+eval(grab('isPartAwaitingPlanning'));
+eval(grab('renderStatsSummary'));
+await renderStatsSummary();
+const ss=store['stats-summary']||'';
+console.log('\nrenderStatsSummary (aylık özet):');
+chk('stsum: parça adı onerror kaçırıldı', !ss.includes('Parça'+EVIL) && ss.includes('Parça&lt;img'));
+chk('stsum: proje <script> kaçırıldı', ss.includes('Prj&lt;script&gt;') && !ss.includes('Prj<script>'));
+chk('stsum: bölüm adı kaçırıldı (verimlilik + tablo)', ss.includes('Böl&lt;img') && !ss.includes('Böl'+EVIL));
+chk('stsum: donut conic-gradient (raw) korundu', ss.includes('conic-gradient('));
+chk('stsum: tamamlanan KPI basıldı', ss.includes('>4</div>'));
+chk('stsum: hafta çubukları inline height aldı', ss.includes('class="bars"') && ss.includes('height:100%'));
+chk('stsum: ay seçici + CSV butonu (raw) korundu', ss.includes('stsum-month') && ss.includes('stsumCsv()'));
 
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);
