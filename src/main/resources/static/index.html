@@ -128,6 +128,20 @@
   .main{flex:1;min-width:0;}
   .top{height:58px;display:flex;align-items:center;gap:14px;padding:0 26px;border-bottom:1px solid var(--line-soft);background:color-mix(in srgb,var(--bg) 70%,transparent);backdrop-filter:blur(14px);position:sticky;top:0;z-index:100;}
   .top .grow{flex:1;}
+  /* Bildirim zili + paneli (konsept .tbtn/.nbdg/.npanel) */
+  .tbtn{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--panel-solid);color:var(--muted);cursor:pointer;display:grid;place-items:center;transition:color .15s,border-color .15s;position:relative;flex-shrink:0;}
+  .tbtn:hover{color:var(--ink);border-color:var(--mut);}
+  .tbtn:focus-visible{outline:2px solid var(--acc);}
+  .nbdg{position:absolute;top:-4px;right:-4px;min-width:15px;height:15px;background:var(--err);border-radius:8px;color:#fff;font-size:9px;font-weight:800;display:grid;place-items:center;padding:0 3px;}
+  .npanel{position:absolute;top:44px;right:0;width:320px;max-height:70vh;overflow-y:auto;background:var(--panel-solid);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:6px;display:none;text-align:left;z-index:200;cursor:default;}
+  .npanel.open{display:block;}
+  .npanel .ni{display:flex;gap:10px;padding:10px 12px;border-radius:10px;font-size:12px;color:var(--ink-2);line-height:1.45;cursor:pointer;width:100%;border:none;background:none;font-family:inherit;text-align:left;}
+  .npanel .ni:hover{background:var(--panel-2);}
+  .npanel .ni i{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0;}
+  .npanel .ni b{color:var(--ink);}
+  .npanel .ni time{display:block;font-size:10px;color:var(--muted);margin-top:2px;}
+  /* Kenar çubuğu sayı rozeti (konsept .bdg) — MİP/Depo canlı sayıları */
+  .nav-tab .bdg{margin-left:auto;font-size:10px;font-weight:700;color:var(--acc-ink);background:var(--acc-grad);border-radius:9px;padding:1px 7px;}
   .vpick{display:flex;gap:3px;background:var(--panel-solid);border:1px solid var(--line);border-radius:10px;padding:3px;flex-shrink:0;}
   .vb{border:none;background:none;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--mut);padding:5px 9px;border-radius:7px;cursor:pointer;font-family:inherit;transition:background .15s,color .15s;}
   .vb:hover{color:var(--ink);}
@@ -320,7 +334,7 @@
   .scan-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:14px;}
   .scan-part-name{font-family:var(--font-display);font-size:32px;letter-spacing:2px;color:var(--text);margin-bottom:2px;}
   .scan-drawing{font-family:var(--font-mono);font-size:13px;color:var(--accent);margin-bottom:6px;}
-  .scan-dept-tag{display:inline-block;background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.3);border-radius:4px;font-family:var(--font-mono);font-size:11px;color:var(--accent);padding:3px 10px;margin-bottom:16px;}
+  .scan-dept-tag{display:inline-block;background:var(--acc-soft);border:1px solid var(--acc-line);border-radius:4px;font-family:var(--font-mono);font-size:11px;color:var(--accent);padding:3px 10px;margin-bottom:16px;}
   .scan-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
   .scan-meta-item{background:var(--surface2);border-radius:6px;padding:10px 14px;}
   .scan-meta-item label{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px;}
@@ -358,9 +372,9 @@
   .log-user{color:var(--accent);min-width:90px;}
   .log-qtys{display:flex;gap:6px;flex-wrap:wrap;}
   .log-qty-badge{padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600;}
-  .log-qty-done{background:rgba(46,204,113,.15);color:var(--green);}
-  .log-qty-pend{background:rgba(243,156,18,.12);color:var(--yellow);}
-  .log-qty-reject{background:rgba(231,76,60,.15);color:var(--red);}
+  .log-qty-done{background:var(--ok-soft);color:var(--green);}
+  .log-qty-pend{background:var(--warn-soft);color:var(--yellow);}
+  .log-qty-reject{background:var(--err-soft);color:var(--red);}
   .log-note{color:var(--text);width:100%;margin-top:4px;font-size:11px;}
   .toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--accent);border-radius:8px;padding:14px 20px;font-family:var(--font-mono);font-size:13px;color:var(--text);z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;max-width:340px;}
   .toast.show{transform:translateY(0);opacity:1;}
@@ -415,13 +429,13 @@
   .cs-icon{font-size:56px;margin-bottom:16px;}
   .cs-title{font-family:var(--font-display);font-size:26px;letter-spacing:3px;color:var(--text);margin-bottom:8px;}
   .cs-sub{font-family:var(--font-mono);font-size:13px;color:var(--muted);margin-bottom:20px;}
-  .cs-badge{display:inline-block;background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);border-radius:20px;padding:4px 16px;font-family:var(--font-mono);font-size:10px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;}
+  .cs-badge{display:inline-block;background:var(--acc-soft);border:1px solid var(--acc-line);border-radius:20px;padding:4px 16px;font-family:var(--font-mono);font-size:10px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;}
   /* BOM */
   .bom-list{display:flex;flex-direction:column;gap:6px;min-height:80px;}
   .bom-part-row{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:grab;transition:all .2s;user-select:none;}
   .bom-part-row:hover{border-color:var(--accent);}
   .bom-part-row.dragging{opacity:.4;border-style:dashed;}
-  .bom-part-row.drag-over{border-color:var(--accent);background:rgba(245,166,35,.08);border-left:4px solid var(--accent);}
+  .bom-part-row.drag-over{border-color:var(--accent);background:color-mix(in srgb,var(--acc) 8%,transparent);border-left:4px solid var(--accent);}
   .bom-part-row.drag-over-child{border-color:var(--info);background:var(--info-soft);border-right:4px solid var(--info);padding-left:28px;}
   .bom-indent{width:20px;height:20px;flex-shrink:0;}
   .bom-drag-handle{color:var(--muted);font-size:14px;cursor:grab;flex-shrink:0;}
@@ -434,7 +448,7 @@
   /* Aranabilir combobox (searchSelect) */
   .ss-list{position:absolute;top:100%;left:0;right:0;z-index:300;max-height:260px;overflow:auto;background:var(--surface2);border:1px solid var(--border);border-radius:0 0 6px 6px;box-shadow:0 8px 24px rgba(0,0,0,.45);}
   .ss-item{padding:8px 12px;font-family:var(--font-mono);font-size:12px;cursor:pointer;white-space:pre;overflow:hidden;text-overflow:ellipsis;}
-  .ss-item:hover,.ss-item.hi{background:rgba(245,166,35,.12);color:var(--accent);}
+  .ss-item:hover,.ss-item.hi{background:var(--acc-soft);color:var(--accent);}
   .ss-empty{color:var(--muted);font-style:italic;}
   .ss-more{padding:6px 12px;font-family:var(--font-mono);font-size:10px;color:var(--muted);}
   .ss-arrow{position:absolute;right:0;top:0;bottom:0;width:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:11px;user-select:none;}
@@ -442,7 +456,7 @@
   /* BOM Tree */
   .bom-tree-node{margin:4px 0;}
   .bom-tree-item{display:inline-flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 14px;font-family:var(--font-mono);font-size:12px;white-space:nowrap;}
-  .bom-tree-item.root{background:rgba(245,166,35,.12);border-color:var(--accent);font-size:14px;font-weight:700;}
+  .bom-tree-item.root{background:var(--acc-soft);border-color:var(--acc-line);font-size:14px;font-weight:700;}
   .bom-tree-children{margin-left:32px;border-left:2px solid var(--border);padding-left:16px;margin-top:4px;}
   .bom-tree-connector{color:var(--muted);margin-right:4px;}
   /* BOM PROJE BAĞLAMA */
@@ -450,7 +464,7 @@
   .pbom-card-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
   .pbom-card-title{font-family:var(--font-display);font-size:18px;letter-spacing:2px;color:var(--text);}
   .pbom-status-draft{background:rgba(127,140,141,.15);color:var(--muted);border:1px solid rgba(127,140,141,.3);border-radius:12px;padding:3px 12px;font-family:var(--font-mono);font-size:11px;}
-  .pbom-status-published{background:rgba(46,204,113,.15);color:var(--green);border:1px solid rgba(46,204,113,.3);border-radius:12px;padding:3px 12px;font-family:var(--font-mono);font-size:11px;}
+  .pbom-status-published{background:var(--ok-soft);color:var(--green);border:1px solid transparent;border-radius:12px;padding:3px 12px;font-family:var(--font-mono);font-size:11px;}
   .pbom-part-row{display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid var(--border);transition:background .15s;}
   .pbom-part-row:last-child{border-bottom:none;}
   .pbom-part-row:hover{background:var(--surface2);}
@@ -474,7 +488,7 @@
   .gantt-header-bot{height:32px;display:flex;}
   .gantt-hcell{display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:9px;color:var(--muted);border-right:1px solid var(--border);text-align:center;padding:0 2px;white-space:nowrap;overflow:hidden;}
   .gantt-hcell.month-label{font-size:10px;font-weight:600;color:var(--text);background:var(--surface2);}
-  .gantt-hcell.today-hcell{color:var(--accent);background:rgba(245,166,35,.08);}
+  .gantt-hcell.today-hcell{color:var(--accent);background:color-mix(in srgb,var(--acc) 8%,transparent);}
   .gantt-hcell.weekend{background:color-mix(in srgb,var(--ink) 3%,transparent);}
   .gantt-row-left{height:44px;display:flex;align-items:center;padding:0 14px;border-bottom:1px solid var(--border);gap:8px;cursor:pointer;transition:background .15s;}
   .gantt-row-left:hover{background:var(--surface2);}
@@ -754,6 +768,13 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 <div class="main">
   <div class="top" id="topbar">
     <div class="grow"></div>
+    <!-- Bildirimler (tasarım 2026 — konsept zili, GERÇEK veriden: MİP kararı,
+         depo talebi, yoldaki sipariş, planlama bekleyen, termin uyarısı) -->
+    <button class="tbtn" id="notif-btn" title="Bildirimler" aria-label="Bildirimler" onclick="notifToggle(event)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 9a6 6 0 0112 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2.2 2.2 0 004 0"/></svg>
+      <span class="nbdg" id="notif-badge" style="display:none">0</span>
+      <div class="npanel" id="notif-panel"></div>
+    </button>
     <div class="vpick" role="group" aria-label="Tema seçimi">
       <button class="vb act" data-var="" onclick="setTheme('')" title="Kehribar — koyu + turuncu"><i style="background:linear-gradient(135deg,#ffbd57,#f08c1e)"></i><span>Kehribar</span></button>
       <button class="vb" data-var="light" onclick="setTheme('light')" title="Fildişi — açık + bronz"><i style="background:linear-gradient(135deg,#fdfcf9,#e0d5be);box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)"></i><span>Fildişi</span></button>
@@ -797,8 +818,12 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 
 <!-- STATS -->
 <div class="view" id="view-stats">
-  <div class="section-title">İSTATİSTİK</div>
-  <div class="section-sub">Personel bazında üretim takibi · Tarih aralığı seçin</div>
+  <div class="dash-phead">
+    <div>
+      <h1>İstatistik</h1>
+      <div class="sub">Aylık üretim özeti · personel bazında detaylı analiz</div>
+    </div>
+  </div>
   <div id="stats-content"></div>
 </div>
 
@@ -1896,6 +1921,95 @@ function setTheme(v){
 // Yüklemede seçici vurgusunu kayıtlı temayla eşle (tema zaten head'de uygulandı)
 try{ setTheme(localStorage.getItem('ut_theme') || ''); }catch(e){}
 
+// ─── BİLDİRİMLER (tasarım 2026 — konsept zili, tamamı CANLI veriden) ───
+// Kaynaklar: MİP karar bekleyen gruplar (proje bazında), bekleyen depo
+// rezervasyon talepleri, yoldaki satın alma siparişleri, planlama bekleyen
+// parçalar, termin uyarıları. Zil rozeti + panel + kenar çubuğu MİP/Depo
+// rozetleri buradan beslenir. loadAll sonrası ve panel her açılışta tazelenir.
+let _notifItems = [];
+function notifToggle(ev){
+  if(ev) ev.stopPropagation();
+  const panel = document.getElementById('notif-panel');
+  if(!panel) return;
+  const opening = !panel.classList.contains('open');
+  panel.classList.toggle('open', opening);
+  if(opening) notifRefresh(); // her açılışta taze veri
+}
+function notifGo(ev, tab){
+  if(ev) ev.stopPropagation();
+  document.getElementById('notif-panel')?.classList.remove('open');
+  switchTab(tab);
+}
+document.addEventListener('click', ()=>{ document.getElementById('notif-panel')?.classList.remove('open'); });
+
+async function notifRefresh(){
+  const panel = document.getElementById('notif-panel');
+  const badge = document.getElementById('notif-badge');
+  if(!panel || !badge) return;
+  if(!_notifItems.length) panel.innerHTML = h`<div style="padding:14px;text-align:center;color:var(--muted);font-size:12px">Yükleniyor…</div>`;
+  try{
+    const [pbs, res, pi] = await Promise.all([
+      dbGet('project_bom'), dbGet('warehouse_reservations'), dbGet('purchase_items')
+    ]);
+    const items = [];
+    // 1) MİP karar bekleyen (yayınlanmış ağaçlar, proje bazında grup sayısı)
+    const pubs = (Array.isArray(pbs)?pbs:[]).filter(p=>p.status==='published');
+    const byProj = {};
+    pubs.forEach(p=>{ (byProj[p.project_name]=byProj[p.project_name]||[]).push(p.id); });
+    let mipTotal = 0;
+    for(const [proj, ids] of Object.entries(byProj)){
+      let pbParts = [];
+      for(const id of ids){
+        const rows = await dbGet('project_bom_parts','project_bom_id=eq.'+id);
+        if(Array.isArray(rows)) pbParts = pbParts.concat(rows);
+      }
+      const n = mipGroupParts(pbParts).filter(g=>!g.decision).length;
+      if(n){ mipTotal += n; items.push({dot:'var(--warn)', tab:'mip', cat:'MİP · tedarik kararı',
+        html:h`<b>MİP:</b> ${proj} projesinde ${n} kalem karar bekliyor`}); }
+    }
+    // 2) Depo: bekleyen rezervasyon talebi
+    const wresN = (Array.isArray(res)?res:[]).filter(r=>r.status==='REQUESTED').length;
+    if(wresN) items.push({dot:'var(--info)', tab:'warehouse', cat:'Depo · rezervasyon',
+      html:h`<b>Depo:</b> ${wresN} rezervasyon talebi onay bekliyor`});
+    // 3) Mal kabul: yoldaki siparişler
+    const piA = Array.isArray(pi)?pi:[];
+    const onWay = piA.filter(i=>i.status==='ORDERED').length;
+    if(onWay) items.push({dot:'var(--info)', tab:'warehouse', cat:'Depo · mal kabul',
+      html:h`<b>Mal kabul:</b> ${onWay} sipariş kalemi yolda`});
+    // 4) Planlama bekleyen parçalar
+    const waitPlan = parts.filter(isPartAwaitingPlanning).length;
+    if(waitPlan) items.push({dot:'var(--warn)', tab:'planning', cat:'Planlama',
+      html:h`<b>Planlama:</b> ${waitPlan} parça iş emri bekliyor`});
+    // 5) Termin uyarıları (aktif siparişlerde geçmiş / 7 gün içinde)
+    const now = new Date();
+    (Array.isArray(orders)?orders:[]).filter(o=>o.status==='active' && o.delivery_days && o.created_at).forEach(o=>{
+      const t = new Date(o.created_at); t.setDate(t.getDate()+parseInt(o.delivery_days));
+      const kalan = Math.ceil((t-now)/86400000);
+      if(kalan < 0) items.push({dot:'var(--err)', tab:'orders', cat:'Sipariş · termin',
+        html:h`<b>${o.project_name}</b> termini ${Math.abs(kalan)} gün geçti`});
+      else if(kalan <= 7) items.push({dot:'var(--warn)', tab:'orders', cat:'Sipariş · termin',
+        html:h`<b>${o.project_name}</b> terminine ${kalan} gün kaldı`});
+    });
+
+    _notifItems = items;
+    badge.style.display = items.length ? 'grid' : 'none';
+    badge.textContent = items.length;
+    panel.innerHTML = items.length
+      ? h`${items.map(it=>h`<button class="ni" onclick="notifGo(event,'${raw(it.tab)}')"><i style="background:${raw(it.dot)}"></i><div>${it.html}<time>${it.cat}</time></div></button>`)}`
+      : h`<div style="padding:14px;text-align:center;color:var(--muted);font-size:12px">🎉 Bekleyen bildirim yok</div>`;
+    // Kenar çubuğu rozetleri (konsept: MİP karar + Depo talep sayıları)
+    const setNavBdg = (tab, n) => {
+      const btn = document.querySelector(`.nav-tab[data-tab="${tab}"]`);
+      if(!btn) return;
+      let b = btn.querySelector('.bdg');
+      if(n){ if(!b){ b = document.createElement('span'); b.className='bdg'; btn.appendChild(b); } b.textContent = n; }
+      else if(b) b.remove();
+    };
+    setNavBdg('mip', mipTotal);
+    setNavBdg('warehouse', wresN);
+  }catch(e){ /* bildirim tazeleme sessiz düşer — uygulamayı etkilemez */ }
+}
+
 // ─── API SERVİSİ — Java Spring Boot Backend ───
 // Sayfa hangi adresten servis edildiyse API de oradan çağrılır
 // (telefon/başka bilgisayardan http://<sunucu-ip>:8080 ile erişim çalışır).
@@ -2891,6 +3005,7 @@ async function loadAll(){
   depts  = Array.isArray(d) ? d : [];
   orders = Array.isArray(o) ? o : [];
   await loadUserPins();
+  notifRefresh(); // (tasarım 2026) zil + kenar çubuğu rozetleri — beklenmez, sessiz tazelenir
 }
 
 async function loadUserPins(){
@@ -3527,6 +3642,8 @@ ${woRows?`<table><tr><th>Kod</th><th>Proje</th><th>Personel</th><th>Alan</th><th
 
 function renderBreadcrumb(){
   const bc = document.getElementById('breadcrumb');
+  // (tasarım 2026) kökte breadcrumb gizli — üstteki PROJELER başlığıyla mükerrerdi
+  bc.style.display = _activeProject ? 'flex' : 'none';
   bc.innerHTML = h`<button class="breadcrumb-btn" onclick="renderDashboard()">🏠 Projeler</button>${
     _activeProject ? h`<span class="breadcrumb-sep">›</span>${
       _activeDept ? h`<button class="breadcrumb-btn" onclick="openProject('${raw(ea(_activeProject))}')">${_activeProject}</button>`
