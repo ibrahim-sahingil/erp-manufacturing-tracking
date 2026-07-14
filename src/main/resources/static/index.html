@@ -404,10 +404,11 @@
   .order-price-sub{font-size:10.5px;color:var(--muted);}
   .order-actions{display:flex;gap:8px;}
   /* PLANNING */
-  .planning-tabs{display:flex;gap:4px;margin-bottom:24px;border-bottom:1px solid var(--border);padding-bottom:0;flex-wrap:wrap;}
-  .planning-tab{padding:10px 20px;border:none;background:transparent;color:var(--muted);font-family:var(--font-mono);font-size:11px;letter-spacing:1px;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;text-transform:uppercase;margin-bottom:-1px;}
-  .planning-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
-  .planning-tab:hover{color:var(--text);}
+  /* tasarım 2026: alt sekmeler konsept segmented-pill dili */
+  .planning-tabs{display:inline-flex;gap:3px;margin-bottom:24px;background:var(--panel-solid);border:1px solid var(--line);border-radius:12px;padding:4px;flex-wrap:wrap;}
+  .planning-tab{padding:8px 16px;border:none;background:transparent;color:var(--muted);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;border-radius:9px;transition:all .15s;}
+  .planning-tab.active{color:var(--accent);background:var(--acc-soft);}
+  .planning-tab:hover:not(.active){color:var(--text);}
   .planning-section{display:none;}
   .planning-section.active{display:block;}
   .coming-soon-card{background:var(--surface);border:1px dashed var(--border);border-radius:12px;padding:60px 40px;text-align:center;max-width:480px;margin:40px auto;}
@@ -462,7 +463,7 @@
   .gantt-period-tab{padding:5px 12px;border:none;background:transparent;color:var(--muted);font-family:var(--font-mono);font-size:10px;letter-spacing:1px;cursor:pointer;border-radius:4px;transition:all .2s;text-transform:uppercase;}
   .gantt-period-tab.active{background:var(--accent);color:#000;font-weight:600;}
   .gantt-period-tab:hover:not(.active){color:var(--text);}
-  .gantt-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:24px;overflow-x:auto;}
+  .gantt-wrap{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;overflow:hidden;margin-bottom:24px;overflow-x:auto;}
   .gantt-container{display:flex;min-width:max-content;}
   .gantt-left{width:200px;flex-shrink:0;border-right:2px solid var(--border);}
   .gantt-right{flex:1;overflow:hidden;position:relative;}
@@ -497,8 +498,8 @@
   .gantt-tooltip-row{display:flex;gap:8px;margin-bottom:3px;color:var(--text);}
   .gantt-tooltip-label{color:var(--muted);min-width:70px;}
   /* PD LIST */
-  .pd-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-bottom:12px;transition:border .2s;}
-  .pd-card:hover{border-color:var(--accent);}
+  .pd-card{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;padding:18px 20px;margin-bottom:12px;transition:border-color .2s,box-shadow .2s;}
+  .pd-card:hover{border-color:var(--acc-line);box-shadow:var(--hover-shadow);}
   .pd-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
   .pd-project-name{font-family:var(--font-display);font-size:20px;letter-spacing:2px;color:var(--accent);}
   .pd-dates{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px;}
@@ -525,7 +526,8 @@
   .wo-part-item.selected .wo-part-check{display:inline;}
   .wo-summary-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
   .wo-summary-chip{background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.3);border-radius:6px;padding:5px 12px;font-family:var(--font-mono);font-size:11px;color:var(--accent);}
-  .wo-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 22px;margin-bottom:12px;transition:border .2s;position:relative;}
+  .wo-card{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;padding:18px 22px;margin-bottom:12px;transition:border-color .2s,box-shadow .2s;position:relative;}
+  .wo-card:hover{border-color:var(--acc-line);box-shadow:var(--hover-shadow);}
   .wo-card:hover{border-color:var(--accent);}
   .wo-card.wo-selected{border-color:var(--accent);background:rgba(245,166,35,.05);}
   .wo-checkbox{position:absolute;top:16px;right:16px;width:20px;height:20px;cursor:pointer;accent-color:var(--accent);}
@@ -533,13 +535,13 @@
   .wo-checkbox-label:hover{border-color:var(--accent);}
   .wo-checkbox-label.checked{background:var(--accent);border-color:var(--accent);color:#000;font-weight:700;font-size:14px;}
   .wo-card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
-  .wo-card-id{font-family:var(--font-display);font-size:18px;letter-spacing:2px;color:var(--accent);}
+  .wo-card-id{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent);}
   .wo-card-meta{font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px;}
-  .wo-status-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-family:var(--font-mono);font-size:11px;font-weight:600;white-space:nowrap;}
-  .wos-planned{background:var(--info-soft);color:var(--info);border:1px solid transparent;}
-  .wos-inprogress{background:rgba(243,156,18,.12);color:var(--yellow);border:1px solid rgba(243,156,18,.3);}
-  .wos-done{background:rgba(46,204,113,.15);color:var(--green);border:1px solid rgba(46,204,113,.3);}
-  .wos-cancelled{background:rgba(127,140,141,.12);color:var(--muted);border:1px solid rgba(127,140,141,.3);}
+  .wo-status-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:12px;font-size:10.5px;font-weight:700;white-space:nowrap;}
+  .wos-planned{background:var(--info-soft);color:var(--info);}
+  .wos-inprogress{background:var(--warn-soft);color:var(--yellow);}
+  .wos-done{background:var(--ok-soft);color:var(--green);}
+  .wos-cancelled{background:color-mix(in srgb,var(--mut) 13%,transparent);color:var(--muted);}
   .wo-info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:12px;}
   .wo-info-item{background:var(--surface2);border-radius:6px;padding:8px 12px;}
   .wo-info-label{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px;letter-spacing:1px;}
@@ -556,11 +558,11 @@
   .wo-rev-item:last-child{border-bottom:none;}
   /* WORKSPACES */
   .ws-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-bottom:24px;}
-  .ws-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border .2s;}
-  .ws-card:hover{border-color:var(--accent);}
-  .ws-card-header{padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
-  .ws-card-title{font-family:var(--font-display);font-size:18px;letter-spacing:2px;color:var(--text);}
-  .ws-card-desc{font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px;}
+  .ws-card{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;overflow:hidden;transition:border-color .2s,box-shadow .2s;}
+  .ws-card:hover{border-color:var(--acc-line);box-shadow:var(--hover-shadow);}
+  .ws-card-header{padding:16px 18px 12px;border-bottom:1px solid var(--line-soft);display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+  .ws-card-title{font-size:15px;font-weight:700;color:var(--text);}
+  .ws-card-desc{font-size:11.5px;color:var(--muted);margin-top:3px;}
   .ws-type-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:12px;font-family:var(--font-mono);font-size:10px;font-weight:600;white-space:nowrap;flex-shrink:0;}
   .ws-type-area{background:var(--info-soft);color:var(--info);border:1px solid transparent;}
   .ws-type-machine{background:var(--warn-soft);color:var(--warn);border:1px solid transparent;}
@@ -883,8 +885,12 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 
 <!-- PLANNING -->
 <div class="view" id="view-planning">
-  <div class="section-title">PLANLAMA</div>
-  <div class="section-sub">Proje · İş Emirleri · Fabrika Çalışma Alanları</div>
+  <div class="dash-phead">
+    <div>
+      <h1>Planlama</h1>
+      <div class="sub">Proje tarihleri · İş emirleri çizelgesi · Fabrika çalışma alanları</div>
+    </div>
+  </div>
 
   <!-- Alt sekmeler -->
   <div class="planning-tabs" id="planning-tabs">
