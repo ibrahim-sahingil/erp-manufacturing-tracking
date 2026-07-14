@@ -86,7 +86,7 @@
     --thumb-bg:#edf3ee;--thumb-ln:#b9cdc0;
   }
   *{margin:0;padding:0;box-sizing:border-box;}
-  body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh;font-size:14px;line-height:1.5;}
+  body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh;font-size:14px;line-height:1.45;}
   /* Tipografi turu (2026-07-15): Segoe 700 fazla ağır — kalınlar 650'de daha rafine */
   b,strong{font-weight:650;}
   h1,h2,h3{line-height:1.25;}
@@ -163,7 +163,7 @@
   }
   .view{display:none;padding:24px 28px 44px;max-width:1300px;margin:0 auto;}
   .view.active{display:block;}
-  .section-title{font-size:24px;font-weight:700;letter-spacing:-.022em;margin-bottom:4px;color:var(--ink);}
+  .section-title{font-size:24px;font-weight:640;letter-spacing:-.022em;margin-bottom:4px;color:var(--ink);}
   .section-sub{color:var(--muted);font-size:12.5px;margin-bottom:24px;}
   .form-card{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;padding:24px;margin-bottom:24px;}
   .form-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px;}
@@ -179,20 +179,22 @@
   .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
   .btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
   .btn-sm{padding:6px 14px;font-size:11px;}
-  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px;}
-  @media(max-width:700px){.stats-row{grid-template-columns:repeat(2,1fr);}}
-  .stat-card{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;padding:16px 18px;position:relative;overflow:hidden;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;}
+  .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px;}
+  @media(max-width:1080px){.stats-row{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:560px){.stats-row{grid-template-columns:1fr;}}
+  
+  .stat-card{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;padding:16px 18px 12px;position:relative;overflow:hidden;transition:transform .22s ease-out,border-color .22s ease-out,box-shadow .22s ease-out;}
   /* tasarım 2026: konsept KPI dili — renk şeridi yok, değer mürekkep, renk delta rozetinde */
-  .stat-card:hover{transform:translateY(-2px);box-shadow:var(--hover-shadow);border-color:var(--line);}
-  .stat-label{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
-  .stat-value{font-size:34px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--ink);line-height:1;}
-  .stat-value .un{font-size:55%;font-weight:650;color:var(--ink-2);margin:0 1px;}
-  .stat-sub{font-size:11px;color:var(--muted);margin-top:6px;}
+  .stat-card:hover{transform:translateY(-2px) scale(1.015);box-shadow:var(--hover-shadow);border-color:var(--line);}
+  .stat-label{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);}
+  .stat-value{font-size:34px;font-weight:620;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--ink);line-height:1.1;margin:6px 0 3px;}
+  .stat-value .un{font-size:14px;font-weight:550;color:var(--muted);letter-spacing:0;margin:0 1px;}
+  .stat-sub{font-size:11.5px;color:var(--muted);margin-top:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .progress-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:16px;}
   .progress-fill{height:100%;background:var(--acc-grad);border-radius:2px;transition:width .5s;}
   /* ── DASHBOARD HERO (konsept bento) ── */
   .dash-phead{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:20px;}
-  .dash-phead h1{font-size:24px;font-weight:700;letter-spacing:-.022em;margin:0;}
+  .dash-phead h1{font-size:24px;font-weight:640;letter-spacing:-.022em;margin:0;}
   .dash-phead .sub{color:var(--muted);font-size:12.5px;margin-top:4px;}
   .dash-phead .grow{flex:1;}
   .hbtn{border:none;cursor:pointer;font-weight:650;font-size:12.5px;border-radius:10px;padding:9px 16px;font-family:inherit;transition:transform .12s ease,box-shadow .12s ease;white-space:nowrap;}
@@ -227,8 +229,8 @@
   .wr-info{flex:1;min-width:0;}
   .wr-info b{display:block;font-size:12.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .wr-info span{font-size:11px;color:var(--muted);}
-  .wbar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:5px;}
-  .wbar i{display:block;height:100%;background:var(--acc-grad);border-radius:2px;}
+  .wbar{height:6px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:5px;}
+  .wbar i{display:block;height:100%;background:var(--acc-grad);border-radius:4px;}
   .feed2{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;}
   @media(max-width:900px){.feed2{grid-template-columns:1fr;}}
   .fi{display:flex;gap:10px;padding:7px 2px;align-items:flex-start;}
@@ -394,10 +396,10 @@
   /* ORDERS */
   .order-item-row{display:grid;grid-template-columns:1fr 1fr 80px 32px;gap:8px;margin-bottom:8px;align-items:center;}
   @media(max-width:600px){.order-item-row{grid-template-columns:1fr 60px 28px;}.oir-hide{display:none;}}
-  .order-card{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;padding:20px 24px;margin-bottom:14px;transition:border-color .2s,box-shadow .2s;}
+  .order-card{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;padding:18px 20px;margin-bottom:14px;transition:border-color .2s,box-shadow .2s;}
   .order-card:hover{border-color:var(--acc-line);box-shadow:var(--hover-shadow);}
   .pstats{display:flex;gap:22px;margin:4px 0 10px;flex-wrap:wrap;}
-  .ps b{display:block;font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .ps b{display:block;font-size:17px;font-weight:750;font-variant-numeric:tabular-nums;}
   .ps span{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:650;}
   .pfoot{display:flex;font-size:11.5px;color:var(--muted);margin-bottom:12px;}
   .order-card:hover{border-color:var(--accent);}
@@ -630,7 +632,7 @@
   .effrow .en b{color:var(--ink-2);font-weight:700;font-variant-numeric:tabular-nums;}
   .effbar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
   .effbar i{display:block;height:100%;background:var(--acc-grad);border-radius:3px;}
-  .delta{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;border-radius:8px;padding:2px 7px;}
+  .delta{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;border-radius:9px;padding:2px 8px;}
   .delta.up{background:var(--ok-soft);color:var(--ok);}
   .delta.dn{background:var(--err-soft);color:var(--err);}
   .stsum-ptag{font-size:10px;font-weight:700;color:var(--accent);background:var(--acc-soft);border-radius:8px;padding:2px 8px;}
@@ -4482,6 +4484,9 @@ async function renderStatsSummary(){
   const doneDelta = pvDone ? Math.round((done-pvDone)/pvDone*100) : null;
   const fire = (done+rej) ? (rej/(done+rej)*100) : 0;
   const pvFire = (pvDone+pvRej) ? (pvRej/(pvDone+pvRej)*100) : null;
+  // Ort. iş emri süresi: tamamlanmış İE'lerin başlangıç→bitiş ortalaması (gün)
+  const woDone=(Array.isArray(workOrders)?workOrders:[]).filter(w=>w.status==='done'&&w.start_datetime&&w.end_datetime);
+  const woAvg=woDone.length? woDone.reduce((t,w)=>t+(new Date(w.end_datetime)-new Date(w.start_datetime)),0)/woDone.length/86400000 : null;
   const spendItems=(Array.isArray(purchaseItems)?purchaseItems:[]).filter(pi=>pi.ordered_at && String(pi.ordered_at).slice(0,7)===ym && pi.unit_price);
   const spend=spendItems.reduce((s,pi)=>s+(parseFloat(pi.unit_price)||0)*(parseFloat(pi.quantity)||0),0);
   const spendTxt = spend>=1000 ? (spend/1000).toLocaleString('tr-TR',{maximumFractionDigits:1})+' bin' : spend.toLocaleString('tr-TR',{maximumFractionDigits:0});
@@ -4558,19 +4563,19 @@ async function renderStatsSummary(){
       <button class="btn btn-primary btn-sm" onclick="stsumCsv()">${raw(ico('download',12))} CSV</button>
     </div>
     <div class="stats-row" style="margin-bottom:16px">
-      <div class="stat-card" style="--c:var(--green)">
+      <div class="stat-card">
         <div class="stat-label">Tamamlanan Adet</div><div class="stat-value">${done}</div>
-        <div class="stat-sub">${deltaBadge(doneDelta,false)}${doneDelta===null?h`${L.length} işlem kaydı`:''}</div>
+        <div class="stat-sub">${deltaBadge(doneDelta,false)}${L.length} işlem · ${people} personel</div>
       </div>
-      <div class="stat-card" style="--c:var(--red)">
+      <div class="stat-card">
+        <div class="stat-label">Ort. İş Emri Süresi</div><div class="stat-value">${woAvg!=null?h`${woAvg.toLocaleString('tr-TR',{maximumFractionDigits:1})}<span class="un"> gün</span>`:'—'}</div>
+        <div class="stat-sub">${woDone.length?h`${woDone.length} tamamlanan iş emrinden`:'tamamlanan iş emri yok'}</div>
+      </div>
+      <div class="stat-card">
         <div class="stat-label">Fire / Red</div><div class="stat-value"><span class="un">%</span>${fire.toLocaleString('tr-TR',{maximumFractionDigits:1})}</div>
         <div class="stat-sub">${pvFire===null?h`${rej} adet ret`:deltaBadge(Math.round(fire-pvFire),true)}</div>
       </div>
-      <div class="stat-card" style="--c:var(--accent)">
-        <div class="stat-label">İşlem Sayısı</div><div class="stat-value">${L.length}</div>
-        <div class="stat-sub">${people} personel çalıştı</div>
-      </div>
-      <div class="stat-card" style="--c:var(--info)">
+      <div class="stat-card">
         <div class="stat-label">Malzeme Harcaması</div><div class="stat-value" style="font-size:28px"><span class="un">₺</span>${raw(String(spendTxt).replace(' bin','<span class="un">bin</span>'))}</div>
         <div class="stat-sub">${spendItems.length} sipariş kalemi</div>
       </div>
