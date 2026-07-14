@@ -2658,6 +2658,8 @@ async function init(){
   if(pid){
     // QR tarama — önce kullanıcı girişi kontrol et
     document.getElementById('nav-tabs').style.display='none';
+    // (tasarım 2026) scan modunda kenar çubuğu rayı komple gizlenir (telefonda yer kazanımı)
+    const sideEl = document.querySelector('.side'); if(sideEl) sideEl.style.display='none';
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     document.getElementById('view-scan').classList.add('active');
     // Session'da kullanıcı var mı? (Veri cekmeden ONCE kontrol edilmeli —
@@ -2677,6 +2679,8 @@ async function init(){
   } else if(rid){
     // QR MAL KABUL — satın alma kaleminin depoya girişi (arkadaş notu #4)
     document.getElementById('nav-tabs').style.display='none';
+    // (tasarım 2026) scan modunda kenar çubuğu rayı komple gizlenir
+    const sideEl2 = document.querySelector('.side'); if(sideEl2) sideEl2.style.display='none';
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     document.getElementById('view-scan').classList.add('active');
     const savedQr = sessionStorage.getItem('ut_user');
@@ -6247,6 +6251,19 @@ function applyPermissions() {
   } else if (!isDev && devTab) {
     devTab.remove();
   }
+
+  // (tasarım 2026) Grubun TÜM sekmeleri gizliyse grup etiketi de gizlensin —
+  // yoksa kısıtlı kullanıcı boş "Yönetim" başlığı görür. Etiketten sonraki
+  // kardeşler bir sonraki .ngroup'a kadar taranır (appusers dinamik sekmesi
+  // de en sona eklendiği için Yönetim grubunda sayılır).
+  document.querySelectorAll('#nav-tabs .ngroup').forEach(g => {
+    let el = g.nextElementSibling, any = false;
+    while (el && !el.classList.contains('ngroup')) {
+      if (el.classList.contains('nav-tab') && el.style.display !== 'none') { any = true; break; }
+      el = el.nextElementSibling;
+    }
+    g.style.display = any ? '' : 'none';
+  });
 
   // İlk görünür sekmeyi aktif yap
   const firstVisible = document.querySelector('.nav-tab[data-tab]:not([style*="none"])');

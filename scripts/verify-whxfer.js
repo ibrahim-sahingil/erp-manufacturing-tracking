@@ -30,6 +30,7 @@ global.whName=id=>({w1:'Depo1',w2:'Depo2'}[id]||null);
 global.purchaseOrders=[];
 global.whMovements=[];
 global.renderWarehouseList=()=>{};
+global.renderWhMovements=()=>{}; // 11. tur: whXferConfirm aktarım sonrası hareket listesini tazeler
 const vals={};
 global.document={ getElementById:id=>({ value: vals[id], remove(){}, }), };
 
