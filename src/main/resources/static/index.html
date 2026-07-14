@@ -2292,6 +2292,27 @@ const FIELD_XLATE = {
       return o;
     }
   },
+  purchase_orders: {
+    // (tasarım 2026) Eski kod grup adlarını "📦 Toplu Sipariş ..." önekiyle
+    // yazmıştı — DB'deki eski kayıtların önekini okuma katmanında süz
+    // (yeni kayıtlar temiz; güncellenen eskiler de böylece temiz yazılır).
+    async fromApi(r) {
+      const o = { ...r };
+      if (typeof o.name === 'string') o.name = o.name.replace(/^📦\s*/, '');
+      return o;
+    },
+    async toApi(b) { return { ...b }; }
+  },
+  purchase_items: {
+    // (tasarım 2026) Aynı temizlik: eski otomatik notlar grup adını 📦 önekiyle
+    // gömmüştü ("Kısmi mal kabul (10/42) · 📦 Toplu Sipariş ...").
+    async fromApi(r) {
+      const o = { ...r };
+      if (typeof o.notes === 'string') o.notes = o.notes.replace(/📦\s*/g, '');
+      return o;
+    },
+    async toApi(b) { return { ...b }; }
+  },
   logs: {
     async fromApi(r) {
       const o = { ...r };
@@ -2652,7 +2673,7 @@ function rebuildCodeWithOps(code, oldOps, newOps){
 // çift tıklamada ağaca 2 parça ekliyordu.
 // ─── İKON SİSTEMİ (tasarım 2026) ───
 // Emoji yerine kenar çubuğuyla aynı ailede ince çizgili SVG ikonlar.
-// Kullanım: h`` içinde ${raw(ico('calendar'))}, düz şablonda ${ico('calendar')}.
+// Kullanım: h`` içinde ${raw(ico('calendar'))}, düz şablonda ${raw(ico('calendar'))}.
 // stroke:currentColor → renk metinden/temadan gelir. Hepsi 24 viewBox.
 function ico(n, s=14){
   const P = {
@@ -4016,8 +4037,8 @@ function partRowHTML(p, i, showDelete){
     </div>
     <div>${statusBadge(p.status)}</div>
     <div class="actions">
-      <button class="icon-btn" title="QR" onclick="showQR('${p.id}','${ea(p.name)}','${ea(p.code)}','${ea(p.drawing||'')}')">${ico('camera',13)}</button>
-      <button class="icon-btn" title="Geçmiş" onclick="showLog('${p.id}','${ea(p.name)}')">${ico('list',13)}</button>
+      <button class="icon-btn" title="QR" onclick="showQR('${p.id}','${ea(p.name)}','${ea(p.code)}','${ea(p.drawing||'')}')">${raw(ico('camera',13))}</button>
+      <button class="icon-btn" title="Geçmiş" onclick="showLog('${p.id}','${ea(p.name)}')">${raw(ico('list',13))}</button>
     </div>
   </div>`;
 }
@@ -4798,7 +4819,7 @@ function filterTableByUser(name) {
   if(!name) {
     // Filtreyi kaldır
     if(clearBtn) clearBtn.style.display = 'none';
-    if(titleEl) titleEl.innerHTML = `${ico('list',12)} İşlem Detayları (${logs.length} kayıt)`;
+    if(titleEl) titleEl.innerHTML = `${raw(ico('list',12))} İşlem Detayları (${logs.length} kayıt)`;
     renderDetailTable(logs, partsMap);
     return;
   }
@@ -4813,7 +4834,7 @@ function filterTableByUser(name) {
   const qp = filtered.reduce((s,l)=>s+(parseInt(l.qty_pending)||0),0);
   const qr = filtered.reduce((s,l)=>s+(parseInt(l.qty_reject)||0),0);
 
-  if(titleEl) titleEl.innerHTML = `${ico('user',12)} ${esc(name)} — ${filtered.length} işlem · ${qd} yapıldı · ${qp} bekliyor · ${qr} ret`;
+  if(titleEl) titleEl.innerHTML = `${raw(ico('user',12))} ${esc(name)} — ${filtered.length} işlem · ${qd} yapıldı · ${qp} bekliyor · ${qr} ret`;
   if(clearBtn) clearBtn.style.display = 'inline-block';
 
   // Tabloya scroll
@@ -5271,7 +5292,7 @@ async function renderPdList() {
     const revs  = revisions.filter(r=>r.project_date_id===d.id);
     const revsHTML = revs.length ? h`
       <div class="pd-revisions">
-        <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:6px">${ico('clock',11)} Revize Geçmişi (${revs.length})</div>
+        <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:1px;margin-bottom:6px">${raw(ico('clock',11))} Revize Geçmişi (${revs.length})</div>
         ${revs.map(r=>h`<div class="pd-rev-item">
           <span style="color:var(--muted);min-width:110px">${new Date(r.created_at).toLocaleDateString('tr-TR')}</span>
           <span style="color:var(--yellow)">${r.old_start} → ${r.old_end}</span>
@@ -5287,7 +5308,7 @@ async function renderPdList() {
         <div class="pd-project-name">${d.project_name}</div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-ghost btn-sm" onclick="openReviseModal('${raw(d.id)}')">Revize</button>
-          <button class="btn btn-ghost btn-sm" onclick="deletePd('${raw(d.id)}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">${ico('trash',13)}</button>
+          <button class="btn btn-ghost btn-sm" onclick="deletePd('${raw(d.id)}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">${raw(ico('trash',13))}</button>
         </div>
       </div>
       <div class="pd-dates">
@@ -6098,24 +6119,24 @@ async function renderWorkOrders() {
           ${isChecked ? '✓' : ''}
         </div>
         <div class="wo-info-grid">
-          <div class="wo-info-item"><span class="wo-info-label">${ico('factory',10)} Çalışma Alanı</span><span class="wo-info-value">${esc(w.workspace_name||'—')}</span></div>
-          <div class="wo-info-item"><span class="wo-info-label">${ico('user',10)} Personel</span><span class="wo-info-value">${esc(w.assigned_user||'—')}</span></div>
-          <div class="wo-info-item"><span class="wo-info-label">${ico('calendar',10)} Başlangıç</span><span class="wo-info-value">${dt}</span></div>
-          <div class="wo-info-item"><span class="wo-info-label">${ico('box',10)} Toplam Parça</span><span class="wo-info-value">${wParts.length} kalem</span></div>
+          <div class="wo-info-item"><span class="wo-info-label">${raw(ico('factory',10))} Çalışma Alanı</span><span class="wo-info-value">${esc(w.workspace_name||'—')}</span></div>
+          <div class="wo-info-item"><span class="wo-info-label">${raw(ico('user',10))} Personel</span><span class="wo-info-value">${esc(w.assigned_user||'—')}</span></div>
+          <div class="wo-info-item"><span class="wo-info-label">${raw(ico('calendar',10))} Başlangıç</span><span class="wo-info-value">${dt}</span></div>
+          <div class="wo-info-item"><span class="wo-info-label">${raw(ico('box',10))} Toplam Parça</span><span class="wo-info-value">${wParts.length} kalem</span></div>
         </div>
         ${partsTableHTML}
         ${w.notes?`<div style="background:var(--surface2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-bottom:10px">${esc(w.notes)}</div>`:''}
         ${revHTML}
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-          <button class="btn btn-ghost btn-sm" onclick="openWoReviseModal('${w.id}','${ea(w.project_name)}','${w.status}','${ea(w.assigned_user||'')}','${ea(w.workspace_name||'')}','${w.start_datetime||''}')">${ico('edit',12)} Revize</button>
-          <button class="btn btn-ghost btn-sm" onclick="deleteWorkOrder('${w.id}')" style="color:var(--red);border-color:transparent">${ico('trash',12)} Sil</button>
+          <button class="btn btn-ghost btn-sm" onclick="openWoReviseModal('${w.id}','${ea(w.project_name)}','${w.status}','${ea(w.assigned_user||'')}','${ea(w.workspace_name||'')}','${w.start_datetime||''}')">${raw(ico('edit',12))} Revize</button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteWorkOrder('${w.id}')" style="color:var(--red);border-color:transparent">${raw(ico('trash',12))} Sil</button>
         </div>
       </div>`;
     }).join('');
 
     return `<div style="margin-bottom:28px">
       <div style="font-weight:700;font-size:16px;color:var(--ink);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
-        ${ico('folder',15)} ${esc(projName)}
+        ${raw(ico('folder',15))} ${esc(projName)}
         <span style="font-family:var(--font-mono);font-size:12px;color:var(--muted);font-weight:400">${woList.length} iş emri</span>
       </div>
       ${cards}
@@ -6714,7 +6735,7 @@ function renderWorkspaces() {
         <span class="ws-member-count">${members.length} kişi</span>
         <div style="display:flex;gap:6px">
           <button class="btn btn-primary btn-sm" onclick="openWsMemberModal('${raw(w.id)}','${raw(ea(w.name))}')">+ Personel Ata</button>
-          <button class="icon-btn" onclick="deleteWorkspace('${raw(w.id)}')">${ico('trash',13)}</button>
+          <button class="icon-btn" onclick="deleteWorkspace('${raw(w.id)}')">${raw(ico('trash',13))}</button>
         </div>
       </div>
     </div>`;
@@ -8113,7 +8134,7 @@ function renderSuppliersModalList(){
       <div style="display:flex;gap:4px;flex-shrink:0">
         <button class="btn btn-ghost btn-sm" onclick="supEdit('${s.id}')"></button>
         <button class="btn btn-ghost btn-sm" onclick="supToggleActive('${s.id}')" title="${passive?'Aktifleştir':'Pasife al'}">${passive?'▶':'⏸'}</button>
-        <button class="btn btn-ghost btn-sm" onclick="supDelete('${s.id}')" style="color:var(--red,#e74c3c)">${ico('trash',13)}</button>
+        <button class="btn btn-ghost btn-sm" onclick="supDelete('${s.id}')" style="color:var(--red,#e74c3c)">${raw(ico('trash',13))}</button>
       </div>
     </div>`;
   })}`;
@@ -9140,7 +9161,7 @@ function sheetRenderList(){
         <b> ${esc(s.name)}</b>
         <span style="color:var(--muted)"> · ${dims}${s.material?' · '+s.material:''}</span>
       </span>
-      <button class="btn btn-ghost btn-sm" onclick="sheetDelete('${s.id}')" style="color:var(--red,#e74c3c)">${ico('trash',13)}</button>
+      <button class="btn btn-ghost btn-sm" onclick="sheetDelete('${s.id}')" style="color:var(--red,#e74c3c)">${raw(ico('trash',13))}</button>
     </div>`;
   }).join('');
 }
@@ -9281,7 +9302,7 @@ function renderPurchaseList(){
           ${i.status==='PLANNED' && !i.stock_plan_id && !i.purchase_order_id ? h`<button class="btn btn-ghost btn-sm" onclick="purTogglePlanning('${raw(i.id)}')" title="${i.needs_planning?'Planlama havuzundan çıkar':'MİP kesim planlaması havuzuna at (plaka/profil yerleşimi)'}" ${i.needs_planning?raw('style="color:var(--accent);border-color:rgba(245,166,35,.4)"'):''}></button>`:''}
           ${purPriceHistoryOf(i.name, i.code, i.id).length?h`<button class="btn btn-ghost btn-sm" onclick="purPriceHistoryModal('${raw(i.id)}')" title="Bu malzemenin geçmiş alış fiyatları (10. tur M11)"></button>`:''}
           <button class="btn btn-ghost btn-sm" onclick="editPurchaseItem('${raw(i.id)}')"></button>
-          <button class="btn btn-ghost btn-sm" onclick="deletePurchaseItem('${raw(i.id)}')" style="color:var(--red,#e74c3c);border-color:rgba(231,76,60,.3)">${ico('trash',13)}</button>
+          <button class="btn btn-ghost btn-sm" onclick="deletePurchaseItem('${raw(i.id)}')" style="color:var(--red,#e74c3c);border-color:rgba(231,76,60,.3)">${raw(ico('trash',13))}</button>
         </div>
       </div>
     </div>`;
@@ -9862,7 +9883,7 @@ function renderPurchaseOrders(){
           </span>
           <span style="display:flex;gap:6px;align-items:center">
             <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${meta}</span>
-            ${isDraft?h`<button class="btn btn-ghost btn-sm" onclick="poDeleteQuote('${raw(q.id)}')" title="Teklifi sil">${ico('trash',13)}</button>`:''}
+            ${isDraft?h`<button class="btn btn-ghost btn-sm" onclick="poDeleteQuote('${raw(q.id)}')" title="Teklifi sil">${raw(ico('trash',13))}</button>`:''}
           </span>
         </div>
         ${!isWinner && q.rejection_reason ? h`<div style="font-family:var(--font-mono);font-size:10px;color:#e74c3c;margin-top:4px">✖ Elenme gerekçesi: ${q.rejection_reason}</div>`:''}
@@ -9895,7 +9916,7 @@ function renderPurchaseOrders(){
       actions = `<button class="btn btn-primary btn-sm" onclick="poApprove('${o.id}')">✔ Onayla</button>
         <button class="btn btn-ghost btn-sm" onclick="poRename('${o.id}')"></button>
         <button class="btn btn-ghost btn-sm" onclick="poCancel('${o.id}')">✖ İptal</button>
-        <button class="btn btn-ghost btn-sm" onclick="poDelete('${o.id}')" style="color:#e74c3c">${ico('trash',13)}</button>`;
+        <button class="btn btn-ghost btn-sm" onclick="poDelete('${o.id}')" style="color:#e74c3c">${raw(ico('trash',13))}</button>`;
     } else if(o.status==='APPROVED'){
       actions = `<button class="btn btn-primary btn-sm" onclick="poOrder('${o.id}')">Sipariş Ver</button>
         <button class="btn btn-ghost btn-sm" onclick="poUndoApprove('${o.id}')">↩ Onayı Geri Al</button>
@@ -10556,7 +10577,7 @@ function whvWarehouseHTML(){
             </div>
             <span style="display:flex;gap:8px;align-items:center">
               <span style="font-family:var(--font-mono);font-size:13px;color:${c};white-space:nowrap">${r.net<0?'⚠ ':''}${Number(r.net.toFixed(4))} ${r.unit}</span>
-              ${r.net>0?h`<button class="btn btn-ghost btn-sm" onclick="whXferLoose('${raw(whId)}','${raw(ea(r.name))}','${raw(ea(r.code||''))}','${raw(ea(r.unit))}',${r.net})" title="Başka depoya aktar">${ico('link',13)}</button>`:''}
+              ${r.net>0?h`<button class="btn btn-ghost btn-sm" onclick="whXferLoose('${raw(whId)}','${raw(ea(r.name))}','${raw(ea(r.code||''))}','${raw(ea(r.unit))}',${r.net})" title="Başka depoya aktar">${raw(ico('link',13))}</button>`:''}
             </span>
           </div>
         </div>`;
@@ -10923,12 +10944,12 @@ function renderDnList(){
     if(n.status==='DRAFT'){
       actions += `<button class="btn btn-primary btn-sm" onclick="dnShip('${n.id}')">Sevk Et</button>
         <button class="btn btn-ghost btn-sm" onclick="dnSetStatus('${n.id}','CANCELLED')">✖ İptal</button>
-        <button class="btn btn-ghost btn-sm" onclick="dnDelete('${n.id}')" style="color:var(--red)">${ico('trash',13)}</button>`;
+        <button class="btn btn-ghost btn-sm" onclick="dnDelete('${n.id}')" style="color:var(--red)">${raw(ico('trash',13))}</button>`;
     } else if(n.status==='SHIPPED'){
       actions += `<button class="btn btn-ghost btn-sm" onclick="dnUnship('${n.id}')">↩ Sevki Geri Al</button>`;
     } else {
       actions += `<button class="btn btn-ghost btn-sm" onclick="dnSetStatus('${n.id}','DRAFT')">↩ Yeniden Aç</button>
-        <button class="btn btn-ghost btn-sm" onclick="dnDelete('${n.id}')" style="color:var(--red)">${ico('trash',13)}</button>`;
+        <button class="btn btn-ghost btn-sm" onclick="dnDelete('${n.id}')" style="color:var(--red)">${raw(ico('trash',13))}</button>`;
     }
     return h`<div class="pbom-card" style="border-left:3px solid ${m.color};margin-bottom:12px">
       <div class="pbom-card-header">
@@ -10961,7 +10982,7 @@ function renderDnDetail(){
         ${i.item_code?h`<span style="color:var(--accent)"> ${i.item_code}</span> —`:''} ${i.item_name}
         <span style="color:var(--muted)"> · ${Number(i.quantity)} ${i.unit||'adet'}${i.warehouse_id?h` · ${whName(i.warehouse_id)||'depo'}`:''}${i.notes?h` · ${i.notes}`:''}</span>
       </span>
-      ${isDraft?h`<button class="btn btn-ghost btn-sm" onclick="dnDeleteItem('${raw(i.id)}')" title="Kalemi sil">${ico('trash',13)}</button>`:''}
+      ${isDraft?h`<button class="btn btn-ghost btn-sm" onclick="dnDeleteItem('${raw(i.id)}')" title="Kalemi sil">${raw(ico('trash',13))}</button>`:''}
     </div>`)}`
     : h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:6px 0">Henüz kalem yok${isDraft?' — aşağıdan ekleyin':''}</div>`;
 
@@ -11515,7 +11536,7 @@ function renderWhmList(){
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <button class="btn btn-ghost btn-sm" onclick="whmEditWarehouse('${w.id}')">Düzenle</button>
           <button class="btn btn-ghost btn-sm" onclick="whmToggleActive('${w.id}')">${active?'⏸ Pasife Al':'▶ Aktifleştir'}</button>
-          <button class="btn btn-ghost btn-sm" onclick="whmDeleteWarehouse('${w.id}')" style="color:#e74c3c" title="Sil">${ico('trash',13)}</button>
+          <button class="btn btn-ghost btn-sm" onclick="whmDeleteWarehouse('${w.id}')" style="color:#e74c3c" title="Sil">${raw(ico('trash',13))}</button>
         </div>
       </div>
     </div>`;
@@ -11890,7 +11911,7 @@ function renderWhMovements(){
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">${meta}</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <button class="btn btn-ghost btn-sm" onclick="whmDeleteMovement('${raw(m.id)}')" style="color:#e74c3c" title="Yanlış kaydı sil">${ico('trash',13)}</button>
+          <button class="btn btn-ghost btn-sm" onclick="whmDeleteMovement('${raw(m.id)}')" style="color:#e74c3c" title="Yanlış kaydı sil">${raw(ico('trash',13))}</button>
         </div>
       </div>
     </div>`;
@@ -12000,7 +12021,7 @@ async function renderAppUsers() {
         <button class="btn btn-ghost btn-sm" onclick="toggleAppUserActive('${raw(u.id)}',${raw(String(!!u.is_active))})" style="${u.is_active?'color:var(--yellow)':'color:var(--green)'}">
           ${u.is_active?'⏸ Pasif Yap':'▶ Aktif Yap'}
         </button>
-        <button class="btn btn-ghost btn-sm" onclick="deleteAppUser('${raw(u.id)}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">${ico('trash',13)}</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteAppUser('${raw(u.id)}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">${raw(ico('trash',13))}</button>
       </div>
     </div>`;
   })}`;
@@ -12300,7 +12321,7 @@ function renderMaterialsModalList(){
       <div style="display:flex;gap:4px;flex-shrink:0">
         <button class="btn btn-ghost btn-sm" onclick="matRename('${m.id}')" title="Yeniden adlandır"></button>
         <button class="btn btn-ghost btn-sm" onclick="matToggleActive('${m.id}')" title="${passive?'Aktifleştir':'Pasife al'}">${passive?'▶':'⏸'}</button>
-        <button class="btn btn-ghost btn-sm" onclick="matDelete('${m.id}')" style="color:var(--red,#e74c3c)">${ico('trash',13)}</button>
+        <button class="btn btn-ghost btn-sm" onclick="matDelete('${m.id}')" style="color:var(--red,#e74c3c)">${raw(ico('trash',13))}</button>
       </div>
     </div>`;
   })}`;
@@ -12436,7 +12457,7 @@ function renderDocs(){
           <div style="display:flex;gap:4px;flex-shrink:0">
             <button class="btn btn-ghost btn-sm" onclick="docsDownload('${raw(d.id)}')" title="İndir"></button>
             <button class="btn btn-ghost btn-sm" onclick="docsEditParts('${raw(d.id)}')" title="Kapsadığı parçaları / kategoriyi düzenle">Parçalar</button>
-            <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="docsDelete('${raw(d.id)}')" title="Sil">${ico('trash',13)}</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="docsDelete('${raw(d.id)}')" title="Sil">${raw(ico('trash',13))}</button>
           </div>
         </div>
         ${linked.length?h`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px">${linked.map(p=>h`
@@ -12834,7 +12855,7 @@ function renderOpDefsList() {
         ${op.description?h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:2px">${op.description}</div>`:''}
       </div>
       <button class="icon-btn" onclick="opDefStartEdit('${raw(op.id)}')" title="Düzenle"></button>
-      <button class="icon-btn" onclick="deleteBomOpDef('${raw(op.id)}')" title="Sil" style="color:var(--red)">${ico('trash',13)}</button>
+      <button class="icon-btn" onclick="deleteBomOpDef('${raw(op.id)}')" title="Sil" style="color:var(--red)">${raw(ico('trash',13))}</button>
     </div>`)}`;
 }
 
@@ -13549,7 +13570,7 @@ function renderBomList() {
         <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="editBomPart('${raw(part.id)}')" title="Ad / kod / malzeme düzenle">Düzenle</button>
         <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="bomCopyBranch('${raw(part.id)}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">Kopyala</button>
         <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" onclick="editBomQty('${raw(part.id)}')" title="Miktarı düzenle">Miktar</button>
-        <button class="icon-btn" title="Sil" onclick="deleteBomPart('${raw(part.id)}')">${ico('trash',13)}</button>
+        <button class="icon-btn" title="Sil" onclick="deleteBomPart('${raw(part.id)}')">${raw(ico('trash',13))}</button>
       </div>
     </div>`;
   })}`;
@@ -14089,7 +14110,7 @@ function renderProjectBomList() {
           <button class="btn btn-primary btn-sm" onclick="openAndPublishPbom('${raw(pb.id)}')">${isPublished?'Yeniden Yayınla':'Yayınla'}</button>
           <button class="btn btn-ghost btn-sm" onclick="openPbomEditor('${raw(pb.id)}')">Düzenle</button>
           ${isPublished?h`<button class="btn btn-ghost btn-sm" onclick="viewPublishedBom('${raw(pb.id)}')" style="color:var(--green);border-color:rgba(46,204,113,.3)">Ağacı Gör</button>`:''}
-          <button class="btn btn-ghost btn-sm" onclick="deleteProjectBom('${raw(pb.id)}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">${ico('trash',13)}</button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteProjectBom('${raw(pb.id)}')" style="color:var(--red);border-color:rgba(231,76,60,.3)">${raw(ico('trash',13))}</button>
         </div>
       </div>
     </div>`;
@@ -14674,9 +14695,9 @@ function pbomeRenderList() {
               ${p.dept_id && !_pbomeProjDepts.some(d=>d.id===p.dept_id)?h`<option value="${p.dept_id}" selected disabled>⚠ ${(depts.find(d=>d.id===p.dept_id)||{}).name||'?'} (başka proje)</option>`:''}
             </select>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditPart('${raw(p.id)}')" title="Ad / kod / malzeme düzenle"></button>
-            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeCopyBranch('${raw(p.id)}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">${ico('list',13)}</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeCopyBranch('${raw(p.id)}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">${raw(ico('list',13))}</button>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditQty('${raw(p.id)}')" title="Miktar düzenle"></button>
-            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px;color:var(--red)" onclick="pbomeDeletePart('${raw(p.id)}')" title="Sil">${ico('trash',13)}</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px;color:var(--red)" onclick="pbomeDeletePart('${raw(p.id)}')" title="Sil">${raw(ico('trash',13))}</button>
           </div>
         </div>${children}`;
       });
@@ -15497,7 +15518,7 @@ function renderPbomCustomParts(pbomId) {
           <div style="display:flex;gap:4px;flex-shrink:0">
             <button class="btn btn-ghost btn-sm" style="padding:3px 7px;font-size:10px" onclick="openPbomCustomEdit('${raw(p.id)}','${raw(pbomId)}')"></button>
             <button class="btn btn-ghost btn-sm" style="padding:3px 7px;font-size:10px" onclick="openPbomCustomOp('${raw(p.id)}','${raw(pbomId)}')"></button>
-            <button class="icon-btn" style="color:var(--red);font-size:11px" onclick="removePbomCustomPart('${raw(p.id)}','${raw(pbomId)}')">${ico('trash',13)}</button>
+            <button class="icon-btn" style="color:var(--red);font-size:11px" onclick="removePbomCustomPart('${raw(p.id)}','${raw(pbomId)}')">${raw(ico('trash',13))}</button>
           </div>
         </div>${children}`;
       });

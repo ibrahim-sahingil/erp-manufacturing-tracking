@@ -750,6 +750,14 @@ chk('dash: SVG grafik (raw) korundu', dh.includes('<polyline') && dh.includes('d
 chk('dash: halka/ilerleme çubuğu (raw) korundu', dh.includes('stroke-dasharray') && dh.includes('class="wbar"'));
 chk('dash: nav butonları (raw) korundu', dh.includes("switchTab('planning')") && dh.includes('dashWeeklyReport()'));
 
+// ── GENEL SIZINTI BEKÇİSİ (2026-07-15): ico() h`` içinde raw'sız kullanılırsa
+// SVG markup'ı ekrana METİN olarak basılır (gerçek olay: çalışma alanı kartları).
+// Tüm render çıktıları taranır — '&lt;svg' görünüyorsa bir yerde raw() unutulmuştur.
+const _leaks = Object.entries(store).filter(([,html]) => String(html).includes('&lt;svg'));
+console.log('\ngenel sızıntı bekçisi:');
+chk('hiçbir render kaçmış SVG içermiyor (raw unutulmamış)', _leaks.length === 0);
+if(_leaks.length) console.log('   sızıntılı hedefler:', _leaks.map(([id]) => id).join(', '));
+
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);
 }
