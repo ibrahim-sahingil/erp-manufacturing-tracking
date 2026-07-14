@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict xQyYkrD2B3wmHJNP4W3BmB1Co6Ba90P2mDYJTKT2tWQBzOIoggohOPPugvBqvwl
+\restrict VldLFkhW347wWKNbluzXgRhCjiaX3n0D7J3Sd5RoTUcnRCYhhBoN01pOuLgGHOs
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -609,7 +609,8 @@ CREATE TABLE public.work_orders (
     end_datetime timestamp without time zone,
     status character varying(20) DEFAULT 'planned'::character varying,
     notes text,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    code character varying(20)
 );
 
 
@@ -926,6 +927,14 @@ ALTER TABLE ONLY public.work_order_parts
 
 ALTER TABLE ONLY public.work_order_revisions
     ADD CONSTRAINT work_order_revisions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: work_orders work_orders_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_orders
+    ADD CONSTRAINT work_orders_code_key UNIQUE (code);
 
 
 --
@@ -1592,5 +1601,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xQyYkrD2B3wmHJNP4W3BmB1Co6Ba90P2mDYJTKT2tWQBzOIoggohOPPugvBqvwl
+\unrestrict VldLFkhW347wWKNbluzXgRhCjiaX3n0D7J3Sd5RoTUcnRCYhhBoN01pOuLgGHOs
 

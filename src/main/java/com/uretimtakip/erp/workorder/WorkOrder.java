@@ -26,6 +26,7 @@ import java.util.UUID;
  *   end_datetime     timestamp      YES
  *   status           varchar        DEFAULT 'planned'  ← lowercase!
  *   notes            text           YES
+ *   code             varchar(20)    YES, UNIQUE  ← İE-YYYY-NNN, servis üretir (2026-07-14)
  *   created_at       timestamp      (BaseEntity'den)
  */
 @Entity
@@ -61,4 +62,8 @@ public class WorkOrder extends BaseEntity {
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
+
+    /** İnsan-okur iş emri numarası (İE-2026-011). İstemciden alınmaz, create'te servis üretir. */
+    @Column(name = "code", length = 20, unique = true)
+    private String code;
 }

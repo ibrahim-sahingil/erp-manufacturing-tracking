@@ -76,12 +76,33 @@ public class WorkOrderService {
                 .endDatetime(request.getEndDatetime())
                 .status(request.getStatus() != null ? request.getStatus() : "planned")
                 .notes(request.getNotes())
+                .code(nextCode())
                 .build();
 
         WorkOrder saved = workOrderRepository.save(workOrder);
-        log.info("WorkOrder created: id={}", saved.getId());
+        log.info("WorkOrder created: id={}, code={}", saved.getId(), saved.getCode());
 
         return WorkOrderResponse.fromEntity(saved);
+    }
+
+    /**
+     * İnsan-okur iş emri numarası: İE-YYYY-NNN, yıl bazında ardışık.
+     * NNN sıfır dolgulu olduğundan sözlük sırası = sayısal sıra; yılın en
+     * büyük kodu bulunur, +1 verilir. (Tek kullanıcılı atölye — yarış
+     * durumu pratikte yok; olursa unique constraint yakalar.)
+     */
+    private String nextCode() {
+        String prefix = "İE-" + java.time.Year.now().getValue() + "-";
+        int next = workOrderRepository.findTopByCodeStartingWithOrderByCodeDesc(prefix)
+                .map(w -> {
+                    try {
+                        return Integer.parseInt(w.getCode().substring(prefix.length())) + 1;
+                    } catch (NumberFormatException e) {
+                        return 1;
+                    }
+                })
+                .orElse(1);
+        return prefix + String.format("%03d", next);
     }
 
     @Transactional

@@ -3070,6 +3070,7 @@ function deptWoStripHTML(deptId){
     const partNames = resolved.slice(0,3).join(', ')
       + (resolved.length>3 ? ` +${resolved.length-3}` : '');
     const meta = [
+      w.code || '',
       fmtDt(w.start_datetime) ? '🕐 '+fmtDt(w.start_datetime)+(fmtDt(w.end_datetime)?' → '+fmtDt(w.end_datetime):'') : '',
       w.assigned_user ? '👷 '+w.assigned_user : '',
       w.workspace_name ? '📍 '+w.workspace_name : '',
@@ -3314,7 +3315,7 @@ async function renderStats(){
         <div class="sub">${dateTxt} · ${projCount} proje, ${openWos.length} açık iş emri${waitRest?` · ⏳ ${waitRest} parça planlama bekliyor`:''}${waitMat?` · 🛒 ${waitMat} parçanın malzemesi hazır/siparişte`:''}</div>
       </div>
       <div class="grow"></div>
-      <button class="hbtn sec" onclick="switchTab('stats')">📈 İstatistik</button>
+      <button class="hbtn sec" onclick="dashWeeklyReport()">📄 Haftalık Rapor</button>
       <button class="hbtn pri" onclick="switchTab('planning')">+ Yeni İş Emri</button>
     </div>
     <div class="bento">
@@ -3373,7 +3374,7 @@ async function renderStats(){
           <div class="worow">
             <div class="wic">İE</div>
             <div class="wr-info">
-              <b>${w.project_name||'(Proje Yok)'}</b>
+              <b>${w.code?w.code+' · ':''}${w.project_name||'(Proje Yok)'}</b>
               <span>${pr.n} parça${w.assigned_user?` · 👷 ${w.assigned_user}`:''}${w.workspace_name?` · 📍 ${w.workspace_name}`:''}</span>
               <div class="wbar"><i style="width:${raw(String(pr.pct))}%"></i></div>
             </div>
@@ -3390,6 +3391,120 @@ async function renderStats(){
             <time>${f.t}${f.user?` · ${f.user}`:''}${f.note?` · 📝 ${f.note}`:''}</time></div>
         </div>`)}</div>`:h`<div class="dash-empty">Son 7 günde üretim hareketi yok</div>`}
     </div>`;
+}
+
+// ─── HAFTALIK ÜRETİM RAPORU (tasarım 2026 — konseptteki "Haftalık rapor" butonu) ───
+// Son 7 günün üretimini yazdırılabilir A4 belgesine döker (diğer PDF raporlarıyla
+// aynı desen: window.open + document.write, ayrı açık-tema stil, her değer esc'li).
+async function dashWeeklyReport(){
+  const now=new Date(); const from=new Date(now); from.setDate(now.getDate()-6);
+  let logs=[];
+  try{ logs=await dbGet('logs',`created_at=gte.${from.toISOString().slice(0,10)}T00:00:00&order=created_at.desc`);}catch(e){}
+  if(!Array.isArray(logs)) logs=[];
+  const sum=(a,f)=>a.reduce((s,x)=>s+(parseInt(x[f])||0),0);
+  const done=sum(logs,'qty_done'), rej=sum(logs,'qty_reject');
+  const people=[...new Set(logs.map(l=>l.username).filter(Boolean))];
+  const openWos=workOrders.filter(w=>w.status==='planned'||w.status==='inprogress');
+  const pi=Array.isArray(purchaseItems)?purchaseItems:[];
+  const inWh=pi.filter(i=>i.status==='IN_WAREHOUSE'||i.status==='IN_STOCK').length;
+
+  // Gün gün
+  const days=[]; for(let i=6;i>=0;i--){const d=new Date(now); d.setDate(now.getDate()-i); days.push(d);}
+  const dayRows=days.map(d=>{
+    const k=d.toISOString().slice(0,10);
+    const dl=logs.filter(l=>String(l.created_at).slice(0,10)===k);
+    return `<tr><td>${esc(d.toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit'}))}</td><td>${esc(d.toLocaleDateString('tr-TR',{weekday:'long'}))}</td><td style="text-align:right">${sum(dl,'qty_done')}</td><td style="text-align:right">${sum(dl,'qty_reject')}</td><td style="text-align:right">${dl.length}</td></tr>`;
+  }).join('');
+
+  // Bölümler (anlık ilerleme, ad bazlı birleşik)
+  const dList=Array.isArray(depts)?depts:[];
+  const activeP=parts.filter(p=>!isPartAwaitingPlanning(p));
+  const dAgg={};
+  activeP.forEach(p=>{ if(!p.department_id) return;
+    const d=dList.find(x=>x.id===p.department_id); if(!d||!d.name) return;
+    const k=d.name.trim(); dAgg[k]=dAgg[k]||{q:0,done:0,n:0};
+    dAgg[k].q+=parseInt(p.qty)||0; dAgg[k].done+=parseInt(p.qty_done)||0; dAgg[k].n++; });
+  const deptRows=Object.entries(dAgg).filter(([,d])=>d.q>0)
+    .map(([name,d])=>({name,...d,pct:Math.round(d.done/d.q*100)}))
+    .sort((a,b)=>b.pct-a.pct)
+    .map(d=>`<tr><td>${esc(d.name)}</td><td style="text-align:right">${d.n}</td><td style="text-align:right">${d.done} / ${d.q}</td><td style="text-align:right">%${d.pct}</td></tr>`).join('');
+
+  // Personel (7 gün)
+  const byUser={};
+  logs.forEach(l=>{ const k=l.username||'—'; byUser[k]=byUser[k]||{d:0,p:0,r:0,n:0};
+    byUser[k].d+=parseInt(l.qty_done)||0; byUser[k].p+=parseInt(l.qty_pending)||0;
+    byUser[k].r+=parseInt(l.qty_reject)||0; byUser[k].n++; });
+  const userRows=Object.entries(byUser).sort((a,b)=>b[1].d-a[1].d)
+    .map(([name,u])=>`<tr><td>${esc(name)}</td><td style="text-align:right">${u.d}</td><td style="text-align:right">${u.p}</td><td style="text-align:right">${u.r}</td><td style="text-align:right">${u.n}</td></tr>`).join('');
+
+  // En çok üretilen parçalar (7 gün)
+  const byPart={};
+  logs.forEach(l=>{ byPart[l.part_id]=byPart[l.part_id]||{d:0,r:0};
+    byPart[l.part_id].d+=parseInt(l.qty_done)||0; byPart[l.part_id].r+=parseInt(l.qty_reject)||0; });
+  const topRows=Object.entries(byPart).map(([pid,s])=>({p:parts.find(x=>x.id===pid),...s}))
+    .filter(t=>t.p&&t.d>0).sort((a,b)=>b.d-a.d).slice(0,10)
+    .map(t=>`<tr><td>${esc(t.p.name)}</td><td>${esc(t.p.code||'—')}</td><td>${esc(t.p.project||'—')}</td><td style="text-align:right">${t.d}</td><td style="text-align:right">${t.r}</td></tr>`).join('');
+
+  // Aktif iş emirleri
+  const WOTR={planned:'Planlandı',inprogress:'Devam Ediyor'};
+  const woRows=openWos.map(w=>{
+    const ids=new Set(workOrderParts.filter(x=>x.work_order_id===w.id).map(x=>x.part_id));
+    const ps=parts.filter(p=>ids.has(p.id));
+    const q=ps.reduce((s,p)=>s+(parseInt(p.qty)||0),0);
+    const pct=q?Math.round(ps.reduce((s,p)=>s+(parseInt(p.qty_done)||0),0)/q*100):0;
+    return `<tr><td>${esc(w.code||'—')}</td><td>${esc(w.project_name||'—')}</td><td>${esc(w.assigned_user||'—')}</td><td>${esc(w.workspace_name||'—')}</td><td>${esc(WOTR[w.status]||w.status)}</td><td style="text-align:right">%${pct}</td></tr>`;
+  }).join('');
+
+  const fmt=d=>d.toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'});
+  const printDate=now.toLocaleString('tr-TR',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const html=`<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
+<title>Haftalık Üretim Raporu — ${esc(fmt(from))} – ${esc(fmt(now))}</title>
+<style>
+  @page { size: A4; margin: 15mm 12mm; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size:11px; color:#1a1a1a; }
+  .print-header { border-bottom:3px solid #f5a623; padding-bottom:10px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:flex-end; }
+  .print-logo { font-size:22px; font-weight:900; letter-spacing:2px; color:#f5a623; }
+  .print-meta { font-size:10px; color:#666; text-align:right; }
+  h2 { font-size:13px; margin:16px 0 6px; color:#333; }
+  table { width:100%; border-collapse:collapse; margin-bottom:4px; }
+  th { background:#f3f0e9; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:#555; }
+  th, td { border:1px solid #ddd; padding:5px 8px; }
+  tr:nth-child(even) td { background:#fafaf7; }
+  .sumgrid { display:flex; gap:10px; margin:10px 0 4px; flex-wrap:wrap; }
+  .sumbox { flex:1; min-width:110px; border:1px solid #ddd; border-radius:6px; padding:8px 10px; }
+  .sumbox b { display:block; font-size:20px; }
+  .sumbox span { font-size:9px; color:#666; text-transform:uppercase; letter-spacing:.5px; }
+  .noprint { position:fixed; top:10px; right:10px; }
+  @media print { .noprint { display:none; } }
+</style></head><body>
+<button class="noprint" onclick="window.print()" style="padding:8px 16px;cursor:pointer">🖨 Yazdır</button>
+<div class="print-header">
+  <div><div class="print-logo">ÜretimTakip</div><div style="font-size:11px;color:#666;margin-top:4px">Haftalık Üretim Raporu — 📅 ${esc(fmt(from))} – ${esc(fmt(now))}</div></div>
+  <div class="print-meta">Yazdırma: ${esc(printDate)}</div>
+</div>
+<div class="sumgrid">
+  <div class="sumbox"><b>${done}</b><span>Tamamlanan adet</span></div>
+  <div class="sumbox"><b>${rej}</b><span>Ret adet</span></div>
+  <div class="sumbox"><b>${logs.length}</b><span>İşlem</span></div>
+  <div class="sumbox"><b>${people.length}</b><span>Personel</span></div>
+  <div class="sumbox"><b>${openWos.length}</b><span>Açık iş emri</span></div>
+  <div class="sumbox"><b>${inWh}</b><span>Depodaki kalem</span></div>
+</div>
+<h2>📈 Gün Gün Üretim</h2>
+<table><tr><th>Tarih</th><th>Gün</th><th style="text-align:right">Tamamlanan</th><th style="text-align:right">Ret</th><th style="text-align:right">İşlem</th></tr>${dayRows}</table>
+<h2>🏭 Bölüm İlerlemesi (anlık)</h2>
+${deptRows?`<table><tr><th>Bölüm</th><th style="text-align:right">Parça</th><th style="text-align:right">Tamamlanan / Planlanan</th><th style="text-align:right">İlerleme</th></tr>${deptRows}</table>`:'<div style="color:#888">Bölüme atanmış parça yok.</div>'}
+<h2>👷 Personel Performansı (7 gün)</h2>
+${userRows?`<table><tr><th>Personel</th><th style="text-align:right">Yapılan</th><th style="text-align:right">Bekleyen</th><th style="text-align:right">Ret</th><th style="text-align:right">İşlem</th></tr>${userRows}</table>`:'<div style="color:#888">Bu hafta işlem kaydı yok.</div>'}
+<h2>🔩 En Çok Üretilen Parçalar (7 gün)</h2>
+${topRows?`<table><tr><th>Parça</th><th>Kod</th><th>Proje</th><th style="text-align:right">Adet</th><th style="text-align:right">Fire</th></tr>${topRows}</table>`:'<div style="color:#888">Bu hafta üretim kaydı yok.</div>'}
+<h2>📋 Açık İş Emirleri</h2>
+${woRows?`<table><tr><th>Kod</th><th>Proje</th><th>Personel</th><th>Alan</th><th>Durum</th><th style="text-align:right">İlerleme</th></tr>${woRows}</table>`:'<div style="color:#888">Açık iş emri yok.</div>'}
+</body></html>`;
+  const win=window.open('','_blank');
+  if(!win){ toast('Açılır pencere engellendi — tarayıcı iznini kontrol edin','error'); return; }
+  win.document.write(html); win.document.close();
 }
 
 function renderBreadcrumb(){
@@ -5744,7 +5859,7 @@ async function renderWorkOrders() {
       return `<div class="wo-card${isChecked?' wo-selected':''}" id="woc-${w.id}">
         <div class="wo-card-header" style="padding-right:40px">
           <div>
-            <div class="wo-card-id">İE-${String(idx).padStart(4,'0')}</div>
+            <div class="wo-card-id">${esc(w.code || 'İE-'+String(idx).padStart(4,'0'))}</div>
             <div class="wo-card-meta">${w.department_name ? w.department_name+' · ' : ''}${dt}</div>
           </div>
           <span class="wo-status-badge ${st.css}">${st.lbl}</span>

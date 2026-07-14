@@ -26,6 +26,7 @@ public class WorkOrderResponse {
     private LocalDateTime endDatetime;
     private String status;
     private String notes;
+    private String code;
     private LocalDateTime createdAt;
 
     public static WorkOrderResponse fromEntity(WorkOrder w) {
@@ -39,6 +40,7 @@ public class WorkOrderResponse {
                 .endDatetime(w.getEndDatetime())
                 .status(w.getStatus())
                 .notes(w.getNotes())
+                .code(w.getCode())
                 .createdAt(w.getCreatedAt())
                 .build();
     }

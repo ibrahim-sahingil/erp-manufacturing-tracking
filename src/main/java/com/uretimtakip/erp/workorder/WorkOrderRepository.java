@@ -23,4 +23,7 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, UUID> {
     List<WorkOrder> findByStatus(String status);
 
     List<WorkOrder> findAllByOrderByCreatedAtDesc();
+
+    /** İE-YYYY-NNN üretimi: yılın en büyük kodu (sözlük sırası = sayısal sıra, NNN sıfır dolgulu). */
+    java.util.Optional<WorkOrder> findTopByCodeStartingWithOrderByCodeDesc(String prefix);
 }

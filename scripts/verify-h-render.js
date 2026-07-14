@@ -743,7 +743,7 @@ chk('dash: bölüm adı kaçırıldı', dh.includes('Böl&lt;img'));
 chk('dash: akış parça adı/kullanıcı/not kaçırıldı', dh.includes('DParça&lt;img') && dh.includes('DUser&lt;i&gt;') && dh.includes('dn&lt;b&gt;'));
 chk('dash: SVG grafik (raw) korundu', dh.includes('<polyline') && dh.includes('dashAg'));
 chk('dash: halka/ilerleme çubuğu (raw) korundu', dh.includes('stroke-dasharray') && dh.includes('class="wbar"'));
-chk('dash: nav butonları (raw) korundu', dh.includes("switchTab('planning')") && dh.includes("switchTab('stats')"));
+chk('dash: nav butonları (raw) korundu', dh.includes("switchTab('planning')") && dh.includes('dashWeeklyReport()'));
 
 console.log(fail?`\n${fail} HATA ❌`:'\nTÜM RENDER GÜVENLİK KONTROLLERİ GEÇTİ ✅');
 process.exit(fail?1:0);
