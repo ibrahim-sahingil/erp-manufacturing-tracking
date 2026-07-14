@@ -9,6 +9,80 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
   :root{--bg:#0d0f12;--surface:#161a1f;--surface2:#1e242b;--border:#2a333d;--accent:#f5a623;--green:#2ecc71;--red:#e74c3c;--yellow:#f39c12;--text:#d4dde8;--muted:#5a6a7a;--font-display:'Bebas Neue',sans-serif;--font-mono:'IBM Plex Mono',monospace;--font-body:'IBM Plex Sans',sans-serif;}
+  /* ═══ TASARIM 2026 TOKENLARI (kaynak: erp-konsept.html, tasarim-konsepti-2026-07-14) ═══
+     Kehribar (koyu+turuncu) = varsayılan; data-variant="light|steel|forest" diğer temalar.
+     NOT: --bg burada YOK — eski değeri korunuyor, Adım C'de konsept değerine geçer. */
+  :root{
+    --bg-deep:#060708;--panel:#101116;--panel-solid:#14151b;--panel-2:#191a21;
+    --line:rgba(255,255,255,.1);--line-soft:rgba(255,255,255,.06);
+    --ink:#f0efeb;--ink-2:#c9cbd0;--mut:#898f9b;
+    --acc:#f5a83c;--acc-2:#f08c1e;--acc-ink:#16110a;
+    --acc-grad:linear-gradient(135deg,#ffbd57,#f08c1e);
+    --acc-soft:rgba(245,168,60,.13);--acc-line:rgba(245,168,60,.4);
+    --ok:#4cc38a;--ok-soft:rgba(76,195,138,.13);
+    --warn:#e5b454;--warn-soft:rgba(229,180,84,.14);
+    --err:#e5645f;--err-soft:rgba(229,100,95,.13);
+    --info:#6ba6e8;--info-soft:rgba(107,166,232,.13);
+    --vio:#a78bfa;--vio-soft:rgba(167,139,250,.13);
+    --dot:#191b21;--shadow:0 8px 28px rgba(0,0,0,.45);--hover-shadow:0 10px 30px rgba(0,0,0,.4);
+    --side-bg:#060708;--side-ink:#a4abb8;--side-act:#f6f5f1;
+    --glow-a:rgba(240,140,30,.05);--glow-b:rgba(80,120,200,.04);
+    --thumb-bg:#0d1320;--thumb-ln:#2a3a55;
+  }
+  /* Fildişi — açık + bronz */
+  :root[data-variant="light"]{
+    --bg:#f2f1ed;--bg-deep:#eae8e2;--panel:#ffffff;--panel-solid:#ffffff;--panel-2:#f7f6f2;
+    --line:#dcd9d0;--line-soft:#e7e4dc;
+    --ink:#22262e;--ink-2:#3c424c;--mut:#737a87;
+    --acc:#c07d14;--acc-2:#a86a0e;--acc-ink:#ffffff;
+    --acc-grad:linear-gradient(135deg,#d99427,#b9750f);
+    --acc-soft:rgba(192,125,20,.11);--acc-line:rgba(192,125,20,.4);
+    --ok:#1e8e5a;--ok-soft:rgba(30,142,90,.11);
+    --warn:#a2790e;--warn-soft:rgba(162,121,14,.13);
+    --err:#c2453f;--err-soft:rgba(194,69,63,.10);
+    --info:#2f6cb0;--info-soft:rgba(47,108,176,.11);
+    --vio:#7c5cd6;--vio-soft:rgba(124,92,214,.11);
+    --dot:#dcd9d0;--shadow:0 8px 24px rgba(45,40,28,.1);--hover-shadow:0 10px 26px rgba(45,40,26,.12);
+    --side-bg:#14161c;--side-ink:#9aa2af;--side-act:#f6f5f1;
+    --glow-a:rgba(217,148,39,.06);--glow-b:rgba(60,110,190,.05);
+    --thumb-bg:#eef2f8;--thumb-ln:#b9c8de;
+  }
+  /* Çelik Gece — koyu + buz mavisi (konseptte eksik olan durum renkleri eklendi) */
+  :root[data-variant="steel"]{
+    --bg:#0a0d12;--bg-deep:#070a0e;--panel:#10141b;--panel-solid:#141924;--panel-2:#19202c;
+    --line:rgba(255,255,255,.1);--line-soft:rgba(255,255,255,.06);
+    --ink:#edf1f6;--ink-2:#c7cdd6;--mut:#8792a2;
+    --acc:#4fb8ff;--acc-2:#2f8de0;--acc-ink:#041322;
+    --acc-grad:linear-gradient(135deg,#6fc6ff,#2f8de0);
+    --acc-soft:rgba(79,184,255,.13);--acc-line:rgba(79,184,255,.4);
+    --ok:#4cc38a;--ok-soft:rgba(76,195,138,.13);
+    --warn:#e5b454;--warn-soft:rgba(229,180,84,.14);
+    --err:#e5645f;--err-soft:rgba(229,100,95,.13);
+    --info:#6ba6e8;--info-soft:rgba(107,166,232,.13);
+    --vio:#a78bfa;--vio-soft:rgba(167,139,250,.13);
+    --dot:#171d27;--shadow:0 8px 28px rgba(0,0,0,.45);--hover-shadow:0 10px 30px rgba(0,0,0,.4);
+    --side-bg:#070a0e;--side-ink:#a1abba;--side-act:#f2f6fa;
+    --glow-a:rgba(60,140,220,.06);--glow-b:rgba(140,90,220,.05);
+    --thumb-bg:#0d1320;--thumb-ln:#2a3a55;
+  }
+  /* Yeşil Atölye — açık + endüstriyel yeşil, koyu yeşil menü */
+  :root[data-variant="forest"]{
+    --bg:#f3f5f2;--bg-deep:#eaeee8;--panel:#ffffff;--panel-solid:#ffffff;--panel-2:#f5f8f4;
+    --line:#d9e0d6;--line-soft:#e5eae2;
+    --ink:#1e2622;--ink-2:#39443d;--mut:#6e7a72;
+    --acc:#1f9d63;--acc-2:#157a4b;--acc-ink:#ffffff;
+    --acc-grad:linear-gradient(135deg,#34b878,#157a4b);
+    --acc-soft:rgba(31,157,99,.11);--acc-line:rgba(31,157,99,.4);
+    --ok:#1e8e5a;--ok-soft:rgba(30,142,90,.11);
+    --warn:#a2790e;--warn-soft:rgba(162,121,14,.13);
+    --err:#c2453f;--err-soft:rgba(194,69,63,.10);
+    --info:#2f6cb0;--info-soft:rgba(47,108,176,.11);
+    --vio:#7c5cd6;--vio-soft:rgba(124,92,214,.11);
+    --dot:#dde5de;--shadow:0 8px 24px rgba(30,45,35,.1);--hover-shadow:0 10px 26px rgba(30,45,35,.12);
+    --side-bg:#12271b;--side-ink:#9fb5a8;--side-act:#f2f7f3;
+    --glow-a:rgba(40,150,95,.05);--glow-b:rgba(50,110,180,.04);
+    --thumb-bg:#edf3ee;--thumb-ln:#b9cdc0;
+  }
   *{margin:0;padding:0;box-sizing:border-box;}
   body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh;}
   #loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:16px;}
