@@ -29,6 +29,11 @@ const MAP = [
   ['proje kartı',      '.pcard',          '.order-card',     ['border-radius','padding','background-color'], 'orders'],
   ['pstats değeri',    '.ps b',           '.ps b',           ['font-size','font-weight'], 'orders'],
   ['ilerleme çubuğu',  '.wbar',           '.wbar',           ['height','border-radius','background-color']],
+  // Ürün Ağacı (tasarım 2026) — bom sekmesine geçince ilk ürün otomatik seçilir (aşağıda)
+  ['ağaç düğümü',      '.tnode',          '.bom-part-row',   ['border-radius','padding'], 'bom'],
+  ['ağaç kodu',        '.tnode .code',    '.bom-part-code',  ['font-size','color'], 'bom'],
+  ['ağaç ikonu',       '.tic.part',       '.tic.part',       ['width','height','border-radius','background-color'], 'bom'],
+  ['ağaç çipi',        '.chipk',          '.bom-part-meta>span', ['font-size','font-weight','border-radius','padding'], 'bom'],
 ];
 
 // Toleranslar: px ±0.8, weight ±15, letter-spacing ±0.2px, renk kanal farkı ≤10
@@ -86,7 +91,18 @@ function same(prop, a, b, fs14) {
   let diff = 0, miss = 0;
   let curTab = 'dashboard';
   for (const [name, cSel, aSel, props, appTab] of MAP) {
-    if (appTab && appTab !== curTab) { await aPage.evaluate(t => switchTab(t), appTab); await aPage.waitForTimeout(1800); curTab = appTab; }
+    if (appTab && appTab !== curTab) {
+      await aPage.evaluate(t => switchTab(t), appTab);
+      await aPage.waitForTimeout(1800);
+      if (appTab === 'bom') { // parça satırları ancak bir ürün seçilince render olur
+        await aPage.evaluate(async () => {
+          const s = document.getElementById('bom-product-select');
+          if (s && s.options.length > 1 && !s.value) { s.value = s.options[1].value; await onBomProductChange(); }
+        });
+        await aPage.waitForTimeout(1200);
+      }
+      curTab = appTab;
+    }
     const [c, a] = [await grab(cPage, cSel, props), await grab(aPage, aSel, props)];
     if (!c || !a) { console.log(`  ⚠ ${name}: bulunamadı (konsept:${!!c} uygulama:${!!a})`); miss++; continue; }
     for (const p of props) {

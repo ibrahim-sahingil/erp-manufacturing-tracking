@@ -223,6 +223,7 @@
   .st.plan{background:var(--info-soft);color:var(--info);}
   .st.wait{background:var(--warn-soft);color:var(--warn);}
   .st.lock{background:var(--err-soft);color:var(--err);}
+  .st.pool{background:var(--vio-soft);color:var(--vio);}
   .worow{display:flex;align-items:center;gap:12px;padding:9px 2px;border-bottom:1px solid var(--line-soft);}
   .worow:last-child{border-bottom:none;}
   .wic{width:34px;height:34px;border-radius:9px;background:var(--acc-soft);color:var(--accent);font-size:11px;font-weight:800;display:grid;place-items:center;flex-shrink:0;}
@@ -436,19 +437,25 @@
   .cs-title{font-weight:700;font-size:20px;color:var(--text);margin-bottom:8px;}
   .cs-sub{font-family:var(--font-mono);font-size:13px;color:var(--muted);margin-bottom:20px;}
   .cs-badge{display:inline-block;background:var(--acc-soft);border:1px solid var(--acc-line);border-radius:20px;padding:4px 16px;font-family:var(--font-mono);font-size:10px;letter-spacing:.09em;color:var(--accent);text-transform:uppercase;font-weight:650;}
-  /* BOM */
-  .bom-list{display:flex;flex-direction:column;gap:6px;min-height:80px;}
-  .bom-part-row{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:grab;transition:all .2s;user-select:none;}
-  .bom-part-row:hover{border-color:var(--accent);}
+  /* BOM — konsept tnode/chipk dili (tasarım 2026) */
+  .bom-list{display:flex;flex-direction:column;gap:5px;min-height:80px;}
+  .bom-part-row{background:var(--surface);border:1px solid var(--line-soft);border-radius:10px;padding:7px 10px;display:flex;align-items:center;gap:9px;cursor:grab;transition:background .12s,border-color .12s;user-select:none;}
+  .bom-part-row:hover{background:var(--panel-2);border-color:var(--acc-line);}
   .bom-part-row.dragging{opacity:.4;border-style:dashed;}
   .bom-part-row.drag-over{border-color:var(--accent);background:color-mix(in srgb,var(--acc) 8%,transparent);border-left:4px solid var(--accent);}
   .bom-part-row.drag-over-child{border-color:var(--info);background:var(--info-soft);border-right:4px solid var(--info);padding-left:28px;}
   .bom-indent{width:20px;height:20px;flex-shrink:0;}
   .bom-drag-handle{color:var(--muted);font-size:14px;cursor:grab;flex-shrink:0;}
-  .bom-part-code{font-family:var(--font-mono);font-size:11px;color:var(--accent);min-width:90px;}
-  .bom-part-name-cell{flex:1;font-size:13px;font-weight:600;}
-  .bom-part-meta{font-family:var(--font-mono);font-size:10px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;}
-  .bom-op-tag{display:inline-flex;align-items:center;gap:4px;background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.25);border-radius:4px;padding:2px 7px;font-family:var(--font-mono);font-size:9px;color:#2980b9;}
+  .tic{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;flex-shrink:0;font-size:12px;}
+  .tic.prod{background:var(--acc-soft);color:var(--accent);}
+  .tic.grp{background:var(--info-soft);color:var(--info);}
+  .tic.part{background:var(--panel-2);color:var(--mut);border:1px solid var(--line-soft);}
+  .chipk{font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line-soft);color:var(--mut);white-space:nowrap;}
+  .bom-part-code{font-family:var(--font-mono);font-size:10.5px;color:var(--mut);min-width:90px;}
+  .bom-part-name-cell{font-size:12.5px;font-weight:650;}
+  .bom-part-meta{font-size:10px;color:var(--mut);display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:3px;}
+  .bom-part-meta>span{font-weight:600;padding:2px 8px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line-soft);white-space:nowrap;}
+  .bom-op-tag{display:inline-flex;align-items:center;gap:4px;background:var(--info-soft);border-radius:8px;padding:2px 8px;font-size:10px;font-weight:600;color:var(--info);}
   .bom-ops{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;}
   .bom-level-line{border-left:2px solid var(--border);margin-left:8px;padding-left:10px;}
   /* Aranabilir combobox (searchSelect) */
@@ -459,23 +466,24 @@
   .ss-more{padding:6px 12px;font-family:var(--font-mono);font-size:10px;color:var(--muted);}
   .ss-arrow{position:absolute;right:0;top:0;bottom:0;width:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:11px;user-select:none;}
   .ss-arrow:hover{color:var(--accent);}
-  /* BOM Tree */
+  /* BOM Tree — konsept tkids dili */
   .bom-tree-node{margin:4px 0;}
-  .bom-tree-item{display:inline-flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 14px;font-family:var(--font-mono);font-size:12px;white-space:nowrap;}
-  .bom-tree-item.root{background:var(--acc-soft);border-color:var(--acc-line);font-size:14px;font-weight:700;}
-  .bom-tree-children{margin-left:32px;border-left:2px solid var(--border);padding-left:16px;margin-top:4px;}
+  .bom-tree-item{display:inline-flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--line-soft);border-radius:10px;padding:7px 14px;font-family:var(--font-mono);font-size:12px;white-space:nowrap;}
+  .bom-tree-item.root{background:var(--acc-soft);border-color:var(--acc-line);font-size:13.5px;font-weight:700;}
+  .bom-tree-children{margin-left:22px;border-left:1px dashed var(--line);padding-left:12px;margin-top:4px;}
   .bom-tree-connector{color:var(--muted);margin-right:4px;}
   /* BOM PROJE BAĞLAMA */
-  .pbom-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:16px;overflow:hidden;}
-  .pbom-card-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
-  .pbom-card-title{font-weight:700;font-size:15px;color:var(--text);}
-  .pbom-status-draft{background:rgba(127,140,141,.15);color:var(--muted);border:1px solid rgba(127,140,141,.3);border-radius:12px;padding:3px 12px;font-family:var(--font-mono);font-size:11px;}
-  .pbom-status-published{background:var(--ok-soft);color:var(--green);border:1px solid transparent;border-radius:12px;padding:3px 12px;font-family:var(--font-mono);font-size:11px;}
+  .pbom-card{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;margin-bottom:14px;overflow:hidden;transition:transform .14s ease,border-color .14s ease;}
+  .pbom-card:hover{transform:translateY(-1px);border-color:var(--acc-line);}
+  .pbom-card-header{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  .pbom-card-title{font-weight:650;font-size:14.5px;color:var(--text);}
+  .pbom-status-draft{background:color-mix(in srgb,var(--mut) 12%,transparent);color:var(--muted);border-radius:10px;padding:3px 10px;font-size:10.5px;font-weight:700;white-space:nowrap;}
+  .pbom-status-published{background:var(--ok-soft);color:var(--green);border-radius:10px;padding:3px 10px;font-size:10.5px;font-weight:700;white-space:nowrap;}
   .pbom-part-row{display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid var(--border);transition:background .15s;}
   .pbom-part-row:last-child{border-bottom:none;}
   .pbom-part-row:hover{background:var(--surface2);}
   .pbom-part-row.excluded{opacity:.4;text-decoration:line-through;}
-  .pbom-part-code{font-family:var(--font-mono);font-size:11px;color:var(--accent);min-width:100px;}
+  .pbom-part-code{font-family:var(--font-mono);font-size:10.5px;color:var(--mut);min-width:100px;}
   .pbom-part-name{flex:1;font-size:13px;}
   .pbom-part-dept{font-family:var(--font-mono);font-size:10px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px 8px;}
   /* GANTT */
@@ -1554,21 +1562,26 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 
 <!-- BOM -->
 <div class="view" id="view-bom">
-  <div class="section-title">ÜRÜN AĞACI</div>
-  <div class="section-sub">Ana ürün seç · Parçaları tanımla · Hiyerarşiyi düzenle · Görselleştir</div>
+  <div class="dash-phead">
+    <div>
+      <h1>Ürün Ağacı</h1>
+      <div class="sub" id="bom-sub">Ana ürün seç · Parçaları tanımla · Hiyerarşiyi düzenle · Projeye bağla</div>
+    </div>
+    <div class="grow"></div>
+    <button class="hbtn sec" onclick="openMaterialsModal()" title="Malzeme listesi — parçalarda malzeme buradan seçilir">Malzeme Kartoteki</button>
+    <button class="hbtn sec" onclick="xlsImportOpen('bom')" title="Basamaklı Excel'den (1, 1.1, 1.1.2...) toplu parça aktar">Excel'den İçe Aktar</button>
+    <button class="hbtn sec" onclick="deleteCurrentProduct()" id="bom-delete-product-btn" style="color:var(--red);display:none">Ürünü Sil</button>
+    <button class="hbtn pri" onclick="openAddProduct()">+ Yeni Ürün</button>
+  </div>
 
-  <!-- Ana Ürün Seçimi / Ekleme -->
+  <!-- Ana Ürün Seçimi -->
   <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:flex-end">
-    <div class="form-group" style="flex:1;min-width:200px">
+    <div class="form-group" style="flex:1;min-width:220px;max-width:420px;margin-bottom:0">
       <label>Ana Ürün Seç</label>
       <select id="bom-product-select" onchange="onBomProductChange()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
         <option value="">— Ürün seçin —</option>
       </select>
     </div>
-    <button class="btn btn-ghost" onclick="openAddProduct()">+ Yeni Ürün</button>
-    <button class="btn btn-ghost" onclick="openMaterialsModal()" title="Malzeme listesi — parçalarda malzeme buradan seçilir">Malzeme Kartoteki</button>
-    <button class="btn btn-ghost" onclick="xlsImportOpen('bom')" title="Basamaklı Excel'den (1, 1.1, 1.1.2...) toplu parça aktar">Excel'den İçe Aktar</button>
-    <button class="btn btn-ghost btn-sm" onclick="deleteCurrentProduct()" id="bom-delete-product-btn" style="color:var(--red);border-color:rgba(231,76,60,.3);display:none">Ürünü Sil</button>
   </div>
 
   <div id="bom-content" style="display:none">
@@ -1682,7 +1695,7 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
       <div style="display:flex;gap:16px;align-items:center">
         <span style="font-size:10px;color:var(--muted)">
           <span style="color:var(--accent)">←</span> Sol = Aynı seviye &nbsp;|&nbsp;
-          <span style="color:#2980b9">→</span> Sağ = Alt parça yap
+          <span style="color:var(--info)">→</span> Sağ = Alt parça yap
         </span>
         <button class="btn btn-ghost btn-sm" onclick="bomExpandAll()" title="Tüm dalları aç">⊞ Tümünü Aç</button>
         <button class="btn btn-ghost btn-sm" onclick="bomCollapseAll()" title="Tüm dalları kapat">⊟ Tümünü Kapat</button>
@@ -1695,19 +1708,19 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
   <!-- Ürün Ağacı Görsel -->
   <div id="bom-tree-view" style="display:none;margin-top:20px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
-      <div style="font-weight:700;font-size:16px;color:var(--ink)">ÜRÜN AĞACI</div>
+      <div style="font-weight:650;font-size:16px;letter-spacing:-.01em;color:var(--ink)">Ürün Ağacı Görünümü</div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-ghost btn-sm" onclick="exportBomExcel()">Excel</button>
         <button class="btn btn-ghost btn-sm" onclick="document.getElementById('bom-tree-view').style.display='none'">✕ Kapat</button>
       </div>
     </div>
-    <div id="bom-tree-container" style="overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;min-height:300px"></div>
+    <div id="bom-tree-container" style="overflow:auto;background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;padding:24px;min-height:300px"></div>
   </div>
 
   <!-- PROJE BAĞLAMA BÖLÜMÜ -->
-  <div style="margin-top:32px;border-top:2px solid var(--border);padding-top:24px">
-    <div style="font-weight:700;font-size:17px;color:var(--ink);margin-bottom:4px">PROJEYE ÜRÜN AĞACI BAĞ</div>
-    <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:20px">Ürün ağacını bir projeye bağlayın · Parçaları özelleştirin · Yayınlayın → Parçalar otomatik üretime çıkar</div>
+  <div style="margin-top:32px;border-top:1px solid var(--line-soft);padding-top:24px">
+    <div style="font-weight:650;font-size:17px;letter-spacing:-.01em;color:var(--ink);margin-bottom:4px">Projeye Ürün Ağacı Bağla</div>
+    <div style="font-size:12.5px;color:var(--muted);margin-bottom:20px">Ürün ağacını bir projeye bağlayın · Parçaları özelleştirin · Yayınlayın → Parçalar otomatik üretime çıkar</div>
 
     <!-- Yeni bağlantı formu -->
     <div class="form-card" style="margin-bottom:20px">
@@ -1735,12 +1748,16 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 
 <!-- PROJE ÜRÜN AĞACI DÜZENLEYICI -->
 <div class="view" id="view-pbom-editor" style="padding-bottom:40px">
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;flex-wrap:wrap">
-    <button class="btn btn-ghost btn-sm" onclick="closePbomEditor()">← Geri</button>
-    <div style="font-weight:700;font-size:17px;color:var(--ink)" id="pbome-title">PROJE ÜRÜN AĞACI</div>
+  <div class="dash-phead" style="align-items:center">
+    <button class="hbtn sec" onclick="closePbomEditor()">← Geri</button>
+    <div>
+      <h1 id="pbome-title" style="font-size:20px">Proje Ürün Ağacı</h1>
+      <div class="sub" id="pbome-subtitle"></div>
+    </div>
     <div id="pbome-status-badge"></div>
+    <div class="grow"></div>
+    <button class="hbtn pri" id="pbome-publish-btn" onclick="pbomePublish()">Yayınla → Üretime Çıkar</button>
   </div>
-  <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:20px" id="pbome-subtitle"></div>
 
   <!-- 2 sütun: Parça Ekle | İşlem Ekle -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
@@ -1851,18 +1868,20 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
       <button class="btn btn-ghost btn-sm" onclick="openMaterialsModal()" title="Malzeme listesi — parçalarda malzeme buradan seçilir">Malzeme</button>
       <button class="btn btn-ghost btn-sm" onclick="xlsImportOpen('pbome')" title="Basamaklı Excel'den (1, 1.1, 1.1.2...) toplu parça aktar">Excel'den İçe Aktar</button>
       <button class="btn btn-primary btn-sm" onclick="pbomeShowTree()">Ağacı Görüntüle</button>
-      <button class="btn btn-primary" id="pbome-publish-btn" onclick="pbomePublish()">Yayınla → Üretime Çıkar</button>
     </div>
   </div>
   <div id="pbome-parts-list" class="bom-list"></div>
 
+  <!-- (tasarım 2026) Konsept v-bom KPI şeridi — gerçek karar verileri, pbomeRenderKpis doldurur -->
+  <div class="stats-row" id="pbome-kpis" style="grid-template-columns:repeat(3,1fr);margin:20px 0 0;display:none"></div>
+
   <!-- Ağaç Görünümü -->
   <div id="pbome-tree-view" style="display:none;margin-top:20px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <div style="font-weight:700;font-size:16px;color:var(--ink)">PROJE ÜRÜN AĞACI</div>
+      <div style="font-weight:650;font-size:16px;letter-spacing:-.01em;color:var(--ink)">Proje Ürün Ağacı Görünümü</div>
       <button class="btn btn-ghost btn-sm" onclick="document.getElementById('pbome-tree-view').style.display='none'">✕ Kapat</button>
     </div>
-    <div id="pbome-tree-container" style="overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;min-height:200px"></div>
+    <div id="pbome-tree-container" style="overflow:auto;background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;padding:24px;min-height:200px"></div>
   </div>
 </div>
 
@@ -13103,7 +13122,7 @@ async function deleteBomOpDef(id) {
 
 async function onBomProductChange() {
   const id = document.getElementById('bom-product-select').value;
-  if(!id) { _activeBomProduct=null; document.getElementById('bom-content').style.display='none'; document.getElementById('bom-tree-view').style.display='none'; bomToggleDeleteBtn(); return; }
+  if(!id) { _activeBomProduct=null; document.getElementById('bom-content').style.display='none'; document.getElementById('bom-tree-view').style.display='none'; bomToggleDeleteBtn(); bomUpdateSub(); return; }
   _activeBomProduct = bomProducts.find(p=>p.id===id);
   await loadBomParts();
   renderBomContent();
@@ -13116,6 +13135,20 @@ async function onBomProductChange() {
 function bomToggleDeleteBtn(){
   const btn = document.getElementById('bom-delete-product-btn');
   if(btn) btn.style.display = _activeBomProduct ? '' : 'none';
+}
+
+// (tasarım 2026) Başlık alt satırı konsept dili: "Ürün · Kod · N parça, M seviye"
+function bomUpdateSub(){
+  const el = document.getElementById('bom-sub');
+  if(!el) return;
+  if(_activeBomProduct){
+    const depth = bomParts.length ? Math.max(...bomParts.map(p=>p.level||0))+1 : 0;
+    el.textContent = _activeBomProduct.name
+      + (_activeBomProduct.code ? ' · '+_activeBomProduct.code : '')
+      + ' · ' + bomParts.length + ' parça' + (depth ? ', '+depth+' seviye' : '');
+  } else {
+    el.textContent = 'Ana ürün seç · Parçaları tanımla · Hiyerarşiyi düzenle · Projeye bağla';
+  }
 }
 
 async function loadBomParts() {
@@ -13234,6 +13267,7 @@ function renderBomContent() {
   if(!_activeBomProduct) return;
   document.getElementById('bom-content').style.display='block';
   document.getElementById('bom-tree-view').style.display='none';
+  bomUpdateSub();
   renderParentSelect();
   renderOpPartSelect();
   renderBomOpDefSelect();
@@ -13644,7 +13678,7 @@ function renderBomList() {
     const opsDept = opsDeptName(ops);
     const opsHTML = ops.length ? h`<div class="bom-ops">${ops.map((o,oi)=>{
       const timeStr = o.duration_per_unit ? ` ${o.total_duration?.toFixed(1)||'?'}dk` : '';
-      return h`<span class="bom-op-tag">${o.name} (${o.code})${timeStr} <button onclick="removeBomOp('${raw(part.id)}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px;margin-left:2px">✕</button></span>`;
+      return h`<span class="bom-op-tag">${o.name} (${o.code})${timeStr} <button onclick="removeBomOp('${raw(part.id)}',${oi})" style="background:none;border:none;cursor:pointer;color:var(--info);opacity:.7;padding:0;font-size:9px;margin-left:2px">✕</button></span>`;
     })}</div>` : '';
     const indent = level * 24;
     const kids = kidCount.get(part.id)||0;
@@ -13660,16 +13694,19 @@ function renderBomList() {
       <span class="bom-drag-handle">⠿</span>
       ${kids?h`<button onclick="bomToggle('${raw(part.id)}')" title="${isCollapsed?'Dalı aç':'Dalı kapat'}" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:12px;padding:0 2px;width:18px">${isCollapsed?'▸':'▾'}</button>`:raw('<span style="display:inline-block;width:18px"></span>')}
       ${level>0?raw(`<span style="color:var(--muted);font-size:10px;margin-right:4px">${'└─'.repeat(1)}</span>`):''}
-      <span class="bom-part-code">${part.code}</span>
+      <span class="tic ${raw(kids?'grp':'part')}">${raw(kids?'▣':'▫')}</span>
       <div style="flex:1">
-        <div class="bom-part-name-cell"${_docPartIds.has(part.id)?raw(' style="color:var(--green)" title="Teknik resmi var"'):''}>${part.name} ${_docPartIds.has(part.id)?raw(''):''}${raw(kindBadge(part.material_kind))}</div>
+        <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+          <span class="bom-part-name-cell"${_docPartIds.has(part.id)?raw(' style="color:var(--green)" title="Teknik resmi var"'):''}>${part.name} ${_docPartIds.has(part.id)?raw(''):''}${raw(kindBadge(part.material_kind))}</span>
+          <span class="bom-part-code">${part.code}</span>
+        </div>
         <div class="bom-part-meta">
           <span id="bom-qty-display-${raw(part.id)}" style="cursor:pointer;border-bottom:1px dashed var(--muted)" onclick="editBomQty('${raw(part.id)}')" title="Miktarı düzenle">${part.quantity} ${part.unit}</span>
           ${isCollapsed&&kids?h`<span style="color:var(--accent);cursor:pointer" onclick="bomToggle('${raw(part.id)}')">▸ ${kids} alt parça gizli</span>`:''}
           ${part.weight_kg?h`<span>${part.weight_kg} kg</span>`:''}
           ${part.material?h`<span>${part.material}</span>`:''}
           ${partDimLabel(part)?h`<span>${partDimLabel(part)}${part.material_form?' · '+MATERIAL_FORMS[part.material_form]:''}</span>`:(part.material_form?h`<span>${MATERIAL_FORMS[part.material_form]}</span>`:'')}
-          ${opsDept?h`<span style="color:#2980b9" title="Bölüm — işlem tanımından türetilir, projeye kopyalanınca atanır">${opsDept}</span>`:''}
+          ${opsDept?h`<span style="color:var(--info)" title="Bölüm — işlem tanımından türetilir, projeye kopyalanınca atanır">${opsDept}</span>`:''}
         </div>
         ${opsHTML}
       </div>
@@ -14747,6 +14784,7 @@ async function pbomeAddOpCore() {
 function pbomeRenderList() {
   const el = document.getElementById('pbome-parts-list');
   if(!el) return;
+  if(typeof pbomeRenderKpis==='function') pbomeRenderKpis(); // (tasarım 2026) KPI şeridi — shim'de tanımsız, guard'lı
   if(!_pbomeParts.length){
     el.innerHTML=h`<div class="empty-state"><span class="emoji"></span>Henüz parça yok. Yukarıdan ekleyin veya ürün ağacından kopyalansın.</div>`;
     return;
@@ -14764,7 +14802,7 @@ function pbomeRenderList() {
       .map(p=>{
         const ops=Array.isArray(p.operations)?p.operations:JSON.parse(p.operations||'[]');
         const dept=p.dept_id?depts.find(d=>d.id===p.dept_id):null;
-        const opsHTML=ops.length?h`<div class="bom-ops">${ops.map((o,oi)=>h`<span class="bom-op-tag">${o.name}(${o.code})${o.duration_per_unit?` ${(o.total_duration||0).toFixed(0)}dk`:''} <button onclick="pbomeRemoveOp('${raw(p.id)}',${oi})" style="background:none;border:none;cursor:pointer;color:rgba(41,128,185,.6);padding:0;font-size:9px">✕</button></span>`)}</div>`:''
+        const opsHTML=ops.length?h`<div class="bom-ops">${ops.map((o,oi)=>h`<span class="bom-op-tag">${o.name}(${o.code})${o.duration_per_unit?` ${(o.total_duration||0).toFixed(0)}dk`:''} <button onclick="pbomeRemoveOp('${raw(p.id)}',${oi})" style="background:none;border:none;cursor:pointer;color:var(--info);opacity:.7;padding:0;font-size:9px">✕</button></span>`)}</div>`:''
         const isFromBom = !!p.bom_part_id;
         const indent = level*24;
         const kids = kidCount.get(p.id)||0;
@@ -14781,16 +14819,20 @@ function pbomeRenderList() {
           <span class="bom-drag-handle">⠿</span>
           ${kids?h`<button onclick="pbomeToggle('${raw(p.id)}')" title="${isCollapsed?'Dalı aç':'Dalı kapat'}" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:12px;padding:0 2px;width:18px">${isCollapsed?'▸':'▾'}</button>`:raw('<span style="display:inline-block;width:18px"></span>')}
           ${level>0?raw('<span style="color:var(--muted);font-size:10px;margin-right:2px">└─</span>'):''}
-          <span class="bom-part-code" style="${isFromBom?'':'color:var(--green)'}">${p.custom_code}</span>
+          <span class="tic ${raw(kids?'grp':'part')}">${raw(kids?'▣':'▫')}</span>
           <div style="flex:1">
-            <div class="bom-part-name-cell">${p.custom_name}${isFromBom?'':' '} ${raw(kindBadge(p.material_kind||p.resolved_material_kind))}</div>
+            <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+              <span class="bom-part-name-cell">${p.custom_name}${isFromBom?'':' '} ${raw(kindBadge(p.material_kind||p.resolved_material_kind))}</span>
+              <span class="bom-part-code" style="${isFromBom?'':'color:var(--green)'}">${p.custom_code}</span>
+              ${p.procurement_decision==='PURCHASE'?h`<span class="st wait">SATIN AL</span>`:p.procurement_decision==='PRODUCE'?h`<span class="st plan">ÜRET</span>`:p.procurement_decision==='POOL'?h`<span class="st pool">HAVUZ</span>`:''}
+            </div>
             <div class="bom-part-meta">
               <span>${p.custom_qty||1} ${p.custom_unit||'adet'}</span>
               ${isCollapsed&&kids?h`<span style="color:var(--accent);cursor:pointer" onclick="pbomeToggle('${raw(p.id)}')">▸ ${kids} alt parça gizli</span>`:''}
               ${p.custom_weight?h`<span>${p.custom_weight}kg</span>`:''}
               ${p.custom_material?h`<span>${p.custom_material}</span>`:''}
               ${pbomeDimLabel(p)?h`<span>${pbomeDimLabel(p)}</span>`:''}
-              ${dept?h`<span style="color:#2980b9">${dept.name}</span>`:''}
+              ${dept?h`<span style="color:var(--info)">${dept.name}</span>`:''}
             </div>
             ${opsHTML}
           </div>
@@ -14811,6 +14853,36 @@ function pbomeRenderList() {
       });
   }
   el.innerHTML = h`${buildTree(null,0)}`;
+}
+
+// (tasarım 2026) Konsept v-bom KPI şeridi — GERÇEK karar verilerinden
+// (procurement_decision: PURCHASE/PRODUCE/POOL/null; kararlar MİP ekranında verilir)
+function pbomeRenderKpis(){
+  const el = document.getElementById('pbome-kpis');
+  if(!el) return;
+  const rows = _pbomeParts.filter(p=>!p.is_excluded);
+  if(!rows.length){ el.style.display='none'; return; }
+  const buy  = rows.filter(p=>p.procurement_decision==='PURCHASE').length;
+  const make = rows.filter(p=>p.procurement_decision==='PRODUCE').length;
+  const pool = rows.filter(p=>p.procurement_decision==='POOL').length;
+  const done = buy+make+pool, pending = rows.length-done;
+  el.style.display='';
+  el.innerHTML = h`
+    <div class="stat-card">
+      <div class="stat-label">Karar Durumu</div>
+      <div class="stat-value">${done}<span class="un">/${rows.length}</span></div>
+      <div class="stat-sub">${pending?h`<span class="delta wa">${pending} kalem karar bekliyor</span>`:h`<span class="delta up">tüm kararlar verildi</span>`}<span>karar MİP ekranında verilir</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Satın Alınacak</div>
+      <div class="stat-value">${buy}<span class="un"> kalem</span></div>
+      <div class="stat-sub"><span class="delta in">karar: satın al</span><span>yayınlanınca MİP'e düşer</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Üretilecek</div>
+      <div class="stat-value">${make}<span class="un"> parça</span></div>
+      <div class="stat-sub"><span class="delta up">karar: üret</span>${pool?h`<span class="delta in">${pool} kalem havuzdan</span>`:''}<span>yayınlanınca üretime çıkar</span></div>
+    </div>`;
 }
 
 // Bölüm ata
