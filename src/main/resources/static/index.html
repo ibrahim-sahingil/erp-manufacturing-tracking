@@ -4348,13 +4348,26 @@ function qrDataUrl(text, size){
 }
 
 // ═══ SCAN ═══
+// (12. tur m14) İş emri başlatılmadan QR kaydı girilemez — parça iş emrine
+// BAĞLIYSA en az biri 'inprogress' olmalı; bağsız parçada eski davranış
+// (kullanıcı kararı). Backend'de de aynı guard var (PartLogService) — QR
+// sayfası halka açık olduğundan asıl kilit orada, burası UX katmanı.
+let _scanWoBlocked = false;
 async function renderScan(id){
   document.getElementById('scan-content').innerHTML = h`<div class="empty-state"><div class="spinner" style="margin:0 auto"></div><p style="margin-top:16px">Yükleniyor...</p></div>`;
-  const [allParts,logs,allUsers]=await Promise.all([
+  const [allParts,logs,allUsers,wops,wos]=await Promise.all([
     dbGet('parts','id=eq.'+id),
     loadLogs(id),
-    dbGet('users','order=name.asc')
+    dbGet('users','order=name.asc'),
+    dbGet('work_order_parts'),
+    dbGet('work_orders')
   ]);
+  const woLinks = (Array.isArray(wops)?wops:[]).filter(w=>w.part_id===id);
+  const woList  = Array.isArray(wos)?wos:[];
+  _scanWoBlocked = woLinks.length>0 && !woLinks.some(l=>{
+    const w = woList.find(x=>x.id===l.work_order_id);
+    return w && w.status==='inprogress';
+  });
   const p=Array.isArray(allParts)?allParts[0]:null;
   const ux=Array.isArray(allUsers)?allUsers:[];
   const content=document.getElementById('scan-content');
@@ -4435,9 +4448,19 @@ async function renderScan(id){
     document.getElementById('manual-user-wrap').style.display=this.value==='__other__'?'block':'none';
   });
   autoSelectScanUser();
+  // (12. tur m14) İş emri başlatılmadıysa uyarı şeridi + Kaydet kilidi
+  if(_scanWoBlocked){
+    const sbtn = document.getElementById('save-btn');
+    if(sbtn){ sbtn.disabled = true; sbtn.title = 'İş emri başlatılmadan adet girişi yapılamaz'; }
+    const anchor = document.querySelector('#scan-content .qty-inputs') || document.getElementById('save-btn');
+    if(anchor) anchor.insertAdjacentHTML('beforebegin',
+      '<div style="background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.4);border-radius:10px;padding:10px 14px;font-size:12.5px;color:#f5a623;margin-bottom:12px"><b>İş emri başlatılmadı</b> — bu parçanın iş emri &quot;Devam Ediyor&quot; durumuna alınmadan adet girişi yapılamaz. Dashboard → bölüm kartı → <b>Başlat</b>.</div>');
+  }
 }
 
 async function submitScan(id){
+  // (12. tur m14) UX katmanı — asıl kilit backend'de (PartLogService)
+  if(_scanWoBlocked){ toast('İş emri başlatılmadan adet girişi yapılamaz — dashboard\'dan Başlat!','error'); return; }
   let userName=document.getElementById('scan-user').value;
   if(userName==='__other__') userName=(document.getElementById('scan-user-manual')?.value||'').trim();
   if(!userName){ toast('Lütfen kişi seçin!','error'); return; }
@@ -4481,8 +4504,14 @@ async function submitScan(id){
   // (U4) Sayaçların tek otoritesi log POST: backend qty_done/reject/pending'i
   // ATOMİK artırır (eşzamanlı QR girişlerinde lost update olmaz). parts PUT
   // artık yalnız status yazar — eski MUTLAK qty PUT'u yarışa açıktı.
-  await dbInsert('logs',{part_id:id, username:userName, status:autoStatus,
+  // (12. tur m14) Log REDDEDİLİRSE (WO_NOT_STARTED vb.) durum da yazılmaz —
+  // eskiden sonuç kontrol edilmeden status güncelleniyordu.
+  const ins = await dbInsert('logs',{part_id:id, username:userName, status:autoStatus,
     qty_done:qDoneNew, qty_pending:0, qty_reject:qRejectNew, note});
+  if(!Array.isArray(ins)||!ins[0]){
+    btn.disabled=false; btn.textContent='✔ KAYDET';
+    return; // hata toast'ı adapter'dan geldi
+  }
   const ok = await dbUpdate('parts',id,{status:autoStatus});
 
   btn.disabled=false; btn.textContent='✔ KAYDET';

@@ -478,6 +478,32 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     waiting = woWaitingChildren(wo.id);
     check('ikisi bitince engel kalktı', waiting.length===0, waiting.length);
 
+    console.log('═══ 12.TUR m14: QR BAŞLATMA KİLİDİ (backend guard) ═══');
+    // partGvd az önce PLANNED iş emrine bağlandı → log yazımı REDDEDİLMELİ;
+    // İE inprogress olunca geçmeli; iş emrine bağlı olmayan parça serbest.
+    const m14u = await api('POST','/users',{name:'E2E M14 Personel', role:'Operatör'});
+    check('m14 personeli oluştu', !!m14u, _lastApiError||'');
+    globalThis._lastApiError = null;
+    const m14denied = await api('POST','/part-logs',{part_id:partGvd.id, user_id:m14u.id, qty_done:1});
+    check('İE planned iken log YAZILAMADI (WO_NOT_STARTED)',
+      !m14denied && /baslatilmadan|is emri/i.test(_lastApiError||''), _lastApiError);
+    await api('PUT','/work-orders/'+wo.id,{status:'inprogress'});
+    globalThis._lastApiError = null;
+    const m14ok = await api('POST','/part-logs',{part_id:partGvd.id, user_id:m14u.id, qty_done:1});
+    check('İE inprogress olunca log yazıldı', !!m14ok, _lastApiError||'');
+    const m14free = (await dbInsert('parts',{name:'E2E M14 Bağsız', code:'E2E-M14F', project:PROJ, qty:1}))[0];
+    globalThis._lastApiError = null;
+    const m14freeLog = await api('POST','/part-logs',{part_id:m14free.id, user_id:m14u.id, qty_done:1});
+    check('iş emrine bağlı olmayan parçada QR serbest (eski davranış)', !!m14freeLog, _lastApiError||'');
+    // temizlik (log→parça→personel sırası; U1 guard'ları)
+    if(m14ok) await api('DELETE','/part-logs/'+m14ok.id);
+    if(m14freeLog) await api('DELETE','/part-logs/'+m14freeLog.id);
+    await api('DELETE','/parts/'+m14free.id);
+    await api('DELETE','/users/'+m14u.id);
+    check('m14 temizlik tamam', !(await api('GET','/users')||[]).some(x=>x.id===m14u.id));
+    // NOT: wo bundan sonra INPROGRESS — U1/U4 log testleri bu sayede geçer
+    // (gerçek akışla uyumlu: QR girişleri başlatılmış iş emrinde yapılır)
+
     console.log('═══ O1: PARÇA SİLME GUARD\'LARI ═══');
     globalThis._lastApiError = null;
     await api('DELETE','/parts/'+partGvd.id);

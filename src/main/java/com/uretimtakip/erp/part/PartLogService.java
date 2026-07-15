@@ -5,6 +5,9 @@ import com.uretimtakip.erp.common.exception.ResourceNotFoundException;
 import com.uretimtakip.erp.part.dto.PartLogRequest;
 import com.uretimtakip.erp.part.dto.PartLogResponse;
 import com.uretimtakip.erp.user.UserRepository;
+import com.uretimtakip.erp.workorder.WorkOrderPart;
+import com.uretimtakip.erp.workorder.WorkOrderPartRepository;
+import com.uretimtakip.erp.workorder.WorkOrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,6 +39,8 @@ public class PartLogService {
     private final PartLogRepository partLogRepository;
     private final PartRepository partRepository;
     private final UserRepository userRepository;
+    private final WorkOrderPartRepository workOrderPartRepository;
+    private final WorkOrderRepository workOrderRepository;
 
     @Transactional(readOnly = true)
     public List<PartLogResponse> listAll() {
@@ -93,6 +98,24 @@ public class PartLogService {
                     "qtyDone, qtyPending veya qtyReject'ten en az biri 0'dan buyuk olmali",
                     "INVALID_QTY"
             );
+        }
+
+        // 3.5 (12. tur m14) QR BASLATMA KILIDI — QR sayfasi halka acik oldugundan
+        // guard BACKEND'de sart. Parca bir is emrine BAGLIYSA, bagli is
+        // emirlerinden en az biri 'inprogress' olmadan uretim kaydi yazilamaz.
+        // Is emrine hic baglanmamis (eski/bagimsiz) parcada eski davranis
+        // korunur — is emri kullanmayan gunluk akis durmasin (kullanici karari).
+        List<WorkOrderPart> woLinks = workOrderPartRepository.findByPartId(request.getPartId());
+        if (!woLinks.isEmpty()) {
+            boolean started = woLinks.stream()
+                    .map(wp -> workOrderRepository.findById(wp.getWorkOrderId()).orElse(null))
+                    .anyMatch(wo -> wo != null && "inprogress".equalsIgnoreCase(wo.getStatus()));
+            if (!started) {
+                throw new BusinessException(
+                        "Is emri baslatilmadan uretim kaydi girilemez — dashboard'dan is emrini baslatin",
+                        "WO_NOT_STARTED"
+                );
+            }
         }
 
         // 4. (U4) Part sayaclarini ATOMIK artir — Java oku-degistir-yaz yerine
