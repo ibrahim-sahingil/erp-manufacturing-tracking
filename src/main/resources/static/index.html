@@ -228,6 +228,15 @@
   .mip-kpi .lb{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px;}
   .mip-kpi .lb i{width:8px;height:8px;border-radius:50%;background:var(--c);flex-shrink:0;}
   .mip-kpi .vl{font-size:22px;font-weight:640;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--ink);margin-top:4px;}
+  /* Depo — konsept wtile/io dili (tasarım 2026) */
+  .mbar{height:7px;border-radius:4px;background:var(--line);overflow:hidden;display:flex;max-width:420px;}
+  .mbar i{height:100%;}
+  .mleg{display:flex;gap:14px;margin-top:8px;font-size:10.5px;color:var(--mut);flex-wrap:wrap;}
+  .mleg em{font-style:normal;display:inline-flex;align-items:center;gap:5px;}
+  .mleg em::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--c);}
+  .io{display:inline-flex;font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;letter-spacing:.05em;white-space:nowrap;}
+  .io.in{color:var(--green);background:var(--ok-soft);}
+  .io.out{color:var(--red);background:var(--err-soft);}
   .worow{display:flex;align-items:center;gap:12px;padding:9px 2px;border-bottom:1px solid var(--line-soft);}
   .worow:last-child{border-bottom:none;}
   .wic{width:34px;height:34px;border-radius:9px;background:var(--acc-soft);color:var(--accent);font-size:11px;font-weight:800;display:grid;place-items:center;flex-shrink:0;}
@@ -1390,8 +1399,14 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 
 <!-- ÜRETİM DEPOSU -->
 <div class="view" id="view-warehouse">
-  <div class="section-title">ÜRETİM DEPOSU</div>
-  <div class="section-sub">Depoya giren malzemeler · Mal kabul · Rezervasyon onayı · Depo yönetimi</div>
+  <div class="dash-phead">
+    <div>
+      <h1>Depo</h1>
+      <div class="sub" id="wh-sub">Depoya giren malzemeler · Mal kabul · Rezervasyon onayı · Depo yönetimi</div>
+    </div>
+    <div class="grow"></div>
+    <button class="hbtn pri" id="wh-additem-btn" onclick="switchWarehouseTab('additem')">+ Manuel Hareket</button>
+  </div>
 
   <!-- Alt sekmeler (planning-tab deseni; switchWarehouseTab #view-warehouse'a scope'ludur) -->
   <div class="planning-tabs" id="warehouse-tabs">
@@ -10374,6 +10389,9 @@ function whApplySubTabPerms(){
   document.querySelectorAll('#warehouse-tabs .planning-tab').forEach(b=>{
     b.style.display = allowed.includes(b.dataset.whtab) ? '' : 'none';
   });
+  // (tasarım 2026) Başlıktaki "+ Manuel Hareket" da aynı izne bağlı
+  const addBtn = document.getElementById('wh-additem-btn');
+  if(addBtn) addBtn.style.display = allowed.includes('additem') ? '' : 'none';
   if(!allowed.length) return;
   const activeTab = document.querySelector('#warehouse-tabs .planning-tab.active')?.dataset.whtab;
   if(!activeTab || !allowed.includes(activeTab)) _whActivateTab(allowed[0]);
@@ -10648,11 +10666,20 @@ function renderWarehouseList(){
     const today = new Date(); today.setHours(0,0,0,0);
     const late = pendingAll.filter(i=>i.status==='ORDERED' && i.expected_date && new Date(i.expected_date)<today).length;
     const chip = (icon,txt,color) =>
-      `<span style="font-family:var(--font-mono);font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid ${color}44;color:${color};background:${color}11">${icon} ${txt}</span>`;
+      `<span style="font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:10px;color:${color};background:${color}15;white-space:nowrap">${icon} ${txt}</span>`;
     sumEl.innerHTML =
       chip('','Depoda: '+inWhAll.length,'#2ecc71') +
       chip('','Beklenen: '+pendingAll.length,'#2980b9') +
       (late ? chip('⚠','Termini geçen: '+late,'#e74c3c') : '');
+  }
+  // (tasarım 2026) Başlık alt satırı: depo/kalem/mal kabul/rezervasyon özeti
+  const subEl = document.getElementById('wh-sub');
+  if(subEl){
+    const aktifDepo = warehouses.filter(w=>w.is_active!==false).length;
+    const bekleyenRez = (Array.isArray(whReservations)?whReservations:[]).filter(r=>r.status==='REQUESTED').length;
+    subEl.textContent = aktifDepo + ' depo · ' + inWhAll.length + ' kalem depoda · '
+      + pendingAll.length + ' mal kabul bekliyor'
+      + (bekleyenRez ? ' · ' + bekleyenRez + ' rezervasyon talebi' : ' · rezervasyonlar güncel');
   }
 
   el.innerHTML = _whvMode==='warehouse' ? whvWarehouseHTML() : whvProjectHTML();
@@ -11689,10 +11716,15 @@ function renderWhmList(){
     el.innerHTML = `<div class="empty-state" style="padding:18px"><span class="emoji"></span>Henüz depo tanımlanmadı</div>`;
     return;
   }
+  // (tasarım 2026) Konsept wtile: depo başına proje kompozisyon çubuğu —
+  // GERÇEK veriden (IN_WAREHOUSE kalem SAYISI payı; birimler karışık olduğundan
+  // miktar değil kalem adedi oranlanır)
+  const MBAR_COLORS = ['var(--accent)','var(--info)','var(--green)','var(--vio)'];
   el.innerHTML = warehouses.map(w=>{
     const active = w.is_active !== false;
     const c = active ? '#2ecc71' : '#7f8c8d';
-    const itemCount = purchaseItems.filter(i=>i.warehouse_id===w.id && i.status==='IN_WAREHOUSE').length;
+    const items = purchaseItems.filter(i=>i.warehouse_id===w.id && i.status==='IN_WAREHOUSE');
+    const itemCount = items.length;
     const mvCount = whMovements.filter(m=>m.warehouse_id===w.id).length;
     const meta = [
       w.location ? ''+w.location : '',
@@ -11700,14 +11732,29 @@ function renderWhmList(){
       'Depoda '+itemCount+' kalem',
       ''+mvCount+' hareket'
     ].filter(Boolean).join(' · ');
+    // proje payı (ilk 3 + diğer)
+    let barHtml = '';
+    if(itemCount){
+      const byProj = {};
+      items.forEach(i=>{ const k=i.project_name||'Münferit'; byProj[k]=(byProj[k]||0)+1; });
+      const top = Object.entries(byProj).sort((a,b)=>b[1]-a[1]);
+      const shown = top.slice(0,3);
+      const rest = top.slice(3).reduce((s,[,n])=>s+n,0);
+      if(rest) shown.push(['Diğer', rest]);
+      barHtml = `<div class="mbar" style="margin-top:9px">${shown.map(([,n],ix)=>
+          `<i style="width:${Math.round(n/itemCount*100)}%;background:${MBAR_COLORS[ix%4]}"></i>`).join('')}</div>
+        <div class="mleg">${shown.map(([p,n],ix)=>
+          `<em style="--c:${MBAR_COLORS[ix%4]}">${esc(p)} · ${Math.round(n/itemCount*100)}%</em>`).join('')}</div>`;
+    }
     return `<div class="pbom-card" style="border-left:3px solid ${c}">
       <div class="pbom-card-header">
-        <div style="min-width:0">
+        <div style="min-width:0;flex:1">
           <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             ${esc(w.name)}
-            <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${c}44;color:${c};background:${c}11">${active?'AKTİF':'PASİF'}</span>
+            <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;color:${c};background:${c}15">${active?'AKTİF':'PASİF'}</span>
           </div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">${meta}</div>
+          ${barHtml}
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <button class="btn btn-ghost btn-sm" onclick="whmEditWarehouse('${w.id}')">Düzenle</button>
@@ -12079,7 +12126,7 @@ function renderWhMovements(){
       <div class="pbom-card-header">
         <div style="min-width:0">
           <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <span style="color:${c};font-family:var(--font-mono);font-size:12px">${isIn?'⬇ GİRİŞ':'⬆ ÇIKIŞ'}</span>
+            <span class="io ${raw(isIn?'in':'out')}">${isIn?'Giriş':'Çıkış'}</span>
             ${m.item_code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${m.item_code}</span>`:''}
             ${m.item_name}
             <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--muted)">${src}</span>
