@@ -672,6 +672,23 @@ const mipRowRej = String(mipRowHTML({
 }, 3));
 chk('mip: depo ret uyarısı çıktı + sebep kaçırıldı',
     mipRowRej.includes('Depo ret verdi') && mipRowRej.includes('Yok&lt;img') && !mipRowRej.includes('Yok'+EVIL));
+// (12. tur m6) Stoktan Tedarik Edilenler bölümü — ad/kod/depo adı kullanıcı verisi
+eval(grab('mipFromStockHTML'));
+const mipStok = String(mipFromStockHTML([
+  {key:'a', code:'RZ<b>'+EVIL, name:'Rezerveli'+EVIL, unit:'ad', need:20, reserved:10, received:0,
+   missing:10, stockByWh:[{name:'Ana Depo'+EVIL, qty:5}], status:'RESERVED'},
+  {key:'b', code:'DN-1', name:'Biten', unit:'ad', need:5, reserved:5, received:0, missing:0,
+   stockByWh:[], status:'DONE'},
+  {key:'c', code:'MS-1', name:'Alakasiz', unit:'ad', need:9, reserved:0, received:0, missing:9,
+   stockByWh:[], status:'MISSING'}
+]));
+console.log('\nmipFromStockHTML (12. tur m6):');
+chk('stoktan: kod/ad/depo kaçırıldı', mipStok.includes('RZ&lt;b&gt;') && mipStok.includes('Rezerveli&lt;img')
+    && mipStok.includes('Ana Depo&lt;img') && !mipStok.includes('Rezerveli'+EVIL));
+chk('stoktan: 2 kalem listelendi (MISSING girmedi) + DONE kapandı',
+    mipStok.includes('· 2 kalem') && mipStok.includes('kapandı') && !mipStok.includes('Alakasiz'));
+chk('stoktan: rezerve rozeti + eksik bilgisi', mipStok.includes('rezerve 10') && mipStok.includes('eksik 10'));
+chk('stoktan: bos listede bos dize', String(mipFromStockHTML([]))==='' && String(mipFromStockHTML([{status:'MISSING',reserved:0,received:0,stockByWh:[]}]))==='');
 
 // ── renderWhReservations (7. tur #4 Aşama 2 — depocu onay listesi) ──
 // Talep eden / proje / malzeme adı / not / kayıp açıklaması kullanıcı verisidir.

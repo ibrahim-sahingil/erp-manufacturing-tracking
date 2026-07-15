@@ -59,6 +59,7 @@ eval(grab('mipSuggest'));
 eval(grab('mipReservePlan'));
 eval(grab('mipBuyQty'));
 eval(grab('mipGuardMsg')); // (11. tur Y3)
+eval(grab('mipPlanInfoOf')); // (12. tur m9)
 
 const WH = [{id: 'A', name: 'A-Depo'}, {id: 'B', name: 'B-Depo'}];
 const mv = (whId, name, code, type, qty) =>
@@ -155,6 +156,21 @@ console.log('\n═══ (12. tur m2) Urun adedi carpani: _pqty ═══');
       gC[0] && gC[0].need);
   chk('carpansiz eski satir davranisi degismedi (1 kabul)',
       mipQtyOf({custom_qty:5}) === 5 && mipQtyOf({custom_qty:5,_pqty:2}) === 10);
+}
+
+console.log('\n═══ (12. tur m9) mipPlanInfoOf: POOL satirina plan durumu ═══');
+{
+  const items = [
+    {id:'s1', name:'Kapak Saci', code:'KS-1', status:'PLANNED', project_bom_part_id:'pbp1', stock_plan_id:'pl1'},
+    {id:'pl1', name:'Plaka 1350x5000x3', code:null, status:'ORDERED'},
+    {id:'x1', name:'Alakasiz', code:'AL-1', status:'PLANNED'}
+  ];
+  const info = mipPlanInfoOf({pbpIds:['pbp1'], name:'Kapak Saci', code:'KS-1'}, items);
+  chk('pbp bagiyla plan bulundu + durumu ORDERED',
+      info && info.planId==='pl1' && info.status==='ORDERED', JSON.stringify(info));
+  const info2 = mipPlanInfoOf({pbpIds:[], name:'Kapak Saci', code:'KS-1'}, items);
+  chk('pbp bagi yoksa ad/kod eslesmesiyle bulunur', info2 && info2.planId==='pl1');
+  chk('plansiz grup null doner', mipPlanInfoOf({pbpIds:['yok'], name:'Alakasiz', code:'AL-1'}, items)===null);
 }
 
 console.log('\n═══ POOL karari (10. tur M5) ═══');

@@ -43,6 +43,7 @@ function grab(name){
 (0,eval)(grab('partWaitingChildren'));
 (0,eval)(grab('woWaitingChildren'));
 (0,eval)(grab('woStartBlockMsg'));
+(0,eval)(grab('woMissingMaterialsCore')); // 12. tur m15: stock_plan zinciri
 (0,eval)(grab('mvInsert'));          // temizlik turu: warehouse_movements kurucu (rcvDoReceive kullanır)
 (0,eval)(grab('splitPurchaseItem')); // temizlik turu: kısmi kabul/aktarım ortak bölme çekirdeği
 (0,eval)(grab('rcvDoReceive'));   // 4. tur: kısmi mal kabul çekirdeği
@@ -93,6 +94,19 @@ check('start > end → HATA', dateRangeOk('2026-07-16','2026-07-15')===false);
 check('datetime-local: ters saat → HATA', dateRangeOk('2026-07-15T14:00','2026-07-15T09:00')===false);
 check('boş bitiş → OK (zorunluluk çağıranın işi)', dateRangeOk('2026-07-15','')===true);
 check('boş başlangıç → OK', dateRangeOk('','2026-07-15')===true);
+
+// (12. tur m15) stock_plan zinciri: kesim planına bağlı kalemin etkin durumu
+// PLAN kaleminin durumudur — plaka depoya gelince iş emri kilidi açılır.
+console.log('═══ 12. TUR m15: woMissingMaterialsCore + stock_plan ═══');
+{
+  const bucket=[{id:'w1', code:'PRC-1'}];
+  const items=[{id:'src1', name:'Sac parca', code:'PRC-1', status:'PLANNED', quantity:2, stock_plan_id:'plan1'}];
+  check('plan depoda → kilit AÇIK', woMissingMaterialsCore(['w1'],bucket,items,{}, {plan1:{id:'plan1',status:'IN_WAREHOUSE'}}).length===0);
+  check('plan siparişte → kilit kapalı', woMissingMaterialsCore(['w1'],bucket,items,{}, {plan1:{id:'plan1',status:'ORDERED'}}).length===1);
+  check('planById verilmezse eski davranış (kilit kapalı)', woMissingMaterialsCore(['w1'],bucket,items,{}).length===1);
+  check('plan iptalse kalemin kendi durumu geçerli (kilit kapalı)', woMissingMaterialsCore(['w1'],bucket,items,{}, {plan1:{id:'plan1',status:'CANCELLED'}}).length===1);
+  check('plansız kalem: depoda ise kilit açık', woMissingMaterialsCore(['w1'],bucket,[{name:'X',code:'PRC-1',status:'IN_WAREHOUSE',quantity:1}],{}).length===0);
+}
 
 // (11. tur F2) İş emrinin etkin bölümleri — "Tümü" ile verilen İE'nin
 // (department_id NULL) dashboard'da parçalarının bölümlerinde görünmesinin

@@ -1338,7 +1338,7 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
     <div class="grow"></div>
     <button class="hbtn sec" onclick="openSuppliersModal()">Tedarikçiler</button>
     <button class="hbtn sec" onclick="togglePurForm()">+ Elle Kalem Ekle</button>
-    <button class="hbtn pri" onclick="openPurImport()">Ürün Ağacından Aktar</button>
+    <button class="hbtn pri" onclick="purGoMip()" title="Ağaçtan sipariş MİP üzerinden verilir (12. tur m11 — tam adetli doğrudan aktarım kaldırıldı, mükerrer kalem kökü)">MİP'te Planla</button>
   </div>
 
   <!-- Alt sekmeler (planning-tab deseni; switchPurchasingTab #view-purchasing'e scope'ludur) -->
@@ -3257,7 +3257,7 @@ function woStartBlockMsg(waiting){
 // bekleyen>0 kontrolü bu yüzden doğru ölçüdür. Bağlı kalemi olmayan parça
 // geçer (beklenecek malzemesi yok). Manuel depo hareketi kilidi AÇMAZ
 // (bilinçli: kilit mal kabul akışına bağlı — arkadaş isteği).
-function woMissingMaterialsCore(partIds, bucketParts, purItems, pbpById){
+function woMissingMaterialsCore(partIds, bucketParts, purItems, pbpById, planById){
   const codeKey = c => (c||'').trim().toLowerCase();
   const partByCode = {};
   bucketParts.forEach(p=>{ const k=codeKey(p.code); if(k && !partByCode[k]) partByCode[k]=p; });
@@ -3274,10 +3274,21 @@ function woMissingMaterialsCore(partIds, bucketParts, purItems, pbpById){
       }
     }
     if(!host || !wanted.has(host.id)) continue;
+    // (12. tur m15) Kalem bir kesim planına bağlıysa (stock_plan_id) etkin
+    // durum PLAN kaleminin durumudur: plaka/profil depoya gelince bağlı
+    // kaynak parçalar da "geldi" sayılır — plaka fabrikada olduğu halde
+    // "malzeme gelmedi" engeli kalkmıyordu. planById sarmalayıcıda proje
+    // filtresi ÖNCESİ tam listeden kurulur (plan 'ORTAK (MRP)' projesinde
+    // olabilir). Plan iptal edildiyse kalemin kendi durumu geçerli.
+    let effStatus = i.status;
+    if(i.stock_plan_id && planById){
+      const plan = planById[i.stock_plan_id];
+      if(plan && plan.status !== 'CANCELLED') effStatus = plan.status;
+    }
     const k = host.id + '|' + mipKey(i.name, i.code);
     const e = acc.get(k) || {part: host, name: i.name, code: i.code, arrived: 0, waiting: 0};
     const q = Number(i.quantity) || 0;
-    if(i.status==='IN_WAREHOUSE' || i.status==='IN_STOCK') e.arrived += q;
+    if(effStatus==='IN_WAREHOUSE' || effStatus==='IN_STOCK') e.arrived += q;
     else e.waiting += q; // PLANNED / ORDERED / RECEIVED — henüz depoda değil
     acc.set(k, e);
   }
@@ -3294,6 +3305,10 @@ async function woMissingMaterials(partIds){
     loadProjectBoms()
   ]);
   if(Array.isArray(pi)) purchaseItems = pi;
+  // (12. tur m15) Plan kalemleri 'ORTAK (MRP)' projesinde yaşayabilir —
+  // planById PROJE FİLTRESİ ÖNCESİ tam listeden kurulmalı (tuzak!)
+  const planById = {};
+  purchaseItems.forEach(i=>{ planById[i.id]=i; });
   const out = [];
   for(const proj of new Set(wanted.map(p=>p.project||'(Proje Yok)'))){
     const bucket = parts.filter(p=>(p.project||'(Proje Yok)')===proj);
@@ -3302,7 +3317,7 @@ async function woMissingMaterials(partIds){
     projectBomParts.forEach(p=>{ if(pbomIds.has(p.project_bom_id)) pbpById[p.id]=p; });
     const projPur = purchaseItems.filter(i=>(i.project_name||'')===proj);
     const ids = partIds.filter(id=>bucket.some(b=>b.id===id));
-    out.push(...woMissingMaterialsCore(ids, bucket, projPur, pbpById));
+    out.push(...woMissingMaterialsCore(ids, bucket, projPur, pbpById, planById));
   }
   return out;
 }
@@ -7863,6 +7878,9 @@ async function renderMipList(){
         ${code?h`<span style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">${code}</span>`:''}
         <span>${name}</span>
         <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${g?mipNum(g.need):mipNum(mipQtyOf(p))} ${g?g.unit:'adet'}</span>
+        ${bekliyor&&calc&&calc.reserved>1e-9?h`<span class="st run" style="font-size:9px;padding:1px 7px" title="Depocu onayladı — stoktan bu projeye ayrıldı (12. tur m6)">rezerve ${mipNum(calc.reserved)}</span>`:''}
+        ${bekliyor&&calc&&calc.received>1e-9?h`<span class="st run" style="font-size:9px;padding:1px 7px">gelen ${mipNum(calc.received)}</span>`:''}
+        ${bekliyor&&calc&&(calc.reserved>1e-9||calc.received>1e-9)?h`<span style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">kalan ${mipNum(Math.max(0,g.need-calc.reserved-calc.received))}</span>`:''}
         ${g&&g.mixed?h`<span style="font-family:var(--font-mono);font-size:9px;color:#e74c3c">⚠ karışık karar — yeniden onaylayın</span>`:''}
         ${g&&g.pbpIds.length>1?h`<span style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">(aynı kod ${g.pbpIds.length} dalda — karar hepsine)</span>`:''}
       </div>
@@ -7914,6 +7932,8 @@ async function renderMipList(){
     })}` : '';
 
   // (10. tur M5) Havuza Aktarılanlar — planlama/sipariş Kesim Planlama'da
+  // (12. tur m9) + plan/sipariş durumu rozeti: havuzdan plaka siparişi
+  // verildiyse burada "sipariş verildi → plaka" görünür
   const havuzHTML = _mipPoolRows.length ? h`
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 8px">
       <div style="font-family:var(--font-mono);font-size:12px;text-transform:uppercase;font-weight:650;letter-spacing:.07em;color:#16a085">Havuza Aktarılanlar · ${_mipPoolRows.length} parça</div>
@@ -7921,6 +7941,7 @@ async function renderMipList(){
     </div>
     ${_mipPoolRows.map((g,i)=>{
       const tur = _mipPoolTypeOf(g);
+      const plan = mipPlanInfoOf(g, purchaseItems);
       return h`<div class="pbom-card" style="border-left:3px solid #16a085;margin-bottom:6px;padding:8px 14px">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between">
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0">
@@ -7928,13 +7949,58 @@ async function renderMipList(){
             <span>${g.name}</span>
             <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${mipNum(g.need)} ${g.unit}</span>
             ${tur?h`<span style="font-family:var(--font-mono);font-size:10px;padding:1px 7px;border-radius:8px;border:1px solid #16a08544;color:#16a085">${tur}</span>`:''}
+            ${plan?h`<span class="st ${raw(plan.status==='ORDERED'?'plan':(plan.status==='IN_WAREHOUSE'||plan.status==='IN_STOCK'||plan.status==='RECEIVED')?'run':'wait')}" style="font-size:9px;padding:1px 7px" title="Kesim planı kalemi: ${plan.name}">${plan.status==='ORDERED'?'sipariş verildi':(plan.status==='IN_WAREHOUSE'||plan.status==='IN_STOCK')?'plaka depoda':plan.status==='RECEIVED'?'teslim alındı':'planlandı'} → ${plan.name}</span>`:h`<span style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">planlanmadı</span>`}
           </div>
           <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px" onclick="mipChangeDecisionPool(${raw(String(i))})" title="Havuz kararını geri al (karar bekleyene döner)">kararı değiştir</button>
         </div>
       </div>`;
     })}` : '';
 
-  el.innerHTML = h`${bekleyenHTML}${satinHTML}${uretHTML}${havuzHTML}`;
+  // (12. tur m6) Stoktan tedarik edilenler — ayrı bölüm
+  const stoktanHTML = mipFromStockHTML(_mipRows);
+
+  el.innerHTML = h`${bekleyenHTML}${satinHTML}${stoktanHTML}${uretHTML}${havuzHTML}`;
+}
+
+// (12. tur m9) Havuz grubunun kesim-planı/sipariş durumu — SAF: gruba bağlı
+// kalem (pbp bağı ya da ad/kod eşleşmesi) stock_plan_id taşıyorsa plan kalemi
+// döner. POOL satırı MİP'te "sipariş verildi/depoda" görünür (arkadaş: "havuzda
+// hâlâ gözüküyor, sipariş verildi olarak geçmiyor").
+function mipPlanInfoOf(g, items){
+  const ids = new Set(g.pbpIds||[]);
+  const src = (items||[]).find(i=>i.stock_plan_id
+    && (ids.has(i.project_bom_part_id) || mipMatches(i.name, i.code, g.name, g.code)));
+  if(!src) return null;
+  const plan = (items||[]).find(i=>i.id===src.stock_plan_id);
+  if(!plan) return null;
+  return {planId: plan.id, name: plan.name, status: plan.status};
+}
+
+// (12. tur m6) "Stoktan Tedarik Edilenler" bölümü — SAF: rezerve/mal kabulle
+// karşılanan PURCHASE satırlarının dökümü; tamamı karşılanan (DONE) "kapandı".
+function mipFromStockHTML(rows){
+  const list = (rows||[]).filter(r=>r.reserved>1e-9 || r.status==='FROM_STOCK'
+    || (r.status==='DONE' && (r.reserved>1e-9 || r.received>1e-9)));
+  if(!list.length) return '';
+  return h`
+    <div style="font-family:var(--font-mono);font-size:12px;text-transform:uppercase;font-weight:650;letter-spacing:.07em;color:#2ecc71;margin:14px 0 8px">Stoktan Tedarik Edilenler · ${list.length} kalem</div>
+    ${list.map(r=>{
+      const kapandi = r.status==='DONE';
+      const kaynak = r.stockByWh.length ? r.stockByWh.map(s=>s.name).join(', ') : 'rezervasyondan';
+      return h`<div class="pbom-card" style="border-left:3px solid #2ecc71;margin-bottom:6px;padding:8px 14px;${raw(kapandi?'opacity:.65':'')}">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0">
+            ${r.code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${r.code}</span>`:''}
+            <span>${r.name}</span>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">ihtiyaç ${mipNum(r.need)} ${r.unit}</span>
+            ${r.reserved>1e-9?h`<span class="st run" style="font-size:9px;padding:1px 7px">rezerve ${mipNum(r.reserved)}</span>`:''}
+            ${r.received>1e-9?h`<span class="st run" style="font-size:9px;padding:1px 7px">mal kabul ${mipNum(r.received)}</span>`:''}
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">kaynak: ${kaynak}</span>
+          </div>
+          ${kapandi?h`<span class="st run" style="font-size:10px">kapandı — tamamı karşılandı</span>`:h`<span style="font-family:var(--font-mono);font-size:10px;color:${raw(r.missing>1e-9?'#f5a623':'var(--muted)')}">${r.missing>1e-9?'eksik '+mipNum(r.missing):'eksik yok'}</span>`}
+        </div>
+      </div>`;
+    })}`;
 }
 
 // (tasarım 2026) Başlık alt satırı: "Proje · son hesap HH:MM · N kalem, K karar bekliyor"
@@ -9591,6 +9657,7 @@ function renderPurchaseList(){
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
             ${i.project_name} · ${metaHtml}
           </div>
+          ${isPlanItem?h`<div style="font-family:var(--font-mono);font-size:10px;color:#16a085;margin-top:3px" title="Kesim planından bu plakaya/profile bağlanan kaynak parçalar (12. tur m9)">bu plakadan çıkacaklar: ${purchaseItems.filter(x=>x.stock_plan_id===i.id).map(x=>(x.code?x.code+' — ':'')+x.name+' ×'+mipNum(Number(x.quantity)||1)).join(' · ')}</div>`:''}
           </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -9916,89 +9983,20 @@ async function savePurchaseEdit(id){
   renderPurchaseList();
 }
 
-// ─── Ürün Ağacından Aktarma ───
-function openPurImport(){
-  const proj = document.getElementById('pur-project-sel').value;
-  if(!proj){ toast('Önce proje seçin!','error'); return; }
-
-  // Bu projenin BOM bağlantılarındaki parçalar (hariç tutulanlar dışında)
-  const pbIds = projectBoms.filter(pb=>pb.project_name===proj).map(pb=>pb.id);
-  if(!pbIds.length){ toast('Bu projeye bağlı ürün ağacı yok! Önce Ürün Ağacı sekmesinden bağlayın.','error'); return; }
-  const already = new Set(purchaseItems.map(i=>i.project_bom_part_id).filter(Boolean));
-  // (B5) pbp bağı olmayan (elle/yayınla eklenmiş) kalemler proje+kod ile
-  // yakalanır: ayna dal satırı ikinci kez sipariş edilmesin — listede
-  // rozetle gösterilir, öntanımlı SEÇİMSİZ gelir.
-  const purByCode = new Map();
-  purchaseItems.forEach(i=>{ if(i.project_name===proj && i.code) purByCode.set(i.code.toLowerCase(), i); });
-  const candidates = projectBomParts.filter(p =>
-    pbIds.includes(p.project_bom_id) && !p.is_excluded && !already.has(p.id));
-
-  if(!candidates.length){ toast('Aktarılacak yeni parça yok — hepsi zaten listede.','error'); return; }
-
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay open';
-  overlay.id = 'pur-import-overlay';
-  overlay.innerHTML = `<div class="modal" style="width:640px;max-height:80vh;display:flex;flex-direction:column;text-align:left">
-    <h3 style="margin-bottom:4px">Ürün Ağacından Aktar</h3>
-    <p style="margin-bottom:12px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">${esc(proj)} · ${candidates.length} parça aktarılabilir · Satın alınacakları işaretleyin</p>
-    <div style="margin-bottom:8px;display:flex;gap:8px">
-      <button class="btn btn-ghost btn-sm" onclick="purImportToggleAll(true)">Tümünü Seç</button>
-      <button class="btn btn-ghost btn-sm" onclick="purImportToggleAll(false)">Tümünü Bırak</button>
-    </div>
-    <div id="pur-import-list" style="overflow-y:auto;flex:1;border:1px solid var(--border);border-radius:6px;padding:6px">
-      ${candidates.map(p=>{
-        // (#7) Tür yönlendirmesi: satın alma türleri ve türsüzler işaretli
-        // başlar; YARI_MAMUL/MAMUL (üretim) işaretsiz başlar ama seçilebilir.
-        // (B5) Aynı kod bu projenin kalemlerinde zaten varsa işaretsiz + rozet.
-        const kind = p.material_kind || p.resolved_material_kind || null;
-        const code = p.custom_code || p.resolved_code || null;
-        const dup = code ? purByCode.get(code.toLowerCase()) : null;
-        const preChecked = !dup && (!kind || PURCHASE_KINDS.includes(kind));
-        return `
-        <label style="display:flex;gap:10px;align-items:center;padding:7px 10px;border-radius:4px;cursor:pointer;font-family:var(--font-mono);font-size:12px" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-          <input type="checkbox" class="pur-import-chk" value="${p.id}" ${preChecked?'checked':''}>
-          <span style="color:var(--accent);min-width:120px">${esc(p.custom_code||'—')}</span>
-          <span style="flex:1">${'&nbsp;'.repeat((p.level||0)*3)}${esc(p.custom_name||'—')} ${kindBadge(kind)}${dup?` <span style="color:#f5a623;font-size:10px;border:1px solid rgba(245,166,35,.4);border-radius:3px;padding:1px 5px">⚠ aynı kod zaten kalemde (adet ${Number(dup.quantity)||0})</span>`:''}</span>
-          <span style="color:var(--muted)">${Number(p.custom_qty||1)} ${esc(p.custom_unit||'adet')}${p.custom_material?' · '+p.custom_material:''}</span>
-        </label>`;}).join('')}
-    </div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
-      <button class="btn btn-ghost" onclick="document.getElementById('pur-import-overlay').remove()">İptal</button>
-      <button class="btn btn-primary" id="pur-import-btn" onclick="purImportSelected('${ea(proj)}')">Seçilenleri Aktar</button>
-    </div>
-  </div>`;
-  document.body.appendChild(overlay);
-}
-
-function purImportToggleAll(state){
-  document.querySelectorAll('.pur-import-chk').forEach(c=>{ c.checked = state; });
-}
-
-async function purImportSelected(proj){
-  const ids = [...document.querySelectorAll('.pur-import-chk:checked')].map(c=>c.value);
-  if(!ids.length){ toast('Parça seçilmedi!','error'); return; }
-  const btn = document.getElementById('pur-import-btn');
-  btn.disabled = true; btn.textContent = 'Aktarılıyor...';
-
-  let okCount = 0;
-  for(const pid of ids){
-    const p = projectBomParts.find(x=>x.id===pid);
-    if(!p) continue;
-    const data = await dbInsert('purchase_items',{
-      project_name: proj,
-      project_bom_part_id: p.id,
-      name: p.custom_name || '—',
-      code: p.custom_code || null,
-      quantity: p.custom_qty != null ? p.custom_qty : 1,
-      unit: p.custom_unit || 'adet',
-      material: p.custom_material || null,
-      created_by: currentUser?.display_name || currentUser?.username || null
-    });
-    if(Array.isArray(data)&&data[0]){ purchaseItems.push(data[0]); okCount++; }
+// ─── (12. tur m11) Ürün Ağacından Aktarma KALDIRILDI ───
+// openPurImport TAM ADETLİ kopyalıyordu; MİP ise stok/rezerve/planlı düşülmüş
+// NET eksiği gönderir — iki paralel yol mükerrer kalemin köküydü (arkadaş:
+// "yalnız MİP'ten benim planladığım malzemeler gitsin"). Tek aktarım yolu
+// artık MİP; buton kullanıcıyı oraya yönlendirir. Elle kalem ekleme KALDI.
+function purGoMip(){
+  const proj = document.getElementById('pur-project-sel')?.value || '';
+  if(proj && !projectBoms.some(pb=>pb.project_name===proj && pb.status==='published')){
+    toast('Bu projenin yayınlanmış ürün ağacı yok — önce Ürün Ağacı sekmesinden yayınlayın.','error'); return;
   }
-  document.getElementById('pur-import-overlay')?.remove();
-  toast(okCount+' parça satın alma listesine aktarıldı!','success');
-  renderPurchaseList();
+  switchTab('mip');
+  const sel = document.getElementById('mip-project-sel');
+  if(sel && proj){ sel.value = proj; renderMipList(); }
+  toast('Ağaçtan sipariş MİP üzerinden verilir: karar ver → eksiği "Satın Almaya Gönder".','success');
 }
 
 // ═══ TOPLU SİPARİŞ & TEKLİF/ONAY ═══
@@ -10699,7 +10697,19 @@ async function whResApproveConfirm(id){
       ? ''+mipNum(onay)+' '+(r.unit||'adet')+' projeye rezerve edildi'+(eksik>1e-9?' · '+mipNum(eksik)+' satın almaya düştü':'')
       : '✖ Talep reddedildi — '+mipNum(eksik)+' satın almaya düştü', 'success');
     renderWarehouse(); // rezervasyon + hareket + satın alma kalemleri tazelenir
+    mipRefreshIfOpen(r.project_name); // (12. tur m6/m10) MİP açıksa sayılar anında tazelenir
   } finally { bitti(); }
+}
+
+// (12. tur m6/m10) Rezervasyon sonuçlanınca MİP paneli açık ve aynı proje
+// seçiliyse yeniden hesapla — "onayladım ama MİP hâlâ eski sayıyı gösteriyor"
+// şikayetinin tazeleme ayağı.
+function mipRefreshIfOpen(projeAdi){
+  try{
+    const mipGorunur = document.getElementById('view-mip')?.classList.contains('active');
+    const secili = document.getElementById('mip-project-sel')?.value || '';
+    if(mipGorunur && secili && (!projeAdi || secili===projeAdi)) renderMip();
+  }catch(e){ /* tazeleme kritik değil — ana akışı bozma */ }
 }
 
 async function whResCancel(id){
@@ -10711,6 +10721,7 @@ async function whResCancel(id){
   }catch(e){ toast(e.message||'İptal edilemedi!','error'); return; }
   toast('Rezervasyon talebi iptal edildi','success');
   renderWarehouse();
+  mipRefreshIfOpen(r.project_name); // (12. tur m6/m10)
 }
 
 function whRow(i, actionsHTML){
