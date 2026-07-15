@@ -1304,8 +1304,16 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 </div>
 
 <div class="view" id="view-purchasing">
-  <div class="section-title">SATIN ALMA PLANLAMASI</div>
-  <div class="section-sub">Proje seç · Elle kalem ekle · Toplu sipariş, teklif ve onay — mal kabul Depo'da, ihtiyaç/kesim planlama MİP'te</div>
+  <div class="dash-phead">
+    <div>
+      <h1>Satın Alma</h1>
+      <div class="sub" id="pur-sub">Kalemler · Toplu sipariş, teklif ve onay — mal kabul Depo'da, ihtiyaç/kesim planlama MİP'te</div>
+    </div>
+    <div class="grow"></div>
+    <button class="hbtn sec" onclick="openSuppliersModal()">Tedarikçiler</button>
+    <button class="hbtn sec" onclick="togglePurForm()">+ Elle Kalem Ekle</button>
+    <button class="hbtn pri" onclick="openPurImport()">Ürün Ağacından Aktar</button>
+  </div>
 
   <!-- Alt sekmeler (planning-tab deseni; switchPurchasingTab #view-purchasing'e scope'ludur) -->
   <div class="planning-tabs" id="purchasing-tabs">
@@ -1316,21 +1324,14 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
   <!-- Kalemler -->
   <div class="planning-section active" id="pur-tab-items">
 
-  <!-- Proje seçimi + aksiyonlar -->
-  <div class="form-card" style="margin-bottom:16px">
-    <div class="form-row">
-      <div class="form-group" style="flex:1"><label>Proje</label>
-        <select id="pur-project-sel" onchange="renderPurchaseList()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
-          <option value="">— Tüm projeler —</option>
-        </select>
-      </div>
-      <div class="form-group" style="display:flex;align-items:flex-end;gap:8px">
-        <button class="btn btn-primary" onclick="openPurImport()">Ürün Ağacından Aktar</button>
-        <button class="btn btn-ghost" onclick="togglePurForm()">+ Elle Kalem Ekle</button>
-        <button class="btn btn-ghost" onclick="openSuppliersModal()">Tedarikçiler</button>
-      </div>
+  <!-- Proje seçimi + durum özeti -->
+  <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end">
+    <div class="form-group" style="flex:1;min-width:220px;max-width:420px;margin-bottom:0"><label>Proje</label>
+      <select id="pur-project-sel" onchange="renderPurchaseList()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+        <option value="">— Tüm projeler —</option>
+      </select>
     </div>
-    <div id="pur-summary" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>
+    <div id="pur-summary" style="display:flex;gap:8px;flex-wrap:wrap;flex:2;min-width:260px;align-items:center"></div>
   </div>
 
   <!-- Elle kalem ekleme formu (gizli başlar) -->
@@ -8295,7 +8296,7 @@ function renderSuppliersModalList(){
         ${meta?h`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">${meta}</div>`:''}
       </div>
       <div style="display:flex;gap:4px;flex-shrink:0">
-        <button class="btn btn-ghost btn-sm" onclick="supEdit('${s.id}')"></button>
+        <button class="btn btn-ghost btn-sm" onclick="supEdit('${s.id}')" title="Düzenle">${raw(ico('edit',13))}</button>
         <button class="btn btn-ghost btn-sm" onclick="supToggleActive('${s.id}')" title="${passive?'Aktifleştir':'Pasife al'}">${passive?'▶':'⏸'}</button>
         <button class="btn btn-ghost btn-sm" onclick="supDelete('${s.id}')" style="color:var(--red,#e74c3c)">${raw(ico('trash',13))}</button>
       </div>
@@ -8775,7 +8776,7 @@ async function renderMrp(){
           <span style="display:flex;gap:4px;align-items:center;font-family:var(--font-mono);font-size:10px;color:var(--muted)">
             En <input type="number" id="mrp-w-${i.id}" value="${d.w||''}" min="0" style="${inp}">
             Boy <input type="number" id="mrp-h-${i.id}" value="${d.h||''}" min="0" style="${inp}">
-            <button class="btn btn-ghost btn-sm" onclick="purTogglePlanning('${i.id}').then(()=>renderMrp())" title="Havuzdan çıkar"></button>
+            <button class="btn btn-ghost btn-sm" onclick="purTogglePlanning('${i.id}').then(()=>renderMrp())" title="Havuzdan çıkar">${ico('x',13)}</button>
           </span>
         </div>`;
       }).join('');
@@ -9362,6 +9363,17 @@ async function sheetDelete(id){
 
 function purFmtMoney(v){ return Number(v).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
+// (tasarım 2026) Başlık alt satırı: "Kapsam · N açık kalem · M grup teklif bekliyor"
+function purUpdateSub(items, proj){
+  const el = document.getElementById('pur-sub');
+  if(!el) return;
+  const acik = items.filter(i=>i.status==='PLANNED'||i.status==='ORDERED').length;
+  const teklif = purchaseOrders.filter(o=>o.status==='DRAFT').length;
+  el.textContent = (proj||'Tüm projeler') + ' · ' + acik + ' açık kalem'
+    + (teklif ? ' · ' + teklif + ' grup teklif bekliyor' : '')
+    + ' — mal kabul Depo\'da, kesim planlama MİP\'te';
+}
+
 function renderPurchaseList(){
   const listEl = document.getElementById('pur-list');
   const sumEl  = document.getElementById('pur-summary');
@@ -9374,7 +9386,7 @@ function renderPurchaseList(){
     const chips = Object.entries(PUR_STATUS).map(([st,m])=>{
       const n = items.filter(i=>i.status===st).length;
       if(!n) return '';
-      return h`<span style="font-family:var(--font-mono);font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid ${m.color}44;color:${m.color};background:${m.color}11">${m.icon} ${m.label}: ${n}</span>`;
+      return h`<span style="font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:10px;color:${m.color};background:${m.color}15;white-space:nowrap">${m.icon} ${m.label}: ${n}</span>`;
     });
     const totals = {};
     items.forEach(i=>{
@@ -9386,7 +9398,8 @@ function renderPurchaseList(){
     const totalTxt = Object.entries(totals)
       .map(([c,t])=>`${purFmtMoney(t)} ${c}`).join(' + ');
     sumEl.innerHTML = h`${chips}${totalTxt
-      ? h`<span style="font-family:var(--font-mono);font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid var(--border);color:var(--muted);margin-left:auto">Tahmini toplam: <b style="color:var(--accent)">${totalTxt}</b></span>` : ''}`;
+      ? h`<span class="chipk" style="font-size:10.5px;padding:3px 10px;margin-left:auto">Tahmini toplam: <b style="color:var(--ink)">${totalTxt}</b></span>` : ''}`;
+    if(typeof purUpdateSub==='function') purUpdateSub(items, proj);
   }
 
   if(!items.length){
@@ -9462,9 +9475,9 @@ function renderPurchaseList(){
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           ${raw(actions)}
           ${i.status==='ORDERED'?h`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)" title="10. tur M1: teslim alma ve fiş satın almadan kaldırıldı">mal kabul Depo'dan</span>`:''}
-          ${i.status==='PLANNED' && !i.stock_plan_id && !i.purchase_order_id ? h`<button class="btn btn-ghost btn-sm" onclick="purTogglePlanning('${raw(i.id)}')" title="${i.needs_planning?'Planlama havuzundan çıkar':'MİP kesim planlaması havuzuna at (plaka/profil yerleşimi)'}" ${i.needs_planning?raw('style="color:var(--accent);border-color:rgba(245,166,35,.4)"'):''}></button>`:''}
-          ${purPriceHistoryOf(i.name, i.code, i.id).length?h`<button class="btn btn-ghost btn-sm" onclick="purPriceHistoryModal('${raw(i.id)}')" title="Bu malzemenin geçmiş alış fiyatları (10. tur M11)"></button>`:''}
-          <button class="btn btn-ghost btn-sm" onclick="editPurchaseItem('${raw(i.id)}')"></button>
+          ${i.status==='PLANNED' && !i.stock_plan_id && !i.purchase_order_id ? h`<button class="btn btn-ghost btn-sm" onclick="purTogglePlanning('${raw(i.id)}')" title="${i.needs_planning?'Planlama havuzundan çıkar':'MİP kesim planlaması havuzuna at (plaka/profil yerleşimi)'}" ${i.needs_planning?raw('style="color:var(--accent);border-color:rgba(245,166,35,.4)"'):''}>${raw(ico('push',13))}</button>`:''}
+          ${purPriceHistoryOf(i.name, i.code, i.id).length?h`<button class="btn btn-ghost btn-sm" onclick="purPriceHistoryModal('${raw(i.id)}')" title="Bu malzemenin geçmiş alış fiyatları (10. tur M11)">${raw(ico('coins',13))}</button>`:''}
+          <button class="btn btn-ghost btn-sm" onclick="editPurchaseItem('${raw(i.id)}')" title="Düzenle">${raw(ico('edit',13))}</button>
           <button class="btn btn-ghost btn-sm" onclick="deletePurchaseItem('${raw(i.id)}')" style="color:var(--red,#e74c3c);border-color:rgba(231,76,60,.3)">${raw(ico('trash',13))}</button>
         </div>
       </div>
@@ -10005,9 +10018,9 @@ function renderPurchaseOrders(){
           <select id="poic-${i.id}" style="${inp};width:60px;padding:4px 3px;font-size:11px">
             ${['TRY','EUR','USD'].map(c=>`<option value="${c}" ${(i.currency||'TRY')===c?'selected':''}>${c}</option>`).join('')}
           </select>
-          <button class="btn btn-ghost btn-sm" onclick="poSetItemPrice('${i.id}')" title="Kalem fiyatını kaydet"></button>`)
+          <button class="btn btn-ghost btn-sm" onclick="poSetItemPrice('${i.id}')" title="Kalem fiyatını kaydet">${ico('save',13)}</button>`)
           : (i.unit_price!=null?raw(`<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${purFmtMoney(i.unit_price)} ${i.currency||'TRY'}</span>`):'')}
-          ${isDraft?raw(`<button class="btn btn-ghost btn-sm" onclick="poRemoveItem('${i.id}')" title="Gruptan çıkar"></button>`):''}
+          ${isDraft?raw(`<button class="btn btn-ghost btn-sm" onclick="poRemoveItem('${i.id}')" title="Gruptan çıkar">${ico('x',13)}</button>`):''}
         </span>
       </div>`)}`
       : h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:4px 0">Grupta kalem kalmadı</div>`;
@@ -10077,7 +10090,7 @@ function renderPurchaseOrders(){
     let actions = '';
     if(o.status==='DRAFT'){
       actions = `<button class="btn btn-primary btn-sm" onclick="poApprove('${o.id}')">✔ Onayla</button>
-        <button class="btn btn-ghost btn-sm" onclick="poRename('${o.id}')"></button>
+        <button class="btn btn-ghost btn-sm" onclick="poRename('${o.id}')" title="Grubu yeniden adlandır">${ico('edit',13)}</button>
         <button class="btn btn-ghost btn-sm" onclick="poCancel('${o.id}')">✖ İptal</button>
         <button class="btn btn-ghost btn-sm" onclick="poDelete('${o.id}')" style="color:#e74c3c">${raw(ico('trash',13))}</button>`;
     } else if(o.status==='APPROVED'){
@@ -12482,7 +12495,7 @@ function renderMaterialsModalList(){
     return h`<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px dashed var(--border);${passive?raw('opacity:.45'):''}">
       <div style="font-family:var(--font-mono);font-size:12px"><b>${m.name}</b>${passive?raw(' <span style="font-size:10px;color:var(--muted)">(pasif)</span>'):''}</div>
       <div style="display:flex;gap:4px;flex-shrink:0">
-        <button class="btn btn-ghost btn-sm" onclick="matRename('${m.id}')" title="Yeniden adlandır"></button>
+        <button class="btn btn-ghost btn-sm" onclick="matRename('${m.id}')" title="Yeniden adlandır">${raw(ico('edit',13))}</button>
         <button class="btn btn-ghost btn-sm" onclick="matToggleActive('${m.id}')" title="${passive?'Aktifleştir':'Pasife al'}">${passive?'▶':'⏸'}</button>
         <button class="btn btn-ghost btn-sm" onclick="matDelete('${m.id}')" style="color:var(--red,#e74c3c)">${raw(ico('trash',13))}</button>
       </div>
@@ -13031,7 +13044,7 @@ function renderOpDefsList() {
         </div>
         ${op.description?h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:2px">${op.description}</div>`:''}
       </div>
-      <button class="icon-btn" onclick="opDefStartEdit('${raw(op.id)}')" title="Düzenle"></button>
+      <button class="icon-btn" onclick="opDefStartEdit('${raw(op.id)}')" title="Düzenle">${raw(ico('edit',13))}</button>
       <button class="icon-btn" onclick="deleteBomOpDef('${raw(op.id)}')" title="Sil" style="color:var(--red)">${raw(ico('trash',13))}</button>
     </div>`)}`;
 }
@@ -14887,16 +14900,16 @@ function pbomeRenderList() {
             ${opsHTML}
           </div>
           <div style="display:flex;gap:4px;align-items:center">
-            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeOpFor('${raw(p.id)}')" title="Bu parçaya işlem ekle — işlem formunu bu parçayla hazırlar"></button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeOpFor('${raw(p.id)}')" title="Bu parçaya işlem ekle — işlem formunu bu parçayla hazırlar">${raw(ico('gear',13))}</button>
             <select onchange="pbomeSetDept('${raw(p.id)}',this.value)"
               style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:4px 6px;outline:none;max-width:130px">
               <option value="">— Bölüm —</option>
               ${_pbomeProjDepts.map(d=>h`<option value="${d.id}"${d.id===p.dept_id?raw(' selected'):''}>${d.name}</option>`)}
               ${p.dept_id && !_pbomeProjDepts.some(d=>d.id===p.dept_id)?h`<option value="${p.dept_id}" selected disabled>⚠ ${(depts.find(d=>d.id===p.dept_id)||{}).name||'?'} (başka proje)</option>`:''}
             </select>
-            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditPart('${raw(p.id)}')" title="Ad / kod / malzeme düzenle"></button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditPart('${raw(p.id)}')" title="Ad / kod / malzeme düzenle">${raw(ico('edit',13))}</button>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeCopyBranch('${raw(p.id)}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">${raw(ico('list',13))}</button>
-            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditQty('${raw(p.id)}')" title="Miktar düzenle"></button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditQty('${raw(p.id)}')" title="Miktar düzenle">${raw(ico('clipboard',13))}</button>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px;color:var(--red)" onclick="pbomeDeletePart('${raw(p.id)}')" title="Sil">${raw(ico('trash',13))}</button>
           </div>
         </div>${children}`;
@@ -15746,8 +15759,8 @@ function renderPbomCustomParts(pbomId) {
             </div>
           </div>
           <div style="display:flex;gap:4px;flex-shrink:0">
-            <button class="btn btn-ghost btn-sm" style="padding:3px 7px;font-size:10px" onclick="openPbomCustomEdit('${raw(p.id)}','${raw(pbomId)}')"></button>
-            <button class="btn btn-ghost btn-sm" style="padding:3px 7px;font-size:10px" onclick="openPbomCustomOp('${raw(p.id)}','${raw(pbomId)}')"></button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 7px;font-size:10px" onclick="openPbomCustomEdit('${raw(p.id)}','${raw(pbomId)}')" title="Düzenle">${raw(ico('edit',13))}</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 7px;font-size:10px" onclick="openPbomCustomOp('${raw(p.id)}','${raw(pbomId)}')" title="İşlem ekle">${raw(ico('gear',13))}</button>
             <button class="icon-btn" style="color:var(--red);font-size:11px" onclick="removePbomCustomPart('${raw(p.id)}','${raw(pbomId)}')">${raw(ico('trash',13))}</button>
           </div>
         </div>${children}`;
