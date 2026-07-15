@@ -8919,13 +8919,16 @@ async function purTogglePlanning(id){
   renderPurchaseList();
 }
 
-// Kalemin ölçüleri: BOM bağıysa resolved ölçüler, yoksa boş (elle girilir)
+// Kalemin ölçüleri: BOM bağıysa ağaçtaki ölçüler, yoksa boş (elle girilir).
+// (12. tur m7) 5 ölçünün tamamı + form; custom_* ÖNCELİKLİ (override kuralı —
+// eskiden yalnız resolved_w/h/t okunuyordu, uzunluk/çap hiç gelmiyordu).
 function mrpItemDims(i){
   const pbp = i.project_bom_part_id ? projectBomParts.find(p=>p.id===i.project_bom_part_id) : null;
+  const g = f => pbp ? (parseFloat(pbp['custom_'+f]) || parseFloat(pbp['resolved_'+f]) || 0) : 0;
   return {
-    w: pbp ? parseFloat(pbp.resolved_width_mm)||0 : 0,
-    h: pbp ? parseFloat(pbp.resolved_height_mm)||0 : 0,
-    t: pbp ? parseFloat(pbp.resolved_thickness_mm)||0 : 0
+    w: g('width_mm'), h: g('height_mm'), t: g('thickness_mm'),
+    l: g('length_mm'), d: g('diameter_mm'),
+    form: pbp ? (pbp.material_form || pbp.resolved_material_form || '') : ''
   };
 }
 
@@ -8961,8 +8964,10 @@ async function renderMrp(){
             ${tur?`<span style="font-size:9px;padding:1px 6px;border-radius:8px;border:1px solid #16a08544;color:#16a085">${esc(tur)}</span>`:''}
           </span>
           <span style="display:flex;gap:4px;align-items:center;font-family:var(--font-mono);font-size:10px;color:var(--muted)">
-            En <input type="number" id="mrp-w-${i.id}" value="${d.w||''}" min="0" style="${inp}">
-            Boy <input type="number" id="mrp-h-${i.id}" value="${d.h||''}" min="0" style="${inp}">
+            ${['PROFIL','MIL','BORU'].includes(d.form)
+              ? `${d.d?`Ø${Number(d.d)}${d.t?'×'+Number(d.t):''} · `:''}Kesim Boyu <input type="number" id="mrp-h-${i.id}" value="${d.l||d.h||''}" min="0" style="${inp}" title="1D kesim boyu — ağaçtaki uzunluk (length_mm) otomatik gelir (12. tur m7)">`
+              : `En <input type="number" id="mrp-w-${i.id}" value="${d.w||''}" min="0" style="${inp}">
+            Boy <input type="number" id="mrp-h-${i.id}" value="${d.h||''}" min="0" style="${inp}">${d.t?` <span title="Ağaçtaki kalınlık">${Number(d.t)}mm</span>`:''}`}
             <button class="btn btn-ghost btn-sm" onclick="purTogglePlanning('${i.id}').then(()=>renderMrp())" title="Havuzdan çıkar">${ico('x',13)}</button>
           </span>
         </div>`;
@@ -9121,6 +9126,7 @@ function renderMrpParams(){
           <div><label style="font-size:10px;color:var(--muted);display:block">Katalog</label>
             <select id="mrp-prf-sel" style="${inp};min-width:170px" onchange="mrpPrfSelChange()">
               <option value="">— elle gir —</option>
+              ${profs.length?`<option value="__opt">⭐ Optimum boy bul (katalog: ${[...new Set(profs.map(s=>Number(s.length_mm)||0).filter(Boolean))].sort((a,b)=>a-b).join('/')} mm)</option>`:''}
               ${profs.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}
             </select>
           </div>
@@ -9141,9 +9147,14 @@ function mrpSacSelChange(){
   if(s.thickness_mm) document.getElementById('mrp-sac-t').value = Number(s.thickness_mm);
 }
 function mrpPrfSelChange(){
-  const s = stockSheets.find(x=>x.id===document.getElementById('mrp-prf-sel').value);
+  const val = document.getElementById('mrp-prf-sel').value;
+  const lenEl = document.getElementById('mrp-prf-len');
+  // (12. tur m8) Optimum modda boy hesapta seçilir — input bilgi amaçlı kilitli
+  if(val==='__opt'){ if(lenEl) lenEl.disabled = true; return; }
+  if(lenEl) lenEl.disabled = false;
+  const s = stockSheets.find(x=>x.id===val);
   if(!s) return;
-  if(s.length_mm) document.getElementById('mrp-prf-len').value = Number(s.length_mm);
+  if(s.length_mm) lenEl.value = Number(s.length_mm);
 }
 
 // Seçili havuz kalemlerini oku (ölçüler satırdaki inputlardan)
@@ -9353,30 +9364,68 @@ function mrpKonsolideProfil(lengths, profilBoyu, firePct){
   return {toplamProfil:profiller.length, profiller, profilBoyu};
 }
 
+// (12. tur m8) OPTİMUM BOY — SAF: aday stok boylarının (6m/12m... katalogdan)
+// her biri için mrpKonsolideProfil koşulur, TOPLAM FİRE (adet×boy − Σparça)
+// en az olan seçilir; eşitlikte kısa boy kazanır (stok/istif kolaylığı).
+// Sığmayan aday kıyasta 'sigmiyor' olarak raporlanır. Dönüş: {L, kons, fire,
+// kiyas:[{L, adet, fire, firePctReal, sigmiyor?}]} ya da hiçbiri sığmazsa null.
+function mrpOptimumProfil(lengths, adayBoylar, firePct){
+  const adaylar = [...new Set((adayBoylar||[]).map(Number).filter(b=>b>0))].sort((a,b)=>a-b);
+  const toplamParca = lengths.reduce((s,b)=>s+b,0);
+  let best = null;
+  const kiyas = [];
+  for(const L of adaylar){
+    const efektif = L*(1-firePct/100);
+    if(lengths.some(b=>b>efektif)){ kiyas.push({L, sigmiyor:true}); continue; }
+    const kons = mrpKonsolideProfil(lengths, L, firePct);
+    const toplamStok = kons.toplamProfil * L;
+    const fire = toplamStok - toplamParca;
+    kiyas.push({L, adet:kons.toplamProfil, fire, firePctReal: toplamStok ? fire/toplamStok*100 : 0});
+    if(!best || fire < best.fire - 1e-9) best = {L, kons, fire};
+  }
+  return best ? {L:best.L, kons:best.kons, fire:best.fire, kiyas} : null;
+}
+
 function mrpCalcProfil(){
   const sel = mrpSelectedItems();
   if(!sel.length){ toast('Havuzdan kalem seçin!','error'); return; }
-  // Profilde kesim boyu = satırdaki "Boy" alanı
+  // Profilde kesim boyu = satırdaki "Boy/Kesim Boyu" alanı
   const noDim = sel.filter(s=>!(s.h>0));
   if(noDim.length){
-    toast('Kesim boyu (Boy) eksik kalemler var: '+noDim.map(s=>s.item.code||s.item.name).join(', '),'error');
+    toast('Kesim boyu eksik kalemler var: '+noDim.map(s=>s.item.code||s.item.name).join(', '),'error');
     return;
   }
-  const L = parseFloat(document.getElementById('mrp-prf-len').value)||0;
+  const selVal = document.getElementById('mrp-prf-sel').value;
   const kerf = parseFloat(document.getElementById('mrp-prf-kerf').value)||0;
   const fire = parseFloat(document.getElementById('mrp-prf-fire').value)||0;
-  if(!(L>0)){ toast('Profil boyu girin!','error'); return; }
-  const tooLong = sel.filter(s=>s.h+kerf > L*(1-fire/100));
-  if(tooLong.length){
-    toast('Profile sığmayan parçalar var: '+tooLong.map(s=>s.item.code||s.item.name).join(', '),'error');
-    return;
-  }
   let lengths=[];
   sel.forEach(s=>{ for(let i=0;i<s.qty;i++) lengths.push(s.h+kerf); });
-  const kons = mrpKonsolideProfil(lengths, L, fire);
-  const selSheet = stockSheets.find(x=>x.id===document.getElementById('mrp-prf-sel').value);
+
+  let L, kons, kiyas = null, selSheet = null;
+  if(selVal==='__opt'){
+    // (12. tur m8) Optimum boy: katalogdaki PROFİL boyları aday — en az fire kazanır
+    const adaylar = [...new Set(stockSheets
+      .filter(x=>x.kind==='PROFIL' && x.is_active!==false)
+      .map(x=>Number(x.length_mm)||0).filter(Boolean))];
+    if(!adaylar.length){ toast('Katalogda boyu tanımlı PROFİL yok — Ölçü Kataloğu\'na ekleyin!','error'); return; }
+    const best = mrpOptimumProfil(lengths, adaylar, fire);
+    if(!best){ toast('Hiçbir katalog boyuna sığmayan parça var — daha uzun boy tanımlayın!','error'); return; }
+    L = best.L; kons = best.kons; kiyas = best.kiyas;
+    selSheet = stockSheets.find(x=>x.kind==='PROFIL' && x.is_active!==false && Number(x.length_mm)===L) || null;
+    const lenEl = document.getElementById('mrp-prf-len'); if(lenEl) lenEl.value = L;
+  } else {
+    L = parseFloat(document.getElementById('mrp-prf-len').value)||0;
+    if(!(L>0)){ toast('Profil boyu girin!','error'); return; }
+    const tooLong = sel.filter(s=>s.h+kerf > L*(1-fire/100));
+    if(tooLong.length){
+      toast('Profile sığmayan parçalar var: '+tooLong.map(s=>s.item.code||s.item.name).join(', '),'error');
+      return;
+    }
+    kons = mrpKonsolideProfil(lengths, L, fire);
+    selSheet = stockSheets.find(x=>x.id===selVal);
+  }
   _mrpResult = {
-    type:'PROFIL', kons, L, kerf, fire,
+    type:'PROFIL', kons, L, kerf, fire, kiyas,
     sheetName: selSheet ? selSheet.name : `PROFİL ${L} mm`,
     material: selSheet?.material || null,
     sourceIds: sel.map(s=>s.item.id),
@@ -9412,6 +9461,11 @@ function mrpRenderProfilResult(){
         <button class="btn btn-primary btn-sm" onclick="mrpApprove()">Onayla → Kalem Oluştur</button>
       </span>
     </div>
+    ${r.kiyas?`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:8px;background:var(--acc-soft);border:1px solid var(--acc-line);border-radius:8px;padding:6px 10px" title="12. tur m8: aday katalog boyları denenip en az fire veren seçildi">
+      ⭐ Optimum boy: <b style="color:var(--accent)">${r.L} mm</b> · kıyas — ${r.kiyas.map(k=>k.sigmiyor
+        ? `${k.L}: sığmıyor`
+        : `${k.L}: ${k.adet} profil, fire %${k.firePctReal.toFixed(1)}${k.L===r.L?' ✓':''}`).join(' · ')}
+    </div>`:''}
     <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:8px">
       ${r.legend.map(l=>`<span style="margin-right:12px">${l.kod}: ${Number(l.boy)}mm × ${l.qty}</span>`).join('')}
     </div>
