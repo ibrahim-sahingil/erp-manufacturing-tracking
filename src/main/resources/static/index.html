@@ -237,6 +237,13 @@
   .io{display:inline-flex;font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;letter-spacing:.05em;white-space:nowrap;}
   .io.in{color:var(--green);background:var(--ok-soft);}
   .io.out{color:var(--red);background:var(--err-soft);}
+  /* İrsaliye — konsept steps ilerleme dili */
+  .steps{display:flex;align-items:center;gap:0;}
+  .steps .sp{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--mut);font-weight:650;white-space:nowrap;}
+  .steps .sp i{width:9px;height:9px;border-radius:50%;background:var(--line);}
+  .steps .sp.done{color:var(--green);} .steps .sp.done i{background:var(--green);}
+  .steps .sp.cur{color:var(--accent);} .steps .sp.cur i{background:var(--accent);box-shadow:0 0 0 3px var(--acc-soft);}
+  .steps .sln{width:26px;height:1.5px;background:var(--line);margin:0 7px;}
   .worow{display:flex;align-items:center;gap:12px;padding:9px 2px;border-bottom:1px solid var(--line-soft);}
   .worow:last-child{border-bottom:none;}
   .wic{width:34px;height:34px;border-radius:9px;background:var(--acc-soft);color:var(--accent);font-size:11px;font-weight:800;display:grid;place-items:center;flex-shrink:0;}
@@ -335,11 +342,15 @@
   .search-row input:focus{border-color:var(--accent);}
   .filter-select{background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 12px;outline:none;cursor:pointer;}
   /* USERS */
-  .users-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:24px;}
-  .user-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;display:flex;align-items:center;gap:12px;}
-  .user-avatar{font-weight:700;width:40px;height:40px;border-radius:50%;background:var(--accent);color:var(--acc-ink);display:flex;align-items:center;justify-content:center;font-size:15px;}
-  .user-name{font-weight:600;font-size:14px;}
-  .user-role{font-family:var(--font-mono);font-size:10px;color:var(--muted);}
+  /* Personel — konsept person kartı dili (tasarım 2026) */
+  .users-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-bottom:24px;}
+  .user-card{background:var(--surface);border:1px solid var(--line-soft);border-radius:16px;padding:18px;display:flex;flex-direction:column;align-items:center;text-align:center;transition:transform .14s ease,border-color .14s ease;}
+  .user-card:hover{transform:translateY(-2px);border-color:var(--acc-line);}
+  .user-avatar{font-weight:750;width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:10px;}
+  .user-name{font-weight:700;font-size:13.5px;display:block;}
+  .user-role{font-size:11px;color:var(--muted);margin:2px 0 10px;}
+  .user-foot{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;}
+  .user-actions{display:flex;justify-content:center;gap:6px;margin-top:12px;}
   /* MODAL */
   .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;align-items:center;justify-content:center;}
   .modal-overlay.open{display:flex;}
@@ -842,15 +853,21 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 
 <!-- USERS -->
 <div class="view" id="view-users">
-  <div class="section-title">PERSONEL</div>
-  <div class="section-sub">QR okutacak çalışanları tanımlayın</div>
-  <div class="form-card">
+  <div class="dash-phead">
+    <div>
+      <h1>Personel</h1>
+      <div class="sub" id="users-sub">QR okutacak çalışanları tanımlayın</div>
+    </div>
+    <div class="grow"></div>
+    <button class="hbtn pri" onclick="toggleUserForm()">+ Personel Ekle</button>
+  </div>
+  <div class="form-card" id="user-form-card" style="display:none">
     <div class="form-row">
       <div class="form-group"><label>Ad Soyad *</label><input type="text" id="u-name" placeholder="Örn: Ahmet Yılmaz"></div>
       <div class="form-group"><label>Departman</label><input type="text" id="u-dept" placeholder="Örn: Kaynak, Bükme"></div>
       <div class="form-group"><label>Ünvan</label><input type="text" id="u-role" placeholder="Örn: Operatör, Usta"></div>
     </div>
-    <button class="btn btn-primary" onclick="addUser()">+ Personel Ekle</button>
+    <button class="btn btn-primary" onclick="addUser()">Kaydet</button>
   </div>
   <div class="users-grid" id="users-grid"></div>
 </div>
@@ -1556,8 +1573,12 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 </div>
 
 <div class="view" id="view-appusers">
-  <div class="section-title">KULLANICI YÖNETİMİ</div>
-  <div class="section-sub">Kullanıcı ekle · Yetki tanımla</div>
+  <div class="dash-phead">
+    <div>
+      <h1>Kullanıcı Yönetimi</h1>
+      <div class="sub">Kullanıcı ekle · Yetki tanımla · Pasif kullanıcı anında kilitlenir</div>
+    </div>
+  </div>
 
   <div class="form-card" id="appuser-form-card">
     <div style="font-weight:700;font-size:15px;color:var(--ink);margin-bottom:16px">+ YENİ KULLANICI</div>
@@ -4245,16 +4266,39 @@ async function toggleUserActive(id){
 // (E1 tagged-template PİLOT) Bu fonksiyon h`` ile yeniden yazıldı: artık
 // interpolasyonlar VARSAYILAN esc'li — esc() çağrıları kalktı, ham parçalar
 // (koşullu stil/rozet) raw() ile işaretli. Deseni yaymadan önce referans.
+// (tasarım 2026) Personel ekleme formu başlıktaki butonla açılır (Siparişler deseni)
+function toggleUserForm(){
+  const f = document.getElementById('user-form-card');
+  if(f) f.style.display = f.style.display==='none' ? '' : 'none';
+}
+
 function renderUsers(){
   const grid = document.getElementById('users-grid');
   if(!users.length){ grid.innerHTML = h`<div class="empty-state"><span class="emoji"></span>Personel eklenmedi</div>`; return; }
+  // (tasarım 2026) Başlık alt satırı: gerçek sayılar
+  const subEl = document.getElementById('users-sub');
+  if(subEl){
+    const aktif = users.filter(u=>u.is_active!==false).length;
+    const bolum = new Set(users.filter(u=>u.is_active!==false&&u.dept).map(u=>u.dept.toLocaleLowerCase('tr'))).size;
+    subEl.textContent = aktif + ' aktif çalışan' + (bolum?' · '+bolum+' bölümde':'') + ' · QR ile adet girişi';
+  }
+  // Konsept person kartı: baş harfli degrade avatar (ada göre deterministik renk — veri değil, görsel)
+  const PAV = ['linear-gradient(135deg,#e0642e,#b8471c)','linear-gradient(135deg,#3a7bd5,#2758a3)',
+    'linear-gradient(135deg,#8e44ad,#6a3086)','linear-gradient(135deg,#45b57e,#2d8a5c)',
+    'linear-gradient(135deg,#d9a62e,#ab7f1a)','linear-gradient(135deg,#16a085,#0e7a64)'];
   grid.innerHTML = h`${users.map(u=>{
     const passive = u.is_active===false;
+    const initials = (u.name||'?').trim().split(/\s+/).map(w=>w.charAt(0)).slice(0,2).join('').toLocaleUpperCase('tr');
+    const hash = [...(u.name||'')].reduce((s,c)=>s+c.charCodeAt(0),0);
     return h`<div class="user-card"${passive?raw(' style="opacity:.55"'):''}>
-    <div class="user-avatar">${u.name.charAt(0)}</div>
-    <div style="flex:1"><div class="user-name">${u.name}${passive?raw(' <span style="font-size:10px;color:var(--muted)">(pasif)</span>'):''}</div><div class="user-role">${[u.dept,u.role].filter(Boolean).join(' · ')}</div></div>
-    <button class="icon-btn" onclick="toggleUserActive('${u.id}')" title="${passive?'Aktifleştir':'Pasife al'}">${passive?'▶':'⏸'}</button>
-    <button class="icon-btn" onclick="deleteUser('${u.id}')" title="Sil">✕</button>
+    <div class="user-avatar" style="background:${raw(PAV[hash%PAV.length])}">${initials}</div>
+    <span class="user-name">${u.name}${passive?raw(' <span style="font-size:10px;color:var(--muted)">(pasif)</span>'):''}</span>
+    <div class="user-role">${u.role||'Personel'}</div>
+    <div class="user-foot">${u.dept?h`<span class="chipk">${u.dept}</span>`:''}${passive?h`<span class="chipk">pasif</span>`:h`<span class="st run">aktif</span>`}</div>
+    <div class="user-actions">
+      <button class="icon-btn" onclick="toggleUserActive('${u.id}')" title="${passive?'Aktifleştir':'Pasife al'}">${passive?'▶':'⏸'}</button>
+      <button class="icon-btn" onclick="deleteUser('${u.id}')" title="Sil">✕</button>
+    </div>
   </div>`;})}`;
 }
 
@@ -11163,7 +11207,13 @@ function renderDnList(){
           </div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">${meta}</div>
         </div>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${raw(actions)}</div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          ${n.status!=='CANCELLED'?h`<div class="steps">
+            <span class="sp done"><i></i>Taslak</span><span class="sln"></span>
+            <span class="sp ${raw(n.status==='SHIPPED'?'done':'cur')}"><i></i>Sevk</span>
+          </div>`:''}
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${raw(actions)}</div>
+        </div>
       </div>
     </div>`;
   })}`;
