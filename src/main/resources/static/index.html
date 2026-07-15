@@ -636,6 +636,7 @@
   .delta.up{background:var(--ok-soft);color:var(--ok);}
   .delta.dn{background:var(--err-soft);color:var(--err);}
   .delta.in{background:var(--info-soft);color:var(--info);}
+  .delta.wa{background:var(--warn-soft);color:var(--warn);}
   .delta.nd{background:color-mix(in srgb,var(--mut) 12%,transparent);color:var(--muted);}
   .stsum-ptag{font-size:10px;font-weight:700;color:var(--accent);background:var(--acc-soft);border-radius:8px;padding:2px 8px;}
   .personnel-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:28px;}
@@ -923,6 +924,8 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
       <h1>Planlama</h1>
       <div class="sub">Proje tarihleri · İş emirleri çizelgesi · Fabrika çalışma alanları</div>
     </div>
+    <div class="grow"></div>
+    <button class="hbtn pri" onclick="document.querySelectorAll('#planning-tabs .planning-tab')[1].click()">+ İş Emri Planla</button>
   </div>
 
   <!-- Alt sekmeler -->
@@ -3466,8 +3469,11 @@ async function renderStats(){
 
   // Son 7 gün üretim akışı (canlı loglardan — gte adapter desteği tasarım turunda eklendi)
   const from=new Date(now); from.setDate(now.getDate()-6);
-  let logs7=[];
-  try{ logs7=await dbGet('logs',`created_at=gte.${from.toISOString().slice(0,10)}T00:00:00&order=created_at.desc`);}catch(e){}
+  let logs7=[], res7=[];
+  try{ [logs7,res7]=await Promise.all([
+    dbGet('logs',`created_at=gte.${from.toISOString().slice(0,10)}T00:00:00&order=created_at.desc`),
+    dbGet('warehouse_reservations') // akış: depo talepleri (7 gün filtresi aşağıda)
+  ]);}catch(e){}
   if(!Array.isArray(logs7)) logs7=[];
   const days=[]; for(let i=6;i>=0;i--){const d=new Date(now); d.setDate(now.getDate()-i); days.push(d);}
   const series=days.map(d=>{const k=d.toISOString().slice(0,10);
@@ -3500,16 +3506,33 @@ async function renderStats(){
   };
   const woRows=openWos.slice().sort((a,b)=>new Date(b.start_datetime||0)-new Date(a.start_datetime||0)).slice(0,5);
 
-  // Son hareketler (son 8 log)
-  const feed=logs7.slice(0,8).map(l=>{
+  // Son hareketler — konsept gibi ÇOK KAYNAKLI olay akışı (son 7 gün, gerçek
+  // zaman damgaları): üretim kayıtları + depo rezervasyon talepleri + verilen
+  // sipariş kalemleri tek akışta, en yeni üstte.
+  const fmtT=(ts)=>{ const d=new Date(ts);
+    const isToday=String(ts).slice(0,10)===now.toISOString().slice(0,10);
+    return (isToday?'bugün ':d.toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit'})+' ')+d.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}); };
+  const cutoff=from.toISOString().slice(0,10);
+  const evts=[];
+  logs7.forEach(l=>{
     const p=parts.find(x=>x.id===l.part_id);
-    const d=new Date(l.created_at);
-    const isToday=String(l.created_at).slice(0,10)===now.toISOString().slice(0,10);
-    return { name:p?p.name:'(silinmiş parça)', proj:p&&p.project?p.project:'',
-      user:l.username||'', note:l.note||'',
-      qd:parseInt(l.qty_done)||0, qr:parseInt(l.qty_reject)||0, qpn:parseInt(l.qty_pending)||0,
-      t:(isToday?'bugün ':d.toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit'})+' ')+d.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}) };
+    const qd=parseInt(l.qty_done)||0, qr=parseInt(l.qty_reject)||0, qpn=parseInt(l.qty_pending)||0;
+    evts.push({ ts:l.created_at, dot:qr?'var(--err)':qd?'var(--ok)':'var(--warn)',
+      title:p?p.name:'(silinmiş parça)', ctx:p&&p.project?p.project:'',
+      meta:[qd?`${qd} yapıldı`:'',qpn?`${qpn} bekliyor`:'',qr?`${qr} ret`:''].filter(Boolean).join(' · '),
+      user:l.username||'', note:l.note||'' });
   });
+  (Array.isArray(res7)?res7:[]).filter(r=>String(r.created_at).slice(0,10)>=cutoff).forEach(r=>{
+    const st=r.status==='REQUESTED'?'onay bekliyor':r.status==='APPROVED'?'onaylandı':r.status==='PARTIAL'?'kısmi onaylandı':r.status==='CANCELLED'?'iptal edildi':r.status;
+    evts.push({ ts:r.created_at, dot:'var(--info)', title:`Depo talebi: ${r.item_name||'—'}`,
+      ctx:r.project_name||'', meta:`${r.requested_qty||''} ${r.unit||'adet'} · ${st}`, user:r.requested_by||'', note:'' });
+  });
+  pi.filter(i=>i.ordered_at && String(i.ordered_at).slice(0,10)>=cutoff).forEach(i=>{
+    evts.push({ ts:i.ordered_at, dot:'var(--acc)', title:`Sipariş verildi: ${i.name||'—'}`,
+      ctx:i.project_name||'', meta:`${i.quantity||1} ${i.unit||'adet'}${i.supplier?` · ${i.supplier}`:''}`, user:'', note:'' });
+  });
+  const feed=evts.sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,8)
+    .map(e=>({ ...e, t:fmtT(e.ts) }));
 
   const stPill=(d)=> d.q&&d.done>=d.q ? h`<span class="st run">tamam</span>`
     : d.done>0 ? h`<span class="st plan">devam</span>` : h`<span class="st wait">bekliyor</span>`;
@@ -3546,15 +3569,15 @@ async function renderStats(){
       </div>
       <div class="stat-card" style="--c:var(--info)">
         <div class="stat-label">Açık İş Emri</div><div class="stat-value">${openWos.length}</div>
-        <div class="stat-sub">${inprogWos} devam ediyor · ${openWos.length-inprogWos} planlı</div>
+        <div class="stat-sub">${inprogWos?h`<span class="delta in">${inprogWos} devam ediyor</span>`:''}${openWos.length-inprogWos} planlı</div>
       </div>
       <div class="stat-card" style="--c:var(--yellow)">
         <div class="stat-label">Bekleyen Parça</div><div class="stat-value">${pend+waitingParts.length}</div>
-        <div class="stat-sub">${qp}/${qt} adet bekliyor${qr?` · ${qr} adet ret`:''}</div>
+        <div class="stat-sub">${waitingParts.length?h`<span class="delta wa">${waitingParts.length} planlama bekliyor</span>`:''}${qp}/${qt} adet${qr?` · ${qr} ret`:''}</div>
       </div>
       <div class="stat-card" style="--c:var(--green)">
         <div class="stat-label">Depodaki Kalem</div><div class="stat-value">${inWh}</div>
-        <div class="stat-sub">${onWay?`${onWay} mal kabulü yolda`:'kalem depoda kayıtlı'}</div>
+        <div class="stat-sub">${onWay?h`<span class="delta in">${onWay} mal kabulü yolda</span>`:'kalem depoda kayıtlı'}</div>
       </div>
     </div>
     <div class="sect-label" style="margin-bottom:12px">${raw(ico('factory',12))} BUGÜN ATÖLYEDE</div>
@@ -3592,8 +3615,8 @@ async function renderStats(){
       <div class="sc-title">Son Hareketler <span>son 7 gün</span></div>
       ${feed.length?h`<div class="feed2">${feed.map(f=>h`
         <div class="fi">
-          <i class="fdot" style="background:${raw(f.qr?'var(--err)':f.qd?'var(--ok)':'var(--warn)')}"></i>
-          <div class="ft"><b>${f.name}</b>${f.proj?` — ${f.proj}`:''} · ${[f.qd?`${f.qd} yapıldı`:'',f.qpn?`${f.qpn} bekliyor`:'',f.qr?`${f.qr} ret`:''].filter(Boolean).join(' · ')}
+          <i class="fdot" style="background:${raw(f.dot)}"></i>
+          <div class="ft"><b>${f.title}</b>${f.ctx?` — ${f.ctx}`:''}${f.meta?` · ${f.meta}`:''}
             <time>${f.t}${f.user?` · ${f.user}`:''}${f.note?h` · ${raw(ico('note',10))} ${f.note}`:''}</time></div>
         </div>`)}</div>`:h`<div class="dash-empty">Son 7 günde üretim hareketi yok</div>`}
     </div>`;
@@ -4554,6 +4577,8 @@ async function renderStatsSummary(){
     months.push({v, t:d.toLocaleDateString('tr-TR',{month:'long',year:'numeric'})}); }
 
   window._stsum = { ym, done, rej, fire, spend, people, ops:L.length, weeks, top,
+    woAvg, woDoneN: woDone.length,
+    ayLabel: new Date(y, m-1, 1).toLocaleDateString('tr-TR',{month:'long',year:'numeric'}),
     donut:{dDone,dProd,dWait,dRej}, effs };
 
   // Aya-göre kıyas HER KPI'da görünür: veri yoksa dürüst "geçen ay veri yok" çipi
@@ -4580,6 +4605,7 @@ async function renderStatsSummary(){
         ${months.map(mo=>raw(`<option value="${mo.v}"${mo.v===ym?' selected':''}>${mo.t}</option>`))}
       </select>
       <button class="btn btn-primary btn-sm" onclick="stsumCsv()">${raw(ico('download',12))} CSV</button>
+      <button class="btn btn-primary btn-sm" onclick="stsumPdf()">${raw(ico('printer',12))} PDF</button>
     </div>
     <div class="stats-row" style="margin-bottom:16px">
       <div class="stat-card">
@@ -4637,6 +4663,60 @@ async function renderStatsSummary(){
 }
 
 // Aylık özet CSV dışa aktarımı (depo modülündeki _whm yardımcıları yeniden kullanılır)
+// Aylık özet PDF (konsept "CSV / PDF" — haftalık raporla aynı yazdırma deseni)
+function stsumPdf(){
+  const s = window._stsum;
+  if(!s){ toast('Önce özet yüklenmeli','error'); return; }
+  const printDate=new Date().toLocaleString('tr-TR',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const dayRows=s.weeks.map((w,i)=>`<tr><td>H${i+1}</td><td style="text-align:right">${w}</td></tr>`).join('');
+  const effRows=(s.effs||[]).map(e=>`<tr><td>${esc(e.name)}</td><td style="text-align:right">%${e.pct}</td></tr>`).join('');
+  const topRows=(s.top||[]).map(t=>`<tr><td>${esc(t.p.name)}</td><td>${esc(t.p.code||'—')}</td><td>${esc(t.p.project||'—')}</td><td style="text-align:right">${t.done}</td><td style="text-align:right">${t.rej}</td></tr>`).join('');
+  const html=`<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
+<title>Aylık Üretim Özeti — ${esc(s.ayLabel)}</title>
+<style>
+  @page { size: A4; margin: 15mm 12mm; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size:11px; color:#1a1a1a; }
+  .print-header { border-bottom:3px solid #f5a623; padding-bottom:10px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:flex-end; }
+  .print-logo { font-size:22px; font-weight:900; letter-spacing:2px; color:#f5a623; }
+  .print-meta { font-size:10px; color:#666; text-align:right; }
+  h2 { font-size:13px; margin:16px 0 6px; color:#333; }
+  table { width:100%; border-collapse:collapse; margin-bottom:4px; }
+  th { background:#f3f0e9; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:#555; }
+  th, td { border:1px solid #ddd; padding:5px 8px; }
+  tr:nth-child(even) td { background:#fafaf7; }
+  .sumgrid { display:flex; gap:10px; margin:10px 0 4px; flex-wrap:wrap; }
+  .sumbox { flex:1; min-width:110px; border:1px solid #ddd; border-radius:6px; padding:8px 10px; }
+  .sumbox b { display:block; font-size:20px; }
+  .sumbox span { font-size:9px; color:#666; text-transform:uppercase; letter-spacing:.5px; }
+  .noprint { position:fixed; top:10px; right:10px; }
+  @media print { .noprint { display:none; } }
+</style></head><body>
+<button class="noprint" onclick="window.print()" style="padding:8px 16px;cursor:pointer">Yazdır</button>
+<div class="print-header">
+  <div><div class="print-logo">ÜretimTakip</div><div style="font-size:11px;color:#666;margin-top:4px">Aylık Üretim Özeti — ${esc(s.ayLabel)}</div></div>
+  <div class="print-meta">Yazdırma: ${esc(printDate)}</div>
+</div>
+<div class="sumgrid">
+  <div class="sumbox"><b>${s.done}</b><span>Tamamlanan adet</span></div>
+  <div class="sumbox"><b>${s.woAvg!=null?s.woAvg.toLocaleString('tr-TR',{maximumFractionDigits:1})+' gün':'—'}</b><span>Ort. iş emri süresi${s.woDoneN?` (${s.woDoneN} İE)`:''}</span></div>
+  <div class="sumbox"><b>%${s.fire.toFixed(1)}</b><span>Fire / red</span></div>
+  <div class="sumbox"><b>${s.rej}</b><span>Ret adet</span></div>
+  <div class="sumbox"><b>${s.ops}</b><span>İşlem · ${s.people} personel</span></div>
+  <div class="sumbox"><b>₺${s.spend.toLocaleString('tr-TR',{maximumFractionDigits:0})}</b><span>Malzeme harcaması</span></div>
+</div>
+<h2>Haftalık Üretim (adet)</h2>
+<table><tr><th>Hafta</th><th style="text-align:right">Tamamlanan</th></tr>${dayRows}</table>
+<h2>Bölüm Verimliliği (tamamlanan / planlanan)</h2>
+${effRows?`<table><tr><th>Bölüm</th><th style="text-align:right">İlerleme</th></tr>${effRows}</table>`:'<div style="color:#888">Bölüme atanmış parça yok.</div>'}
+<h2>En Çok Üretilen Parçalar</h2>
+${topRows?`<table><tr><th>Parça</th><th>Kod</th><th>Proje</th><th style="text-align:right">Adet</th><th style="text-align:right">Fire</th></tr>${topRows}</table>`:'<div style="color:#888">Bu ay üretim kaydı yok.</div>'}
+</body></html>`;
+  const win=window.open('','_blank');
+  if(!win){ toast('Açılır pencere engellendi — tarayıcı iznini kontrol edin','error'); return; }
+  win.document.write(html); win.document.close();
+}
+
 function stsumCsv(){
   const s = window._stsum;
   if(!s){ toast('Önce özet yüklenmeli','error'); return; }
@@ -5007,7 +5087,7 @@ async function renderOrders() {
         <div class="ps"><b class="num">${matStr||'—'}</b><span>malzeme</span></div>
       </div>
       <div class="wbar" style="margin-bottom:4px"><i style="width:${raw(String(pPct))}%"></i></div>
-      <div class="pfoot"><span class="num">%${pPct} tamamlandı · ${pQd}/${pQt} adet</span></div>`:''}
+      <div class="pfoot"><span class="num">%${pPct} tamamlandı · ${pQd}/${pQt} adet</span>${(()=>{const nAct=workOrders.filter(w=>w.project_name===o.project_name&&w.status==='inprogress').length; return nAct?h`<span style="margin-left:auto">${nAct} iş emri devam ediyor</span>`:'';})()}</div>`:''}
       <div class="order-meta-grid">
         <div class="order-meta-item"><label>${raw(ico('pin',10))} Konum</label><span>${o.location||'—'}</span></div>
         <div class="order-meta-item"><label>${raw(ico('clock',10))} Teslim Süresi</label><span>${o.delivery_days?o.delivery_days+' Gün':'—'}</span></div>
