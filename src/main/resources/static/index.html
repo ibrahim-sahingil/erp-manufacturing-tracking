@@ -458,6 +458,15 @@
   .bom-op-tag{display:inline-flex;align-items:center;gap:4px;background:var(--info-soft);border-radius:8px;padding:2px 8px;font-size:10px;font-weight:600;color:var(--info);}
   .bom-ops{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;}
   .bom-level-line{border-left:2px solid var(--border);margin-left:8px;padding-left:10px;}
+  /* Teknik Resimler — konsept draw kart dili (tasarım 2026) */
+  .draws{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;align-items:start;}
+  .draw{background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;overflow:hidden;transition:transform .14s ease,border-color .14s ease;}
+  .draw:hover{transform:translateY(-2px);border-color:var(--acc-line);}
+  .draw .thumb{background:var(--thumb-bg);padding:14px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--info);min-height:64px;}
+  .draw .thumb .ext{font-family:var(--font-mono);font-size:14px;font-weight:750;letter-spacing:.08em;}
+  .draw .dmeta{padding:11px 14px;}
+  .draw .dmeta b{display:block;font-size:12.5px;font-weight:650;word-break:break-all;}
+  .draw .dmeta>span{font-size:10.5px;color:var(--mut);}
   /* Aranabilir combobox (searchSelect) */
   .ss-list{position:absolute;top:100%;left:0;right:0;z-index:300;max-height:260px;overflow:auto;background:var(--surface2);border:1px solid var(--border);border-radius:0 0 6px 6px;box-shadow:0 8px 24px rgba(0,0,0,.45);}
   .ss-item{padding:8px 12px;font-family:var(--font-mono);font-size:12px;cursor:pointer;white-space:pre;overflow:hidden;text-overflow:ellipsis;}
@@ -1887,27 +1896,32 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 
 <!-- TEKNİK RESİMLER (5. tur #7) -->
 <div class="view" id="view-docs">
-  <div class="section-title">TEKNİK RESİMLER</div>
-  <div class="section-sub">DWG / resim / PDF yükle · Üretim ve Ar-Ge resimleri · Parça kapsamı takibi</div>
+  <div class="dash-phead">
+    <div>
+      <h1>Teknik Resimler</h1>
+      <div class="sub" id="docs-sub">DWG / resim / PDF yükle · Üretim ve Ar-Ge resimleri · Parça kapsamı takibi</div>
+    </div>
+    <div class="grow"></div>
+    <button class="hbtn sec" onclick="docsUpload('ARGE')">⬆ Ar-Ge Resmi Yükle</button>
+    <button class="hbtn pri" onclick="docsUpload('URETIM')">⬆ Üretim Resmi Yükle</button>
+  </div>
 
   <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap">
-    <div class="form-group" style="margin-bottom:0;min-width:320px"><label>Ürün</label>
+    <div class="form-group" style="margin-bottom:0;min-width:320px;max-width:420px;flex:1"><label>Ürün</label>
       <div id="docs-product-ss"></div>
     </div>
-    <button class="btn btn-primary" onclick="docsUpload('URETIM')">⬆ Üretim Resmi Yükle</button>
-    <button class="btn btn-primary" onclick="docsUpload('ARGE')">⬆ Ar-Ge Resmi Yükle</button>
   </div>
 
   <div id="docs-content" style="display:none">
     <div id="docs-coverage" style="margin-bottom:20px"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
       <div>
-        <div style="font-weight:700;font-size:14px;color:var(--ink);margin-bottom:12px">ÜRETİM RESİMLERİ</div>
-        <div id="docs-list-URETIM"></div>
+        <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:10px">Üretim Resimleri</div>
+        <div id="docs-list-URETIM" class="draws"></div>
       </div>
       <div>
-        <div style="font-weight:700;font-size:14px;color:var(--ink);margin-bottom:12px">AR-GE RESİMLERİ</div>
-        <div id="docs-list-ARGE"></div>
+        <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:10px">Ar-Ge Resimleri</div>
+        <div id="docs-list-ARGE" class="draws"></div>
       </div>
     </div>
   </div>
@@ -12535,7 +12549,7 @@ async function docsProductChanged(){
   _docsProduct = document.getElementById('docs-product')?.value||null;
   const content = document.getElementById('docs-content');
   const empty   = document.getElementById('docs-empty');
-  if(!_docsProduct){ if(content) content.style.display='none'; if(empty) empty.style.display=''; return; }
+  if(!_docsProduct){ if(content) content.style.display='none'; if(empty) empty.style.display=''; docsUpdateSub(); return; }
   if(content) content.style.display='block';
   if(empty) empty.style.display='none';
   await docsLoad();
@@ -12562,38 +12576,52 @@ function fmtBytes(n){
 }
 
 function renderDocs(){
+  if(typeof docsUpdateSub==='function') docsUpdateSub(); // (tasarım 2026) başlık alt satırı — shim'de tanımsız, guard'lı
   const partById = new Map(_docsParts.map(p=>[p.id,p]));
   ['URETIM','ARGE'].forEach(cat=>{
     const el = document.getElementById('docs-list-'+cat);
     if(!el) return;
     const list = bomDocs.filter(d=>d.category===cat);
     if(!list.length){
-      el.innerHTML = h`<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:20px;text-align:center;border:1px dashed var(--border);border-radius:8px">Henüz dosya yok — yukarıdan yükleyin.</div>`;
+      el.innerHTML = h`<div style="grid-column:1/-1;font-size:12px;color:var(--muted);padding:20px;text-align:center;border:1px dashed var(--line);border-radius:14px">Henüz dosya yok — yukarıdan yükleyin.</div>`;
       return;
     }
     el.innerHTML = h`${list.map(d=>{
       const linked = (d.part_ids||[]).map(pid=>partById.get(pid)).filter(Boolean);
-      return h`<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-          <div style="min-width:0">
-            <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;word-break:break-all">${d.filename}</div>
-            <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">
-              ${fmtBytes(d.size_bytes)} · ${(d.created_at||'').slice(0,10)}${d.uploaded_by?' · '+d.uploaded_by:''}
-            </div>
-          </div>
-          <div style="display:flex;gap:4px;flex-shrink:0">
-            <button class="btn btn-ghost btn-sm" onclick="docsDownload('${raw(d.id)}')" title="İndir"></button>
+      const ext = (d.filename||'').includes('.') ? d.filename.split('.').pop().toUpperCase().slice(0,6) : 'DOSYA';
+      return h`<div class="draw">
+        <div class="thumb">${raw(ico('file',22))}<span class="ext">${ext}</span></div>
+        <div class="dmeta">
+          <b>${d.filename}</b>
+          <span>${fmtBytes(d.size_bytes)} · ${(d.created_at||'').slice(0,10)}${d.uploaded_by?' · '+d.uploaded_by:''}</span>
+          ${linked.length?h`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px">${linked.map(p=>h`
+            <span class="chipk" style="color:var(--green);border-color:color-mix(in srgb,var(--green) 35%,transparent);background:var(--ok-soft)">${p.code} — ${p.name}</span>`)}</div>`
+          :h`<div style="font-size:10px;color:var(--muted);margin-top:8px">Parça bağlanmamış — Parçalar ile bağlayın.</div>`}
+          <div style="display:flex;gap:4px;margin-top:10px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" onclick="docsDownload('${raw(d.id)}')" title="İndir">${raw(ico('download',13))} İndir</button>
             <button class="btn btn-ghost btn-sm" onclick="docsEditParts('${raw(d.id)}')" title="Kapsadığı parçaları / kategoriyi düzenle">Parçalar</button>
             <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="docsDelete('${raw(d.id)}')" title="Sil">${raw(ico('trash',13))}</button>
           </div>
         </div>
-        ${linked.length?h`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px">${linked.map(p=>h`
-          <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:8px;border:1px solid rgba(46,204,113,.35);color:var(--green);background:rgba(46,204,113,.08)">${p.code} — ${p.name}</span>`)}</div>`
-        :h`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:8px">Parça bağlanmamış — Parçalar ile bağlayın.</div>`}
       </div>`;
     })}`;
   });
   renderDocsCoverage();
+}
+
+// (tasarım 2026) Başlık alt satırı: "Ürün · Kod · N çizim (u üretim, a ar-ge)"
+function docsUpdateSub(){
+  const el = document.getElementById('docs-sub');
+  if(!el) return;
+  const prod = bomProducts.find(p=>p.id===_docsProduct);
+  if(prod){
+    const u = bomDocs.filter(d=>d.category==='URETIM').length;
+    const a = bomDocs.filter(d=>d.category==='ARGE').length;
+    el.textContent = prod.name + (prod.code?' · '+prod.code:'') + ' · '
+      + bomDocs.length + ' çizim' + (bomDocs.length?' ('+u+' üretim, '+a+' ar-ge)':'');
+  } else {
+    el.textContent = 'DWG / resim / PDF yükle · Üretim ve Ar-Ge resimleri · Parça kapsamı takibi';
+  }
 }
 
 // Kapsam paneli: her YARI_MAMUL + MAMUL parçanın en az bir ÜRETİM resmi olmalı
@@ -12606,12 +12634,12 @@ function renderDocsCoverage(){
   if(!need.length){ el.innerHTML=''; return; }
   const missing = need.filter(p=>!covered.has(p.id));
   el.innerHTML = missing.length
-    ? h`<div style="background:rgba(231,76,60,.07);border:1px solid rgba(231,76,60,.3);border-radius:8px;padding:12px 16px;font-family:var(--font-mono);font-size:12px">
+    ? h`<div style="background:var(--err-soft);border:1px solid color-mix(in srgb,var(--err) 30%,transparent);border-radius:12px;padding:12px 16px;font-size:12px">
         <div style="color:var(--red);font-weight:700;margin-bottom:6px">⚠ Üretim resmi OLMAYAN yarı mamul / mamul parçalar: ${missing.length} / ${need.length}</div>
         <div style="display:flex;gap:4px;flex-wrap:wrap">${missing.map(p=>h`
-          <span style="font-size:10px;padding:2px 8px;border-radius:8px;border:1px solid rgba(231,76,60,.35);color:var(--red);background:rgba(231,76,60,.06)">${p.code} — ${p.name}</span>`)}</div>
+          <span class="chipk" style="color:var(--red);border-color:color-mix(in srgb,var(--err) 35%,transparent);background:transparent">${p.code} — ${p.name}</span>`)}</div>
       </div>`
-    : h`<div style="background:rgba(46,204,113,.07);border:1px solid rgba(46,204,113,.3);border-radius:8px;padding:12px 16px;font-family:var(--font-mono);font-size:12px;color:var(--green)">Tüm yarı mamul ve mamul parçaların (${need.length}) üretim resmi bağlı.</div>`;
+    : h`<div style="background:var(--ok-soft);border:1px solid color-mix(in srgb,var(--green) 30%,transparent);border-radius:12px;padding:12px 16px;font-size:12px;color:var(--green)">Tüm yarı mamul ve mamul parçaların (${need.length}) üretim resmi bağlı.</div>`;
 }
 
 // ─── Parça seçim listesi (yükleme + düzenleme modallarında ortak) ───

@@ -34,6 +34,10 @@ const MAP = [
   ['ağaç kodu',        '.tnode .code',    '.bom-part-code',  ['font-size','color'], 'bom'],
   ['ağaç ikonu',       '.tic.part',       '.tic.part',       ['width','height','border-radius','background-color'], 'bom'],
   ['ağaç çipi',        '.chipk',          '.bom-part-meta>span', ['font-size','font-weight','border-radius','padding'], 'bom'],
+  // Teknik Resimler (tasarım 2026) — canlıda dosya yoksa örnek .draw düğümü enjekte edilir (aşağıda)
+  ['çizim kartı',      '.draw',           '.draw',           ['border-radius','background-color'], 'docs'],
+  ['çizim başlığı',    '.draw .dmeta b',  '.draw .dmeta b',  ['font-size','font-weight'], 'docs'],
+  ['çizim küçük resmi','.draw .thumb',    '.draw .thumb',    ['background-color'], 'docs'],
 ];
 
 // Toleranslar: px ±0.8, weight ±15, letter-spacing ±0.2px, renk kanal farkı ≤10
@@ -100,6 +104,17 @@ function same(prop, a, b, fs14) {
           if (s && s.options.length > 1 && !s.value) { s.value = s.options[1].value; await onBomProductChange(); }
         });
         await aPage.waitForTimeout(1200);
+      }
+      if (appTab === 'docs') { // dosya yoksa CSS ölçümü için ekran dışına örnek kart bas (DB'ye yazmaz)
+        await aPage.evaluate(() => {
+          if (!document.querySelector('.draw')) {
+            const host = document.createElement('div');
+            host.style.cssText = 'position:absolute;left:-9999px;top:0;width:260px';
+            host.innerHTML = '<div class="draw"><div class="thumb"><span class="ext">DWG</span></div><div class="dmeta"><b>örnek</b><span>ölçüm</span></div></div>';
+            document.body.appendChild(host);
+          }
+        });
+        await aPage.waitForTimeout(300);
       }
       curTab = appTab;
     }
