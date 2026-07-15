@@ -3,6 +3,32 @@
 QR kod destekli üretim takip sistemi. Tek geliştirici (İbrahim);
 ikinci kişi fikir/test notu sağlar, geliştirme yapmaz.
 
+## Tasarım 2026 — KURALLAR ve DOĞRULAMA KAPISI (2026-07-15)
+
+Referans şartname: `Desktop\ERP proje\01 - Belgeler\tasarim-konsepti-2026-07-14\erp-konsept.html`
+(4 tema: Kehribar varsayılan + light/steel/forest, `data-variant`). Konsept İLHAM DEĞİL,
+ÖLÇÜLEBİLİR ŞARTNAMEDİR — göz kararı yasak, `audit-concept-parity.js` ölçer.
+
+- **EMOJİ YASAK** (favicon hariç). İkon = `ico(ad,boyut)` (index.html ~2655, 34 çizgi ikon).
+  Kullanım HER ZAMAN `${raw(ico('ad',12))}` — raw'sız kullanım h``'de SVG'yi METİN basar
+  (verify-h-render bunu yakalar). Metin-içi bağlamda ikon yerine temiz metin.
+- **Tipografi**: px letter-spacing YASAK (em kullan: etiketler .07–.12em); uppercase mikro
+  etiketler ≥650 ağırlık; büyük değer rakamları MÜREKKEP (var(--ink)) + tabular + küçük
+  birim (`.stat-value .un`) — RENKLİ BÜYÜK RAKAM YASAK, renk yalnız `.delta`/`.st` pillerinde.
+  KPI kıyas satırı HER KOŞULDA dolu (veri yoksa `.delta.nd` "geçen ay veri yok").
+- **Sahte veri YASAK**: her sayı/grafik gerçek veriden; tarihsel seri yoksa sparkline konmaz.
+- **Sekme geçiş akışı**: (1) konsept ekranın ÖĞE ENVANTERİNİ çıkar (başlık/buton/kart/çip
+  düzeyinde), (2) geçir — İÇ BÖLGELER dahil (gantt panelleri, sihirbaz adımları), yeni
+  bileşenleri parity MAP'ine ekle, (3) kapı: `node scripts/verify-all.js`, (4) kullanıcıya
+  SONUÇ ekran görüntüsü göster — hata raporunu kullanıcıdan BEKLEME.
+- **DOĞRULAMA KAPISI**: `node scripts/verify-all.js` — derleme + 7 sunucusuz bekçi +
+  konsept paritesi + UI tam taraması (4 tema × 11 sekme + alt sekmeler: JS hatası, SVG
+  sızıntısı, emoji, undefined/NaN, yatay taşma) + e2e + yetki + playwright(retry'li).
+  Ara kontrol için `--hizli`. Kapı geçmeden "bitti" DENMEZ. Sunucu güncel-yapı kontrolü
+  kapının 0. adımı (eski-yapı tuzağına karşı).
+- Toplu metin değişimlerinde node-replace no-op'ları SESSİZ kaçar — her değişimi say/logla
+  veya Edit kullan; index.html değişince compile+restart ETMEDEN ölçüm/test yapma.
+
 ## Çalıştırma
 
 ```
