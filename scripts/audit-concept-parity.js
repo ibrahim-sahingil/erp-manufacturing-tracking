@@ -38,6 +38,9 @@ const MAP = [
   ['çizim kartı',      '.draw',           '.draw',           ['border-radius','background-color'], 'docs'],
   ['çizim başlığı',    '.draw .dmeta b',  '.draw .dmeta b',  ['font-size','font-weight'], 'docs'],
   ['çizim küçük resmi','.draw .thumb',    '.draw .thumb',    ['background-color'], 'docs'],
+  // MİP (tasarım 2026) — mip sekmesine geçince ilk yayınlanmış proje seçilir (aşağıda)
+  ['MİP KPI kutusu',   '.kpi',            '.mip-kpi',        ['border-radius','background-color'], 'mip'],
+  ['MİP KPI etiketi',  '.kpi .lbl',       '.mip-kpi .lb',    ['font-size','font-weight','text-transform','color'], 'mip'],
 ];
 
 // Toleranslar: px ±0.8, weight ±15, letter-spacing ±0.2px, renk kanal farkı ≤10
@@ -104,6 +107,13 @@ function same(prop, a, b, fs14) {
           if (s && s.options.length > 1 && !s.value) { s.value = s.options[1].value; await onBomProductChange(); }
         });
         await aPage.waitForTimeout(1200);
+      }
+      if (appTab === 'mip') { // özet kutuları ancak yayınlanmış bir proje seçilince render olur
+        await aPage.evaluate(async () => {
+          const s = document.getElementById('mip-project-sel');
+          if (s && s.options.length > 1 && !s.value) { s.value = s.options[1].value; await renderMipList(); }
+        });
+        await aPage.waitForTimeout(1500);
       }
       if (appTab === 'docs') { // dosya yoksa CSS ölçümü için ekran dışına örnek kart bas (DB'ye yazmaz)
         await aPage.evaluate(() => {

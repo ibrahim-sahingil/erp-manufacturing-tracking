@@ -224,6 +224,10 @@
   .st.wait{background:var(--warn-soft);color:var(--warn);}
   .st.lock{background:var(--err-soft);color:var(--err);}
   .st.pool{background:var(--vio-soft);color:var(--vio);}
+  .mip-kpi{flex:1;min-width:130px;background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;padding:12px 16px;}
+  .mip-kpi .lb{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px;}
+  .mip-kpi .lb i{width:8px;height:8px;border-radius:50%;background:var(--c);flex-shrink:0;}
+  .mip-kpi .vl{font-size:22px;font-weight:640;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--ink);margin-top:4px;}
   .worow{display:flex;align-items:center;gap:12px;padding:9px 2px;border-bottom:1px solid var(--line-soft);}
   .worow:last-child{border-bottom:none;}
   .wic{width:34px;height:34px;border-radius:9px;background:var(--acc-soft);color:var(--accent);font-size:11px;font-weight:800;display:grid;place-items:center;flex-shrink:0;}
@@ -1238,8 +1242,14 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 <!-- MİP — Malzeme İhtiyaç Planlama (7. tur #4; Aşama 1: görünürlük,
      Aşama 2: rezervasyon, Aşama 3: kesim planlama Satın Alma'dan taşındı) -->
 <div class="view" id="view-mip">
-  <div class="section-title">MİP — MALZEME İHTİYAÇ PLANLAMA</div>
-  <div class="section-sub">İhtiyaç listesi · Depo rezervasyonu · Plaka/profil kesim planlama</div>
+  <div class="dash-phead">
+    <div>
+      <h1>Malzeme İhtiyaç Planlaması</h1>
+      <div class="sub" id="mip-sub">İhtiyaç listesi · Depo rezervasyonu · Plaka/profil kesim planlama</div>
+    </div>
+    <div class="grow"></div>
+    <button class="hbtn pri" onclick="renderMip()" title="Depo ve satın alma verisini yeniden çekip ihtiyacı hesaplar">Yeniden Hesapla</button>
+  </div>
 
   <!-- Alt sekmeler (planning-tab deseni; switchMipTab #view-mip'e scope'ludur) -->
   <div class="planning-tabs" id="mip-tabs">
@@ -1250,22 +1260,17 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
   <!-- İhtiyaç Listesi (Aşama 1-2) -->
   <div class="planning-section active" id="mip-tab-list">
 
-  <div class="form-card" style="margin-bottom:16px">
-    <div class="form-row" style="margin-bottom:0">
-      <div class="form-group" style="flex:1;margin-bottom:0"><label>Proje (yayınlanmış ürün ağacı)</label>
-        <select id="mip-project-sel" onchange="renderMipList()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
-          <option value="">— Proje seçin —</option>
-        </select>
-      </div>
-      <div class="form-group" style="margin-bottom:0;align-self:flex-end">
-        <button class="btn btn-ghost btn-sm" onclick="renderMip()" title="Depo ve satın alma verisini yeniden çek">Yenile</button>
-      </div>
+  <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end">
+    <div class="form-group" style="flex:1;min-width:220px;max-width:420px;margin-bottom:0"><label>Proje (yayınlanmış ürün ağacı)</label>
+      <select id="mip-project-sel" onchange="renderMipList()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+        <option value="">— Proje seçin —</option>
+      </select>
     </div>
   </div>
 
   <div id="mip-summary"></div>
 
-  <div style="background:rgba(41,128,185,.08);border:1px solid rgba(41,128,185,.2);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">
+  <div style="background:var(--info-soft);border:1px solid color-mix(in srgb,var(--info) 20%,transparent);border-radius:10px;padding:8px 12px;font-size:11.5px;color:var(--muted);margin-bottom:14px">
     <b>Tedarik kararı burada verilir</b> (9. tur): yayınlanan parçalar önce "Karar Bekleyen"e düşer — parça bazında Satın Al / Üret seçin (öneri türden gelir) veya tümünü öneriyle onaylayın. Karar verilmeden parça hiçbir akışa girmez.
     Depo stoğu <b>projelere ayrılmamış serbest havuzdur</b> — aynı malzemeyi başka bir proje de görüyor olabilir.
     Rezervasyon emri gönderin: depocu sayıma göre tam/kısmi onaylar, onaylanan stoktan düşüp projeye ayrılır, eksik satın almaya düşer.
@@ -7645,6 +7650,7 @@ async function renderMipList(){
 
   if(!proje){
     if(sum) sum.innerHTML = '';
+    if(typeof mipUpdateSub==='function') mipUpdateSub(null);
     const yayinVar = projectBoms.some(p=>p.status==='published');
     el.innerHTML = h`<div class="empty-state" style="padding:26px"><span class="emoji"></span>${
       yayinVar ? 'Yukarıdan bir proje seçin' : 'Henüz yayınlanmış ürün ağacı yok — Ürün Ağacı sekmesinden bir ağacı projeye bağlayıp yayınlayın'}</div>`;
@@ -7678,6 +7684,7 @@ async function renderMipList(){
     });
 
   if(sum) sum.innerHTML = mipSummaryHTML(_mipRows, _mipPendingRows.length, _mipProduceRows.length, _mipPoolRows.length);
+  if(typeof mipUpdateSub==='function') mipUpdateSub(proje, gruplar.length, _mipPendingRows.length);
 
   if(!gruplar.length){
     el.innerHTML = h`<div class="empty-state" style="padding:26px"><span class="emoji"></span>Bu projenin yayınlanmış ağacında parça yok</div>`;
@@ -7808,11 +7815,26 @@ async function renderMipList(){
   el.innerHTML = h`${bekleyenHTML}${satinHTML}${uretHTML}${havuzHTML}`;
 }
 
+// (tasarım 2026) Başlık alt satırı: "Proje · son hesap HH:MM · N kalem, K karar bekliyor"
+function mipUpdateSub(proje, kalem, bekleyen){
+  const el = document.getElementById('mip-sub');
+  if(!el) return;
+  if(proje){
+    const saat = new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});
+    el.textContent = proje + ' · son hesap ' + saat + ' · ' + kalem + ' kalem'
+      + (bekleyen ? ', ' + bekleyen + ' karar bekliyor' : ', tüm kararlar verildi');
+  } else {
+    el.textContent = 'İhtiyaç listesi · Depo rezervasyonu · Plaka/profil kesim planlama';
+  }
+}
+
 function mipSummaryHTML(rows, pendingCount = 0, produceCount = 0, poolCount = 0){
   const say = s => rows.filter(r=>r.status===s).length;
-  const kutu = (etiket, adet, renk) => h`<div style="flex:1;min-width:120px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid ${raw(renk)};border-radius:6px;padding:10px 14px">
-      <div style="font-family:var(--font-mono);font-size:20px;color:${raw(renk)}">${adet}</div>
-      <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:650;letter-spacing:.07em">${etiket}</div>
+  // (tasarım 2026) Konsept KPI dili: etiket üstte renk noktalı, değer MÜREKKEP
+  // (renkli büyük rakam yasak — renk yalnız noktada)
+  const kutu = (etiket, adet, renk) => h`<div class="mip-kpi" style="--c:${raw(renk)}">
+      <div class="lb"><i></i>${etiket}</div>
+      <div class="vl">${adet}</div>
     </div>`;
   return h`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
     ${pendingCount?kutu('Karar bekleyen', pendingCount, '#f5a623'):''}
@@ -7862,13 +7884,13 @@ function mipRowHTML(r, idx){
           &nbsp;·&nbsp; Stok: <b style="color:${raw(r.stockTotal>0?'var(--green,#2ecc71)':'var(--muted)')}">${mipNum(r.stockTotal)}</b>
           ${r.reserved?h`&nbsp;·&nbsp; Rezerve: <b style="color:${raw(MIP_STATUS.RESERVED.color)}">${mipNum(r.reserved)}</b>`:''}
           ${r.received?h`&nbsp;·&nbsp; Mal kabul: <b style="color:var(--green,#2ecc71)">${mipNum(r.received)}</b>`:''}
-          ${r.ordered?h`&nbsp;·&nbsp; Siparişte: <b style="color:#2980b9">${mipNum(r.ordered)}</b>`:''}
+          ${r.ordered?h`&nbsp;·&nbsp; Siparişte: <b style="color:var(--info)">${mipNum(r.ordered)}</b>`:''}
           ${r.planned?h`&nbsp;·&nbsp; Planlandı: ${mipNum(r.planned)}`:''}
           ${r.missing?h`&nbsp;·&nbsp; ⚠ Eksik: <b style="color:${raw(MIP_STATUS.MISSING.color)}">${mipNum(r.missing)}</b>`:''}
         </div>
         <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">${dagilim}</div>
-        <div style="font-family:var(--font-mono);font-size:11px;color:#2980b9;margin-top:3px">${mipSuggest(r)}</div>
-        ${r.rejectInfo?h`<div style="font-family:var(--font-mono);font-size:11px;color:#e74c3c;margin-top:3px">⚠ Depo ${r.rejectInfo.status==='REJECTED'?'ret verdi':'kısmi karşıladı ('+mipNum(r.rejectInfo.approved)+'/'+mipNum(r.rejectInfo.requested)+')'}${r.rejectInfo.reason?': '+r.rejectInfo.reason:''}${r.rejectInfo.at?' · '+r.rejectInfo.at.slice(0,16).replace('T',' '):''} — gerekirse tekrar talep gönderilebilir</div>`:''}
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--info);margin-top:3px">${mipSuggest(r)}</div>
+        ${r.rejectInfo?h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--red);margin-top:3px">⚠ Depo ${r.rejectInfo.status==='REJECTED'?'ret verdi':'kısmi karşıladı ('+mipNum(r.rejectInfo.approved)+'/'+mipNum(r.rejectInfo.requested)+')'}${r.rejectInfo.reason?': '+r.rejectInfo.reason:''}${r.rejectInfo.at?' · '+r.rejectInfo.at.slice(0,16).replace('T',' '):''} — gerekirse tekrar talep gönderilebilir</div>`:''}
       </div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${aksiyon}${alBtn}<button class="btn btn-ghost btn-sm" onclick="mipChangeDecisionPurchase(${raw(String(Number(idx)))})" title="Satın alma kararını üretime çevir (10. tur B3)">kararı değiştir</button></div>
     </div>
