@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YnbW5qq908zb86AYZa5hkOXhnoUpB3OdgKxtQ4lXrNRU5Eph5ciaZe646hmqfio
+\restrict QOxx1Gaf8ghVkXaIcneZQ2Cmv6bDleJ5RVPN72LejC8GYx8n6v6ET0ITccsY70w
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -202,6 +202,24 @@ CREATE TABLE public.materials (
 
 
 --
+-- Name: order_documents; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.order_documents (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    order_id uuid NOT NULL,
+    category character varying(20) DEFAULT 'QUOTE'::character varying NOT NULL,
+    filename character varying(300) NOT NULL,
+    content_type character varying(150),
+    size_bytes bigint,
+    data bytea NOT NULL,
+    uploaded_by character varying(150),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT order_documents_category_check CHECK (((category)::text = ANY ((ARRAY['QUOTE'::character varying, 'ORDER'::character varying])::text[])))
+);
+
+
+--
 -- Name: order_items; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -229,10 +247,13 @@ CREATE TABLE public.orders (
     delivery_days integer,
     total_price numeric(15,2),
     currency character varying(10) DEFAULT 'TRY'::character varying,
-    status character varying(20) DEFAULT 'ACTIVE'::character varying,
+    status character varying(20) DEFAULT 'active'::character varying,
     approved_by uuid,
     notes text,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    approved_at timestamp without time zone,
+    approval_note text,
+    CONSTRAINT orders_status_chk CHECK (((status)::text = ANY ((ARRAY['quote'::character varying, 'quote_lost'::character varying, 'active'::character varying, 'pending'::character varying, 'completed'::character varying, 'cancelled'::character varying])::text[])))
 );
 
 
@@ -731,6 +752,14 @@ ALTER TABLE ONLY public.materials
 
 
 --
+-- Name: order_documents order_documents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.order_documents
+    ADD CONSTRAINT order_documents_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: order_items order_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1201,6 +1230,13 @@ CREATE INDEX idx_wres_status ON public.warehouse_reservations USING btree (statu
 
 
 --
+-- Name: order_documents_order_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX order_documents_order_idx ON public.order_documents USING btree (order_id);
+
+
+--
 -- Name: parts_order_code_ci_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1284,6 +1320,14 @@ ALTER TABLE ONLY public.delivery_notes
 
 ALTER TABLE ONLY public.departments
     ADD CONSTRAINT departments_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: order_documents order_documents_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.order_documents
+    ADD CONSTRAINT order_documents_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
 
 
 --
@@ -1602,5 +1646,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YnbW5qq908zb86AYZa5hkOXhnoUpB3OdgKxtQ4lXrNRU5Eph5ciaZe646hmqfio
+\unrestrict QOxx1Gaf8ghVkXaIcneZQ2Cmv6bDleJ5RVPN72LejC8GYx8n6v6ET0ITccsY70w
 

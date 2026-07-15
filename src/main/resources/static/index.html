@@ -436,6 +436,8 @@
   .osb-pending{background:var(--warn-soft);color:var(--warn);}
   .osb-completed{background:var(--info-soft);color:var(--info);}
   .osb-cancelled{background:color-mix(in srgb,var(--mut) 13%,transparent);color:var(--muted);}
+  .osb-quote{background:var(--vio-soft);color:var(--vio);}
+  .osb-quotelost{background:var(--err-soft);color:var(--red);}
   .order-meta-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:14px;}
   .order-meta-item{background:var(--surface2);border-radius:9px;padding:8px 12px;}
   .order-meta-item label{font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px;letter-spacing:.08em;}
@@ -895,6 +897,13 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
     <button class="hbtn pri" id="order-form-toggle" onclick="toggleOrderForm()">+ Yeni Sipariş</button>
   </div>
 
+  <!-- (12. tur m1) Teklif / Onaylanan ayrımı — Teklifler alt sekmesi yalnız
+       orders_quotes yetkisine (veya developer'a) görünür; API de filtreler -->
+  <div class="planning-tabs" id="orders-tabs" style="margin-bottom:16px">
+    <button class="planning-tab active" data-otab="orders" onclick="switchOrdersTab('orders')">Onaylanan Siparişler</button>
+    <button class="planning-tab" data-otab="quotes" id="orders-quotes-tab" onclick="switchOrdersTab('quotes')" style="display:none">Teklifler</button>
+  </div>
+
   <!-- YENİ SİPARİŞ FORMU (toggleOrderForm ile açılır; yetkisize hiç görünmez) -->
   <div class="form-card" id="order-form-card" style="display:none">
     <div style="font-size:16px;font-weight:700;margin-bottom:20px">+ Yeni Sipariş</div>
@@ -934,10 +943,12 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
       </div>
       <div class="form-group"><label>Durum</label>
         <select id="o-status">
-          <option value="active">Aktif</option>
+          <option value="quote">Teklif (onay bekliyor)</option>
+          <option value="active" selected>Aktif</option>
           <option value="pending">Beklemede</option>
           <option value="completed">Tamamlandı</option>
           <option value="cancelled">İptal</option>
+          <option value="quote_lost">Teklif — kabul edilmedi</option>
         </select>
       </div>
     </div>
@@ -959,6 +970,8 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
       <option value="pending">Beklemede</option>
       <option value="completed">Tamamlandı</option>
       <option value="cancelled">İptal</option>
+      <option value="quote">Teklif</option>
+      <option value="quote_lost">Teklif — kabul edilmedi</option>
     </select>
   </div>
   <div id="orders-list"></div>
@@ -1597,6 +1610,7 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
       <div class="perm-item" data-perm="stats" onclick="togglePerm(this)"><div class="perm-check"></div>İstatistik</div>
       <div class="perm-item" data-perm="orders_view" onclick="togglePerm(this)"><div class="perm-check"></div>Siparişler (Görüntüle)</div>
       <div class="perm-item" data-perm="orders_edit" onclick="togglePerm(this)"><div class="perm-check"></div>Siparişler (Düzenle)</div>
+      <div class="perm-item" data-perm="orders_quotes" onclick="togglePerm(this)" title="Teklifler alt sekmesi + teklif dosyaları — verilmezse teklif kayıtları API'de bile görünmez (12. tur m1)"><div class="perm-check"></div>Teklifler</div>
       <div class="perm-item" data-perm="purchasing" onclick="togglePerm(this)"><div class="perm-check"></div>Satın Alma</div>
       <div class="perm-item" data-perm="warehouse" onclick="togglePerm(this)"><div class="perm-check"></div>Depo</div>
       <div class="perm-item" data-perm="delivery" onclick="togglePerm(this)"><div class="perm-check"></div>İrsaliye</div>
@@ -2132,6 +2146,8 @@ const TABLE_ENDPOINTS = {
   work_orders: 'work-orders',
   work_order_parts: 'work-order-parts',
   work_order_revisions: 'work-order-revisions',
+  order_documents: 'order-documents', // (12. tur m1) teklif/sipariş dosyaları
+
   workspaces: 'workspaces',
   workspace_members: 'workspace-members',
   bom_products: 'bom-products',
@@ -4174,7 +4190,7 @@ function partRowHTML(p, i, showDelete){
 function renderDeptProjectSel(){
   const dp = document.getElementById('d-project');
   if(!dp) return;
-  const orderProjects = orders.map(o=>o.project_name).filter(Boolean).sort();
+  const orderProjects = activeOrders().map(o=>o.project_name).filter(Boolean).sort(); // (12. tur m1) teklifler hariç
   const curDp = dp.value;
   dp.innerHTML = h`<option value="">— Sipariş seçin —</option>${
     orderProjects.map(pr=>h`<option value="${pr}"${pr===curDp?raw(' selected'):''}>${pr}</option>`)}`;
@@ -5113,8 +5129,24 @@ function toggleOrderForm(open){
   const formCard = document.getElementById('order-form-card');
   if(formCard) formCard.style.display = _orderFormOpen ? 'block' : 'none';
   const btn = document.getElementById('order-form-toggle');
-  if(btn) btn.textContent = _orderFormOpen ? '✕ Formu Kapat' : '+ Yeni Sipariş';
+  const quotesView = (typeof _ordersView!=='undefined' && _ordersView==='quotes');
+  if(btn) btn.textContent = _orderFormOpen ? '✕ Formu Kapat' : (quotesView ? '+ Yeni Teklif' : '+ Yeni Sipariş');
+  // (12. tur m1) Teklifler sekmesinden yeni kayıt açılırsa durum 'Teklif' gelir
+  if(_orderFormOpen && quotesView && !_editOrderId){
+    const st = document.getElementById('o-status');
+    if(st) st.value = 'quote';
+  }
   if(_orderFormOpen && formCard) formCard.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+// (12. tur m1) Teklifler ÜRETİM AKIŞINA GİRMEZ: dashboard sayımları, proje
+// seçicileri (iş emri, proje tarihi, ürün ağacı bağlama, satın alma, irsaliye)
+// yalnız onaylanmış siparişleri görür. Teklif onaylanınca (active) akışa girer.
+function activeOrders(){
+  return orders.filter(o=>{
+    const s = (o.status||'').toLowerCase();
+    return s!=='quote' && s!=='quote_lost';
+  });
 }
 
 async function renderOrders() {
@@ -5149,19 +5181,33 @@ async function renderOrders() {
   const freshPi = await dbGet('purchase_items');
   if(Array.isArray(freshPi)) purchaseItems = freshPi;
 
+  // (12. tur m1) Teklif/Onaylanan ayrımı: alt sekme görünürlüğü orders_quotes
+  // yetkisine bağlı (API listesi de yetkisize quote döndürmez — çift katman)
+  const _operms = currentUser ? (Array.isArray(currentUser.permissions)?currentUser.permissions:JSON.parse(currentUser.permissions||'[]')) : [];
+  const canQuotes = (currentUser?.role==='developer') || _operms.includes('orders_quotes');
+  const isQ = s => ['quote','quote_lost'].includes((s||'').toLowerCase());
+  const view = (typeof _ordersView!=='undefined' && canQuotes) ? _ordersView : 'orders';
+  const qtab = document.getElementById('orders-quotes-tab');
+  if(qtab && qtab.style) qtab.style.display = canQuotes ? '' : 'none';
+  const quotes  = orders.filter(o=>isQ(o.status));
+  const regular = orders.filter(o=>!isQ(o.status));
+
   // Başlık altı özet (konsept phead sub'ı — gerçek sayılar)
   const subEl = document.getElementById('orders-sub');
   if(subEl){
-    const nAct = orders.filter(o=>o.status==='active').length;
-    subEl.textContent = orders.length
-      ? `${orders.length} sipariş · ${nAct} aktif · ${parts.length} üretim parçası`
-      : 'Proje siparişlerini oluştur ve yönet';
+    const nAct = regular.filter(o=>o.status==='active').length;
+    subEl.textContent = view==='quotes'
+      ? `${quotes.length} teklif · ${quotes.filter(o=>o.status==='quote').length} onay bekliyor · ${quotes.filter(o=>o.status==='quote_lost').length} kabul edilmedi`
+      : (regular.length
+        ? `${regular.length} sipariş · ${nAct} aktif · ${parts.length} üretim parçası${canQuotes&&quotes.length?` · ${quotes.filter(o=>o.status==='quote').length} teklif bekliyor`:''}`
+        : 'Proje siparişlerini oluştur ve yönet');
   }
 
   const search = (document.getElementById('order-search')?.value||'').toLowerCase();
   const statusF = document.getElementById('order-status-filter')?.value||'';
 
-  const filtered = orders.filter(o=>
+  const base = view==='quotes' ? quotes : regular;
+  const filtered = base.filter(o=>
     (!search || (o.project_name||'').toLowerCase().includes(search) || (o.customer_name||'').toLowerCase().includes(search)) &&
     (!statusF || o.status === statusF)
   ).sort((a,b) => {
@@ -5174,14 +5220,14 @@ async function renderOrders() {
   const list = document.getElementById('orders-list');
   if(!list) return;
   if(!filtered.length) {
-    list.innerHTML = h`<div class="empty-state">${raw(ico('clipboard',36))}Henüz sipariş eklenmedi</div>`;
+    list.innerHTML = h`<div class="empty-state">${raw(ico('clipboard',36))}${view==='quotes'?'Henüz teklif yok — "+ Yeni Teklif" ile başlayın (durumu Teklif seçili gelir)':'Henüz sipariş eklenmedi'}</div>`;
     return;
   }
 
   const pinnedOrders = filtered.filter(o => isPinned('order', o.id));
   list.innerHTML = h`${pinnedOrders.length > 0 ? raw('<div class="pinned-label">'+ico('push',11)+' Sabitlenmiş Siparişler</div>') : ''}${filtered.map(o => {
     const items = Array.isArray(o.items) ? o.items : (typeof o.items==='string'?JSON.parse(o.items||'[]'):[]);
-    const statusMap = { active:{cls:'osb-active',lbl:'Aktif'}, pending:{cls:'osb-pending',lbl:'Beklemede'}, completed:{cls:'osb-completed',lbl:'Tamamlandı'}, cancelled:{cls:'osb-cancelled',lbl:'İptal'} };
+    const statusMap = { active:{cls:'osb-active',lbl:'Aktif'}, pending:{cls:'osb-pending',lbl:'Beklemede'}, completed:{cls:'osb-completed',lbl:'Tamamlandı'}, cancelled:{cls:'osb-cancelled',lbl:'İptal'}, quote:{cls:'osb-quote',lbl:'Teklif'}, quote_lost:{cls:'osb-quotelost',lbl:'Kabul Edilmedi'} };
     const st = statusMap[o.status] || statusMap.active;
     const priceStr = o.price ? Number(o.price).toLocaleString('tr-TR',{minimumFractionDigits:2}) + ' ' + (o.currency||'TRY') : '—';
     const createdAt = o.created_at ? new Date(o.created_at).toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
@@ -5248,12 +5294,175 @@ async function renderOrders() {
           ${matStr?h`<div class="order-price-sub" style="margin-top:4px">${raw(ico('coins',11))} Malzeme bedeli: <b style="color:var(--accent)">${matStr}</b></div>`:''}
         </div>
         <div class="order-actions">
+          ${o.status==='quote'&&canEdit?h`<button class="btn btn-primary btn-sm" onclick="orderQuoteApprove('${raw(o.id)}')">✔ Onayla → Siparişe Çevir</button>
+          <button class="btn btn-ghost btn-sm" onclick="orderQuoteLost('${raw(o.id)}')" style="color:var(--red)">Kabul Edilmedi</button>`:''}
+          ${o.status==='quote_lost'&&canEdit?h`<button class="btn btn-ghost btn-sm" onclick="orderQuoteReopen('${raw(o.id)}')">↩ Teklife Geri Al</button>`:''}
+          ${(canEdit||canQuotes)?h`<button class="btn btn-ghost btn-sm" onclick="orderDocsToggle('${raw(o.id)}')" title="Teklif/sipariş dosyaları — PDF, sözleşme, revizyon (12. tur m1)">${raw(ico('folder',12))} Dosyalar</button>`:''}
           <button class="btn btn-ghost btn-sm" onclick="editOrder('${raw(o.id)}')" style="${canEdit?'':'display:none'}">${raw(ico('edit',12))} Düzenle</button>
           <button class="btn btn-ghost btn-sm" onclick="deleteOrder('${raw(o.id)}')" style="color:var(--red);border-color:transparent;${canEdit?'':'display:none'}">${raw(ico('trash',12))} Sil</button>
         </div>
       </div>
+      ${o.approval_note?h`<div style="font-size:11px;color:var(--muted);margin-top:6px">${raw(ico('note',10))} ${o.status==='quote_lost'?'Gerekçe':'Onay notu'}: ${o.approval_note}${o.approved_at?' · '+new Date(o.approved_at).toLocaleString('tr-TR'):''}</div>`:''}
+      <div id="odocs-${raw(o.id)}" style="display:none;margin-top:10px;border-top:1px dashed var(--border);padding-top:10px"></div>
     </div>`;
   })}`;
+}
+
+// ═══ (12. tur m1) TEKLİF AKIŞI ═══
+// PUT tam gövde ister (items alanı null OLMAYAN boş liste kalemleri siler —
+// backend clear+recreate deseni); mevcut kalemler aynen geri gönderilir.
+function _orderFullPayload(o, patch){
+  const items = Array.isArray(o.items)?o.items:(typeof o.items==='string'?JSON.parse(o.items||'[]'):[]);
+  return Object.assign({
+    project_name:o.project_name, location:o.location||'', customer_name:o.customer_name||'',
+    customer_email:o.customer_email||'', customer_phone:o.customer_phone||'',
+    delivery_days:o.delivery_days||null, price:o.price||null, currency:o.currency||'TRY',
+    approved_by:o.approved_by||'', status:o.status||'active', notes:o.notes||'',
+    approval_note:o.approval_note||null,
+    items: items.map(it=>({name:it.name, desc:it.desc, qty:it.qty}))
+  }, patch);
+}
+
+let _ordersView = 'orders';
+function switchOrdersTab(v){
+  _ordersView = v;
+  document.querySelectorAll('#orders-tabs .planning-tab').forEach(b=>
+    b.classList.toggle('active', b.dataset.otab===v));
+  const btn = document.getElementById('order-form-toggle');
+  if(btn) btn.textContent = v==='quotes' ? '+ Yeni Teklif' : '+ Yeni Sipariş';
+  renderOrders();
+}
+
+// Teklifi onayla → aynı kayıt 'active' olur (bağlar kopmaz), approved_at backend'de damgalanır
+function orderQuoteApprove(id){
+  const o = orders.find(x=>x.id===id);
+  if(!o) return;
+  document.getElementById('oqa-overlay')?.remove();
+  const overlay=document.createElement('div'); overlay.className='modal-overlay open'; overlay.id='oqa-overlay';
+  overlay.innerHTML=`<div class="modal" style="width:440px;text-align:left">
+    <h3 style="margin-bottom:4px">Teklifi Onayla → Siparişe Çevir</h3>
+    <p style="font-size:11.5px;color:var(--muted);margin-bottom:14px">${esc(o.project_name)} — onaylanınca "Onaylanan Siparişler"e taşınır, onay tarihi damgalanır; üretim/planlama akışlarına girer.</p>
+    <div class="form-group" style="margin-bottom:16px"><label>Onay notu (isteğe bağlı)</label>
+      <input type="text" id="oqa-note" placeholder="Örn: müşteri onayı 16.07 e-posta" style="${INP()}"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('oqa-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" id="oqa-confirm">✔ Onayla</button>
+    </div></div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#oqa-confirm').onclick = async ()=>{
+    const bitti = btnBusy('oqa-confirm','Onaylanıyor…'); if(!bitti) return;
+    try{
+      const note = document.getElementById('oqa-note')?.value?.trim()||null;
+      const ok = await dbUpdate('orders', id, _orderFullPayload(o,{status:'active', approval_note:note}));
+      if(!ok) return;
+      o.status='active'; if(note) o.approval_note=note;
+      document.getElementById('oqa-overlay')?.remove();
+      toast('Teklif onaylandı — artık "Onaylanan Siparişler"de.','success');
+      switchOrdersTab('orders');
+    } finally { bitti(); }
+  };
+}
+
+async function orderQuoteLost(id){
+  const o = orders.find(x=>x.id===id);
+  if(!o) return;
+  const neden = prompt('Teklif neden kabul edilmedi? (kayıt için zorunlu)');
+  if(neden===null) return;
+  if(!neden.trim()){ toast('Gerekçe zorunlu!','error'); return; }
+  const ok = await dbUpdate('orders', id, _orderFullPayload(o,{status:'quote_lost', approval_note:neden.trim()}));
+  if(!ok) return;
+  o.status='quote_lost'; o.approval_note=neden.trim();
+  toast('Teklif "kabul edilmedi" olarak kapatıldı.','success');
+  renderOrders();
+}
+
+async function orderQuoteReopen(id){
+  const o = orders.find(x=>x.id===id);
+  if(!o || !confirm('Teklif yeniden "onay bekliyor" durumuna alınsın mı?')) return;
+  const ok = await dbUpdate('orders', id, _orderFullPayload(o,{status:'quote'}));
+  if(!ok) return;
+  o.status='quote';
+  toast('Teklif yeniden açıldı.','success');
+  renderOrders();
+}
+
+// ── Teklif/sipariş dosyaları (order_documents — bom_documents deseni) ──
+async function orderDocsToggle(id){
+  const box = document.getElementById('odocs-'+id);
+  if(!box) return;
+  if(box.style.display!=='none'){ box.style.display='none'; return; }
+  box.style.display='';
+  box.innerHTML = '<div style="font-size:11px;color:var(--muted)">Yükleniyor…</div>';
+  await orderDocsRender(id);
+}
+
+async function orderDocsRender(id){
+  const box = document.getElementById('odocs-'+id);
+  if(!box) return;
+  let docs = [];
+  try{ docs = await apiFetch('/order-documents?order_id='+id); }
+  catch(e){ box.innerHTML = '<div style="font-size:11px;color:var(--red)">Dosyalar yüklenemedi: '+esc(e.message||'yetki?')+'</div>'; return; }
+  docs = Array.isArray(docs)?docs:[];
+  box.innerHTML = h`
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+      <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Dosyalar · ${docs.length}</span>
+      <input type="file" id="odoc-file-${raw(id)}" multiple style="font-size:11px">
+      <button class="btn btn-ghost btn-sm" onclick="orderDocUpload('${raw(id)}')">⬆ Yükle</button>
+    </div>
+    ${docs.length?h`${docs.map(d=>h`<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px dashed var(--border);font-size:11.5px;flex-wrap:wrap">
+      <span class="chipk">${d.category==='QUOTE'?'teklif':'sipariş'}</span>
+      <span style="min-width:0;overflow:hidden;text-overflow:ellipsis">${d.filename}</span>
+      <span style="color:var(--muted);font-size:10.5px">${fmtBytes(d.size_bytes)}${d.uploaded_by?h` · ${d.uploaded_by}`:''} · ${(d.created_at||'').slice(0,10)}</span>
+      <span style="margin-left:auto;display:flex;gap:4px">
+        <button class="btn btn-ghost btn-sm" onclick="orderDocDownload('${raw(d.id)}','${raw(ea(d.filename))}')" title="İndir">${raw(ico('download',12))}</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="orderDocDelete('${raw(d.id)}','${raw(id)}')" title="Sil">${raw(ico('trash',12))}</button>
+      </span>
+    </div>`)}`:h`<div style="font-size:11px;color:var(--muted)">Henüz dosya yok — teklif PDF'i, sözleşme, revizyon dosyası yükleyin.</div>`}`;
+}
+
+async function orderDocUpload(orderId){
+  const inp = document.getElementById('odoc-file-'+orderId);
+  const files = [...(inp?.files||[])];
+  if(!files.length){ toast('Dosya seçin!','error'); return; }
+  const o = orders.find(x=>x.id===orderId);
+  const cat = ['quote','quote_lost'].includes((o?.status||'').toLowerCase()) ? 'QUOTE' : 'ORDER';
+  let ok = 0;
+  for(const f of files){
+    const fd = new FormData();
+    fd.append('file', f);
+    fd.append('order_id', orderId);
+    fd.append('category', cat);
+    fd.append('uploaded_by', currentUser?.display_name||currentUser?.username||'');
+    try{
+      // apiFetch kullanılamaz: multipart boundary'yi tarayıcı koymalı (docs deseni)
+      const r = await fetch(API_BASE_URL+'/order-documents', {method:'POST',
+        headers: authToken?{Authorization:'Bearer '+authToken}:{}, body: fd});
+      if(r.ok) ok++;
+      else { const j = await r.json().catch(()=>null); toast((j&&j.message)||('Yükleme hatası (HTTP '+r.status+')'),'error'); }
+    }catch(e){ toast('Yükleme hatası: '+e.message,'error'); }
+  }
+  if(ok) toast(ok+' dosya yüklendi','success');
+  orderDocsRender(orderId);
+}
+
+async function orderDocDownload(id, fname){
+  try{
+    const r = await fetch(API_BASE_URL+'/order-documents/'+id+'/download',
+      {headers: authToken?{Authorization:'Bearer '+authToken}:{}});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = fname||'dosya'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  }catch(e){ toast('İndirilemedi: '+e.message,'error'); }
+}
+
+async function orderDocDelete(id, orderId){
+  if(!confirm('Dosya silinsin mi?')) return;
+  try{ await apiFetch('/order-documents/'+id, {method:'DELETE'}); }
+  catch(e){ toast(e.message||'Silinemedi','error'); return; }
+  toast('Dosya silindi','success');
+  orderDocsRender(orderId);
 }
 
 // Sipariş kalemleri
@@ -5422,7 +5631,7 @@ function renderPdForm() {
   if(!sel) return;
   const cur = sel.value;
   sel.innerHTML = h`<option value="">— Sipariş seçin —</option>${
-    orders.map(o=>h`<option value="${o.project_name}"${o.project_name===cur?raw(' selected'):''}>${o.project_name}</option>`)}`;
+    activeOrders().map(o=>h`<option value="${o.project_name}"${o.project_name===cur?raw(' selected'):''}>${o.project_name}</option>`)}`;
 }
 
 async function loadAndRenderPd() {
@@ -5958,13 +6167,13 @@ async function initWorkOrders() {
   const proj = document.getElementById('wo-project');
   if (proj) {
     proj.innerHTML = '<option value="">— Proje seçin —</option>' +
-      orders.map(o=>`<option value="${esc(o.project_name)}">${esc(o.project_name)}</option>`).join('');
+      activeOrders().map(o=>`<option value="${esc(o.project_name)}">${esc(o.project_name)}</option>`).join('');
   }
   // Proje filtre dropdown (liste)
   const projF = document.getElementById('wo-project-filter');
   if (projF) {
     const cur = projF.value;
-    const projNames = [...new Set(orders.map(o=>o.project_name).filter(Boolean))].sort();
+    const projNames = [...new Set(activeOrders().map(o=>o.project_name).filter(Boolean))].sort();
     projF.innerHTML = '<option value="">Tüm Projeler</option>' +
       projNames.map(n=>`<option value="${n}"${n===cur?' selected':''}>${n}</option>`).join('');
   }
@@ -6307,7 +6516,7 @@ async function renderWorkOrders() {
   const projF_el = document.getElementById('wo-project-filter');
   if (projF_el) {
     const allProjs = [...new Set([
-      ...orders.map(o=>o.project_name),
+      ...activeOrders().map(o=>o.project_name),
       ...workOrders.map(w=>w.project_name)
     ].filter(Boolean))].sort();
     const cur = projF_el.value;
@@ -8645,7 +8854,7 @@ async function renderPurchasing(){
   if(sel){
     const cur = sel.value;
     const projNames = [...new Set([
-      ...orders.map(o=>o.project_name),
+      ...activeOrders().map(o=>o.project_name),
       ...purchaseItems.map(i=>i.project_name)
     ].filter(Boolean))].sort();
     sel.innerHTML = '<option value="">— Tüm projeler —</option>' +
@@ -11265,7 +11474,7 @@ async function renderDelivery(){
   const sel = document.getElementById('dn-order');
   if(sel){
     const cur = sel.value;
-    sel.innerHTML = h`<option value="">— Proje yok —</option>${orders.map(o=>h`<option value="${o.id}">${o.project_name}</option>`)}`;
+    sel.innerHTML = h`<option value="">— Proje yok —</option>${activeOrders().map(o=>h`<option value="${o.id}">${o.project_name}</option>`)}`;
     sel.value = cur;
   }
   renderDnDetail();
@@ -12456,7 +12665,7 @@ async function renderAppUsers() {
   list.innerHTML = h`${nonDev.map(u => {
     const perms = Array.isArray(u.permissions) ? u.permissions : JSON.parse(u.permissions||'[]');
     const permBadges = perms.map(p => {
-      const labels = {dashboard:'Dashboard',parts:'Parçalar',users:'Personel',stats:'İstatistik',orders:'Siparişler',orders_view:'Siparişler (Görüntüle)',orders_edit:'Siparişler (Düzenle)',planning:'Planlama',scan:'QR Okutma'};
+      const labels = {dashboard:'Dashboard',parts:'Parçalar',users:'Personel',stats:'İstatistik',orders:'Siparişler',orders_view:'Siparişler (Görüntüle)',orders_edit:'Siparişler (Düzenle)',orders_quotes:'Teklifler',planning:'Planlama',scan:'QR Okutma'};
       return h`<span style="background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:2px 8px;font-family:var(--font-mono);font-size:10px;color:var(--accent)">${labels[p]||p}</span>`;
     });
 
@@ -12490,8 +12699,8 @@ function editAppUserPerms(id) {
   const u = appUsers.find(x => x.id === id);
   if (!u) return;
   const perms = Array.isArray(u.permissions) ? u.permissions : JSON.parse(u.permissions||'[]');
-  const allPerms = ['dashboard','users','stats','orders_view','orders_edit','mip','purchasing','warehouse','delivery','planning','scan']; // (10. tur M7) parts kalktı; delivery eklendi (önceden eksikti)
-  const labels = {dashboard:'Dashboard',parts:'Parçalar',users:'Personel',stats:'İstatistik',orders_view:'Siparişler (Görüntüle)',orders_edit:'Siparişler (Düzenle)',mip:'MİP',purchasing:'Satın Alma',warehouse:'Depo',delivery:'İrsaliye',planning:'Planlama',scan:'QR Okutma'};
+  const allPerms = ['dashboard','users','stats','orders_view','orders_edit','orders_quotes','mip','purchasing','warehouse','delivery','planning','scan']; // (10. tur M7) parts kalktı; (12. tur m1) orders_quotes eklendi
+  const labels = {dashboard:'Dashboard',parts:'Parçalar',users:'Personel',stats:'İstatistik',orders_view:'Siparişler (Görüntüle)',orders_edit:'Siparişler (Düzenle)',orders_quotes:'Teklifler',mip:'MİP',purchasing:'Satın Alma',warehouse:'Depo',delivery:'İrsaliye',planning:'Planlama',scan:'QR Okutma'};
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
@@ -14467,7 +14676,7 @@ function renderPbomDropdowns() {
   const prSel = document.getElementById('pbom-project-sel');
   if(prSel) {
     const cur = prSel.value;
-    const projNames = [...new Set(orders.map(o=>o.project_name).filter(Boolean))].sort();
+    const projNames = [...new Set(activeOrders().map(o=>o.project_name).filter(Boolean))].sort();
     prSel.innerHTML = h`<option value="">— Proje seçin —</option>${
       projNames.map(n=>h`<option value="${n}">${n}</option>`)}`;
     if(projNames.includes(cur)) prSel.value = cur;

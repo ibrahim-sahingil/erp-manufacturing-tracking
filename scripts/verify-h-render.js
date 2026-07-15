@@ -220,6 +220,7 @@ global.statusBadge=()=>'<span class="badge">x</span>';
 global._woPrintSelected=new Set();
 global.dbGet=async(t)=> t==='work_order_revisions'?[{id:'rv1', work_order_id:'w1', field_changed:'Alan<b>',
   new_value:'Yeni<script>', revised_by:'Rev<img>', reason:'Sebep'+EVIL, created_at:'2026-01-01'}] : [];
+eval(grab('activeOrders')); // (12. tur m1) proje seçicileri teklifleri elemek için bunu kullanır
 eval(grab('renderWorkOrders'));
 await renderWorkOrders();
 const wo=store['wo-list']||'';

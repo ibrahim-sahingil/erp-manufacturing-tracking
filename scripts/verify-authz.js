@@ -118,6 +118,36 @@ function izinVerilmeli(ad, r) {
   izinVerilmeli('GET /bom-products', await lim('GET', '/bom-products'));
   izinVerilmeli('GET /warehouses',   await lim('GET', '/warehouses'));
 
+  console.log('\n═══ (12. tur m1) TEKLIF GIZLILIGI ═══');
+  // Teklif kaydi: orders_quotes'suz kullaniciya LISTEDE de TEK KAYITTA da donmemeli
+  const qOrder = await dev('POST', '/orders',
+    { project_name: 'AUTHZ Teklif ' + sfx, customer_name: 'AUTHZ Musteri', status: 'quote' });
+  const qList = await fetch(BASE + 'orders', { headers: { Authorization: 'Bearer ' + DEV } })
+    .then(r => r.json());
+  const qId = qList.data.find(o => o.project_name === 'AUTHZ Teklif ' + sfx)?.id;
+  if (qId) created.push(['/orders', qId]);
+  {
+    const limList = await fetch(BASE + 'orders', { headers: { Authorization: 'Bearer ' + LIM } })
+      .then(r => r.json()).catch(() => null);
+    const gorunuyor = !!(limList && limList.data || []).length
+      && limList.data.some(o => o.project_name === 'AUTHZ Teklif ' + sfx);
+    console.log((gorunuyor ? '  ❌ SIZDI — quote yetkisiz listede gorunuyor' : '  ✅ liste filtreli') + '  GET /orders (orders_quotes yok)');
+    if (gorunuyor) fail++;
+    const tek = await lim('GET', '/orders/' + qId);
+    const tekOk = tek.status === 404 || tek.status === 403 || (tek.ok === false);
+    console.log((tekOk ? '  ✅ tek kayit da gizli [' + tek.status + ']' : '  ❌ SIZDI [' + tek.status + ']') + '  GET /orders/{quoteId}');
+    if (!tekOk) fail++;
+    // developer quote'u GORMELI (filtre yalnizca yetkisize)
+    const devList = qList.data.some(o => o.id === qId);
+    console.log((devList ? '  ✅ developer teklifi goruyor' : '  ❌ developer da goremiyor!') + '  GET /orders (dev)');
+    if (!devList) fail++;
+    // Teklif dosyalari: OKUMA DAHIL kisitli (fiyat icerir)
+    reddedilmeli('GET /order-documents (teklif dosyalari — okuma da kisitli)',
+      await lim('GET', '/order-documents?order_id=' + qId));
+    reddedilmeli('DELETE /order-documents',
+      await lim('DELETE', '/order-documents/' + qId)); // id sahte; 403 yetkiden once
+  }
+
   console.log('\n═══ Kirilma kontrolu: uretim akisi YAZMA kilitli olmamali ═══');
   // Gecersiz govde ile 400/404 donebilir; onemli olan 403 (yetki) OLMAMASI.
   const yetkiEngeliOlmamali = (ad, r) => {

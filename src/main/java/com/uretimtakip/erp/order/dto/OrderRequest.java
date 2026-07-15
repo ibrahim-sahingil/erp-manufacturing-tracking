@@ -3,6 +3,7 @@ package com.uretimtakip.erp.order.dto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -68,10 +69,20 @@ public class OrderRequest {
     @Size(max = 10)
     private String currency;
 
+    /**
+     * (12. tur m1) UCLU KURAL: DB CHECK (orders_status_chk) + bu @Pattern +
+     * OrderService normalizasyonu ayni listeyi tutmali. Lowercase kanon.
+     */
     @Size(max = 20)
+    @Pattern(regexp = "quote|quote_lost|active|pending|completed|cancelled",
+            message = "Gecersiz durum (quote/quote_lost/active/pending/completed/cancelled)")
     private String status;
 
     private UUID approvedBy;
+
+    /** (12. tur m1) Teklif sureci / onay notu. */
+    @Size(max = 4000)
+    private String approvalNote;
 
     private String notes;
 

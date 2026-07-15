@@ -35,6 +35,8 @@ public class OrderResponse {
     private String currency;
     private String status;
     private UUID approvedBy;
+    private LocalDateTime approvedAt;
+    private String approvalNote;
     private String notes;
     private LocalDateTime createdAt;
     private List<OrderItemResponse> items;
@@ -52,6 +54,8 @@ public class OrderResponse {
                 .currency(order.getCurrency())
                 .status(order.getStatus())
                 .approvedBy(order.getApprovedBy())
+                .approvedAt(order.getApprovedAt())
+                .approvalNote(order.getApprovalNote())
                 .notes(order.getNotes())
                 .createdAt(order.getCreatedAt())
                 .items(order.getItems() == null ? List.of() : order.getItems().stream()

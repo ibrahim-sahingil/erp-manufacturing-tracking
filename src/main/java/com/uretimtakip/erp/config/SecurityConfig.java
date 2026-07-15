@@ -70,6 +70,12 @@ public class SecurityConfig {
                     // (frontend canEdit ile birebir; GET herkese acik kalir).
                     writeRule(auth, new String[]{"/api/orders/**"},
                             "ROLE_DEVELOPER", "orders_edit", "orders");
+                    // (12. tur m1) Teklif/siparis dosyalari FIYAT icerir —
+                    // OKUMA DAHIL tum ucler kisitli (quote gorunurlugu
+                    // OrderService listesinde ayrica filtrelenir).
+                    auth.requestMatchers("/api/order-documents/**")
+                            .hasAnyAuthority("ROLE_DEVELOPER", "orders_quotes",
+                                    "orders_edit", "orders");
                     // Kullanici yazma uclari authenticated kalir; hesap/rol/
                     // yetki degisiklikleri UserService'te alan bazli denetlenir
                     // (personel karti ekleme + kendi sifreni degistirme serbest).

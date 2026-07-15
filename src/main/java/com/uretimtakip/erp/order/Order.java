@@ -15,6 +15,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -74,12 +75,26 @@ public class Order extends BaseEntity {
     @Builder.Default
     private String currency = "TRY";
 
+    /**
+     * (12. tur m1) Durum kanonu LOWERCASE + DB CHECK (orders_status_chk):
+     * quote (teklif) / quote_lost (kaybedildi) / active / pending /
+     * completed / cancelled. Teklif onaylaninca AYNI kayit active olur —
+     * project_name baglari kopmaz.
+     */
     @Column(name = "status", length = 20)
     @Builder.Default
-    private String status = "ACTIVE";
+    private String status = "active";
 
     @Column(name = "approved_by")
     private UUID approvedBy;
+
+    /** (12. tur m1) Teklif -> siparis onayinin zamani (quote->active gecisinde damgalanir). */
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    /** (12. tur m1) Onay/teklif sureci notu. */
+    @Column(name = "approval_note", columnDefinition = "TEXT")
+    private String approvalNote;
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;

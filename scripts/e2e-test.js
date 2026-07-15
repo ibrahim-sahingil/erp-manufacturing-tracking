@@ -219,6 +219,20 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const order = await api('POST','/orders',{project_name:PROJ, customer_name:'E2E Müşteri'});
     check('sipariş oluştu', !!order); orderId = order.id;
 
+    console.log('═══ 12.TUR m1: TEKLİF → ONAY AKIŞI ═══');
+    // AYNI kayıt quote→active olur (bağlar kopmaz); geçişte approved_at damgalanır
+    const qo = await api('POST','/orders',{project_name:PROJ+'-TEKLIF', customer_name:'E2E Teklif Müşterisi', status:'quote'});
+    check('teklif oluştu (status=quote, approved_at boş)', !!qo && qo.status==='quote' && !qo.approved_at, _lastApiError||JSON.stringify({s:qo?.status}));
+    globalThis._lastApiError = null;
+    const qBad = await api('PUT','/orders/'+qo.id,{project_name:PROJ+'-TEKLIF', status:'HACKSTATUS'});
+    check('geçersiz durum @Pattern ile reddedildi', !qBad, _lastApiError||'kabul edildi!');
+    const qAct = await api('PUT','/orders/'+qo.id,{project_name:PROJ+'-TEKLIF', customer_name:'E2E Teklif Müşterisi', status:'active', approval_note:'E2E onayı'});
+    check('quote→active geçişi approved_at damgaladı + not yazıldı',
+      !!qAct && qAct.status==='active' && !!qAct.approved_at && qAct.approval_note==='E2E onayı',
+      JSON.stringify({s:qAct?.status, at:qAct?.approved_at, n:qAct?.approval_note}));
+    await api('DELETE','/orders/'+qo.id);
+    check('teklif temizlendi', !(await api('GET','/orders')||[]).some(o=>o.id===qo.id));
+
     const prod = await api('POST','/bom-products',{name:'E2E Ürün', code:'E2E-PRD-'+Date.now().toString(36)});
     check('bom ürünü oluştu', !!prod);
 

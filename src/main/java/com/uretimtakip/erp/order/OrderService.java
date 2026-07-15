@@ -12,10 +12,14 @@ import com.uretimtakip.erp.warehouse.WarehouseReservationRepository;
 import com.uretimtakip.erp.workorder.WorkOrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -34,23 +38,51 @@ public class OrderService {
     private final ProjectBomRepository projectBomRepository;
     private final WarehouseReservationRepository warehouseReservationRepository;
 
+    /**
+     * (12. tur m1) Teklif durumlari. Gorunurluk: developer veya orders_quotes
+     * yetkisi olmayan kullaniciya LISTEDE HIC DONMEZ (kullanici karari —
+     * sekme gizlemek yetmez, GET /api/orders herkese acik).
+     * UCLU KURAL: bu liste = DB CHECK (orders_status_chk) = OrderRequest @Pattern.
+     */
+    private static final Set<String> QUOTE_STATUSES = Set.of("quote", "quote_lost");
+
+    private boolean canSeeQuotes() {
+        Authentication a = SecurityContextHolder.getContext().getAuthentication();
+        if (a == null) return false;
+        return a.getAuthorities().stream().anyMatch(g ->
+                "ROLE_DEVELOPER".equals(g.getAuthority())
+                        || "orders_quotes".equals(g.getAuthority()));
+    }
+
+    private boolean quoteHidden(Order o) {
+        return QUOTE_STATUSES.contains(o.getStatus() == null ? "" : o.getStatus().toLowerCase())
+                && !canSeeQuotes();
+    }
+
     @Transactional(readOnly = true)
     public List<OrderResponse> listAll() {
         return orderRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
+                .filter(o -> !quoteHidden(o))
                 .map(OrderResponse::fromEntity)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public OrderResponse getById(UUID id) {
-        return OrderResponse.fromEntity(findEntityById(id));
+        Order order = findEntityById(id);
+        // Yetkisize teklif kaydinin VARLIGI da sizdirilmaz (404 gibi davran)
+        if (quoteHidden(order)) {
+            throw new ResourceNotFoundException("Order", "id", id);
+        }
+        return OrderResponse.fromEntity(order);
     }
 
     @Transactional(readOnly = true)
     public List<OrderResponse> listByStatus(String status) {
         return orderRepository.findByStatus(status)
                 .stream()
+                .filter(o -> !quoteHidden(o))
                 .map(OrderResponse::fromEntity)
                 .collect(Collectors.toList());
     }
@@ -73,8 +105,11 @@ public class OrderService {
                 .deliveryDays(request.getDeliveryDays())
                 .totalPrice(request.getTotalPrice())
                 .currency(request.getCurrency() != null ? request.getCurrency() : "TRY")
-                .status(request.getStatus() != null ? request.getStatus() : "ACTIVE")
+                // (12. tur m1) lowercase kanon; @Pattern zaten dogruladi
+                .status(request.getStatus() != null && !request.getStatus().isBlank()
+                        ? request.getStatus().toLowerCase() : "active")
                 .approvedBy(request.getApprovedBy())
+                .approvalNote(request.getApprovalNote())
                 .notes(request.getNotes())
                 .build();
 
@@ -119,7 +154,18 @@ public class OrderService {
         order.setDeliveryDays(request.getDeliveryDays());
         order.setTotalPrice(request.getTotalPrice());
         if (request.getCurrency() != null) order.setCurrency(request.getCurrency());
-        if (request.getStatus() != null) order.setStatus(request.getStatus());
+        // (12. tur m1) quote -> active gecisi ONAY'dir: approved_at damgalanir.
+        // Diger gecisler serbest (whitelist @Pattern + DB CHECK'te).
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            String oldStatus = order.getStatus() == null ? "" : order.getStatus().toLowerCase();
+            String newStatus = request.getStatus().toLowerCase();
+            if ("quote".equals(oldStatus) && "active".equals(newStatus)
+                    && order.getApprovedAt() == null) {
+                order.setApprovedAt(LocalDateTime.now());
+            }
+            order.setStatus(newStatus);
+        }
+        if (request.getApprovalNote() != null) order.setApprovalNote(request.getApprovalNote());
         order.setApprovedBy(request.getApprovedBy());
         order.setNotes(request.getNotes());
 
