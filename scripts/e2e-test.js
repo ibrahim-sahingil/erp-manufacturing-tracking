@@ -83,6 +83,17 @@ check('nullish/bool → boş dize',
 check('tırnak/ampersand kaçırma',
   h`${'A & "B" \'C\''}`.toString()==='A &amp; &quot;B&quot; &#39;C&#39;');
 
+// (12. tur m13) Ortak tarih-aralığı kontrolü — iş emri + proje tarihleri
+// aynı helper'ı kullanır; boş alan engel değildir.
+(0,eval)(grab('dateRangeOk'));
+console.log('═══ 12. TUR m13: dateRangeOk ═══');
+check('start < end → OK', dateRangeOk('2026-07-01','2026-07-15')===true);
+check('start = end → OK', dateRangeOk('2026-07-15','2026-07-15')===true);
+check('start > end → HATA', dateRangeOk('2026-07-16','2026-07-15')===false);
+check('datetime-local: ters saat → HATA', dateRangeOk('2026-07-15T14:00','2026-07-15T09:00')===false);
+check('boş bitiş → OK (zorunluluk çağıranın işi)', dateRangeOk('2026-07-15','')===true);
+check('boş başlangıç → OK', dateRangeOk('','2026-07-15')===true);
+
 // (11. tur F2) İş emrinin etkin bölümleri — "Tümü" ile verilen İE'nin
 // (department_id NULL) dashboard'da parçalarının bölümlerinde görünmesinin
 // saf çekirdeği. 10.tur regresyonunun bekçisi.

@@ -1745,7 +1745,7 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 
     <!-- Parça Listesi (sürükle-bırak) -->
     <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
-      <span>Parça Listesi — Hiyerarşiyi Düzenle</span>
+      <span>Parça Listesi — Hiyerarşiyi Düzenle <span style="text-transform:none;letter-spacing:0;color:var(--muted);font-weight:500">· değişiklikler anında kaydedilir</span></span>
       <div style="display:flex;gap:16px;align-items:center">
         <span style="font-size:10px;color:var(--muted)">
           <span style="color:var(--accent)">←</span> Sol = Aynı seviye &nbsp;|&nbsp;
@@ -1911,7 +1911,7 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 
   <!-- Parça Listesi -->
   <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
-    <span>Parça Listesi — Hiyerarşiyi Düzenle</span>
+    <span>Parça Listesi — Hiyerarşiyi Düzenle <span style="text-transform:none;letter-spacing:0;color:var(--muted);font-weight:500">· değişiklikler anında kaydedilir</span></span>
     <div style="display:flex;gap:12px;align-items:center">
       <span style="font-size:10px;color:var(--muted)">
         <span style="color:var(--accent)">←</span> Sol = Aynı seviye &nbsp;|&nbsp;
@@ -5394,7 +5394,7 @@ async function saveProjDate() {
   const end_date     = document.getElementById('pd-end').value;
   if(!project_name){ toast('Proje seçin!','error'); return; }
   if(!start_date||!end_date){ toast('Başlangıç ve bitiş tarihi zorunlu!','error'); return; }
-  if(start_date > end_date){ toast('Bitiş tarihi başlangıçtan önce olamaz!','error'); return; }
+  if(!dateRangeOk(start_date, end_date)){ toast('Bitiş tarihi başlangıçtan önce olamaz!','error'); return; }
   const btn = document.getElementById('pd-save-btn');
   btn.disabled=true; btn.textContent='Kaydediliyor...';
   let ok=false;
@@ -5472,7 +5472,7 @@ async function submitRevise(id, oldStart, oldEnd) {
   const revisedBy= document.getElementById('rv-user').value;
   if(!reason){ toast('Revize açıklaması zorunlu!','error'); return; }
   if(!newStart||!newEnd){ toast('Tarih alanları zorunlu!','error'); return; }
-  if(newStart>newEnd){ toast('Bitiş tarihi başlangıçtan önce olamaz!','error'); return; }
+  if(!dateRangeOk(newStart, newEnd)){ toast('Bitiş tarihi başlangıçtan önce olamaz!','error'); return; }
   // Backend revize kaydini islerken ProjectDate tarihlerini de gunceller
   // (ProjectDateRevisionService) — ayrica PUT gondermeye gerek yok.
   const rev = await dbInsert('project_date_revisions',{id:genId(),project_date_id:id,old_start:oldStart,old_end:oldEnd,new_start:newStart,new_end:newEnd,reason,revised_by:revisedBy});
@@ -5874,6 +5874,41 @@ const WO_STATUS = {
   cancelled:  { lbl:'İptal',          css:'wos-cancelled' }
 };
 
+// (12. tur m13) Ortak tarih-aralığı kontrolü: ikisi de doluysa start ≤ end
+// olmalı. date (YYYY-MM-DD) ve datetime-local değerlerinde çalışır; boş alan
+// engel değildir (zorunluluk kontrolü çağıranın işi).
+function dateRangeOk(start, end){
+  if(!start || !end) return true;
+  return new Date(start) <= new Date(end);
+}
+
+// (12. tur m12) İş emri personel dropdown'ı: alan seçiliyse workspace_members'a
+// atanmış personelle daraltılır; alan seçilmemişse tüm aktif personel.
+// Alana hiç üye atanmamışsa / üyeler personel listesinde yoksa tüm liste + ipucu.
+async function woFillUserSelect(selId, workspaceId, keep){
+  const el = document.getElementById(selId);
+  if(!el) return;
+  const cur = keep !== undefined ? keep : el.value;
+  if(workspaceId && !wsMembers.length){
+    const d = await dbGet('workspace_members','order=created_at.asc');
+    wsMembers = Array.isArray(d)?d:[];
+  }
+  const memberNames = workspaceId
+    ? new Set(wsMembers.filter(m=>m.workspace_id===workspaceId).map(m=>m.user_name))
+    : null;
+  let list = users.filter(x=>x.is_active!==false);
+  let note = '';
+  if(memberNames && memberNames.size){
+    const dar = list.filter(x=>memberNames.has(x.name));
+    if(dar.length) list = dar;
+    else note = ' (alan üyeleri personel listesinde yok — tümü)';
+  } else if(memberNames){
+    note = ' (alana personel atanmamış — tümü)';
+  }
+  el.innerHTML = '<option value="">— Seçin'+note+' —</option>' +
+    list.map(x=>`<option value="${esc(x.name)}"${x.name===cur?' selected':''}>${esc(x.name)}${x.dept?' ('+esc(x.dept)+')':''}</option>`).join('');
+}
+
 async function initWorkOrders() {
   // Proje dropdown (form)
   const proj = document.getElementById('wo-project');
@@ -5898,13 +5933,11 @@ async function initWorkOrders() {
     }
     ws.innerHTML = '<option value="">— Seçin —</option>' +
       workspaces.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('');
+    // (12. tur m12) Alan seçilince personel o alana atananlara daralır
+    ws.onchange = ()=>woFillUserSelect('wo-user', ws.value);
   }
-  // User dropdown
-  const u = document.getElementById('wo-user');
-  if (u) {
-    u.innerHTML = '<option value="">— Seçin —</option>' +
-      users.map(u=>`<option value="${esc(u.name)}">${esc(u.name)}${u.dept?' ('+esc(u.dept)+')':''}</option>`).join('');
-  }
+  // User dropdown — (m12) alana atanmış personelle filtreli doldurulur
+  woFillUserSelect('wo-user', ws?.value||'');
   // Varsayılan datetime
   const dt = document.getElementById('wo-start-dt');
   if (dt && !dt.value) {
@@ -6125,6 +6158,10 @@ async function saveWorkOrder() {
   const startDt = document.getElementById('wo-start-dt').value;
   if (!proj)   { toast('Proje seçin!', 'error'); return; }
   if (!startDt){ toast('Başlangıç tarihi zorunlu!', 'error'); return; }
+  // (12. tur m13) Bitiş, başlangıçtan önce olamaz (boş bitiş serbest)
+  if (!dateRangeOk(startDt, document.getElementById('wo-end-dt').value)) {
+    toast('Tahmini bitiş, başlangıçtan önce olamaz — tarihleri kontrol edin!', 'error'); return;
+  }
   if (!_woSelectedParts.size) { toast('Parça seçin!', 'error'); return; }
 
   // (O2) #8 engeli oluşturma yolunda da geçerli: durum "Devam Ediyor" ile
@@ -6405,6 +6442,12 @@ function openWoReviseModal(id, proj, status, user, workspace, startDt) {
     </div>
   </div>`;
   document.body.appendChild(overlay);
+  // (12. tur m12) Alan değişince personel o alana atananlara daralır (mevcut seçim korunur)
+  const worWs = document.getElementById('wor-workspace');
+  if(worWs){
+    worWs.onchange = ()=>woFillUserSelect('wor-user', (worWs.value||'').split('|')[0], document.getElementById('wor-user')?.value);
+    if(worWs.value) woFillUserSelect('wor-user', worWs.value.split('|')[0], user);
+  }
 }
 
 async function submitWoRevise(id, oldStatus, oldUser, oldWorkspace, oldDt) {
@@ -6425,6 +6468,14 @@ async function submitWoRevise(id, oldStatus, oldUser, oldWorkspace, oldDt) {
     const woPartIds = workOrderParts.filter(wp=>wp.work_order_id===id).map(wp=>wp.part_id);
     const missing = await woMissingMaterials(woPartIds);
     if(missing.length){ toast(woMaterialBlockMsg(missing),'error'); return; }
+  }
+
+  // (12. tur m13) Yeni başlangıç, iş emrinin mevcut tahmini bitişinden sonra olamaz
+  if(newDt){
+    const wo = workOrders.find(w=>w.id===id);
+    if(wo && wo.end_datetime && !dateRangeOk(newDt, wo.end_datetime)){
+      toast('Yeni başlangıç, iş emrinin tahmini bitişinden ('+new Date(wo.end_datetime).toLocaleString('tr-TR')+') sonra olamaz!','error'); return;
+    }
   }
 
   const wsId   = wsVal.split('|')[0];
@@ -13329,7 +13380,9 @@ async function onBomProductChange() {
 // hiç uygulanmıyordu — düğme hep görünüyordu, gizleyen kod da yoktu.)
 function bomToggleDeleteBtn(){
   const btn = document.getElementById('bom-delete-product-btn');
-  if(btn) btn.style.display = _activeBomProduct ? '' : 'none';
+  // (12. tur m4) Ağacın tamamını silme yalnız yetkili personelde (şimdilik
+  // developer; arkadaş ileride ayrı yetki anahtarı isteyebilir)
+  if(btn) btn.style.display = (_activeBomProduct && currentUser?.role==='developer') ? '' : 'none';
 }
 
 // (tasarım 2026) Başlık alt satırı konsept dili: "Ürün · Kod · N parça, M seviye"
@@ -13530,9 +13583,12 @@ function renderFormDims(prefix, form, values={}){
   const el = document.getElementById(prefix+'-dims');
   if(!el) return;
   const dims = FORM_DIMS[form]||FORM_DIMS[''];
-  el.style.gridTemplateColumns = 'repeat('+dims.length+',1fr)';
+  // (12. tur m3) minmax + min-width:0 + dar padding: 4-5 kolonlu formlarda
+  // (PROFIL/BORU) girilen sayı kesilmesin; kolonlar sığmazsa alta sarsın
+  el.style.gridTemplateColumns = 'repeat(auto-fit,minmax(90px,1fr))';
+  const inpS = dims.length>3 ? INP('8px 8px','13px') : INP();
   el.innerHTML = dims.map(([f,label])=>
-    `<input type="number" id="${prefix}-dim-${f}" min="0" step="any" placeholder="${label}" title="${label} (mm)" value="${dimVal(values[f])}" style="${INP()}">`).join('');
+    `<input type="number" id="${prefix}-dim-${f}" min="0" step="any" placeholder="${label}" title="${label} (mm)" value="${dimVal(values[f])}" style="${inpS};min-width:0">`).join('');
 }
 // 5 ölçüyü target'a yazar: formda sorulmayan alanlar 0 (=update'te temizle —
 // form değişince bayat ölçü kalmasın). Create'te çağıran 0'ları null'a çevirir.
@@ -15256,11 +15312,25 @@ async function pbomeRemoveOp(partId, opIdx) {
   const ops=[...oldOps];
   ops.splice(opIdx,1);
   const newCode=rebuildCodeWithOps(p.custom_code, oldOps, ops);
-  const ok=await dbUpdate('project_bom_parts',partId,{operations:ops,custom_code:newCode});
+  // (12. tur m5) Bölüm simetrisi: işlem eklerken bölüm otomatik atanıyordu ama
+  // silinince ESKİ bölüm kalıyordu (arkadaş: "işlem silip yeniden ekleyince
+  // bölüm karışıyor"). Kalan işlemlerin sonuncusundan bölüm yeniden türetilir;
+  // hiç işlem kalmadıysa dept_id'ye DOKUNULMAZ (elle atama ezilmesin).
+  const patch = {operations:ops, custom_code:newCode};
+  if(ops.length){
+    const deptAdi = opsDeptName(ops);
+    if(deptAdi){
+      const pb = projectBoms.find(x=>x.id===_activePbomId);
+      const newDeptId = await ensureProjectDept(pb?.project_name, deptAdi);
+      if(newDeptId && newDeptId !== p.dept_id) patch.dept_id = newDeptId;
+    }
+  }
+  const ok=await dbUpdate('project_bom_parts',partId,patch);
   if(!ok) return; // hata toast'ı adapter'dan geldi — yerel durumu bozma
   p.operations=ops; p.custom_code=newCode;
+  if(patch.dept_id) p.dept_id=patch.dept_id;
   pbomeRenderContent();
-  toast('İşlem kaldırıldı.','success');
+  toast('İşlem kaldırıldı'+(patch.dept_id?' — bölüm kalan işleme göre güncellendi':'')+'.','success');
 }
 
 // Parça sil

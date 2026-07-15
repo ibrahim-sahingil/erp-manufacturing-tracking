@@ -1,5 +1,6 @@
 package com.uretimtakip.erp.workorder;
 
+import com.uretimtakip.erp.common.exception.BusinessException;
 import com.uretimtakip.erp.common.exception.ResourceNotFoundException;
 import com.uretimtakip.erp.workorder.dto.WorkOrderRequest;
 import com.uretimtakip.erp.workorder.dto.WorkOrderResponse;
@@ -65,8 +66,20 @@ public class WorkOrderService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * (12. tur m13) Bitiş, başlangıçtan önce olamaz — frontend toast'ının
+     * backend güvencesi (ikisi de doluysa kontrol edilir; PARTIAL update'te
+     * yalnız gönderilen tarafla mevcut değer karşılaştırılır).
+     */
+    private void validateDateRange(java.time.LocalDateTime start, java.time.LocalDateTime end) {
+        if (start != null && end != null && end.isBefore(start)) {
+            throw new BusinessException("Bitiş tarihi başlangıçtan önce olamaz", "WO_DATE_RANGE");
+        }
+    }
+
     @Transactional
     public WorkOrderResponse create(WorkOrderRequest request) {
+        validateDateRange(request.getStartDatetime(), request.getEndDatetime());
         WorkOrder workOrder = WorkOrder.builder()
                 .orderId(request.getOrderId())
                 .departmentId(request.getDepartmentId())
@@ -108,6 +121,11 @@ public class WorkOrderService {
     @Transactional
     public WorkOrderResponse update(UUID id, WorkOrderUpdateRequest request) {
         WorkOrder workOrder = findEntityById(id);
+
+        // (12. tur m13) Etkin start/end çifti (gönderilen ?: mevcut) kontrol edilir
+        validateDateRange(
+                request.getStartDatetime() != null ? request.getStartDatetime() : workOrder.getStartDatetime(),
+                request.getEndDatetime() != null ? request.getEndDatetime() : workOrder.getEndDatetime());
 
         // PARTIAL update: sadece gonderilen (non-null) alanlar islenir.
         // Dashboard {status} tek basina yollar; revize modali da kismi yollar.
