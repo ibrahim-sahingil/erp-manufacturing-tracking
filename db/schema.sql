@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict VldLFkhW347wWKNbluzXgRhCjiaX3n0D7J3Sd5RoTUcnRCYhhBoN01pOuLgGHOs
+\restrict YnbW5qq908zb86AYZa5hkOXhnoUpB3OdgKxtQ4lXrNRU5Eph5ciaZe646hmqfio
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -289,7 +289,8 @@ CREATE TABLE public.project_bom (
     status character varying(20) DEFAULT 'draft'::character varying,
     created_by character varying(150),
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    published_at timestamp without time zone
+    published_at timestamp without time zone,
+    product_qty integer DEFAULT 1 NOT NULL
 );
 
 
@@ -1601,5 +1602,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VldLFkhW347wWKNbluzXgRhCjiaX3n0D7J3Sd5RoTUcnRCYhhBoN01pOuLgGHOs
+\unrestrict YnbW5qq908zb86AYZa5hkOXhnoUpB3OdgKxtQ4lXrNRU5Eph5ciaZe646hmqfio
 

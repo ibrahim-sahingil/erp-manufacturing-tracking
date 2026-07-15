@@ -322,6 +322,19 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
       `qty=${partBrk?.qty}, parent=${partBrk?.parent_part_id===partPlt?.id?'PLT':(partBrk?.parent_part_id===partPlt2?.id?'PLT2':'?')}`);
     check('SAC/CVT parts\'a GİRMEDİ', !parts.some(p=>p.project===PROJ&&['E2E-SAC','E2E-CVT'].includes(p.code)));
 
+    console.log('═══ 12.TUR m2: ÜRÜN ADEDİ ÇARPANI (×3 yeniden yayın) ═══');
+    // Bağın product_qty'si parça hedeflerinin ÇARPANIDIR; ×1'e geri yayınla
+    // (sonraki testler eski hedeflerle çalışır — yeniden yayın adet günceller)
+    globalThis.parts = await dbGet('parts');
+    await pbomPublishParts({project_name:PROJ, product_qty:3}, pbps, tpl);
+    const brkX3 = (await dbGet('parts')).find(p=>p.project===PROJ && p.code==='E2E-BRK');
+    check('×3 yayın: BRK hedefi 2→6', Number(brkX3?.qty)===6, brkX3?.qty);
+    globalThis.parts = await dbGet('parts');
+    await pbomPublishParts({project_name:PROJ}, pbps, tpl);
+    globalThis.parts = await dbGet('parts');
+    const brkX1 = parts.find(p=>p.project===PROJ && p.code==='E2E-BRK');
+    check('×1 geri yayın: BRK hedefi tekrar 2 (carpansiz eski davranış)', Number(brkX1?.qty)===2, brkX1?.qty);
+
     console.log('═══ 8.TUR: EKSİK, MİP\'TEN SATIN ALMAYA GÖNDERİLİR ═══');
     // Gerçek çekirdek: mipGroupParts → mipCalcRow → mipBuyQty → insert
     // (mipBuyConfirm'in yazdığı kalemle birebir alanlar).

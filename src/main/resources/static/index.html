@@ -7420,7 +7420,9 @@ function mipCodeOf(p){ return p.custom_code || p.resolved_code || null; }
 function mipNameOf(p){ return p.custom_name || p.resolved_name || null; }
 function mipQtyOf(p){
   const q = p.custom_qty != null ? p.custom_qty : (p.resolved_qty != null ? p.resolved_qty : 1);
-  return Number(q) || 0;
+  // (12. tur m2) _pqty = bağın ürün adedi çarpanı (renderMipList enjekte eder;
+  // verify-mip eski senaryoları _pqty'siz koşar → 1 = eski davranış)
+  return (Number(q) || 0) * (Number(p._pqty) || 1);
 }
 function mipKindOf(p){ return p.material_kind || p.resolved_material_kind || null; }
 
@@ -7775,11 +7777,17 @@ async function renderMipList(){
   // Bu projeye bağlı TÜM yayınlanmış ağaçların parçaları
   // (9. tur M4: yerel ad pbParts — global `parts` (üretim) gölgelenmesin,
   // üretilecekler bölümü "üretimde mi" kontrolünü global listeden yapar)
-  const pbomIds = projectBoms.filter(p=>p.project_name===proje && p.status==='published').map(p=>p.id);
+  const pubBoms = projectBoms.filter(p=>p.project_name===proje && p.status==='published');
   let pbParts = [];
-  for(const id of pbomIds){
-    const rows = await dbGet('project_bom_parts','project_bom_id=eq.'+id);
-    if(Array.isArray(rows)) pbParts = pbParts.concat(rows);
+  for(const pbx of pubBoms){
+    const rows = await dbGet('project_bom_parts','project_bom_id=eq.'+pbx.id);
+    if(Array.isArray(rows)){
+      // (12. tur m2) Bağın ürün adedi çarpanı satırlara enjekte edilir —
+      // mipQtyOf ihtiyaçları custom_qty × product_qty olarak hesaplar
+      const pq = Math.max(1, parseInt(pbx.product_qty)||1);
+      rows.forEach(r=>{ r._pqty = pq; });
+      pbParts = pbParts.concat(rows);
+    }
   }
 
   // (9. tur M4) Üç bölüm: karar bekleyen / satın alınacak / üretilecek.
@@ -14376,6 +14384,7 @@ function renderPbomDropdowns() {
 // ─── Makine ekleme akışı (arkadaş isteği, 07.07 görsel): önce proje seçilir,
 // sonra listeden makine eklenir; "+ Makine Ekle" ile 2., 3. satır açılır ───
 let _pbomMachineSel = ['']; // satır başına seçilen bom_product_id ('' = boş)
+let _pbomMachineQty = [1];  // (12. tur m2) satır başına ürün adedi (parça çarpanı)
 
 function pbomProjOnChange(){
   _pbomMachineSel = [''];
@@ -14411,6 +14420,11 @@ function pbomRenderMachineRows(){
         <option value="">— Makine seçin —</option>
         ${avail.map(p=>`<option value="${p.id}" ${p.id===val?'selected':''}>${esc(p.name)}${p.code?' ('+p.code+')':''}</option>`).join('')}
       </select>
+      <input type="number" value="${_pbomMachineQty[idx]||1}" min="1" step="1"
+        title="Bu üründen projede kaç adet var — parça adetleri bu sayıyla çarpılır (12. tur m2)"
+        style="${INP('10px 8px','13px','width:70px;flex-shrink:0;')};min-width:0"
+        onchange="_pbomMachineQty[${idx}]=Math.max(1,parseInt(this.value)||1);this.value=_pbomMachineQty[${idx}]">
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);flex-shrink:0">adet</span>
       ${_pbomMachineSel.length>1?`<button class="btn btn-ghost btn-sm" onclick="pbomRemoveMachineRow(${idx})" title="Satırı kaldır" style="color:var(--red);flex-shrink:0">✕</button>`:''}
     </div>`;
   }).join('');
@@ -14440,25 +14454,59 @@ function pbomAddMachineRow(){
   const remaining = bomProducts.filter(p=>!linked.has(p.id) && !_pbomMachineSel.includes(p.id)).length;
   if(!remaining){ toast('Eklenebilecek başka makine kalmadı!','error'); return; }
   _pbomMachineSel.push('');
+  _pbomMachineQty.push(1);
   pbomRenderMachineRows();
 }
 
 function pbomRemoveMachineRow(idx){
   _pbomMachineSel.splice(idx,1);
+  _pbomMachineQty.splice(idx,1);
   pbomRenderMachineRows();
+}
+
+// (12. tur m2) Bağın ürün adedini değiştir — yayınlanmış bağda hedefler
+// ancak "Yeniden Yayınla" ile güncellenir (kullanıcı uyarılır)
+function pbomEditProductQty(pbomId){
+  const pb = projectBoms.find(x=>x.id===pbomId);
+  if(!pb) return;
+  document.getElementById('pbomqty-overlay')?.remove();
+  const overlay=document.createElement('div'); overlay.className='modal-overlay open'; overlay.id='pbomqty-overlay';
+  overlay.innerHTML=`<div class="modal" style="width:360px;text-align:left">
+    <h3 style="margin-bottom:6px">Ürün Adedi</h3>
+    <p style="font-size:11.5px;color:var(--muted);margin-bottom:14px">${esc(pb.project_name)} — bu üründen projede kaç adet var? Ağaçtaki parça adetleri bu sayıyla çarpılır.${pb.status==='published'?'<br><b style="color:#f5a623">Yayınlanmış bağ: değişiklik üretim hedeflerine ancak YENİDEN YAYINLA ile işler.</b>':''}</p>
+    <div class="form-group" style="margin-bottom:16px"><label>Adet</label>
+      <input type="number" id="pbomqty-val" value="${pb.product_qty||1}" min="1" step="1" style="${INP('10px 12px','18px')}">
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('pbomqty-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" id="pbomqty-save">Kaydet</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#pbomqty-save').onclick = async ()=>{
+    const v = Math.max(1, parseInt(document.getElementById('pbomqty-val').value)||1);
+    const ok = await dbUpdate('project_bom', pbomId, {product_qty: v});
+    if(!ok) return;
+    pb.product_qty = v;
+    document.getElementById('pbomqty-overlay').remove();
+    toast('Ürün adedi × '+v+' kaydedildi'+(pb.status==='published'?' — hedefler için Yeniden Yayınla gerekli!':'.'),'success');
+    renderProjectBomList();
+  };
+  setTimeout(()=>{const el=document.getElementById('pbomqty-val');if(el){el.focus();el.select();}},100);
 }
 
 async function createProjectBom() {
   // Seçilen her makine için ayrı project_bom satırı
   const projName = document.getElementById('pbom-project-sel').value;
-  const prodIds  = _pbomMachineSel.filter(Boolean);
   if(!projName){ toast('Önce proje seçin!','error'); return; }
-  if(!prodIds.length){ toast('Listeden en az bir makine ekleyin!','error'); return; }
+  const rows = _pbomMachineSel.map((id,ix)=>({id, qty:Math.max(1,parseInt(_pbomMachineQty[ix])||1)})).filter(r=>r.id);
+  if(!rows.length){ toast('Listeden en az bir makine ekleyin!','error'); return; }
   let ok = 0, skipped = 0;
-  for(const bomProdId of prodIds){
-    if(projectBoms.find(pb=>pb.bom_product_id===bomProdId&&pb.project_name===projName)){ skipped++; continue; }
+  for(const r of rows){
+    if(projectBoms.find(pb=>pb.bom_product_id===r.id&&pb.project_name===projName)){ skipped++; continue; }
     const data = await dbInsert('project_bom',{
-      id: genId(), project_name: projName, bom_product_id: bomProdId,
+      id: genId(), project_name: projName, bom_product_id: r.id,
+      product_qty: r.qty, // (12. tur m2) parça adetlerinin çarpanı
       status:'draft', created_by: currentUser?.display_name||currentUser?.username||'—'
     });
     if(Array.isArray(data)&&data[0]){ projectBoms.unshift(data[0]); ok++; }
@@ -14469,6 +14517,7 @@ async function createProjectBom() {
   }
   toast(`${ok} bağlantı oluşturuldu${skipped?` (${skipped} zaten bağlıydı)`:''}! Parçaları düzenleyip yayınlayın.`,'success');
   _pbomMachineSel = [''];
+  _pbomMachineQty = [1];
   renderProjectBomList();
 }
 
@@ -14495,7 +14544,8 @@ function renderProjectBomList() {
     return h`<div class="pbom-card">
       <div class="pbom-card-header">
         <div>
-          <div class="pbom-card-title">${prod?.name||'—'} ${prod?.code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">(${prod.code})</span>`:''}</div>
+          <div class="pbom-card-title">${prod?.name||'—'} ${prod?.code?h`<span style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">(${prod.code})</span>`:''}
+            <span class="chipk" style="cursor:pointer;margin-left:6px" onclick="pbomEditProductQty('${raw(pb.id)}')" title="Ürün adedi — parça adetleri bu sayıyla çarpılır; tıklayıp değiştirin">× ${pb.product_qty||1} adet</span></div>
           <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:3px">
             ${excCount>0?excCount+' parça hariç tutuldu · ':''}
             ${isPublished?'Yayınlandı: '+new Date(pb.published_at).toLocaleDateString('tr-TR'):'Taslak'}
@@ -14575,7 +14625,9 @@ async function openPbomEditor(pbomId) {
 
   // Başlık güncelle
   document.getElementById('pbome-title').textContent = pb.project_name+' — Ürün Ağacı';
-  document.getElementById('pbome-subtitle').textContent = ''+prod.name+(prod.code?' ('+prod.code+')':'')+' · Kaynak ürün ağacından kopyalandı · Serbestçe düzenleyebilirsiniz';
+  document.getElementById('pbome-subtitle').textContent = ''+prod.name+(prod.code?' ('+prod.code+')':'')
+    +' · ürün adedi × '+(pb.product_qty||1)+' (parça adetleri çarpılır)'
+    +' · Kaynak ürün ağacından kopyalandı · Serbestçe düzenleyebilirsiniz';
   const statusBadgeEl = document.getElementById('pbome-status-badge');
   statusBadgeEl.innerHTML = pb.status==='published'
     ? '<span class="pbom-status-published">Yayınlandı</span>'
@@ -15580,6 +15632,10 @@ async function pbomPublishParts(pb, allPbParts, templateParts){
   // yazılmaz (decisionPending — MİP "Karar Bekleyen" bölümünde onay ister).
   // migration-9 yayınlanmış eski projelere türden türetilmiş karar yazdığından
   // eski ağaçlar birebir önceki davranışı sürdürür (geriye uyumluluk).
+  // (12. tur m2) Ürün adedi çarpanı: projede bu üründen N adet varsa her
+  // parçanın hedef adedi custom_qty × N (BOM patlatması). Eski bağlarda
+  // product_qty=1 (migration) → davranış birebir eski.
+  const pqty = Math.max(1, parseInt(pb.product_qty)||1);
   const prodGroups = new Map(); // codeLower → {rows, qty}
   const mipCodes = new Set();   // PURCHASE kararlılar — MİP'e düşenlerin sayısı
   const pendingCodes = new Set();
@@ -15592,7 +15648,7 @@ async function pbomPublishParts(pb, allPbParts, templateParts){
     if(dec !== 'PRODUCE'){ pendingCodes.add(code.toLowerCase()); continue; } // karar bekliyor
     const qty = Number(p.custom_qty!=null ? p.custom_qty : (p.resolved_qty!=null ? p.resolved_qty : 1)) || 1;
     const g = prodGroups.get(code.toLowerCase()) || {rows:[], qty:0};
-    g.rows.push(p); g.qty += qty;
+    g.rows.push(p); g.qty += qty * pqty;
     prodGroups.set(code.toLowerCase(), g);
   }
   res.mipPending = mipCodes.size;
@@ -15605,13 +15661,14 @@ async function pbomPublishParts(pb, allPbParts, templateParts){
   const otherProdQty = new Map(); // codeLower → qty
   const sibs = projectBoms.filter(x=>x.project_name===pb.project_name && x.id!==pb.id && x.status==='published');
   for(const sib of sibs){
+    const sibPqty = Math.max(1, parseInt(sib.product_qty)||1); // (12. tur m2) kardeş bağın çarpanı — B1 ping-pong kuralı çarpanla da korunur
     const rows = await dbGet('project_bom_parts','project_bom_id=eq.'+sib.id);
     for(const sp of (Array.isArray(rows)?rows:[])){
       const code = sp.custom_code || sp.resolved_code, name = sp.custom_name || sp.resolved_name;
       if(sp.is_excluded || !name || !code) continue;
       if(sp.procurement_decision !== 'PRODUCE') continue; // (M4) yalnız üret kararlılar
       const q = Number(sp.custom_qty!=null ? sp.custom_qty : (sp.resolved_qty!=null ? sp.resolved_qty : 1)) || 1;
-      otherProdQty.set(code.toLowerCase(), (otherProdQty.get(code.toLowerCase())||0) + q);
+      otherProdQty.set(code.toLowerCase(), (otherProdQty.get(code.toLowerCase())||0) + q * sibPqty);
     }
   }
 

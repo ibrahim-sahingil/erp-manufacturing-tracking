@@ -143,6 +143,20 @@ const mix = gruplar.find(g => g.code === 'MIX-1');
 chk('dallarda farkli karar -> mixed + decision null', mix && mix.mixed === true && mix.decision === null);
 chk('is_excluded parca elendi', !gruplar.some(g => g.code === 'X-1'));
 
+console.log('\n═══ (12. tur m2) Urun adedi carpani: _pqty ═══');
+{
+  // renderMipList bagin product_qty'sini satirlara _pqty olarak enjekte eder;
+  // mipQtyOf ihtiyaci custom_qty × _pqty hesaplar. _pqty'siz satir = 1 (eski).
+  const gC = mipGroupParts([
+    {id:'c1', custom_code:'KLN-1', custom_name:'Kolon', custom_qty:4, material_kind:'HAMMADDE', procurement_decision:'PURCHASE', _pqty:3},
+    {id:'c2', custom_code:'KLN-1', custom_name:'Kolon', custom_qty:2, material_kind:'HAMMADDE', procurement_decision:'PURCHASE'} // baska bag, carpansiz
+  ]);
+  chk('carpanli ihtiyac: 4×3 + 2×1 = 14', gC.length===1 && gC[0].need===14,
+      gC[0] && gC[0].need);
+  chk('carpansiz eski satir davranisi degismedi (1 kabul)',
+      mipQtyOf({custom_qty:5}) === 5 && mipQtyOf({custom_qty:5,_pqty:2}) === 10);
+}
+
 console.log('\n═══ POOL karari (10. tur M5) ═══');
 const gPool = mipGroupParts([
   {id:'pp1', custom_code:'PL-1', custom_name:'Plaka', custom_qty:3, material_kind:'HAMMADDE', procurement_decision:'POOL'},

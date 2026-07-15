@@ -140,6 +140,8 @@ public class ProjectBomService {
                 .status(request.getStatus() != null && !request.getStatus().isBlank()
                         ? request.getStatus() : "draft")
                 .createdBy(request.getCreatedBy())
+                // (12. tur m2) urun adedi carpani — bos gelirse 1
+                .productQty(request.getProductQty() != null ? request.getProductQty() : 1)
                 .build();
         ProjectBom savedProjectBom = projectBomRepository.save(projectBom);
 
@@ -195,6 +197,10 @@ public class ProjectBomService {
         }
         if (request.getPublishedAt() != null) {
             pb.setPublishedAt(request.getPublishedAt());
+        }
+        // (12. tur m2) urun adedi carpani — bos gelirse mevcut deger korunur
+        if (request.getProductQty() != null) {
+            pb.setProductQty(request.getProductQty());
         }
         if (request.getCreatedBy() != null && !request.getCreatedBy().isBlank()) {
             pb.setCreatedBy(request.getCreatedBy());

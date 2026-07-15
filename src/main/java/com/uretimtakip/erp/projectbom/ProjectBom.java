@@ -65,4 +65,14 @@ public class ProjectBom extends BaseEntity {
     /** Yayinlanma zamani (status 'published' oldugunda dolar). */
     @Column(name = "published_at")
     private LocalDateTime publishedAt;
+
+    /**
+     * (12. tur m2) Bu urunden projede kac adet var — parca adetlerinin CARPANI.
+     * Yayinlama hedef adedi = parca custom_qty x product_qty (BOM patlatmasi).
+     * Sablona (bom_products) konmaz: adet siparis bilgisidir, sablon tanimdir.
+     * DB: product_qty integer NOT NULL DEFAULT 1 (mevcut baglar 1 = eski davranis).
+     */
+    @Column(name = "product_qty", nullable = false)
+    @Builder.Default
+    private Integer productQty = 1;
 }

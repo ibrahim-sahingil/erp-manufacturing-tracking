@@ -1,5 +1,6 @@
 package com.uretimtakip.erp.projectbom.dto;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -58,4 +59,11 @@ public class ProjectBomRequest {
 
     /** Yayinlanma zamani (opsiyonel; frontend published_at olarak gonderir). */
     private LocalDateTime publishedAt;
+
+    /**
+     * (12. tur m2) Urun adedi carpani. CREATE'te bos gelirse 1; UPDATE'te
+     * bos gelirse mevcut deger korunur (partial update deseni — service).
+     */
+    @Min(value = 1, message = "Urun adedi en az 1 olmalidir")
+    private Integer productQty;
 }

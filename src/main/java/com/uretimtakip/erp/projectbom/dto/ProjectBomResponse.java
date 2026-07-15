@@ -32,6 +32,9 @@ public class ProjectBomResponse {
     private LocalDateTime createdAt;
     private LocalDateTime publishedAt;
 
+    /** (12. tur m2) Urun adedi carpani. */
+    private Integer productQty;
+
     /**
      * Sadece CREATE response'unda dolu olur (otomatik kopyalanan parca sayisi).
      */
@@ -46,6 +49,7 @@ public class ProjectBomResponse {
                 .createdBy(e.getCreatedBy())
                 .createdAt(e.getCreatedAt())
                 .publishedAt(e.getPublishedAt())
+                .productQty(e.getProductQty())
                 .build();
     }
 
