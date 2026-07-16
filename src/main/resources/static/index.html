@@ -9280,6 +9280,25 @@ async function mrpSendToPurchasing(id){
 // (ses 03:02 — arkadaş: "bu kritik"). Kaynak: stok özeti satırları (net>0),
 // ölçü kataloğu adıyla veya addaki "1000x2000" kalıbıyla ölçüsü çıkarılabilenler.
 let _mrpLeftovers = [];
+
+// (13. tur madde 3) Artık plakanın hangi proje(ler)e ait olduğunu bulur — SAF:
+// purchaseItems'ı parametre alır (verify-mip grab() ile test eder). Depodaki
+// IN_WAREHOUSE kalemlerden aynı depo + ad/kod eşleşmesiyle [{project_name, qty}]
+// döner (mrpUseLeftover/mrpApprove plan kalemleri, mal kabulle depoya girenler).
+// NOT (bilinçli v1 sınırı): kalemin kısmen tüketilmiş olması miktar bazında
+// hesaplanmaz — sahiplik proje düzeyinde rozet + guard olarak uygulanır.
+function mrpLeftoverOwners(r, items){
+  const map = new Map();
+  for(const i of (items||[])){
+    if(i.status!=='IN_WAREHOUSE') continue;
+    if(i.warehouse_id!==r.wh) continue;
+    if(!mipMatches(i.name, i.code, r.name, r.code)) continue;
+    const p = i.project_name || '';
+    map.set(p, (map.get(p)||0) + (Number(i.quantity)||1));
+  }
+  return [...map.entries()].map(([project_name, qty])=>({project_name, qty}));
+}
+
 function _mrpLeftoverList(){
   return whStockRows('').filter(r=>r.net>0).map(r=>{
     const dims = String(r.name||'').match(/(\d{2,5})\s*[x×]\s*(\d{2,5})/i);
@@ -9301,19 +9320,35 @@ function renderMrpLeftovers(){
     return;
   }
   const inp = INP('4px 6px','11px','width:76px;');
-  el.innerHTML = _mrpLeftovers.map((r,i)=>`
+  // (13. tur madde 3) Sahiplik: başka projeye atanmış plakada "Bunu Kullan"
+  // ÇIKMAZ, hangi projede olduğu yazılır. Sahip projeler havuzdaki SEÇİLİ
+  // kalemlerin projeleriyle örtüşüyorsa (kendi plakası) buton kalır;
+  // 'ORTAK (MRP)' ortak havuzdur, kilitlemez (A6 varsayılanı).
+  const seciliProjeler = new Set(mrpSelectedItems().map(s=>s.item.project_name).filter(Boolean));
+  el.innerHTML = _mrpLeftovers.map((r,i)=>{
+    const owners = mrpLeftoverOwners(r, purchaseItems);
+    const kilitleyen = owners.map(o=>o.project_name).filter(p=>p && p!=='ORTAK (MRP)');
+    const kilitli = kilitleyen.length>0 && !kilitleyen.every(p=>seciliProjeler.has(p));
+    const ownerHTML = owners.length
+      ? `<span style="font-size:9px;padding:1px 6px;border-radius:8px;border:1px solid ${kilitli?'rgba(231,76,60,.4)':'#16a08544'};color:${kilitli?'var(--red,#e74c3c)':'#16a085'};margin-left:4px" title="Bu stok şu proje kalemlerine bağlı (IN_WAREHOUSE): kilitliyse başka projede kullanılamaz">${owners.map(o=>o.project_name==='ORTAK (MRP)'?'Ortak havuz':'Proje: '+esc(o.project_name)).join(' · ')}</span>`
+      : '';
+    return `
     <div style="display:flex;gap:10px;align-items:center;padding:6px 4px;border-bottom:1px dashed var(--border);flex-wrap:wrap">
       <span style="font-family:var(--font-mono);font-size:11px;min-width:0;flex:1">
         ${r.code?`<span style="color:var(--accent)">${esc(r.code)}</span> — `:''}${esc(r.name)}
         <span style="color:var(--muted)"> · ${esc(whName(r.wh)||'—')} · stok ${Number(r.net.toFixed(4))} ${esc(r.unit)}</span>
+        ${ownerHTML}
       </span>
       <span style="display:flex;gap:4px;align-items:center;font-family:var(--font-mono);font-size:10px;color:var(--muted)">
         En <input type="number" id="mrplo-w-${i}" value="${r.w}" min="1" style="${inp}">
         Boy <input type="number" id="mrplo-h-${i}" value="${r.h}" min="1" style="${inp}">
         Adet <input type="number" id="mrplo-q-${i}" value="1" min="1" max="${Math.floor(r.net)}" style="${inp}">
-        <button class="btn btn-primary btn-sm" id="mrplo-use-${i}" onclick="mrpUseLeftover(${i})" title="Seçili havuz kalemlerini bu artığa yerleştir — plan kalemi depoda oluşur, depodan otomatik düşülür">Bunu Kullan</button>
+        ${kilitli
+          ? `<span style="font-size:10px;color:var(--red,#e74c3c)" title="Bu plaka ${esc(kilitleyen.join(', '))} projesine atanmış — başka projede kullanılamaz (13. tur madde 3)">başka projeye atanmış</span>`
+          : `<button class="btn btn-primary btn-sm" id="mrplo-use-${i}" onclick="mrpUseLeftover(${i})" title="Seçili havuz kalemlerini bu artığa yerleştir — plan kalemi depoda oluşur, depodan otomatik düşülür">Bunu Kullan</button>`}
       </span>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 async function mrpUseLeftover(idx){
@@ -9321,6 +9356,17 @@ async function mrpUseLeftover(idx){
   if(!r) return;
   const sel = mrpSelectedItems();
   if(!sel.length){ toast('Önce havuzdan kalem seçin!','error'); return; }
+  // (13. tur madde 3) Guard: render'ı baypas eden bayat DOM'a karşı — plaka
+  // başka projeye atanmışsa ve seçili kalemler o projelerin değilse kullanılamaz.
+  {
+    const owners = mrpLeftoverOwners(r, purchaseItems);
+    const kilitleyen = owners.map(o=>o.project_name).filter(p=>p && p!=='ORTAK (MRP)');
+    const secili = new Set(sel.map(s=>s.item.project_name).filter(Boolean));
+    if(kilitleyen.length>0 && !kilitleyen.every(p=>secili.has(p))){
+      toast('Bu plaka "'+kilitleyen.join(', ')+'" projesine atanmış — başka projede kullanılamaz.','error');
+      return;
+    }
+  }
   const noDim = sel.filter(s=>!(s.w>0 && s.h>0));
   if(noDim.length){ toast('Ölçüsü eksik kalemler var (En×Boy girin): '+noDim.map(s=>s.item.code||s.item.name).join(', '),'error'); return; }
   const W = parseFloat(document.getElementById('mrplo-w-'+idx)?.value)||0;

@@ -63,6 +63,7 @@ eval(grab('mipPlanInfoOf')); // (12. tur m9)
 eval(grab('mrpKonsolideProfil')); // (12. tur m8 bağımlılığı)
 eval(grab('mrpOptimumProfil'));   // (12. tur m8)
 eval(grab('mrpItemDims'));        // (12. tur m7)
+eval(grab('mrpLeftoverOwners'));  // (13. tur madde 3)
 
 const WH = [{id: 'A', name: 'A-Depo'}, {id: 'B', name: 'B-Depo'}];
 const mv = (whId, name, code, type, qty) =>
@@ -399,6 +400,31 @@ chk('serbest PLANNED -> engel yok (null)', mipGuardMsg([gk()]) === null);
 chk('mesaj kalem adlarini listeler (ilk 3 + fazlasi)',
     mipGuardMsg([gk({status:'ORDERED', code:'A1'}), gk({status:'ORDERED', code:'A2'}),
                  gk({status:'ORDERED', code:'A3'}), gk({status:'ORDERED', code:'A4'})]).msg.includes('A1, A2, A3 +1'));
+
+console.log('\n═══ mrpLeftoverOwners: artik plakanin proje sahipligi (13. tur madde 3) ═══');
+// Depodaki IN_WAREHOUSE kalemler ayni depo + ad/kod eslesmesiyle sahip sayilir;
+// baska projeye atanmis plakada "Bunu Kullan" cikmaz, proje adi yazilir.
+const loRow = {name:'SAC 500x1000x5', code:null, wh:'W1', unit:'adet', net:1};
+const loItems = [
+  {name:'SAC 500x1000x5', code:null, status:'IN_WAREHOUSE', warehouse_id:'W1', project_name:'Deneme 2', quantity:1},
+  {name:'SAC 500x1000x5', code:null, status:'IN_WAREHOUSE', warehouse_id:'W2', project_name:'Baska Depo', quantity:1},   // farkli depo -> sahip degil
+  {name:'SAC 500x1000x5', code:null, status:'PLANNED',      warehouse_id:'W1', project_name:'Planli', quantity:1},        // depoda degil -> sahip degil
+  {name:'BASKA MALZEME',  code:null, status:'IN_WAREHOUSE', warehouse_id:'W1', project_name:'Alakasiz', quantity:1},      // ad tutmaz -> sahip degil
+  {name:'SAC 500x1000x5', code:null, status:'IN_WAREHOUSE', warehouse_id:'W1', project_name:'ORTAK (MRP)', quantity:2}
+];
+const loOwners = mrpLeftoverOwners(loRow, loItems);
+chk('yalniz ayni depo + IN_WAREHOUSE + ad eslesmesi sahip sayilir',
+    loOwners.length === 2 && loOwners.some(o=>o.project_name==='Deneme 2') && loOwners.some(o=>o.project_name==='ORTAK (MRP)'),
+    JSON.stringify(loOwners));
+chk('adet toplanir (ORTAK 2)', (loOwners.find(o=>o.project_name==='ORTAK (MRP)')||{}).qty === 2);
+chk('sahipsiz plaka bos dizi', mrpLeftoverOwners({name:'YOK', code:null, wh:'W1'}, loItems).length === 0);
+// kod oncelikli eslesme: kodlar farkliysa ad tutsa da birlesmez (mipMatches kurali)
+chk('farkli kod sahiplik yaratmaz',
+    mrpLeftoverOwners({name:'SAC 500x1000x5', code:'KOD-A', wh:'W1'},
+      [{name:'SAC 500x1000x5', code:'KOD-B', status:'IN_WAREHOUSE', warehouse_id:'W1', project_name:'X', quantity:1}]).length === 0);
+chk('ayni kod sahiplik yaratir (ad farkli olsa da)',
+    mrpLeftoverOwners({name:'FARKLI AD', code:'KOD-A', wh:'W1'},
+      [{name:'SAC 500x1000x5', code:'KOD-A', status:'IN_WAREHOUSE', warehouse_id:'W1', project_name:'X', quantity:1}]).length === 1);
 
 console.log('\n' + '─'.repeat(60));
 if(fail){ console.log(`❌ ${fail} kontrol BASARISIZ.`); process.exit(1); }
