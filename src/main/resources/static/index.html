@@ -1638,7 +1638,16 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
           <select id="dn-order"><option value="">— Proje yok —</option></select>
         </div>
         <div class="form-group"><label>Sevk Tarihi</label><input type="date" id="dn-shipdate"></div>
-        <div class="form-group"><label>Taşıyıcı / Plaka</label><input type="text" id="dn-carrier" placeholder="Opsiyonel"></div>
+        <div class="form-group"><label>Nakliye Firması</label><input type="text" id="dn-carrier" placeholder="Opsiyonel"></div>
+      </div>
+      <!-- (13. tur m4/F) Araç bilgileri — Sistem.pdf "5. Araç bilgileri girilir" -->
+      <div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr">
+        <div class="form-group"><label>Araç Plakası</label><input type="text" id="dn-plate" placeholder="34 ABC 123"></div>
+        <div class="form-group"><label>Şoför</label><input type="text" id="dn-driver" placeholder="Ad soyad"></div>
+        <div class="form-group"><label>Konteyner No</label><input type="text" id="dn-container" placeholder="Opsiyonel"></div>
+        <div class="form-group"><label>TIR No</label><input type="text" id="dn-tir" placeholder="Opsiyonel"></div>
+        <div class="form-group"><label>Kargo Takip No</label><input type="text" id="dn-tracking" placeholder="Opsiyonel"></div>
+        <div class="form-group"><label>Tahmini Varış</label><input type="date" id="dn-eta"></div>
       </div>
       <div class="form-group"><label>Not</label><input type="text" id="dn-notes" placeholder="Opsiyonel açıklama"></div>
       <div style="display:flex;gap:10px;margin-top:8px">
@@ -3134,6 +3143,7 @@ async function init(){
   } catch(e){ /* config yoksa location fallback */ }
   const pid = new URLSearchParams(location.search).get('part');
   const rid = new URLSearchParams(location.search).get('receive');
+  const pkid = new URLSearchParams(location.search).get('paket'); // (13. tur m4/F)
   if(pid){
     // QR tarama — önce kullanıcı girişi kontrol et
     document.getElementById('nav-tabs').style.display='none';
@@ -3177,6 +3187,27 @@ async function init(){
       hideLoading();
       document.getElementById('login-screen').style.display='flex';
       _qrReceiveId = rid;
+      showQrLoginMode(null);
+    }
+  } else if(pkid){
+    // (13. tur m4/F) QR PAKET GÖRÜNÜMÜ — paketleme zamanı + paketleyen + içerik
+    // (?part=/?receive= üçüz deseni; login-gated — halka açık uç İSTENMEDİ)
+    document.getElementById('nav-tabs').style.display='none';
+    const sideEl3 = document.querySelector('.side'); if(sideEl3) sideEl3.style.display='none';
+    const ubEl3 = document.getElementById('user-badge'), tbEl3 = document.getElementById('topbar');
+    if(ubEl3 && tbEl3) tbEl3.appendChild(ubEl3);
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-scan').classList.add('active');
+    const savedQr = sessionStorage.getItem('ut_user');
+    if(savedQr && sessionStorage.getItem('ut_token')){
+      currentUser = JSON.parse(savedQr);
+      document.getElementById('login-screen').style.display='none';
+      hideLoading();
+      renderPackageView(pkid);
+    } else {
+      hideLoading();
+      document.getElementById('login-screen').style.display='flex';
+      _qrPaketId = pkid;
       showQrLoginMode(null);
     }
   } else {
@@ -5249,8 +5280,14 @@ async function renderOrders() {
 
   // (#2 arkadaş isteği) Proje kartındaki "Malzeme bedeli" satırı için
   // satın alma kalemleri (iptaller hariç, para birimi bazında toplanır)
-  const freshPi = await dbGet('purchase_items');
+  // (13. tur m4/F) + sevkiyat rozeti için irsaliyeler (türetilmiş durum —
+  // orders'a kolon YOK; kalıcı zincir arkadaş A4 cevabına göre sonraki tur)
+  const [freshPi, freshDn] = await Promise.all([
+    dbGet('purchase_items'),
+    dbGet('delivery_notes')
+  ]);
   if(Array.isArray(freshPi)) purchaseItems = freshPi;
+  if(Array.isArray(freshDn)) deliveryNotes = freshDn;
 
   // (12. tur m1) Teklif/Onaylanan ayrımı: alt sekme görünürlüğü orders_quotes
   // yetkisine bağlı (API listesi de yetkisize quote döndürmez — çift katman)
@@ -5339,6 +5376,13 @@ async function renderOrders() {
         </div>
         <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           ${terminStr?h`<span style="font-size:11px;color:var(--muted)">Termin: <b class="num" style="color:${raw(terminLate?'var(--err)':'var(--text)')}">${terminStr}</b></span>`:''}
+          ${(()=>{ // (13. tur m4/F) sevkiyat rozeti — bağlı irsaliyelerden türetilir
+            const dns = deliveryNotes.filter(d=>d.order_id===o.id && d.status!=='CANCELLED');
+            if(!dns.length) return '';
+            const sevk = dns.some(d=>d.status==='SHIPPED');
+            const c = sevk ? '#2ecc71' : '#f5a623';
+            return h`<span title="Bağlı irsaliyelerden türetilir (Depo > İrsaliye)" style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${raw(c)}44;color:${raw(c)};background:${raw(c)}11">${sevk?'Sevk Edildi':'Sevkiyat Hazırlanıyor'}</span>`;
+          })()}
           <span class="order-status-badge ${st.cls}"><span class="dot" style="background:currentColor"></span>${st.lbl}</span>
         </span>
       </div>
@@ -6691,6 +6735,7 @@ function shipRenderPacking(){
         </div>
         <div style="display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap">
           ${acik?h`<button class="btn btn-primary btn-sm" id="shippk-close-${raw(k.id)}" onclick="shipPkgClose('${raw(k.id)}')" title="Paketi kapat — paketleyen kaydedilir, içerik kilitlenir">Paketi Kapat</button>`:''}
+          ${!acik?h`<button class="btn btn-ghost btn-sm" onclick="pkgPrint('${raw(k.id)}')" title="Paket detay PDF'i — QR kodlu (okutunca paketleme zamanı + paketleyen + içerik)">PDF + QR</button>`:''}
           ${k.status==='CLOSED'?h`<button class="btn btn-ghost btn-sm" onclick="shipPkgReopen('${raw(k.id)}')" title="İçeriği düzenlemek için yeniden aç">Yeniden Aç</button>`:''}
           ${(k.status==='OPEN'||k.status==='CLOSED')?h`<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="shipPkgDelete('${raw(k.id)}')" title="Paketi sil (içerik satırlarıyla)">${raw(ico('trash',13))}</button>`:''}
           ${(k.status==='LOADED'||k.status==='SHIPPED')?h`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">araç bağlı — Depo &gt; İrsaliye</span>`:''}
@@ -7836,6 +7881,7 @@ function loadRemembered() {
 let _qrPartId = null; // QR mod için part ID sakla
 
 let _qrReceiveId = null; // ?receive= akışında login sonrası açılacak kalem
+let _qrPaketId = null;   // (13. tur m4/F) ?paket= akışında login sonrası açılacak paket
 
 function showQrLoginMode(pid) {
   _qrPartId = pid;
@@ -7922,6 +7968,10 @@ async function doLogin() {
     // QR mal kabul — sayfa kendi verisini çeker, loadAll gerekmez
     renderReceive(_qrReceiveId);
     _qrReceiveId = null;
+  } else if(_qrPaketId) {
+    // (13. tur m4/F) QR paket görünümü — sayfa kendi verisini çeker
+    renderPackageView(_qrPaketId);
+    _qrPaketId = null;
   } else if(_qrPartId) {
     // QR girisinden sonra veriler yuklenmeli (init'te artik yuklenmiyor)
     showLoading();
@@ -12002,14 +12052,18 @@ const DN_STATUS = {
 };
 
 async function renderDelivery(){
-  const [dn, di, ws] = await Promise.all([
+  const [dn, di, ws, sp, spi] = await Promise.all([
     dbGet('delivery_notes'),
     dbGet('delivery_note_items','order=created_at.asc'),
-    dbGet('warehouses')
+    dbGet('warehouses'),
+    dbGet('shipment_packages'),      // (13. tur m4/F) paket yükleme bağı
+    dbGet('shipment_package_items')
   ]);
   deliveryNotes = Array.isArray(dn) ? dn : [];
   deliveryItems = Array.isArray(di) ? di : [];
   warehouses    = Array.isArray(ws) ? ws : warehouses;
+  if(Array.isArray(sp))  shipmentPackages = sp;
+  if(Array.isArray(spi)) shipmentPackageItems = spi;
   // Proje dropdown'u
   const sel = document.getElementById('dn-order');
   if(sel){
@@ -12053,6 +12107,12 @@ async function dnCreate(){
     order_id:    document.getElementById('dn-order').value || null,
     ship_date:   document.getElementById('dn-shipdate').value || null,
     carrier:     document.getElementById('dn-carrier').value.trim() || null,
+    vehicle_plate:     document.getElementById('dn-plate').value.trim() || null,
+    driver_name:       document.getElementById('dn-driver').value.trim() || null,
+    container_no:      document.getElementById('dn-container').value.trim() || null,
+    tir_no:            document.getElementById('dn-tir').value.trim() || null,
+    cargo_tracking_no: document.getElementById('dn-tracking').value.trim() || null,
+    eta_date:          document.getElementById('dn-eta').value || null,
     notes:       document.getElementById('dn-notes').value.trim() || null,
     created_by:  currentUser?.display_name || currentUser?.username || null
   };
@@ -12060,7 +12120,7 @@ async function dnCreate(){
   if(!Array.isArray(data)||!data[0]){ toast('İrsaliye oluşturulamadı!','error'); return; }
   deliveryNotes.unshift(data[0]);
   ensureSupplier(recipient);
-  ['dn-recipient','dn-taxno','dn-taxoffice','dn-address','dn-city','dn-district','dn-shipdate','dn-carrier','dn-notes']
+  ['dn-recipient','dn-taxno','dn-taxoffice','dn-address','dn-city','dn-district','dn-shipdate','dn-carrier','dn-plate','dn-driver','dn-container','dn-tir','dn-tracking','dn-eta','dn-notes']
     .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   dnToggleForm();
   _dnActive = data[0].id;
@@ -12122,7 +12182,12 @@ function renderDnList(){
     ].filter(Boolean).join(' · ');
     // actions statik HTML (n.id UUID) → raw ile ham geçer
     let actions = `<button class="btn btn-ghost btn-sm" onclick="dnOpen('${n.id}')">${_dnActive===n.id?'▴ Kapat':'Aç'}</button>
-      <button class="btn btn-ghost btn-sm" onclick="dnPrint('${n.id}')">PDF</button>`;
+      <button class="btn btn-ghost btn-sm" onclick="dnPrint('${n.id}')" title="Sevk irsaliyesi PDF">İrsaliye</button>`;
+    // (13. tur m4/F) Paket bağlıysa Packing List + Çeki Listesi
+    if(shipmentPackages.some(k=>k.delivery_note_id===n.id)){
+      actions += `<button class="btn btn-ghost btn-sm" onclick="dnPackingList('${n.id}')" title="Paket listesi (Packing List) PDF">Paket Listesi</button>
+        <button class="btn btn-ghost btn-sm" onclick="dnWeighList('${n.id}')" title="Çeki listesi PDF (koli/ölçü/hacim/brüt kg)">Çeki</button>`;
+    }
     if(n.status==='DRAFT'){
       actions += `<button class="btn btn-primary btn-sm" onclick="dnShip('${n.id}')">Sevk Et</button>
         <button class="btn btn-ghost btn-sm" onclick="dnSetStatus('${n.id}','CANCELLED')">✖ İptal</button>
@@ -12196,14 +12261,92 @@ function renderDnDetail(){
         <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:2px">
           ${n.note_type==='MATBUDAN'?'Matbudan':'Sevk'} · ${n.scenario||'TEMEL'}${n.carrier?' · '+n.carrier:''}${n.ship_date?' · '+new Date(n.ship_date).toLocaleDateString('tr-TR'):''}
         </div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:2px">
+          ${[n.vehicle_plate?'Plaka: '+esc(n.vehicle_plate):'', n.driver_name?'Şoför: '+esc(n.driver_name):'', n.container_no?'Konteyner: '+esc(n.container_no):'', n.tir_no?'TIR: '+esc(n.tir_no):'', n.cargo_tracking_no?'Takip: '+esc(n.cargo_tracking_no):'', n.eta_date?'Tahmini varış: '+new Date(n.eta_date).toLocaleDateString('tr-TR'):''].filter(Boolean).join(' · ')||'Araç bilgisi girilmedi — form alanları düzenleme modalında'}
+        </div>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="dnOpen('${n.id}')">▴ Kapat</button>
     </div>
     ${isDraft?'':'<div style="font-family:var(--font-mono);font-size:10px;color:var(--yellow);margin-top:8px">Sevk edilmiş irsaliye düzenlenemez — değişiklik için önce sevki geri alın.</div>'}
+    ${dnPkgSectionHTML(n)}
     <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin:14px 0 6px">Kalemler (${items.length})</div>
     ${itemRows}
     ${addRow}
   </div>`;
+}
+
+// ═══ (13. tur m4/F) İRSALİYEYE PAKET YÜKLEME ═══
+// Sevkiyat'ta kapatılan (CLOSED) paketler irsaliyeye bağlanır → LOADED;
+// dnShip bağlı paketleri SHIPPED yapar, dnUnship LOADED'a geri alır.
+function dnPkgSectionHTML(n){
+  const pkgs = shipmentPackages.filter(k=>k.delivery_note_id===n.id);
+  const proj = n.order_id ? (orders.find(o=>o.id===n.order_id)||{}).project_name : null;
+  const yuklenebilir = proj
+    ? shipmentPackages.filter(k=>k.project_name===proj && k.status==='CLOSED' && !k.delivery_note_id)
+    : [];
+  const rows = pkgs.map(k=>{
+    const adet = shipmentPackageItems.filter(it=>it.package_id===k.id).length;
+    return `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px dashed var(--border)">
+      <span style="font-family:var(--font-mono);font-size:11px;min-width:0">
+        <span style="color:var(--accent)">${esc(k.package_no)}</span>${k.name?' — '+esc(k.name):''}
+        <span style="color:var(--muted)"> · ${adet} satır${k.weight_kg!=null?' · '+Number(k.weight_kg)+' kg':''} · ${esc((SHIP_PKG_STATUS[k.status]||{}).label||k.status)}</span>
+      </span>
+      <span style="display:flex;gap:6px">
+        <button class="btn btn-ghost btn-sm" onclick="pkgPrint('${k.id}')" title="Paket detay PDF'i (QR'lı)">PDF</button>
+        ${n.status==='DRAFT'&&k.status==='LOADED'?`<button class="btn btn-ghost btn-sm" onclick="dnPkgUnload('${k.id}')" title="Paketi araçtan indir (CLOSED'a döner)">İndir</button>`:''}
+      </span>
+    </div>`;
+  }).join('');
+  return `<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin:14px 0 6px">Yüklü Paketler (${pkgs.length})</div>
+    ${rows || `<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:4px 0">Paket yüklenmedi${proj?'':' — paket yüklemek için irsaliyeyi bir projeye bağlayın'}</div>`}
+    ${n.status==='DRAFT'&&yuklenebilir.length?`<button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="dnPkgLoadModal('${n.id}')">+ Paket Yükle (${yuklenebilir.length} kapalı paket)</button>`:''}
+    ${n.status==='DRAFT'&&proj&&!yuklenebilir.length&&!pkgs.length?`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:4px">Yüklenecek kapalı paket yok — Sevkiyat &gt; Paketleme'de paket kapatın</div>`:''}`;
+}
+
+function dnPkgLoadModal(noteId){
+  const n = deliveryNotes.find(x=>x.id===noteId);
+  if(!n) return;
+  const proj = n.order_id ? (orders.find(o=>o.id===n.order_id)||{}).project_name : null;
+  const adaylar = shipmentPackages.filter(k=>k.project_name===proj && k.status==='CLOSED' && !k.delivery_note_id);
+  if(!adaylar.length){ toast('Yüklenecek kapalı paket yok.','error'); return; }
+  document.getElementById('dn-pkg-overlay')?.remove();
+  const ov = document.createElement('div'); ov.className='modal-overlay open'; ov.id='dn-pkg-overlay';
+  ov.innerHTML = `<div class="modal" style="width:520px;max-width:95vw;text-align:left">
+    <h3 style="margin-bottom:4px">Paket Yükle — ${esc(n.note_no)}</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px">Seçilen paket bu irsaliyeye/araca bağlanır (LOADED); irsaliye sevk edilince SHIPPED olur.</p>
+    <div style="max-height:45vh;overflow:auto">
+      ${adaylar.map(k=>{
+        const adet = shipmentPackageItems.filter(it=>it.package_id===k.id).length;
+        return `<div onclick="dnPkgLoad('${noteId}','${k.id}')" style="display:flex;justify-content:space-between;gap:10px;padding:9px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+          <span style="font-family:var(--font-mono);font-size:12px;min-width:0"><span style="color:var(--accent)">${esc(k.package_no)}</span>${k.name?' — '+esc(k.name):''}<span style="color:var(--muted)"> · ${adet} satır</span></span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted);white-space:nowrap">${k.weight_kg!=null?Number(k.weight_kg)+' kg':''}</span>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-ghost" onclick="document.getElementById('dn-pkg-overlay').remove()">Vazgeç</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+async function dnPkgLoad(noteId, pkgId){
+  document.getElementById('dn-pkg-overlay')?.remove();
+  const ok = await dbUpdate('shipment_packages', pkgId, {delivery_note_id: noteId, status:'LOADED'});
+  if(!ok) return; // hata toast'ı adapter'dan geldi (irsaliye bağı zorunluluğu backend'de)
+  const k = shipmentPackages.find(x=>x.id===pkgId);
+  if(k){ k.delivery_note_id = noteId; k.status='LOADED'; }
+  toast('Paket araca yüklendi.','success');
+  renderDnDetail(); renderDnList();
+}
+
+async function dnPkgUnload(pkgId){
+  const ok = await dbUpdate('shipment_packages', pkgId, {status:'CLOSED', delivery_note_id: null});
+  if(!ok) return;
+  const k = shipmentPackages.find(x=>x.id===pkgId);
+  if(k){ k.status='CLOSED'; k.delivery_note_id=null; }
+  toast('Paket araçtan indirildi.','success');
+  renderDnDetail(); renderDnList();
 }
 
 async function dnAddItem(noteId){
@@ -12309,17 +12452,29 @@ async function dnShip(id){
   await Promise.all(whItems.map(i=>mvInsert({whId:i.warehouse_id, type:'OUT', qty:i.quantity,
     unit:i.unit, name:i.item_name, code:i.item_code,
     sourceType:'DELIVERY', notes:'İrsaliye sevki: '+(n?.note_no||''), dnId:id})));
-  toast('Sevk edildi!','success');
+  // (13. tur m4/F) Bağlı paketler SHIPPED — durum zinciri: LOADED → SHIPPED
+  const bagli = shipmentPackages.filter(k=>k.delivery_note_id===id && k.status==='LOADED');
+  for(const k of bagli){
+    const okP = await dbUpdate('shipment_packages', k.id, {status:'SHIPPED'});
+    if(okP) k.status='SHIPPED';
+  }
+  toast('Sevk edildi!'+(bagli.length?' '+bagli.length+' paket SHIPPED oldu.':''),'success');
   renderDelivery();
 }
 
 async function dnUnship(id){
-  if(!confirm('Sevk geri alınsın mı? Bu irsaliyenin depo çıkışları silinecek.')) return;
+  if(!confirm('Sevk geri alınsın mı? Bu irsaliyenin depo çıkışları silinecek; bağlı paketler "araca yüklü" durumuna döner.')) return;
   const ok = await dbUpdate('delivery_notes', id, {status:'DRAFT'});
   if(!ok) return;
   const mv = await dbGet('warehouse_movements');
   const mine = (Array.isArray(mv)?mv:[]).filter(m=>m.delivery_note_id===id);
   for(const m of mine){ await dbDelete('warehouse_movements', m.id); }
+  // (13. tur m4/F) Bağlı paketler geri: SHIPPED → LOADED
+  const bagli = shipmentPackages.filter(k=>k.delivery_note_id===id && k.status==='SHIPPED');
+  for(const k of bagli){
+    const okP = await dbUpdate('shipment_packages', k.id, {status:'LOADED'});
+    if(okP) k.status='LOADED';
+  }
   toast('↩ Sevk geri alındı, depo çıkışları silindi.','success');
   renderDelivery();
 }
@@ -12401,7 +12556,11 @@ function dnPrint(id){
       <div class="block-title">Sevk Bilgileri</div>
       <table>
         <tr><td><b>Sevk Tarihi</b></td><td>${fmtD(n.ship_date)}</td></tr>
-        <tr><td><b>Taşıyıcı</b></td><td>${n.carrier||'—'}</td></tr>
+        <tr><td><b>Nakliye</b></td><td>${esc(n.carrier||'—')}</td></tr>
+        <tr><td><b>Plaka / Şoför</b></td><td>${esc([n.vehicle_plate,n.driver_name].filter(Boolean).join(' / ')||'—')}</td></tr>
+        ${n.container_no||n.tir_no?`<tr><td><b>Konteyner/TIR</b></td><td>${esc([n.container_no,n.tir_no].filter(Boolean).join(' / '))}</td></tr>`:''}
+        ${n.cargo_tracking_no?`<tr><td><b>Kargo Takip</b></td><td>${esc(n.cargo_tracking_no)}</td></tr>`:''}
+        ${n.eta_date?`<tr><td><b>Tahmini Varış</b></td><td>${fmtD(n.eta_date)}</td></tr>`:''}
         <tr><td><b>Proje</b></td><td>${proj||'—'}</td></tr>
         <tr><td><b>Durum</b></td><td>${(DN_STATUS[n.status]||{}).label||n.status}${n.shipped_at?' · '+new Date(n.shipped_at).toLocaleString('tr-TR'):''}</td></tr>
         ${n.notes?`<tr><td><b>Not</b></td><td>${esc(n.notes)}</td></tr>`:''}
@@ -12422,6 +12581,212 @@ function dnPrint(id){
   const w = window.open('','_blank','width=900,height=700');
   w.document.write(html); w.document.close(); w.focus();
   setTimeout(()=>{ w.print(); },600);
+}
+
+// ═══ (13. tur m4/F) SEVKİYAT BELGELERİ: paket PDF (QR'lı) + Packing List + Çeki Listesi ═══
+// dnPrint kardeşleri: aynı A4 dili, window.open + document.write + elle esc
+// (PDF/print blokları bilinçli h`` dışı — CLAUDE.md).
+const _SEVK_PDF_CSS = `
+  @page { size: A4; margin: 15mm 12mm; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size:11px; color:#1a1a1a; }
+  .hd { border-bottom:3px solid #f5a623; padding-bottom:10px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:flex-end; }
+  .logo { font-size:22px; font-weight:900; letter-spacing:.09em; color:#f5a623; }
+  .doc-title { font-size:16px; font-weight:800; letter-spacing:.09em; text-align:right; }
+  .doc-no { font-family:monospace; font-size:12px; color:#666; text-align:right; margin-top:2px; }
+  .items { width:100%; border-collapse:collapse; margin-bottom:14px; }
+  .items th { background:#f5f5f5; padding:6px 8px; font-size:9px; text-transform:uppercase;font-weight:650; color:#555; border:1px solid #ddd; text-align:left; }
+  .items td { padding:6px 8px; font-size:10px; border:1px solid #eee; }
+  .items tr:nth-child(even) td { background:#fafafa; }
+  .items tfoot td { background:#f5f5f5; font-weight:700; border:1px solid #ddd; }
+  .pk-head td { background:#fdf3e3 !important; font-weight:700; }
+  .meta { font-size:10px; color:#555; margin-bottom:12px; }
+  .foot { margin-top:18px; padding-top:8px; border-top:1px solid #ddd; font-size:8px; color:#999; text-align:center; }
+  @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }`;
+
+function _sevkPdfOpen(html){
+  const w = window.open('','_blank','width=900,height=700');
+  w.document.write(html); w.document.close(); w.focus();
+  setTimeout(()=>{ w.print(); },600);
+}
+
+function _pkgDims(k){
+  return [k.length_cm,k.width_cm,k.height_cm].some(x=>x!=null)
+    ? [k.length_cm,k.width_cm,k.height_cm].map(x=>x!=null?Number(x):'?').join('×')+' cm' : '—';
+}
+function _pkgVolM3(k){
+  const l=Number(k.length_cm)||0, w=Number(k.width_cm)||0, h=Number(k.height_cm)||0;
+  return (l&&w&&h) ? l*w*h/1e6 : 0;
+}
+
+// Paket detay PDF'i — QR okutulunca ?paket= sayfası açılır: paketleme zamanı,
+// paketleyen personel, içerik (Sistem.pdf madde 4)
+function pkgPrint(id){
+  const k = shipmentPackages.find(x=>x.id===id);
+  if(!k) return;
+  const items = shipmentPackageItems.filter(it=>it.package_id===id);
+  const dn = k.delivery_note_id ? deliveryNotes.find(n=>n.id===k.delivery_note_id) : null;
+  const printDate = new Date().toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const qr = qrDataUrl(QR_BASE+'?paket='+id, 110);
+  const rows = items.length ? items.map((it,ix)=>`<tr>
+      <td style="text-align:center">${ix+1}</td>
+      <td>${esc(it.item_code||'—')}</td>
+      <td>${esc(it.item_name)}</td>
+      <td style="text-align:right">${Number(it.quantity)}</td>
+      <td>${esc(it.unit||'adet')}</td>
+    </tr>`).join('')
+    : `<tr><td colspan="5" style="text-align:center;color:#999">İçerik yok</td></tr>`;
+  const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
+<title>${esc(k.package_no)} — Paket Detayı</title>
+<style>${_SEVK_PDF_CSS}</style></head><body>
+  <div class="hd">
+    <div><div class="logo">ÜretimTakip</div><div style="font-size:10px;color:#666;margin-top:4px">Düzenleme: ${printDate}</div></div>
+    <div style="display:flex;gap:14px;align-items:flex-end">
+      <div><div class="doc-title">PAKET DETAYI</div><div class="doc-no">${esc(k.package_no)} · ${esc((SHIP_PKG_STATUS[k.status]||{}).label||k.status)}</div></div>
+      ${qr?`<img src="${qr}" style="width:82px;height:82px" alt="QR">`:''}
+    </div>
+  </div>
+  <div class="meta">
+    <b>Proje:</b> ${esc(k.project_name)}${k.name?` · <b>Paket:</b> ${esc(k.name)}`:''}
+    · <b>Ölçü:</b> ${esc(_pkgDims(k))}${k.weight_kg!=null?` · <b>Ağırlık:</b> ${Number(k.weight_kg)} kg`:''}
+    ${k.packed_by?`<br><b>Paketleyen:</b> ${esc(k.packed_by)}${k.packed_at?` · <b>Paketleme zamanı:</b> ${new Date(k.packed_at).toLocaleString('tr-TR')}`:''}`:''}
+    ${dn?`<br><b>İrsaliye:</b> ${esc(dn.note_no)}${dn.vehicle_plate?` · <b>Araç:</b> ${esc(dn.vehicle_plate)}`:''}${dn.driver_name?` · <b>Şoför:</b> ${esc(dn.driver_name)}`:''}`:''}
+  </div>
+  <table class="items">
+    <thead><tr><th style="width:28px">#</th><th style="width:110px">Kod</th><th>Parça / Malzeme</th><th style="width:60px;text-align:right">Miktar</th><th style="width:50px">Birim</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="foot">QR kodu okutun: paketleme zamanı, paketleyen personel ve paket içeriği görüntülenir · ${esc(k.package_no)} · ${printDate}</div>
+</body></html>`;
+  _sevkPdfOpen(html);
+}
+
+// Packing List — irsaliyeye yüklü paketler, paket başına içerik dökümü
+function dnPackingList(dnId){
+  const n = deliveryNotes.find(x=>x.id===dnId);
+  if(!n) return;
+  const pkgs = shipmentPackages.filter(k=>k.delivery_note_id===dnId)
+    .sort((a,b)=>(a.package_no||'').localeCompare(b.package_no||''));
+  if(!pkgs.length){ toast('Bu irsaliyeye yüklü paket yok — önce Paket Yükle.','error'); return; }
+  const printDate = new Date().toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  let body = '';
+  pkgs.forEach((k,pi)=>{
+    const items = shipmentPackageItems.filter(it=>it.package_id===k.id);
+    body += `<tr class="pk-head"><td colspan="2">KOLİ ${pi+1} — ${esc(k.package_no)}${k.name?' · '+esc(k.name):''}</td>
+      <td colspan="3">${esc(_pkgDims(k))}${k.weight_kg!=null?' · '+Number(k.weight_kg)+' kg':''}</td></tr>`;
+    body += items.length ? items.map((it,ix)=>`<tr>
+        <td style="text-align:center">${pi+1}.${ix+1}</td>
+        <td>${esc(it.item_code||'—')}</td>
+        <td>${esc(it.item_name)}</td>
+        <td style="text-align:right">${Number(it.quantity)}</td>
+        <td>${esc(it.unit||'adet')}</td>
+      </tr>`).join('')
+      : `<tr><td colspan="5" style="text-align:center;color:#999">içerik yok</td></tr>`;
+  });
+  const toplamSatir = pkgs.reduce((s,k)=>s+shipmentPackageItems.filter(it=>it.package_id===k.id).length,0);
+  const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
+<title>${esc(n.note_no)} — Paket Listesi (Packing List)</title>
+<style>${_SEVK_PDF_CSS}</style></head><body>
+  <div class="hd">
+    <div><div class="logo">ÜretimTakip</div><div style="font-size:10px;color:#666;margin-top:4px">Düzenleme: ${printDate}</div></div>
+    <div><div class="doc-title">PAKET LİSTESİ / PACKING LIST</div><div class="doc-no">${esc(n.note_no)} · ${pkgs.length} koli</div></div>
+  </div>
+  <div class="meta"><b>Alıcı:</b> ${esc(n.recipient_name)}${n.vehicle_plate?` · <b>Araç:</b> ${esc(n.vehicle_plate)}`:''}${n.driver_name?` · <b>Şoför:</b> ${esc(n.driver_name)}`:''}${n.carrier?` · <b>Nakliye:</b> ${esc(n.carrier)}`:''}</div>
+  <table class="items">
+    <thead><tr><th style="width:40px">#</th><th style="width:110px">Kod</th><th>Parça / Malzeme</th><th style="width:60px;text-align:right">Miktar</th><th style="width:50px">Birim</th></tr></thead>
+    <tbody>${body}</tbody>
+    <tfoot><tr><td colspan="3">TOPLAM</td><td style="text-align:right">${pkgs.length} koli</td><td>${toplamSatir} satır</td></tr></tfoot>
+  </table>
+  <div class="foot">Bu belge ÜretimTakip ile düzenlenmiş paket listesidir · ${esc(n.note_no)} · ${printDate}</div>
+</body></html>`;
+  _sevkPdfOpen(html);
+}
+
+// Çeki Listesi — koli başına ölçü/hacim/brüt ağırlık + toplamlar
+// (kolon seti varsayılan — arkadaş A3 cevabına göre genişletilebilir)
+function dnWeighList(dnId){
+  const n = deliveryNotes.find(x=>x.id===dnId);
+  if(!n) return;
+  const pkgs = shipmentPackages.filter(k=>k.delivery_note_id===dnId)
+    .sort((a,b)=>(a.package_no||'').localeCompare(b.package_no||''));
+  if(!pkgs.length){ toast('Bu irsaliyeye yüklü paket yok — önce Paket Yükle.','error'); return; }
+  const printDate = new Date().toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  let topKg = 0, topM3 = 0;
+  const rows = pkgs.map((k,ix)=>{
+    const kg = Number(k.weight_kg)||0, m3 = _pkgVolM3(k);
+    topKg += kg; topM3 += m3;
+    const adet = shipmentPackageItems.filter(it=>it.package_id===k.id).length;
+    return `<tr>
+      <td style="text-align:center">${ix+1}</td>
+      <td>${esc(k.package_no)}</td>
+      <td>${esc(k.name||'—')}</td>
+      <td style="text-align:center">${adet}</td>
+      <td>${esc(_pkgDims(k))}</td>
+      <td style="text-align:right">${m3?m3.toFixed(3):'—'}</td>
+      <td style="text-align:right">${kg?kg.toLocaleString('tr-TR'):'—'}</td>
+    </tr>`;
+  }).join('');
+  const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
+<title>${esc(n.note_no)} — Çeki Listesi</title>
+<style>${_SEVK_PDF_CSS}</style></head><body>
+  <div class="hd">
+    <div><div class="logo">ÜretimTakip</div><div style="font-size:10px;color:#666;margin-top:4px">Düzenleme: ${printDate}</div></div>
+    <div><div class="doc-title">ÇEKİ LİSTESİ</div><div class="doc-no">${esc(n.note_no)} · ${pkgs.length} koli</div></div>
+  </div>
+  <div class="meta"><b>Alıcı:</b> ${esc(n.recipient_name)}${n.vehicle_plate?` · <b>Araç:</b> ${esc(n.vehicle_plate)}`:''}${n.tir_no?` · <b>TIR:</b> ${esc(n.tir_no)}`:''}${n.container_no?` · <b>Konteyner:</b> ${esc(n.container_no)}`:''}</div>
+  <table class="items">
+    <thead><tr><th style="width:30px">#</th><th style="width:120px">Koli No</th><th>Paket Adı</th><th style="width:50px;text-align:center">Satır</th><th style="width:110px">Ölçü (cm)</th><th style="width:70px;text-align:right">Hacim m³</th><th style="width:80px;text-align:right">Brüt kg</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="5">TOPLAM — ${pkgs.length} koli</td><td style="text-align:right">${topM3?topM3.toFixed(3):'—'}</td><td style="text-align:right">${topKg?topKg.toLocaleString('tr-TR'):'—'}</td></tr></tfoot>
+  </table>
+  <div class="foot">Bu belge ÜretimTakip ile düzenlenmiş çeki listesidir · ${esc(n.note_no)} · ${printDate}</div>
+</body></html>`;
+  _sevkPdfOpen(html);
+}
+
+// ═══ (13. tur m4/F) QR PAKET GÖRÜNÜMÜ — paket PDF'indeki QR okutulunca ═══
+// Paketleme zamanı, paketleyen personel ve paket içeriği (Sistem.pdf madde 4).
+async function renderPackageView(id){
+  const content=document.getElementById('scan-content');
+  if(!content) return;
+  content.innerHTML=h`<div class="empty-state"><div class="spinner" style="margin:0 auto"></div><p style="margin-top:16px">Yükleniyor...</p></div>`;
+  const [pk, items, dns]=await Promise.all([
+    dbGet('shipment_packages','id=eq.'+id),
+    dbGet('shipment_package_items'),
+    dbGet('delivery_notes')
+  ]);
+  const k=Array.isArray(pk)?pk.find(x=>x.id===id):null;
+  if(!k){ content.innerHTML=h`<div class="not-found"><div class="icon">⚠</div><h2>Paket Bulunamadı</h2><p>Bu QR koda ait paket kaydı mevcut değil (silinmiş olabilir).</p></div>`; return; }
+  const rows=(Array.isArray(items)?items:[]).filter(it=>it.package_id===id);
+  const dn=k.delivery_note_id?(Array.isArray(dns)?dns:[]).find(n=>n.id===k.delivery_note_id):null;
+  const st=SHIP_PKG_STATUS[k.status]||SHIP_PKG_STATUS.OPEN;
+  const dims=[k.length_cm,k.width_cm,k.height_cm].some(x=>x!=null)
+    ?[k.length_cm,k.width_cm,k.height_cm].map(x=>x!=null?Number(x):'?').join('×')+' cm':'—';
+  const bilgi=[
+    ['Proje', k.project_name||'—'],
+    ['Durum', st.label],
+    ['Ölçü', dims],
+    ['Ağırlık', k.weight_kg!=null?Number(k.weight_kg)+' kg':'—'],
+    ['Paketleyen', k.packed_by||'—'],
+    ['Paketleme zamanı', k.packed_at?new Date(k.packed_at).toLocaleString('tr-TR'):'—'],
+    ['İrsaliye / Araç', dn?(dn.note_no+(dn.vehicle_plate?' · '+dn.vehicle_plate:'')+(dn.driver_name?' · '+dn.driver_name:'')):'—']
+  ];
+  content.innerHTML=h`<div style="max-width:560px;margin:0 auto">
+    <div class="form-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="font-weight:700;font-size:16px;color:var(--ink)"><span style="font-family:var(--font-mono);color:var(--accent)">${k.package_no}</span>${k.name?h` — ${k.name}`:''}</div>
+        <span style="font-family:var(--font-mono);font-size:10px;padding:2px 10px;border-radius:10px;border:1px solid ${raw(st.color)}44;color:${raw(st.color)};background:${raw(st.color)}11">${st.label}</span>
+      </div>
+      ${bilgi.map(([kk,v])=>h`<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border)">
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:650">${kk}</span>
+        <span style="font-size:13px;text-align:right">${v}</span></div>`)}
+      <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin:14px 0 6px">Paket İçeriği (${rows.length})</div>
+      ${rows.length?rows.map(it=>h`<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dashed var(--border)">
+        <span style="font-family:var(--font-mono);font-size:12px;min-width:0">${it.item_code?h`<span style="color:var(--accent)">${it.item_code}</span>${raw(' — ')}`:''}${it.item_name}</span>
+        <span style="font-family:var(--font-mono);font-size:12px;white-space:nowrap">${mipNum(Number(it.quantity)||0)} ${it.unit||'adet'}</span>
+      </div>`):h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:6px 0">İçerik yok</div>`}
+    </div>
+  </div>`;
 }
 
 // ═══ QR MAL KABUL (arkadaş notu #4: sipariş verilen her kaleme QR'lı PDF,

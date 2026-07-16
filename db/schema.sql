@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Q3KsZ0b1pisGu2YYgoJV40b9cplVs0BP02zsojbT9hJfMPvGaeHdaLjqOT6CgGT
+\restrict lDYvvlnu5OAZulKJAYvQFxMzgUaYKqGfJi9gUVi5SkI29yx3VTTzPnwzbpqJ5Tb
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -172,6 +172,12 @@ CREATE TABLE public.delivery_notes (
     created_by character varying(100),
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     shipped_at timestamp without time zone,
+    vehicle_plate character varying(20),
+    driver_name character varying(150),
+    container_no character varying(50),
+    tir_no character varying(50),
+    cargo_tracking_no character varying(100),
+    eta_date date,
     CONSTRAINT delivery_notes_status_check CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'SHIPPED'::character varying, 'CANCELLED'::character varying])::text[])))
 );
 
@@ -1746,5 +1752,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Q3KsZ0b1pisGu2YYgoJV40b9cplVs0BP02zsojbT9hJfMPvGaeHdaLjqOT6CgGT
+\unrestrict lDYvvlnu5OAZulKJAYvQFxMzgUaYKqGfJi9gUVi5SkI29yx3VTTzPnwzbpqJ5Tb
 

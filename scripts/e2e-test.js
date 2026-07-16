@@ -161,7 +161,8 @@ const EP = {parts:'parts', purchase_items:'purchase-items', project_bom:'project
   work_orders:'work-orders', work_order_parts:'work-order-parts', orders:'orders',
   warehouses:'warehouses', warehouse_movements:'warehouse-movements',
   warehouse_reservations:'warehouse-reservations',
-  shipment_packages:'shipment-packages', shipment_package_items:'shipment-package-items'};
+  shipment_packages:'shipment-packages', shipment_package_items:'shipment-package-items',
+  delivery_notes:'delivery-notes'};
 globalThis.dbGet = async (t,q)=>{
   let d = await api('GET','/'+EP[t]);
   if(!Array.isArray(d)) return [];
@@ -686,6 +687,32 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     // temizlik: CLOSED→OPEN geri al → satır silinebilir → paketler silinir
     check('CLOSED→OPEN geri alınır', await dbUpdate('shipment_packages', pk1.id, {status:'OPEN'}));
     check('OPEN pakette satır silinir', await dbDelete('shipment_package_items', spkSatir.id));
+
+    console.log('═══ 13.TUR m4/F: ARAÇ BİLGİLERİ + PAKET→ARAÇ→SEVK ZİNCİRİ ═══');
+    // İrsaliye araç alanları (create DTO — canlı doğrulama, POOL dersi)
+    const spkDn = (await dbInsert('delivery_notes',{recipient_name:'E2E Sevk Alıcısı',
+      vehicle_plate:'34 E2E 13', driver_name:'E2E Şoför', tir_no:'TIR-13',
+      cargo_tracking_no:'TRK-13', created_by:'E2E'}))[0];
+    check('irsaliye araç alanlarıyla oluştu (plaka/şoför/TIR/takip)',
+      spkDn?.vehicle_plate==='34 E2E 13' && spkDn?.driver_name==='E2E Şoför'
+      && spkDn?.tir_no==='TIR-13' && spkDn?.cargo_tracking_no==='TRK-13',
+      JSON.stringify({p:spkDn?.vehicle_plate,s:spkDn?.driver_name}));
+    // Zincir: CLOSED → (irsaliye bağı + LOADED aynı istekte) → SHIPPED → geri
+    check('pk2 kapatıldı', await dbUpdate('shipment_packages', pk2.id, {status:'CLOSED', packed_by:'E2E'}));
+    check('OPEN paket araca yüklenemez (yalnız CLOSED)', // pk1 şu an OPEN
+      !(await dbUpdate('shipment_packages', pk1.id, {status:'LOADED', delivery_note_id:spkDn.id})));
+    check('CLOSED paket irsaliye bağı + LOADED (aynı istek)',
+      await dbUpdate('shipment_packages', pk2.id, {delivery_note_id:spkDn.id, status:'LOADED'}));
+    check('LOADED → SHIPPED (dnShip akışının paket adımı)',
+      await dbUpdate('shipment_packages', pk2.id, {status:'SHIPPED'}));
+    check('SHIPPED paket silinemez', !(await dbDelete('shipment_packages', pk2.id)));
+    check('SHIPPED → LOADED (dnUnship geri alma)',
+      await dbUpdate('shipment_packages', pk2.id, {status:'LOADED'}));
+    check('LOADED → CLOSED + araçtan indirme (bağ null)',
+      await dbUpdate('shipment_packages', pk2.id, {status:'CLOSED', delivery_note_id:null}));
+    const pk2Son = (await dbGet('shipment_packages')).find(p=>p.id===pk2.id);
+    check('bağ gerçekten kalktı', pk2Son && !pk2Son.delivery_note_id, JSON.stringify(pk2Son?.delivery_note_id));
+    check('irsaliye temizliği', await dbDelete('delivery_notes', spkDn.id));
 
     console.log('═══ E2: ONDALIK ADET ÜRETİMDE YUKARI YUVARLANIR ═══');
     // parts.total_qty INTEGER — ondalık BOM adedi eskiden sessizce kesiliyordu.

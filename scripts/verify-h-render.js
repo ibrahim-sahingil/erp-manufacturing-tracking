@@ -233,11 +233,17 @@ chk('wo: openWoReviseModal ea onclick (tırnak kaçışlı) bozulmadı', wo.incl
 
 // ── renderDnList + renderDnDetail (irsaliye) ──
 global.DN_STATUS={DRAFT:{icon:'📝',label:'Taslak',color:'#f5a623'}, SHIPPED:{icon:'🚚',label:'Sevk',color:'#2ecc71'}};
+// (13. tur m4/F) irsaliye render'ları artık paket bağını ve araç alanlarını da basar
+global.SHIP_PKG_STATUS={OPEN:{label:'Açık',color:'#f5a623'}, CLOSED:{label:'Kapatıldı',color:'#3498db'}, LOADED:{label:'Araca yüklü',color:'#8e44ad'}, SHIPPED:{label:'Sevk edildi',color:'#2ecc71'}};
 global.deliveryNotes=[{id:'d1', status:'DRAFT', note_no:'IRS-1', recipient_name:'Alıcı'+EVIL, order_id:null,
-  city:'İst<b>', district:'Kad<i>', created_by:'Yap<script>', created_at:'2026-01-01', ship_date:null}];
+  city:'İst<b>', district:'Kad<i>', created_by:'Yap<script>', created_at:'2026-01-01', ship_date:null,
+  vehicle_plate:'Plk'+EVIL, driver_name:'Şoför<b>', container_no:null, tir_no:null, cargo_tracking_no:null, eta_date:null}];
 global.deliveryItems=[{id:'di1', delivery_note_id:'d1', item_code:'K'+EVIL, item_name:'Ad'+EVIL, unit:'ad<i>',
   quantity:2, warehouse_id:null, notes:'Not<img>'}];
 global.orders=[];
+global.shipmentPackages=[{id:'dpk1', delivery_note_id:'d1', project_name:'P', package_no:'PKT-2026-0009',
+  name:'DnPaket'+EVIL, status:'LOADED', weight_kg:10, packed_by:'Pk<b>'}];
+global.shipmentPackageItems=[];
 global._dnActive='d1';
 eval(grab('renderDnList'));
 renderDnList();
@@ -246,10 +252,15 @@ console.log('\nrenderDnList / renderDnDetail (irsaliye):');
 chk('dn-list: alıcı adı onerror kaçırıldı', dl.includes('Alıcı&lt;img') && !dl.includes('Alıcı'+EVIL));
 chk('dn-list: şehir/oluşturan <script> kaçırıldı', dl.includes('İst&lt;b&gt;') && dl.includes('Yap&lt;script&gt;'));
 chk('dn-list: actions (raw) korundu', dl.includes("dnShip('d1')") && dl.includes("dnDelete('d1')"));
+chk('dn-list: paket bağlıyken belge butonları çıktı (13. tur m4/F)',
+  dl.includes("dnPackingList('d1')") && dl.includes("dnWeighList('d1')"));
+eval(grab('dnPkgSectionHTML'));
 eval(grab('renderDnDetail'));
 renderDnDetail();
 const dd=store['dn-detail']||'';
 chk('dn-detail: kalem kod/ad/not kaçırıldı', dd.includes('K&lt;img') && dd.includes('Ad&lt;img') && dd.includes('Not&lt;img'));
+chk('dn-detail: araç plakası/şoför kaçırıldı (13. tur m4/F)', dd.includes('Plk&lt;img') && dd.includes('Şoför&lt;b&gt;') && !dd.includes('Plk'+EVIL));
+chk('dn-detail: yüklü paket adı kaçırıldı + PDF butonu korundu', dd.includes('DnPaket&lt;img') && dd.includes("pkgPrint('dpk1')"));
 chk('dn-detail: kalem sil butonu (raw) korundu', dd.includes("dnDeleteItem('di1')"));
 
 // ── deptWoStripHTML (bölüm dashboard'ı iş emri şeridi) ──

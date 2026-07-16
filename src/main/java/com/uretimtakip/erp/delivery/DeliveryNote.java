@@ -43,7 +43,13 @@ import java.util.UUID;
  *   district       varchar(50)   NULL
  *   scenario       varchar(30)   DEFAULT 'TEMEL'
  *   note_type      varchar(30)   DEFAULT 'SEVK'
- *   carrier        varchar(150)  NULL (tasiyici / plaka)
+ *   carrier        varchar(150)  NULL (tasiyici / nakliye firmasi)
+ *   vehicle_plate  varchar(20)   NULL (13. tur m4/F: arac plakasi)
+ *   driver_name    varchar(150)  NULL (sofor)
+ *   container_no   varchar(50)   NULL (konteyner no)
+ *   tir_no         varchar(50)   NULL (TIR no)
+ *   cargo_tracking_no varchar(100) NULL (kargo takip no)
+ *   eta_date       date          NULL (tahmini varis)
  *   status         varchar(20)   DEFAULT 'DRAFT' (CHECK: DRAFT/SHIPPED/CANCELLED)
  *   ship_date      date          NULL (fiili sevk tarihi)
  *   notes          text          NULL
@@ -94,6 +100,25 @@ public class DeliveryNote extends BaseEntity {
 
     @Column(name = "carrier", length = 150)
     private String carrier;
+
+    // (13. tur m4/F) Arac/yukleme bilgileri — Sistem.pdf "5. Arac bilgileri girilir"
+    @Column(name = "vehicle_plate", length = 20)
+    private String vehiclePlate;
+
+    @Column(name = "driver_name", length = 150)
+    private String driverName;
+
+    @Column(name = "container_no", length = 50)
+    private String containerNo;
+
+    @Column(name = "tir_no", length = 50)
+    private String tirNo;
+
+    @Column(name = "cargo_tracking_no", length = 100)
+    private String cargoTrackingNo;
+
+    @Column(name = "eta_date")
+    private LocalDate etaDate;
 
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default

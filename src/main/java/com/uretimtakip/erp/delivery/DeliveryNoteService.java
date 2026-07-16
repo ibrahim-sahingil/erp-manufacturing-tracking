@@ -65,6 +65,12 @@ public class DeliveryNoteService {
                 .noteType(request.getNoteType() != null && !request.getNoteType().isBlank()
                         ? request.getNoteType() : "SEVK")
                 .carrier(blankToNull(request.getCarrier()))
+                .vehiclePlate(blankToNull(request.getVehiclePlate()))
+                .driverName(blankToNull(request.getDriverName()))
+                .containerNo(blankToNull(request.getContainerNo()))
+                .tirNo(blankToNull(request.getTirNo()))
+                .cargoTrackingNo(blankToNull(request.getCargoTrackingNo()))
+                .etaDate(request.getEtaDate())
                 .shipDate(request.getShipDate())
                 .notes(blankToNull(request.getNotes()))
                 .createdBy(blankToNull(request.getCreatedBy()))
@@ -93,6 +99,9 @@ public class DeliveryNoteService {
                         || request.getCity() != null || request.getDistrict() != null
                         || request.getScenario() != null || request.getNoteType() != null
                         || request.getCarrier() != null || request.getShipDate() != null
+                        || request.getVehiclePlate() != null || request.getDriverName() != null
+                        || request.getContainerNo() != null || request.getTirNo() != null
+                        || request.getCargoTrackingNo() != null || request.getEtaDate() != null
                         || request.getNotes() != null;
         if (fieldsTouched && !"DRAFT".equals(note.getStatus())) {
             throw new BusinessException(
@@ -115,6 +124,12 @@ public class DeliveryNoteService {
             note.setNoteType(request.getNoteType());
         }
         if (request.getCarrier() != null) note.setCarrier(blankToNull(request.getCarrier()));
+        if (request.getVehiclePlate() != null) note.setVehiclePlate(blankToNull(request.getVehiclePlate()));
+        if (request.getDriverName() != null) note.setDriverName(blankToNull(request.getDriverName()));
+        if (request.getContainerNo() != null) note.setContainerNo(blankToNull(request.getContainerNo()));
+        if (request.getTirNo() != null) note.setTirNo(blankToNull(request.getTirNo()));
+        if (request.getCargoTrackingNo() != null) note.setCargoTrackingNo(blankToNull(request.getCargoTrackingNo()));
+        if (request.getEtaDate() != null) note.setEtaDate(request.getEtaDate());
         if (request.getShipDate() != null) note.setShipDate(request.getShipDate());
         if (request.getNotes() != null) note.setNotes(blankToNull(request.getNotes()));
 

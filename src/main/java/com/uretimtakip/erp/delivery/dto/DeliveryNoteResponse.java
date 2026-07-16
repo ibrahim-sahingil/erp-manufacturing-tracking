@@ -33,6 +33,12 @@ public class DeliveryNoteResponse {
     private String scenario;
     private String noteType;
     private String carrier;
+    private String vehiclePlate;
+    private String driverName;
+    private String containerNo;
+    private String tirNo;
+    private String cargoTrackingNo;
+    private LocalDate etaDate;
     private String status;
     private LocalDate shipDate;
     private String notes;
@@ -54,6 +60,12 @@ public class DeliveryNoteResponse {
                 .scenario(e.getScenario())
                 .noteType(e.getNoteType())
                 .carrier(e.getCarrier())
+                .vehiclePlate(e.getVehiclePlate())
+                .driverName(e.getDriverName())
+                .containerNo(e.getContainerNo())
+                .tirNo(e.getTirNo())
+                .cargoTrackingNo(e.getCargoTrackingNo())
+                .etaDate(e.getEtaDate())
                 .status(e.getStatus())
                 .shipDate(e.getShipDate())
                 .notes(e.getNotes())

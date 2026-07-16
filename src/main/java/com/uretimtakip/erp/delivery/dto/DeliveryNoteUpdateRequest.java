@@ -56,6 +56,24 @@ public class DeliveryNoteUpdateRequest {
     @Size(max = 150, message = "Tasiyici en fazla 150 karakter olabilir")
     private String carrier;
 
+    // (13. tur m4/F) Arac/yukleme bilgileri
+    @Size(max = 20, message = "Plaka en fazla 20 karakter olabilir")
+    private String vehiclePlate;
+
+    @Size(max = 150, message = "Sofor en fazla 150 karakter olabilir")
+    private String driverName;
+
+    @Size(max = 50, message = "Konteyner no en fazla 50 karakter olabilir")
+    private String containerNo;
+
+    @Size(max = 50, message = "TIR no en fazla 50 karakter olabilir")
+    private String tirNo;
+
+    @Size(max = 100, message = "Kargo takip no en fazla 100 karakter olabilir")
+    private String cargoTrackingNo;
+
+    private LocalDate etaDate;
+
     private LocalDate shipDate;
 
     private String notes;
