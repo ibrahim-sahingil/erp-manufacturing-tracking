@@ -800,6 +800,7 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
     <button class="nav-tab" data-tab="mip" onclick="switchTab('mip')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg><span>MİP</span></button>
     <button class="nav-tab" data-tab="purchasing" onclick="switchTab('purchasing')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 4h2l2.4 11h10.2L21 8H7"/><circle cx="9.5" cy="19.5" r="1.4"/><circle cx="16.5" cy="19.5" r="1.4"/></svg><span>Satın Alma</span></button>
     <button class="nav-tab" data-tab="warehouse" onclick="switchTab('warehouse')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8l9-5 9 5v8l-9 5-9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg><span>Depo</span></button>
+    <button class="nav-tab" data-tab="shipping" onclick="switchTab('shipping')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 5h13v10H1zM14 8h4l3 3v4h-7z"/><circle cx="5.5" cy="17.5" r="1.8"/><circle cx="16.5" cy="17.5" r="1.8"/></svg><span>Sevkiyat</span></button>
     <div class="ngroup">Yönetim</div>
     <button class="nav-tab" data-tab="users" onclick="switchTab('users')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c1.4-3.4 4-5 7-5s5.6 1.6 7 5"/></svg><span>Personel</span></button>
   </div>
@@ -1344,6 +1345,66 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
     <div class="form-card" id="mrp-pending-send-card" style="margin-bottom:16px">
       <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:10px">MİP'te Bekleyenler <span style="text-transform:none">(satın almaya gönderilmemiş kalemler — arkadaş isteği: otomatik düşmesin)</span></div>
       <div id="mrp-pending-send"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SEVKİYAT (13. tur madde 4 — Sistem.pdf sevkiyat ekranı) ═══
+     1) Ağaç & Durum: proje ürün ağacı, parça bazında üretildi/üretimde/satın
+        alma/depoda durumu + paketlenen-kalan rozetleri + sevk planı filtresi
+     2) Paketleme: paket kutuları (ad+ölçü+ağırlık), ağaçtan sürükle-bırak,
+        adet bölme (3 → 2+1), otomatik benzersiz paket kodu (PKT-yıl-sıra) -->
+<div class="view" id="view-shipping">
+  <div class="dash-phead">
+    <div>
+      <h1>Sevkiyat</h1>
+      <div class="sub" id="ship-sub">Ürün ağacı durumu · Paket planlaması · Paketleme</div>
+    </div>
+    <div class="grow"></div>
+    <button class="hbtn pri" onclick="renderShipping()" title="Üretim, satın alma, depo ve paket verisini yeniden çeker">Yeniden Yükle</button>
+  </div>
+
+  <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end">
+    <div class="form-group" style="flex:1;min-width:220px;max-width:420px;margin-bottom:0"><label>Proje</label>
+      <select id="ship-project-sel" onchange="shipRenderActive()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+        <option value="">— Proje seçin —</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="planning-tabs" id="ship-tabs">
+    <button class="planning-tab active" data-shiptab="tree" onclick="switchShippingTab('tree')">Ağaç & Durum</button>
+    <button class="planning-tab" data-shiptab="pack" onclick="switchShippingTab('pack')">Paketleme</button>
+  </div>
+
+  <div class="planning-section active" id="ship-tab-tree">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;font-family:var(--font-mono);font-size:12px;color:var(--muted)">
+      <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="ship-only-planned" onchange="shipRenderTree()" style="accent-color:var(--accent)"> Yalnız sevk planındakiler (Paket Planlaması)</label>
+      <span>· plan işareti ürün ağacı düzenleyicisindeki sevk butonuyla konur</span>
+    </div>
+    <div id="ship-tree"></div>
+  </div>
+
+  <div class="planning-section" id="ship-tab-pack">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+      <div class="form-card" style="margin-bottom:0">
+        <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:10px">Sevk Edilecekler <span style="text-transform:none">(satırı sağdaki AÇIK pakete sürükleyin — adet bölünebilir)</span></div>
+        <div id="ship-pack-source"></div>
+      </div>
+      <div>
+        <div class="form-card" style="margin-bottom:16px">
+          <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:10px">+ Yeni Paket <span style="text-transform:none">(kod otomatik: PKT-yıl-sıra)</span></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
+            <input type="text" id="ship-pk-name" placeholder="Paket adı (örn. Çelik Konstrüksiyon)" style="flex:1;min-width:150px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none">
+            <input type="number" id="ship-pk-l" placeholder="Uzunluk cm" min="0" style="width:92px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none">
+            <input type="number" id="ship-pk-w" placeholder="Genişlik cm" min="0" style="width:92px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none">
+            <input type="number" id="ship-pk-h" placeholder="Yükseklik cm" min="0" style="width:94px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none">
+            <input type="number" id="ship-pk-kg" placeholder="Ağırlık kg" min="0" step="0.001" style="width:88px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none">
+            <button class="btn btn-primary btn-sm" id="ship-pk-add-btn" onclick="shipPkgCreate()">+ Paket</button>
+          </div>
+        </div>
+        <div id="ship-pack-cards"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -6381,6 +6442,365 @@ function woMatChip(p, byCode){
   return `<span style="font-family:var(--font-mono);font-size:9px;padding:1px 7px;border-radius:9px;border:1px solid ${m.color}44;color:${m.color};background:${m.color}11;margin-left:6px">${m.icon} ${m.label}</span>`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SEVKİYAT (13. tur madde 4 — Sistem.pdf sevkiyat ekranı)
+// ═══════════════════════════════════════════════════════════════════════════
+// 1) Ağaç & Durum: parts hiyerarşisi (woRenderPartsGrid deseni) + parça başına
+//    üretildi/üretimde/satın alma/depoda durumu + paketlenen/kalan rozetleri.
+// 2) Paketleme: paket kutuları; ağaç satırı sürükle-bırakla pakete konur
+//    (pbome DnD deseni), adet bölünebilir (3 → 2+1), içerik SNAPSHOT yazılır.
+// Paket kodu backend'de üretilir (PKT-yıl-sıra, DB UNIQUE — mükerrer imkânsız).
+// Durum makinesi backend whitelist'te (OPEN↔CLOSED↔LOADED↔SHIPPED).
+let shipmentPackages = [];
+let shipmentPackageItems = [];
+let _shipDragRow = null; // sürüklenen satır {key,name,code,qty,unit,partId,pbpId,kalan}
+
+const SHIP_PKG_STATUS = {
+  OPEN:    {label:'Açık',         color:'#f5a623'},
+  CLOSED:  {label:'Kapatıldı',    color:'#3498db'},
+  LOADED:  {label:'Araca yüklü',  color:'#8e44ad'},
+  SHIPPED: {label:'Sevk edildi',  color:'#2ecc71'}
+};
+
+async function renderShipping(){
+  const sel = document.getElementById('ship-project-sel');
+  if(!sel) return;
+  const cur = sel.value;
+  const projs = [...new Set(activeOrders().map(o=>o.project_name).filter(Boolean))].sort();
+  sel.innerHTML = h`<option value="">— Proje seçin —</option>${projs.map(p=>h`<option value="${p}"${p===cur?raw(' selected'):''}>${p}</option>`)}`;
+  // Taze veri: durum bileşimi 5 kaynaktan (üretim/satın alma/iş emri/paket)
+  const [pr, pi, wop, wo, sp, spi] = await Promise.all([
+    dbGet('parts'),
+    dbGet('purchase_items','order=created_at.asc'),
+    dbGet('work_order_parts'),
+    dbGet('work_orders'),
+    dbGet('shipment_packages'),
+    dbGet('shipment_package_items'),
+    loadProjectBoms()
+  ]);
+  if(Array.isArray(pr))  parts = pr;
+  if(Array.isArray(pi))  purchaseItems = pi;
+  if(Array.isArray(wop)) workOrderParts = wop;
+  if(Array.isArray(wo))  workOrders = wo;
+  if(Array.isArray(sp))  shipmentPackages = sp;
+  if(Array.isArray(spi)) shipmentPackageItems = spi;
+  shipRenderActive();
+}
+
+function switchShippingTab(tab){
+  document.querySelectorAll('#view-shipping .planning-tab').forEach(t=>
+    t.classList.toggle('active', t.dataset.shiptab===tab));
+  document.querySelectorAll('#view-shipping .planning-section').forEach(s=>
+    s.classList.toggle('active', s.id==='ship-tab-'+tab));
+  shipRenderActive();
+}
+
+function shipRenderActive(){
+  const aktif = document.querySelector('#view-shipping .planning-tab.active')?.dataset.shiptab || 'tree';
+  if(aktif==='tree') shipRenderTree(); else shipRenderPacking();
+}
+
+// ── Ortak yardımcılar ──
+// Paketlenen adetler: part_id > pbp_id > ad/kod anahtarıyla eşlenir (SAF-imsi;
+// verify-h-render shim'inde de koşar). SHIPPED dahil tüm paketler sayılır —
+// "kalan" gerçek sevk edilebilir bakiyedir.
+function shipPackedMap(proj){
+  const pkgIds = new Set(shipmentPackages.filter(k=>k.project_name===proj).map(k=>k.id));
+  const m = new Map();
+  for(const it of shipmentPackageItems){
+    if(!pkgIds.has(it.package_id)) continue;
+    const key = it.part_id ? 'p:'+it.part_id
+      : (it.project_bom_part_id ? 'b:'+it.project_bom_part_id
+      : 'k:'+((it.item_code||it.item_name||'').trim().toLowerCase()));
+    m.set(key, (m.get(key)||0) + (Number(it.quantity)||0));
+  }
+  return m;
+}
+function shipRowKey(r){
+  return r.partId ? 'p:'+r.partId
+    : (r.pbpId ? 'b:'+r.pbpId
+    : 'k:'+((r.code||r.name||'').trim().toLowerCase()));
+}
+
+// Projenin sevk satırları: üretim parçaları (hiyerarşili) + ağaç-dışı satın
+// alma kalemleri. ship_planned pbp'den koda göre çözülür (parts pbp id taşımaz).
+function _shipRows(proj){
+  const bucket = parts.filter(p=>(p.project||'(Proje Yok)')===proj);
+  const codeKey = c=>(c||'').trim().toLowerCase();
+  const pbomIds = new Set(projectBoms.filter(b=>b.project_name===proj).map(b=>b.id));
+  const projPbps = projectBomParts.filter(p=>pbomIds.has(p.project_bom_id));
+  const plannedCodes = new Set(projPbps.filter(p=>p.ship_planned)
+    .map(p=>codeKey(p.custom_code||p.resolved_code)).filter(Boolean));
+  const pbpByCode = {};
+  projPbps.forEach(p=>{ const k=codeKey(p.custom_code||p.resolved_code); if(k && !pbpByCode[k]) pbpByCode[k]=p; });
+  const partRows = bucket.map(p=>({
+    kind:'part', id:p.id, partId:p.id,
+    pbpId:(pbpByCode[codeKey(p.code)]||{}).id||null,
+    name:p.name, code:p.code, qty:Number(p.qty)||0, unit:'adet',
+    parentId:p.parent_part_id||null, part:p,
+    planned: plannedCodes.has(codeKey(p.code))
+  }));
+  const partCodes = new Set(bucket.map(p=>codeKey(p.code)).filter(Boolean));
+  const purRows = purchaseItems
+    .filter(i=>(i.project_name||'')===proj && i.status!=='CANCELLED'
+      && i.sent_to_purchasing!==false && !partCodes.has(codeKey(i.code)))
+    .map(i=>({
+      kind:'pur', id:i.id, partId:null, pbpId:i.project_bom_part_id||null,
+      name:i.name, code:i.code, qty:Number(i.quantity)||0, unit:i.unit||'adet',
+      parentId:null, pur:i,
+      planned: i.project_bom_part_id
+        ? !!(projPbps.find(p=>p.id===i.project_bom_part_id)||{}).ship_planned
+        : false
+    }));
+  return {partRows, purRows};
+}
+
+// Üretim parçasının sevkiyat gözünden durumu (PDF madde 1: üretildi /
+// üretimde hangi aşamada / iş emrinde planlı / bekliyor)
+function shipPartStatus(p){
+  const qty = Number(p.qty)||0, done = Number(p.qty_done)||0;
+  const dept = p.department_id ? (depts.find(d=>d.id===p.department_id)||{}).name : null;
+  if(qty>0 && done>=qty) return {lbl:'Üretildi', color:'#2ecc71'};
+  const wos = workOrderParts.filter(w=>w.part_id===p.id)
+    .map(w=>workOrders.find(o=>o.id===w.work_order_id)).filter(Boolean);
+  if(wos.some(w=>w.status==='inprogress') || done>0)
+    return {lbl:'Üretimde'+(dept?' — '+dept:''), color:'#f5a623'};
+  if(wos.length) return {lbl:'İş emrinde planlı'+(dept?' — '+dept:''), color:'#3498db'};
+  return {lbl:'Bekliyor'+(dept?' — '+dept:''), color:'#7f8c8d'};
+}
+
+// ── Ekran 1: Ağaç & Durum ──
+function shipRenderTree(){
+  const el = document.getElementById('ship-tree');
+  if(!el) return;
+  const proj = document.getElementById('ship-project-sel')?.value || '';
+  if(!proj){ el.innerHTML = h`<div class="empty-state"><span class="emoji"></span>Proje seçin — ağaç, parça durumları ve paket planı burada görünür</div>`; return; }
+  const {partRows, purRows} = _shipRows(proj);
+  if(!partRows.length && !purRows.length){
+    el.innerHTML = h`<div class="empty-state"><span class="emoji"></span>Bu projede yayınlanmış parça yok</div>`; return;
+  }
+  const packed = shipPackedMap(proj);
+  const onlyPlanned = !!document.getElementById('ship-only-planned')?.checked;
+  // Filtre: planlı olmayan ama planlı torunu olan üstler bağlam için kalır
+  const kidsMap = new Map();
+  partRows.forEach(r=>{ const k=r.parentId; if(!kidsMap.has(k)) kidsMap.set(k,[]); kidsMap.get(k).push(r); });
+  const ids = new Set(partRows.map(r=>r.partId));
+  const roots = partRows.filter(r=>!r.parentId || !ids.has(r.parentId));
+  const hasPlannedDesc = r=>r.planned || (kidsMap.get(r.partId)||[]).some(hasPlannedDesc);
+  const matByCode = new Map();
+  purchaseItems.filter(i=>(i.project_name||'')===proj && i.status!=='CANCELLED').forEach(i=>{
+    const k=(i.code||'').trim().toLowerCase(); if(!k) return;
+    if(!matByCode.has(k)) matByCode.set(k,[]); matByCode.get(k).push(i);
+  });
+  const rowHTML = (r, depth)=>{
+    if(onlyPlanned && !hasPlannedDesc(r)) return '';
+    const st = shipPartStatus(r.part);
+    const pk = packed.get(shipRowKey(r))||0;
+    const kalan = Math.max(0, r.qty - pk);
+    return h`<div style="margin:3px 0 3px ${depth*22}px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;display:flex;gap:10px;align-items:center">
+      ${depth>0?raw('<span style="color:var(--muted);font-size:10px">└─</span>'):''}
+      <div style="min-width:0;flex:1">
+        <span style="font-weight:600;font-size:13px">${r.name}</span>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent);margin-left:8px">${r.code}</span>
+        ${r.planned?h`<span style="font-family:var(--font-mono);font-size:9px;padding:1px 7px;border-radius:9px;border:1px solid var(--accent);color:var(--accent);margin-left:6px" title="Paket Planlaması: sevk edilecek diye işaretli (ürün ağacı düzenleyicisinden)">SEVK PLANINDA</span>`:''}
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">
+          ${r.qty} ${r.unit}
+          <span style="color:${raw(st.color)}"> · ${st.lbl}</span>
+          ${raw(woMatChip(r.part, matByCode))}
+          ${pk>0?h`<span style="color:#16a085"> · paketlenen ${mipNum(pk)} / kalan ${mipNum(kalan)}</span>`:''}
+        </div>
+      </div>
+    </div>${(kidsMap.get(r.partId)||[]).map(k=>rowHTML(k, depth+1))}`;
+  };
+  const purRowHTML = r=>{
+    if(onlyPlanned && !r.planned) return '';
+    const m = PUR_STATUS[r.pur.status] || PUR_STATUS.PLANNED;
+    const pk = packed.get(shipRowKey(r))||0;
+    return h`<div style="margin:2px 0;padding:5px 12px;border-left:2px dashed ${raw(m.color)}66;font-family:var(--font-mono);font-size:10.5px;color:var(--muted)">
+      ${r.code?h`<span style="color:var(--accent)">${r.code}</span>${raw(' — ')}`:''}${r.name}
+      · ${mipNum(r.qty)} ${r.unit}
+      <span style="color:${raw(m.color)}">${m.label}</span>${r.pur.status==='IN_WAREHOUSE'&&whName(r.pur.warehouse_id)?h` · ${whName(r.pur.warehouse_id)}`:''}
+      ${r.planned?h`<span style="font-size:9px;padding:1px 6px;border-radius:8px;border:1px solid var(--accent);color:var(--accent);margin-left:4px">SEVK PLANINDA</span>`:''}
+      ${pk>0?h`<span style="color:#16a085"> · paketlenen ${mipNum(pk)}</span>`:''}
+    </div>`;
+  };
+  el.innerHTML = h`${roots.map(r=>rowHTML(r,0))}${purRows.length?h`
+    <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;font-weight:650;letter-spacing:.07em;color:var(--muted);margin:14px 0 4px">Satın alma malzemeleri (ağaç dışı) · ${purRows.length}</div>
+    ${purRows.map(purRowHTML)}`:''}`;
+}
+
+// ── Ekran 2: Paketleme ──
+function shipRenderPacking(){
+  const srcEl = document.getElementById('ship-pack-source');
+  const cardsEl = document.getElementById('ship-pack-cards');
+  if(!srcEl || !cardsEl) return;
+  const proj = document.getElementById('ship-project-sel')?.value || '';
+  if(!proj){
+    srcEl.innerHTML = cardsEl.innerHTML = '';
+    srcEl.innerHTML = h`<div class="empty-state"><span class="emoji"></span>Proje seçin</div>`;
+    return;
+  }
+  const {partRows, purRows} = _shipRows(proj);
+  const packed = shipPackedMap(proj);
+  const rows = [...partRows, ...purRows];
+  // Sol panel: sürüklenebilir satırlar (kalan 0 → soluk, sürüklenmez)
+  srcEl.innerHTML = rows.length ? h`${rows.map((r,i)=>{
+    const pk = packed.get(shipRowKey(r))||0;
+    const kalan = Math.max(0, r.qty - pk);
+    return h`<div draggable="${raw(String(kalan>0))}" data-shiprow="${i}"
+      ondragstart="shipDragStart(event,${i})" ondragend="shipDragEnd()"
+      style="display:flex;gap:8px;align-items:center;padding:6px 10px;margin:3px 0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;${raw(kalan>0?'cursor:grab':'opacity:.45')}">
+      <span style="color:var(--muted)">⠿</span>
+      <span style="font-family:var(--font-mono);font-size:11px;min-width:0;flex:1">
+        ${r.code?h`<span style="color:var(--accent)">${r.code}</span>${raw(' — ')}`:''}${r.name}
+        ${r.planned?h`<span style="font-size:9px;padding:1px 6px;border-radius:8px;border:1px solid var(--accent);color:var(--accent);margin-left:4px">PLAN</span>`:''}
+      </span>
+      <span style="font-family:var(--font-mono);font-size:10px;color:${raw(kalan>0?'var(--muted)':'#2ecc71')}">${kalan>0?h`kalan ${mipNum(kalan)} / ${mipNum(r.qty)}`:h`tamamı paketlendi`}</span>
+    </div>`;
+  })}` : h`<div class="empty-state"><span class="emoji"></span>Bu projede sevk edilecek satır yok</div>`;
+  window._shipPackRows = rows; // drop anında indeks → satır
+  // Sağ panel: paket kartları
+  const pkgs = shipmentPackages.filter(k=>k.project_name===proj)
+    .sort((a,b)=>(a.package_no||'').localeCompare(b.package_no||''));
+  cardsEl.innerHTML = pkgs.length ? h`${pkgs.map(k=>{
+    const st = SHIP_PKG_STATUS[k.status] || SHIP_PKG_STATUS.OPEN;
+    const items = shipmentPackageItems.filter(it=>it.package_id===k.id);
+    const acik = k.status==='OPEN';
+    const dims = [k.length_cm,k.width_cm,k.height_cm].some(x=>x!=null)
+      ? [k.length_cm,k.width_cm,k.height_cm].map(x=>x!=null?Number(x):'?').join('×')+' cm' : '';
+    return h`<div class="pbom-card" style="border-left:3px solid ${raw(st.color)};margin-bottom:10px"
+      ${acik?h`ondragover="shipPkgDragOver(event,this)" ondragleave="this.style.outline=''" ondrop="shipPkgDrop(event,'${raw(k.id)}',this)"`:''}>
+      <div class="pbom-card-header">
+        <div style="min-width:0;flex:1">
+          <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${k.package_no}</span>
+            ${k.name||''}
+            <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${raw(st.color)}44;color:${raw(st.color)};background:${raw(st.color)}11">${st.label}</span>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">
+            ${dims}${k.weight_kg!=null?h`${dims?raw(' · '):''}${Number(k.weight_kg)} kg`:''}
+            ${k.packed_by?h` · paketleyen: ${k.packed_by}${k.packed_at?' ('+new Date(k.packed_at).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+')':''}`:''}
+          </div>
+          ${items.length?h`<div style="margin-top:6px">${items.map(it=>h`
+            <div style="display:flex;gap:8px;align-items:center;font-family:var(--font-mono);font-size:10.5px;color:var(--muted);padding:2px 0">
+              <span style="min-width:0;flex:1">${it.item_code?h`<span style="color:var(--accent)">${it.item_code}</span>${raw(' — ')}`:''}${it.item_name}</span>
+              <span>${mipNum(Number(it.quantity)||0)} ${it.unit||'adet'}</span>
+              ${acik?h`<button class="icon-btn" style="width:20px;height:20px;font-size:10px;color:var(--red)" title="Satırı çıkar" onclick="shipItemRemove('${raw(it.id)}')">✕</button>`:''}
+            </div>`)}</div>`
+            : h`<div style="font-family:var(--font-mono);font-size:10.5px;color:var(--muted);margin-top:6px;${raw(acik?'border:1px dashed var(--border);border-radius:6px;padding:8px;text-align:center':'')}">${acik?'Boş paket — soldan parça sürükleyin':'içerik yok'}</div>`}
+        </div>
+        <div style="display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap">
+          ${acik?h`<button class="btn btn-primary btn-sm" id="shippk-close-${raw(k.id)}" onclick="shipPkgClose('${raw(k.id)}')" title="Paketi kapat — paketleyen kaydedilir, içerik kilitlenir">Paketi Kapat</button>`:''}
+          ${k.status==='CLOSED'?h`<button class="btn btn-ghost btn-sm" onclick="shipPkgReopen('${raw(k.id)}')" title="İçeriği düzenlemek için yeniden aç">Yeniden Aç</button>`:''}
+          ${(k.status==='OPEN'||k.status==='CLOSED')?h`<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="shipPkgDelete('${raw(k.id)}')" title="Paketi sil (içerik satırlarıyla)">${raw(ico('trash',13))}</button>`:''}
+          ${(k.status==='LOADED'||k.status==='SHIPPED')?h`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">araç bağlı — Depo &gt; İrsaliye</span>`:''}
+        </div>
+      </div>
+    </div>`;
+  })}` : h`<div class="empty-state" style="padding:24px"><span class="emoji"></span>Henüz paket yok — yukarıdan açın, soldan parça sürükleyin</div>`;
+}
+
+// ── Sürükle-bırak (pbome DnD deseni) ──
+function shipDragStart(e, idx){
+  _shipDragRow = (window._shipPackRows||[])[idx] || null;
+  e.dataTransfer.effectAllowed = 'copy';
+}
+function shipDragEnd(){ _shipDragRow = null; document.querySelectorAll('#ship-pack-cards .pbom-card').forEach(c=>c.style.outline=''); }
+function shipPkgDragOver(e, card){ e.preventDefault(); card.style.outline = '2px dashed var(--accent)'; }
+
+async function shipPkgDrop(e, pkgId, card){
+  e.preventDefault();
+  card.style.outline = '';
+  const r = _shipDragRow;
+  _shipDragRow = null;
+  if(!r) return;
+  const proj = document.getElementById('ship-project-sel')?.value || '';
+  const packed = shipPackedMap(proj);
+  const kalan = Math.max(0, r.qty - (packed.get(shipRowKey(r))||0));
+  if(kalan<=0){ toast('Bu satırın tamamı zaten paketlendi.','error'); return; }
+  const cevap = prompt('Kaç '+ (r.unit||'adet') +' bu pakete konsun? (kalan: '+mipNum(kalan)+')', String(kalan));
+  if(cevap===null) return;
+  const q = parseFloat(String(cevap).replace(',','.'));
+  if(!(q>0)){ toast('Geçerli bir adet girin!','error'); return; }
+  if(q > kalan + 1e-9){ toast('Kalandan fazla ('+mipNum(kalan)+') paketlenemez!','error'); return; }
+  const d = await dbInsert('shipment_package_items', {
+    package_id: pkgId, part_id: r.partId||null, project_bom_part_id: r.pbpId||null,
+    item_name: r.name, item_code: r.code||null, quantity: q, unit: r.unit||'adet'
+  });
+  if(!Array.isArray(d)||!d[0]) return; // hata toast'ı adapter'dan geldi
+  shipmentPackageItems.push(d[0]);
+  toast(mipNum(q)+' '+(r.unit||'adet')+' pakete eklendi.','success');
+  shipRenderPacking();
+}
+
+async function shipItemRemove(itemId){
+  const ok = await dbDelete('shipment_package_items', itemId);
+  if(!ok) return;
+  shipmentPackageItems = shipmentPackageItems.filter(it=>it.id!==itemId);
+  shipRenderPacking();
+}
+
+// ── Paket aksiyonları ──
+async function shipPkgCreate(){
+  const proj = document.getElementById('ship-project-sel')?.value || '';
+  if(!proj){ toast('Önce proje seçin!','error'); return; }
+  const bitti = btnBusy('ship-pk-add-btn','...');
+  if(!bitti) return;
+  try{
+    const g = id=>document.getElementById(id);
+    const num = id=>{ const v=parseFloat(g(id)?.value); return isNaN(v)?null:v; };
+    const d = await dbInsert('shipment_packages', {
+      project_name: proj, name: (g('ship-pk-name')?.value||'').trim()||null,
+      length_cm: num('ship-pk-l'), width_cm: num('ship-pk-w'),
+      height_cm: num('ship-pk-h'), weight_kg: num('ship-pk-kg'),
+      created_by: currentUser?.display_name||currentUser?.username||null
+    });
+    if(!Array.isArray(d)||!d[0]) return;
+    shipmentPackages.push(d[0]);
+    ['ship-pk-name','ship-pk-l','ship-pk-w','ship-pk-h','ship-pk-kg'].forEach(id=>{ if(g(id)) g(id).value=''; });
+    toast('Paket açıldı: '+d[0].package_no,'success');
+    shipRenderPacking();
+  } finally { bitti(); }
+}
+
+async function shipPkgClose(pkgId){
+  const k = shipmentPackages.find(x=>x.id===pkgId);
+  if(!k) return;
+  const varsayilan = currentUser?.display_name||currentUser?.username||'';
+  const paketleyen = prompt('Paketleyen personel (QR/PDF çıktısında görünür):', varsayilan);
+  if(paketleyen===null || !paketleyen.trim()){ if(paketleyen!==null) toast('Paketleyen zorunlu!','error'); return; }
+  const bitti = btnBusy('shippk-close-'+pkgId,'...');
+  if(!bitti) return;
+  try{
+    const ok = await dbUpdate('shipment_packages', pkgId, {status:'CLOSED', packed_by: paketleyen.trim()});
+    if(!ok) return;
+    const taze = await dbGet('shipment_packages');
+    if(Array.isArray(taze)) shipmentPackages = taze; // packed_at damgası backend'den
+    toast(k.package_no+' kapatıldı.','success');
+    shipRenderPacking();
+  } finally { bitti(); }
+}
+
+async function shipPkgReopen(pkgId){
+  const ok = await dbUpdate('shipment_packages', pkgId, {status:'OPEN'});
+  if(!ok) return;
+  const k = shipmentPackages.find(x=>x.id===pkgId);
+  if(k){ k.status='OPEN'; k.packed_by=null; k.packed_at=null; }
+  shipRenderPacking();
+}
+
+async function shipPkgDelete(pkgId){
+  const k = shipmentPackages.find(x=>x.id===pkgId);
+  const adet = shipmentPackageItems.filter(it=>it.package_id===pkgId).length;
+  if(!confirm('"'+(k?.package_no||'Paket')+'" silinsin mi?'+(adet?'\n\nİçindeki '+adet+' satır da silinir (parçalar sevk edilebilir kalır).':''))) return;
+  const ok = await dbDelete('shipment_packages', pkgId);
+  if(!ok) return;
+  shipmentPackages = shipmentPackages.filter(x=>x.id!==pkgId);
+  shipmentPackageItems = shipmentPackageItems.filter(it=>it.package_id!==pkgId);
+  toast('Paket silindi.','success');
+  shipRenderPacking();
+}
+
 function woTogglePart(id, name, code) {
   const el = document.getElementById('wopi-' + id);
   if (_woSelectedParts.has(id)) {
@@ -7635,6 +8055,7 @@ async function switchTab(tab) {
   if(tab==='mip'){ renderMip(); if(document.getElementById('mip-tab-mrp')?.classList.contains('active')) renderMrp(); }
   if(tab==='purchasing') renderPurchasing();
   if(tab==='warehouse'){ whApplySubTabPerms(); renderWarehouse(); }
+  if(tab==='shipping')  renderShipping();
   if(tab==='planning')  renderPlanning();
   if(tab==='bom')       initBom();
   if(tab==='docs')      initDocs();
@@ -15552,6 +15973,7 @@ function pbomeRenderList() {
               <option value="__yeni__">+ Yeni bölüm…</option>
             </select>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditPart('${raw(p.id)}')" title="Ad / kod / malzeme düzenle">${raw(ico('edit',13))}</button>
+            <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px${raw(p.ship_planned?';color:var(--accent);border-color:rgba(245,166,35,.4)':'')}" onclick="pbomeToggleShipPlan('${raw(p.id)}')" title="${p.ship_planned?'Sevk planından çıkar':'Sevk planına al (Paket Planlaması) — sevkiyatçının ağacında SEVK PLANINDA rozetiyle görünür'}">${raw(ico('push',13))}</button>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeCopyBranch('${raw(p.id)}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">${raw(ico('list',13))}</button>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditQty('${raw(p.id)}')" title="Miktar düzenle">${raw(ico('clipboard',13))}</button>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px;color:var(--red)" onclick="pbomeDeletePart('${raw(p.id)}')" title="Sil">${raw(ico('trash',13))}</button>
@@ -15590,6 +16012,21 @@ function pbomeRenderKpis(){
       <div class="stat-value">${make}<span class="un"> parça</span></div>
       <div class="stat-sub"><span class="delta up">karar: üret</span>${pool?h`<span class="delta in">${pool} kalem havuzdan</span>`:''}<span>yayınlanınca üretime çıkar</span></div>
     </div>`;
+}
+
+// (13. tur madde 4) Paket Planlaması: sevk edilecek parçayı işaretle/çıkar —
+// işaret sevkiyat ekranındaki ağaçta "SEVK PLANINDA" rozeti olarak görünür.
+async function pbomeToggleShipPlan(partId){
+  const p = _pbomeParts.find(x=>x.id===partId);
+  if(!p) return;
+  const yeni = !p.ship_planned;
+  const ok = await dbUpdate('project_bom_parts', partId, {ship_planned: yeni});
+  if(!ok) return; // hata toast'ı adapter'dan geldi
+  p.ship_planned = yeni;
+  const g = projectBomParts.find(x=>x.id===partId);
+  if(g) g.ship_planned = yeni;
+  pbomeRenderList();
+  toast(yeni ? '"'+(p.custom_name||'')+'" sevk planına alındı.' : '"'+(p.custom_name||'')+'" sevk planından çıkarıldı.','success');
 }
 
 // Bölüm ata

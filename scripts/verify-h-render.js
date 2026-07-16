@@ -767,6 +767,48 @@ chk('dash: SVG grafik (raw) korundu', dh.includes('<polyline') && dh.includes('d
 chk('dash: halka/ilerleme çubuğu (raw) korundu', dh.includes('stroke-dasharray') && dh.includes('class="wbar"'));
 chk('dash: nav butonları (raw) korundu', dh.includes("switchTab('planning')") && dh.includes('dashWeeklyReport()'));
 
+// ── shipRenderTree + shipRenderPacking (13. tur madde 4 — Sevkiyat) ──
+// Ağaç ve paket kartları kullanıcı verisi taşır (parça adı/kodu, paket adı,
+// paketleyen, satır snapshot'ları) — hepsi h`` disiplinli olmalı.
+global.orders=[{project_name:'SPrj<b>', status:'active'}];
+els['ship-project-sel'] = { value:'SPrj<b>', addEventListener(){}, style:{}, classList:{add(){},remove(){}}, set innerHTML(v){store['ship-project-sel']=String(v);}, get innerHTML(){return store['ship-project-sel']||'';} };
+els['ship-only-planned'] = { checked:false };
+global.parts=[{id:'sp1', project:'SPrj<b>', name:'SevkParça'+EVIL, code:'SVK<b>', qty:3, qty_done:1, qty_reject:0, department_id:'d1', parent_part_id:null}];
+global.depts=[{id:'d1', project:'SPrj<b>', name:'SevkBöl<i>'}];
+global.projectBoms=[{id:'spb1', project_name:'SPrj<b>'}];
+global.projectBomParts=[{id:'spbp1', project_bom_id:'spb1', custom_code:'SVK<b>', ship_planned:true}];
+global.workOrders=[]; global.workOrderParts=[];
+global.purchaseItems=[{id:'spi1', project_name:'SPrj<b>', name:'SevkMalzeme'+EVIL, code:'SVM<i>',
+  quantity:4, unit:'ad<x>', status:'IN_WAREHOUSE', warehouse_id:'w1', sent_to_purchasing:true, project_bom_part_id:null}];
+global.whName=()=> 'Depo<w>';
+global.shipmentPackages=[{id:'pk1', project_name:'SPrj<b>', package_no:'PKT-2026-0001', name:'Paket'+EVIL,
+  status:'OPEN', length_cm:10, width_cm:20, height_cm:30, weight_kg:5, packed_by:'Paketçi<b>', packed_at:'2026-01-01T10:00:00'}];
+global.shipmentPackageItems=[{id:'it1', package_id:'pk1', part_id:'sp1', item_name:'SevkParça'+EVIL, item_code:'SVK<b>', quantity:1, unit:'adet'}];
+global.mipNum=n=>String(n);
+global.PUR_STATUS = global.PUR_STATUS || {PLANNED:{label:'Planlandı',icon:'',color:'#f5a623'}, IN_WAREHOUSE:{label:'Üretim Deposunda',icon:'',color:'#16a085'}};
+global.SHIP_PKG_STATUS = {OPEN:{label:'Açık',color:'#f5a623'}, CLOSED:{label:'Kapatıldı',color:'#3498db'}, LOADED:{label:'Araca yüklü',color:'#8e44ad'}, SHIPPED:{label:'Sevk edildi',color:'#2ecc71'}};
+eval(grab('shipPackedMap'));
+eval(grab('shipRowKey'));
+eval(grab('_shipRows'));
+eval(grab('shipPartStatus'));
+eval(grab('woMatChip'));
+eval(grab('shipRenderTree'));
+eval(grab('shipRenderPacking'));
+shipRenderTree();
+const shtr=store['ship-tree']||'';
+console.log('\nshipRenderTree (sevkiyat ağacı):');
+chk('shipTree: parça adı onerror kaçırıldı', shtr.includes('SevkParça&lt;img') && !shtr.includes('SevkParça'+EVIL));
+chk('shipTree: kod/bölüm kaçırıldı', shtr.includes('SVK&lt;b&gt;') && shtr.includes('SevkBöl&lt;i&gt;'));
+chk('shipTree: satın alma satırı adı kaçırıldı', shtr.includes('SevkMalzeme&lt;img'));
+chk('shipTree: SEVK PLANINDA rozeti + paketlenen sayacı çıktı', shtr.includes('SEVK PLANINDA') && shtr.includes('paketlenen 1'));
+shipRenderPacking();
+const shps=store['ship-pack-source']||'', shpc=store['ship-pack-cards']||'';
+console.log('\nshipRenderPacking (paketleme):');
+chk('packSource: satır adı kaçırıldı + draggable korundu', shps.includes('SevkParça&lt;img') && shps.includes('draggable="true"'));
+chk('packCards: paket adı/paketleyen kaçırıldı', shpc.includes('Paket&lt;img') && shpc.includes('Paketçi&lt;b&gt;'));
+chk('packCards: satır snapshot kaçırıldı', shpc.includes('SevkParça&lt;img') && shpc.includes('SVK&lt;b&gt;'));
+chk('packCards: paket no + aksiyon butonları (raw) korundu', shpc.includes('PKT-2026-0001') && shpc.includes("shipPkgClose('pk1')") && shpc.includes("shipItemRemove('it1')"));
+
 // ── GENEL SIZINTI BEKÇİSİ (2026-07-15): ico() h`` içinde raw'sız kullanılırsa
 // SVG markup'ı ekrana METİN olarak basılır (gerçek olay: çalışma alanı kartları).
 // Tüm render çıktıları taranır — '&lt;svg' görünüyorsa bir yerde raw() unutulmuştur.

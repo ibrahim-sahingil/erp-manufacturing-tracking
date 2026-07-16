@@ -10,7 +10,7 @@
 // --hizli: yalnız Kehribar + Fildişi temaları (varsayılan: 4 tema).
 const { chromium } = require('@playwright/test');
 
-const TABS = ['dashboard','stats','orders','planning','bom','docs','mip','purchasing','warehouse','users','appusers'];
+const TABS = ['dashboard','stats','orders','planning','bom','docs','mip','purchasing','warehouse','shipping','users','appusers']; // (13. tur m4) shipping eklendi
 const THEMES = process.argv.includes('--hizli') ? ['', 'light'] : ['', 'light', 'steel', 'forest'];
 const EMOJI = /[\u{1F000}-\u{1FAFF}]/u;
 
