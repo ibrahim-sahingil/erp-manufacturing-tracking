@@ -203,6 +203,8 @@ public class ProjectBomPartService {
                 .level(level)
                 .sortOrder(request.getSortOrder() != null
                         ? request.getSortOrder() : 0)
+                // (13. tur madde 4) CREATE'te de islenir (needs_planning dersi)
+                .shipPlanned(Boolean.TRUE.equals(request.getShipPlanned()))
                 .build();
 
         ProjectBomPart saved = projectBomPartRepository.save(pbp);
@@ -314,6 +316,11 @@ public class ProjectBomPartService {
             applyParentChange(pbp, request.getParentCustomId(), request.getLevel());
         } else if (request.getLevel() != null) {
             pbp.setLevel(request.getLevel());
+        }
+
+        // (13. tur madde 4) Paket Planlamasi isareti
+        if (request.getShipPlanned() != null) {
+            pbp.setShipPlanned(request.getShipPlanned());
         }
 
         ProjectBomPart saved = projectBomPartRepository.save(pbp);

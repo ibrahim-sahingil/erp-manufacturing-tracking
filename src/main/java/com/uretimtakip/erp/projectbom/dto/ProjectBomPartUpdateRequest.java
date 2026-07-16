@@ -123,4 +123,7 @@ public class ProjectBomPartUpdateRequest {
 
     @Size(max = 150, message = "Karar veren en fazla 150 karakter olabilir")
     private String decidedBy;
+
+    /** (13. tur madde 4) Paket Planlamasi isareti; null = dokunma. */
+    private Boolean shipPlanned;
 }

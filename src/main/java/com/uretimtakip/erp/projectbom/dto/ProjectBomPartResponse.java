@@ -66,6 +66,9 @@ public class ProjectBomPartResponse {
     private String decidedBy;
     private LocalDateTime decidedAt;
 
+    /** (13. tur madde 4) Paket Planlamasi isareti. */
+    private Boolean shipPlanned;
+
     // ============ RESOLVED ALANLAR (coalesce edilmis) ============
     private String resolvedName;
     private String resolvedCode;
@@ -123,6 +126,7 @@ public class ProjectBomPartResponse {
                 .procurementDecision(e.getProcurementDecision())
                 .decidedBy(e.getDecidedBy())
                 .decidedAt(e.getDecidedAt())
+                .shipPlanned(e.getShipPlanned())
                 .build();
 
         // RESOLVED alanlar - custom oncelikli, yoksa sablondan

@@ -116,4 +116,10 @@ public class ProjectBomPartRequest {
 
     @PositiveOrZero(message = "Sira 0 veya pozitif olmali")
     private Integer sortOrder;
+
+    /**
+     * (13. tur madde 4) Paket Planlamasi isareti. CREATE ve UPDATE
+     * DTO'larinin IKISINDE de olmali (needs_planning dersi).
+     */
+    private Boolean shipPlanned;
 }

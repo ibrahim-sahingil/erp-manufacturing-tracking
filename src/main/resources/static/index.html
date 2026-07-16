@@ -1620,6 +1620,7 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
       <div class="perm-item" data-perm="purchasing" onclick="togglePerm(this)"><div class="perm-check"></div>Satın Alma</div>
       <div class="perm-item" data-perm="warehouse" onclick="togglePerm(this)"><div class="perm-check"></div>Depo</div>
       <div class="perm-item" data-perm="delivery" onclick="togglePerm(this)"><div class="perm-check"></div>İrsaliye</div>
+      <div class="perm-item" data-perm="shipping" onclick="togglePerm(this)" title="Sevkiyat sekmesi: paket planı görünümü, paketleme, paket belgeleri (13. tur madde 4)"><div class="perm-check"></div>Sevkiyat</div>
       <div class="perm-item" data-perm="planning" onclick="togglePerm(this)"><div class="perm-check"></div>Planlama</div>
       <div class="perm-item" data-perm="scan" onclick="togglePerm(this)"><div class="perm-check"></div>QR Okutma</div>
     </div>
@@ -2170,6 +2171,8 @@ const TABLE_ENDPOINTS = {
   purchase_order_quotes: 'purchase-order-quotes',
   delivery_notes: 'delivery-notes',
   delivery_note_items: 'delivery-note-items',
+  shipment_packages: 'shipment-packages',
+  shipment_package_items: 'shipment-package-items',
   suppliers: 'suppliers',
   materials: 'materials',
   bom_documents: 'bom-documents',
@@ -12815,8 +12818,8 @@ function editAppUserPerms(id) {
   const u = appUsers.find(x => x.id === id);
   if (!u) return;
   const perms = Array.isArray(u.permissions) ? u.permissions : JSON.parse(u.permissions||'[]');
-  const allPerms = ['dashboard','users','stats','orders_view','orders_edit','orders_quotes','mip','purchasing','warehouse','delivery','planning','scan']; // (10. tur M7) parts kalktı; (12. tur m1) orders_quotes eklendi
-  const labels = {dashboard:'Dashboard',parts:'Parçalar',users:'Personel',stats:'İstatistik',orders_view:'Siparişler (Görüntüle)',orders_edit:'Siparişler (Düzenle)',orders_quotes:'Teklifler',mip:'MİP',purchasing:'Satın Alma',warehouse:'Depo',delivery:'İrsaliye',planning:'Planlama',scan:'QR Okutma'};
+  const allPerms = ['dashboard','users','stats','orders_view','orders_edit','orders_quotes','mip','purchasing','warehouse','delivery','shipping','planning','scan']; // (10. tur M7) parts kalktı; (12. tur m1) orders_quotes; (13. tur m4) shipping
+  const labels = {dashboard:'Dashboard',parts:'Parçalar',users:'Personel',stats:'İstatistik',orders_view:'Siparişler (Görüntüle)',orders_edit:'Siparişler (Düzenle)',orders_quotes:'Teklifler',mip:'MİP',purchasing:'Satın Alma',warehouse:'Depo',delivery:'İrsaliye',shipping:'Sevkiyat',planning:'Planlama',scan:'QR Okutma'};
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';

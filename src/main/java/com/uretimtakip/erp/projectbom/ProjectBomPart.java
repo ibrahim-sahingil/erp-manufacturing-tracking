@@ -60,6 +60,8 @@ import java.util.UUID;
  *   procurement_decision varchar(10) NULL  CHECK (PURCHASE/PRODUCE) — 9. tur M4
  *   decided_by        varchar(150)  NULL
  *   decided_at        timestamp     NULL
+ *   ship_planned      boolean       DEFAULT false NOT NULL (13. tur madde 4 —
+ *                                   Paket Planlamasi isareti)
  *   created_at        timestamp     (BaseEntity'den)
  */
 @Entity
@@ -167,4 +169,14 @@ public class ProjectBomPart extends BaseEntity {
 
     @Column(name = "decided_at")
     private java.time.LocalDateTime decidedAt;
+
+    /**
+     * (13. tur madde 4) "Paket Planlamasi" isareti: agac duzenleyicisinde
+     * sevk edilecek diye isaretlenen parca sevkiyatcinin agacinda
+     * "SEVK PLANINDA" rozetiyle gorunur. v1 parca basina isaret (adet degil —
+     * arkadas sorusu A1); paketlemedeki fiili adet shipment_package_items'ta.
+     */
+    @Column(name = "ship_planned", nullable = false)
+    @Builder.Default
+    private Boolean shipPlanned = false;
 }

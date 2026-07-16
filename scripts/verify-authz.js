@@ -113,10 +113,19 @@ function izinVerilmeli(ad, r) {
   // kalmali — QR okutan isci uretim kaydi yaziyor (asagida kirilma kontrolu).
   reddedilmeli('DELETE /part-logs (uretim gecmisi — denetim izi)',
       await lim('DELETE', '/part-logs/' + prodId)); // id sahte; 403 yetkiden once gelmeli
+  // (13. tur madde 4) Sevkiyat paketleme: yazma `shipping` yetkisine kilitli
+  reddedilmeli('POST /shipment-packages (sevkiyat paketi)',
+      await lim('POST', '/shipment-packages', { project_name: 'HACK' }));
+  reddedilmeli('DELETE /shipment-packages',
+      await lim('DELETE', '/shipment-packages/' + prodId)); // id sahte; 403 yetkiden once
+  reddedilmeli('POST /shipment-package-items (paket satiri)',
+      await lim('POST', '/shipment-package-items',
+        { package_id: prodId, item_name: 'HACK', quantity: 1 }));
 
   console.log('\n═══ Kirilma kontrolu: OKUMA acik kalmali ═══');
   izinVerilmeli('GET /bom-products', await lim('GET', '/bom-products'));
   izinVerilmeli('GET /warehouses',   await lim('GET', '/warehouses'));
+  izinVerilmeli('GET /shipment-packages', await lim('GET', '/shipment-packages'));
 
   console.log('\n═══ (12. tur m1) TEKLIF GIZLILIGI ═══');
   // Teklif kaydi: orders_quotes'suz kullaniciya LISTEDE de TEK KAYITTA da donmemeli

@@ -160,7 +160,8 @@ const EP = {parts:'parts', purchase_items:'purchase-items', project_bom:'project
   project_bom_parts:'project-bom-parts', bom_products:'bom-products', bom_parts:'bom-parts',
   work_orders:'work-orders', work_order_parts:'work-order-parts', orders:'orders',
   warehouses:'warehouses', warehouse_movements:'warehouse-movements',
-  warehouse_reservations:'warehouse-reservations'};
+  warehouse_reservations:'warehouse-reservations',
+  shipment_packages:'shipment-packages', shipment_package_items:'shipment-package-items'};
 globalThis.dbGet = async (t,q)=>{
   let d = await api('GET','/'+EP[t]);
   if(!Array.isArray(d)) return [];
@@ -649,6 +650,43 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     check('gönderilen kalem artık satın alma listesinde görünür (true)',
       spSonra?.sent_to_purchasing===true, JSON.stringify(spSonra?.sent_to_purchasing));
 
+    console.log('═══ 13.TUR m4/D: SEVKİYAT PAKETİ (no üretimi + durum + OPEN kilidi) ═══');
+    // package_no backend üretir (PKT-yıl-sıra, DB UNIQUE); durum whitelist
+    // OPEN<->CLOSED<->LOADED<->SHIPPED; içerik yalnız OPEN pakette değişir.
+    const pk1 = (await dbInsert('shipment_packages',{project_name:PROJ, name:'E2E Paket 1'}))[0];
+    const pk2 = (await dbInsert('shipment_packages',{project_name:PROJ, name:'E2E Paket 2'}))[0];
+    created.spk = [pk1?.id, pk2?.id];
+    check('paket no PKT-<yıl>- formatında', /^PKT-\d{4}-\d{4}$/.test(pk1?.package_no||''), pk1?.package_no);
+    check('ikinci pakette sıra artar (mükerrer yok)',
+      pk1?.package_no !== pk2?.package_no, pk1?.package_no+' / '+pk2?.package_no);
+    check('paket OPEN başlar', pk1?.status==='OPEN', pk1?.status);
+    const spkSatir = (await dbInsert('shipment_package_items',{package_id:pk1.id,
+      item_name:'E2E Sevk Parçası', item_code:'E2E-SEVK-1', quantity:2, unit:'adet'}))[0];
+    check('OPEN pakete satır eklendi', !!spkSatir, _lastApiError||'');
+    // OPEN -> LOADED atlama YASAK (whitelist)
+    check('OPEN→LOADED atlaması reddedilir',
+      !(await dbUpdate('shipment_packages', pk1.id, {status:'LOADED'})));
+    // packed_by olmadan kapatma YASAK
+    check('packed_by olmadan CLOSED reddedilir',
+      !(await dbUpdate('shipment_packages', pk1.id, {status:'CLOSED'})));
+    check('packed_by ile CLOSED kabul edilir',
+      await dbUpdate('shipment_packages', pk1.id, {status:'CLOSED', packed_by:'E2E Paketleyici'}));
+    const pk1Kapali = (await dbGet('shipment_packages')).find(p=>p.id===pk1.id);
+    check('CLOSED: packed_at damgalandı', !!pk1Kapali?.packed_at);
+    // CLOSED pakete satır ekleme/silme YASAK
+    check('CLOSED pakete satır eklenemez',
+      !(await dbInsert('shipment_package_items',{package_id:pk1.id, item_name:'X', quantity:1}))[0]);
+    check('CLOSED paketten satır silinemez', !(await dbDelete('shipment_package_items', spkSatir.id)));
+    // irsaliye bağı olmadan LOADED YASAK
+    check('irsaliye bağı olmadan LOADED reddedilir',
+      !(await dbUpdate('shipment_packages', pk1.id, {status:'LOADED'})));
+    // geçersiz durum (@Pattern — yalnız HTTP katmanında yakalanır: POOL dersi)
+    check('geçersiz durum 400 alır (@Pattern)',
+      !(await dbUpdate('shipment_packages', pk1.id, {status:'HACK'})));
+    // temizlik: CLOSED→OPEN geri al → satır silinebilir → paketler silinir
+    check('CLOSED→OPEN geri alınır', await dbUpdate('shipment_packages', pk1.id, {status:'OPEN'}));
+    check('OPEN pakette satır silinir', await dbDelete('shipment_package_items', spkSatir.id));
+
     console.log('═══ E2: ONDALIK ADET ÜRETİMDE YUKARI YUVARLANIR ═══');
     // parts.total_qty INTEGER — ondalık BOM adedi eskiden sessizce kesiliyordu.
     // İzole: türsüz ondalık (2.5) parça yayınla → parts qty 3 + rounded uyarısı.
@@ -971,6 +1009,10 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const del = async (t,id)=>{ if(id) await dbDelete(t,id).catch(()=>{}); };
     for(const id of created.wop) await del('work_order_parts', id);
     for(const id of created.wo)  await del('work_orders', id);
+    // (13. tur m4) Sevkiyat paketleri: satırlar paketle CASCADE silinir;
+    // LOADED/SHIPPED silinemez ama testte OPEN/CLOSED bırakılıyor
+    for(const p of (await dbGet('shipment_packages')).filter(x=>x.project_name===PROJ))
+      await del('shipment_packages', p.id);
     // (O4/O5 guard'ları) depodaki kalem ve kaleme bağlı mal kabul hareketi
     // silinemez: önce kalemler CANCELLED + depodan çözülür, kalemler
     // silinince hareketlerin purchase_item_id bağı NULL'a düşer
@@ -1011,6 +1053,7 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const kalanUrunIds = new Set(kalanUrunler.map(p=>p.id));
     const leftovers =
       (await dbGet('purchase_items')).filter(x=>x.project_name===PROJ).length +
+      (await dbGet('shipment_packages')).filter(x=>x.project_name===PROJ).length +
       (await dbGet('parts')).filter(x=>x.project===PROJ).length +
       (await dbGet('project_bom')).filter(x=>x.project_name===PROJ).length +
       (await dbGet('orders')).filter(x=>x.project_name===PROJ).length +

@@ -121,6 +121,11 @@ public class SecurityConfig {
                     writeRule(auth, new String[]{"/api/delivery-notes/**",
                                     "/api/delivery-note-items/**"},
                             "ROLE_DEVELOPER", "delivery");
+                    // (13. tur madde 4) Sevkiyat paketleme: yeni `shipping`
+                    // yetkisi (K1 karari — yeni ust sekme + ayri anahtar)
+                    writeRule(auth, new String[]{"/api/shipment-packages/**",
+                                    "/api/shipment-package-items/**"},
+                            "ROLE_DEVELOPER", "shipping");
                     writeRule(auth, new String[]{"/api/project-dates/**",
                                     "/api/project-date-revisions/**", "/api/stock-sheets/**"},
                             "ROLE_DEVELOPER", "planning");

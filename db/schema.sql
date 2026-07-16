@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict wCJJConiywFpgdaOms61sghDSXIx2dKzMBDoShDwSsRRmWlICJuP7D1p2wACXPf
+\restrict Q3KsZ0b1pisGu2YYgoJV40b9cplVs0BP02zsojbT9hJfMPvGaeHdaLjqOT6CgGT
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -346,6 +346,7 @@ CREATE TABLE public.project_bom_parts (
     procurement_decision character varying(10),
     decided_by character varying(150),
     decided_at timestamp without time zone,
+    ship_planned boolean DEFAULT false NOT NULL,
     CONSTRAINT project_bom_parts_material_form_chk CHECK (((material_form IS NULL) OR ((material_form)::text = ANY ((ARRAY['SAC'::character varying, 'PROFIL'::character varying, 'MIL'::character varying, 'BORU'::character varying, 'DELRIN'::character varying, 'COK_KOMPONENTLI'::character varying])::text[])))),
     CONSTRAINT project_bom_parts_material_kind_chk CHECK (((material_kind IS NULL) OR ((material_kind)::text = ANY ((ARRAY['TEDARIK'::character varying, 'HAMMADDE'::character varying, 'YARI_MAMUL'::character varying, 'MAMUL'::character varying, 'SARF'::character varying])::text[])))),
     CONSTRAINT project_bom_parts_proc_decision_chk CHECK (((procurement_decision IS NULL) OR ((procurement_decision)::text = ANY (ARRAY[('PURCHASE'::character varying)::text, ('PRODUCE'::character varying)::text, ('POOL'::character varying)::text]))))
@@ -451,6 +452,48 @@ CREATE TABLE public.purchase_orders (
     created_by character varying(150),
     created_at timestamp without time zone DEFAULT now(),
     CONSTRAINT purchase_orders_status_check CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'APPROVED'::character varying, 'ORDERED'::character varying, 'CANCELLED'::character varying])::text[])))
+);
+
+
+--
+-- Name: shipment_package_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.shipment_package_items (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    package_id uuid NOT NULL,
+    part_id uuid,
+    project_bom_part_id uuid,
+    item_name character varying(200) NOT NULL,
+    item_code character varying(100),
+    quantity numeric(15,4) NOT NULL,
+    unit character varying(20) DEFAULT 'adet'::character varying,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT shipment_package_items_quantity_check CHECK ((quantity > (0)::numeric))
+);
+
+
+--
+-- Name: shipment_packages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.shipment_packages (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    package_no character varying(30) NOT NULL,
+    project_name character varying(100) NOT NULL,
+    name character varying(150),
+    length_cm numeric(10,2),
+    width_cm numeric(10,2),
+    height_cm numeric(10,2),
+    weight_kg numeric(12,3),
+    status character varying(20) DEFAULT 'OPEN'::character varying NOT NULL,
+    delivery_note_id uuid,
+    packed_by character varying(150),
+    packed_at timestamp without time zone,
+    notes text,
+    created_by character varying(150),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT shipment_packages_status_chk CHECK (((status)::text = ANY ((ARRAY['OPEN'::character varying, 'CLOSED'::character varying, 'LOADED'::character varying, 'SHIPPED'::character varying])::text[])))
 );
 
 
@@ -862,6 +905,30 @@ ALTER TABLE ONLY public.purchase_order_quotes
 
 ALTER TABLE ONLY public.purchase_orders
     ADD CONSTRAINT purchase_orders_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: shipment_package_items shipment_package_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.shipment_package_items
+    ADD CONSTRAINT shipment_package_items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: shipment_packages shipment_packages_package_no_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.shipment_packages
+    ADD CONSTRAINT shipment_packages_package_no_key UNIQUE (package_no);
+
+
+--
+-- Name: shipment_packages shipment_packages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.shipment_packages
+    ADD CONSTRAINT shipment_packages_pkey PRIMARY KEY (id);
 
 
 --
@@ -1500,6 +1567,38 @@ ALTER TABLE ONLY public.purchase_orders
 
 
 --
+-- Name: shipment_package_items shipment_package_items_package_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.shipment_package_items
+    ADD CONSTRAINT shipment_package_items_package_id_fkey FOREIGN KEY (package_id) REFERENCES public.shipment_packages(id) ON DELETE CASCADE;
+
+
+--
+-- Name: shipment_package_items shipment_package_items_part_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.shipment_package_items
+    ADD CONSTRAINT shipment_package_items_part_id_fkey FOREIGN KEY (part_id) REFERENCES public.parts(id) ON DELETE SET NULL;
+
+
+--
+-- Name: shipment_package_items shipment_package_items_project_bom_part_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.shipment_package_items
+    ADD CONSTRAINT shipment_package_items_project_bom_part_id_fkey FOREIGN KEY (project_bom_part_id) REFERENCES public.project_bom_parts(id) ON DELETE SET NULL;
+
+
+--
+-- Name: shipment_packages shipment_packages_delivery_note_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.shipment_packages
+    ADD CONSTRAINT shipment_packages_delivery_note_id_fkey FOREIGN KEY (delivery_note_id) REFERENCES public.delivery_notes(id) ON DELETE SET NULL;
+
+
+--
 -- Name: user_pins user_pins_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1647,5 +1746,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wCJJConiywFpgdaOms61sghDSXIx2dKzMBDoShDwSsRRmWlICJuP7D1p2wACXPf
+\unrestrict Q3KsZ0b1pisGu2YYgoJV40b9cplVs0BP02zsojbT9hJfMPvGaeHdaLjqOT6CgGT
 
