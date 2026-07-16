@@ -82,4 +82,11 @@ public class PurchaseItemRequest {
      * create'te sessizce dusuyordu ve kalem havuz filtresine girmiyordu.
      */
     private Boolean needsPlanning;
+
+    /**
+     * (13. tur madde 2) Satin Alma listesi gorunurlugu. null/verilmezse TRUE
+     * (elle giris eski davranis); MIP havuz/MRP plan akislari false gonderir.
+     * CREATE ve UPDATE DTO'larinin IKISINDE de olmali (needs_planning dersi).
+     */
+    private Boolean sentToPurchasing;
 }

@@ -1339,6 +1339,12 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
     </div>
     <div class="form-card" id="mrp-params" style="margin-bottom:16px"></div>
     <div id="mrp-result"></div>
+    <!-- (13. tur madde 2) Hammadde satın almaya OTOMATİK düşmez: havuz kararı ve
+         MRP plan kalemleri burada bekler; kullanıcı isterse tek tuşla gönderir -->
+    <div class="form-card" id="mrp-pending-send-card" style="margin-bottom:16px">
+      <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:10px">MİP'te Bekleyenler <span style="text-transform:none">(satın almaya gönderilmemiş kalemler — arkadaş isteği: otomatik düşmesin)</span></div>
+      <div id="mrp-pending-send"></div>
+    </div>
   </div>
 </div>
 
@@ -8453,6 +8459,7 @@ async function _mipPoolApply(groups){
           name: g.name, code: g.code || null,
           quantity: qty, unit: g.unit || 'adet', material: g.material || null,
           needs_planning: true,
+          sent_to_purchasing: false, // (13. tur madde 2) satın almaya otomatik düşmez
           notes: 'MİP havuz kararı' + (tur ? ' ('+tur+')' : ''),
           created_by: currentUser?.display_name||currentUser?.username||null
         });
@@ -8466,9 +8473,10 @@ async function _mipPoolApply(groups){
         // Create DTO'su needs_planning'i yeni destekliyor (restart'a kadar eski
         // backend'de düşebilir) — bayrak ayrı PUT ile GARANTİLENİR; yoksa kalem
         // Kesim Planlama havuz filtresine (needs_planning && PLANNED) girmez.
-        if(!yeni.needs_planning){
-          const ok = await dbUpdate('purchase_items', yeni.id, {needs_planning: true});
-          if(ok) yeni.needs_planning = true;
+        // (13. tur) sent_to_purchasing:false da aynı garantiden geçer.
+        if(!yeni.needs_planning || yeni.sent_to_purchasing!==false){
+          const ok = await dbUpdate('purchase_items', yeni.id, {needs_planning: true, sent_to_purchasing: false});
+          if(ok){ yeni.needs_planning = true; yeni.sent_to_purchasing = false; }
         }
       }
       n++;
@@ -9214,7 +9222,56 @@ async function renderMrp(){
   }
   renderMrpParams();
   renderMrpLeftovers(); // (10. tur M10)
+  renderMrpPendingSend(); // (13. tur madde 2)
   if(!pool.length){ document.getElementById('mrp-result').innerHTML=''; _mrpResult=null; }
+}
+
+// ─── (13. tur madde 2) MİP'te Bekleyenler — satın almaya gönderilmemiş kalemler ───
+// Hammadde satın almaya OTOMATİK düşmez (arkadaş isteği, ses kaydı): havuz
+// kararı ve MRP plan kalemleri sent_to_purchasing=false ile oluşur, burada
+// listelenir; kullanıcı isterse "Satın Almaya Gönder" ile düşürür.
+function renderMrpPendingSend(){
+  const el = document.getElementById('mrp-pending-send');
+  if(!el) return;
+  const rows = purchaseItems.filter(i=>i.sent_to_purchasing===false && i.status!=='CANCELLED');
+  if(!rows.length){
+    el.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:8px;text-align:center">Bekleyen kalem yok — havuz kararı ve plan kalemleri burada birikir, satın almaya buradan gönderilir</div>`;
+    return;
+  }
+  el.innerHTML = h`${rows.map(i=>{
+    const gonderilebilir = i.status==='PLANNED';
+    const planParent = i.stock_plan_id ? purchaseItems.find(x=>x.id===i.stock_plan_id) : null;
+    const etiketler = [
+      i.needs_planning ? 'havuzda — plana bağlanınca plan kalemini gönderin' : '',
+      planParent ? '→ '+ (planParent.name||'') : '',
+      i.status==='IN_WAREHOUSE' ? 'depoda — satın alma gerekmez' : ''
+    ].filter(Boolean);
+    return h`<div style="display:flex;gap:10px;align-items:center;padding:6px 4px;border-bottom:1px dashed var(--border);flex-wrap:wrap">
+      <span style="font-family:var(--font-mono);font-size:11px;min-width:0;flex:1">
+        ${i.code?h`<span style="color:var(--accent)">${i.code}</span>${raw(' — ')}`:''}${i.name}
+        <span style="color:var(--muted)"> · ${mipNum(Number(i.quantity)||1)} ${i.unit||'adet'} · ${i.project_name}${i.notes?' · '+i.notes:''}</span>
+        ${etiketler.map(t=>h`<span style="font-size:9px;padding:1px 6px;border-radius:8px;border:1px solid var(--border);color:var(--muted);margin-left:4px">${t}</span>`)}
+      </span>
+      ${gonderilebilir
+        ? h`<button class="btn btn-primary btn-sm" id="mrpsend-${raw(i.id)}" onclick="mrpSendToPurchasing('${raw(i.id)}')" title="Kalemi Satın Alma listesine düşür — sipariş süreci oradan yürür">Satın Almaya Gönder</button>`
+        : ''}
+    </div>`;
+  })}`;
+}
+
+async function mrpSendToPurchasing(id){
+  const i = purchaseItems.find(x=>x.id===id);
+  if(!i) return;
+  const bitti = btnBusy('mrpsend-'+id, '…');
+  if(!bitti) return;
+  try{
+    const ok = await dbUpdate('purchase_items', id, {sent_to_purchasing: true});
+    if(!ok) return; // hata toast'ı adapter'dan geldi
+    i.sent_to_purchasing = true;
+    toast(`"${i.name}" satın almaya gönderildi.`,'success');
+    renderMrpPendingSend();
+    if(document.getElementById('pur-list')) renderPurchaseList();
+  } finally { bitti(); }
 }
 
 // ─── (10. tur M10) Depodaki artık plakalar / profiller ───
@@ -9302,15 +9359,16 @@ async function mrpUseLeftover(idx){
       project_name: [...new Set(tamYerlesen.map(s=>s.item.project_name))].length===1 ? tamYerlesen[0].item.project_name : 'ORTAK (MRP)',
       name: r.name, code: r.code || null,
       quantity: kullanilacak, unit: r.unit || 'adet',
+      sent_to_purchasing: false, // (13. tur madde 2) satın alma değil, depo kullanımı
       notes: `Depo artığından — ${tamYerlesen.length} kalem: ${tamYerlesen.map(s=>s.item.code||s.item.name).join(', ')} · ${whName(r.wh)||''}`,
       created_by: currentUser?.display_name || currentUser?.username || null
     });
     if(!Array.isArray(d)||!d[0]){ toast('Plan kalemi oluşturulamadı!','error'); return; }
     const planItem = d[0];
     purchaseItems.push(planItem);
-    const okSt = await dbUpdate('purchase_items', planItem.id, {status:'IN_WAREHOUSE', warehouse_id: r.wh});
+    const okSt = await dbUpdate('purchase_items', planItem.id, {status:'IN_WAREHOUSE', warehouse_id: r.wh, sent_to_purchasing:false});
     if(!okSt){ await dbDelete('purchase_items', planItem.id); purchaseItems = purchaseItems.filter(x=>x.id!==planItem.id); toast('Plan kalemi depoya bağlanamadı — geri alındı.','error'); return; }
-    planItem.status='IN_WAREHOUSE'; planItem.warehouse_id=r.wh;
+    planItem.status='IN_WAREHOUSE'; planItem.warehouse_id=r.wh; planItem.sent_to_purchasing=false;
     // 2) Depodan otomatik düşüm (source_type CHECK'li — MANUAL + açıklayıcı not)
     const mv = await mvInsert({whId:r.wh, type:'OUT', qty:kullanilacak, unit:r.unit, name:r.name, code:r.code,
       sourceType:'MANUAL', notes:'Kesim planı artık kullanımı: '+tamYerlesen.map(s=>s.item.code||s.item.name).join(', ')});
@@ -9725,7 +9783,7 @@ async function mrpApprove(){
   const calcTxt = r.type==='SAC'
     ? `hesap: ${r.plates.length} plaka, ort. verim %${r.ortVerim.toFixed(1)}`
     : `hesap: ${r.kons.toplamProfil} profil (${r.L}mm, fire %${r.fire})`;
-  if(!confirm(`"${r.sheetName}" için ${qty} adet satın alma kalemi (PLANNED) oluşturulacak;\n${sources.length} kaynak kalem bu plana bağlanacak (havuzdan düşer). Devam?`)) return;
+  if(!confirm(`"${r.sheetName}" için ${qty} adet plan kalemi oluşturulacak — MİP'te bekler, satın almaya GÖNDERİLMEZ (aşağıdaki "MİP'te Bekleyenler"den gönderirsiniz);\n${sources.length} kaynak kalem bu plana bağlanacak (havuzdan düşer). Devam?`)) return;
 
   const d = await dbInsert('purchase_items',{
     project_name: projName,
@@ -9733,12 +9791,18 @@ async function mrpApprove(){
     code: null,
     quantity: qty, unit: 'adet',
     material: r.material || null,
+    sent_to_purchasing: false, // (13. tur madde 2) kullanıcı isterse gönderir
     notes: `MRP planı — ${sources.length} kalem: ${sources.map(s=>s.code||s.name).join(', ')} · ${calcTxt}`,
     created_by: currentUser?.display_name || currentUser?.username || null
   });
   if(!Array.isArray(d)||!d[0]){ toast('Plan kalemi oluşturulamadı!','error'); return; }
   const planItem = d[0];
   purchaseItems.push(planItem);
+  // Eski backend'e karşı garanti (needs_planning PUT deseni)
+  if(planItem.sent_to_purchasing!==false){
+    const okSp = await dbUpdate('purchase_items', planItem.id, {sent_to_purchasing:false});
+    if(okSp) planItem.sent_to_purchasing = false;
+  }
   let linked = 0;
   for(const s of sources){
     const ok = await dbUpdate('purchase_items', s.id, {stock_plan_id: planItem.id, needs_planning: false});
@@ -9859,7 +9923,11 @@ function renderPurchaseList(){
   const sumEl  = document.getElementById('pur-summary');
   if(!listEl) return;
   const proj  = document.getElementById('pur-project-sel')?.value || '';
-  const items = proj ? purchaseItems.filter(i=>i.project_name===proj) : purchaseItems;
+  // (13. tur madde 2) MİP'te bekleyen kalemler (sent_to_purchasing=false)
+  // Satın Alma listesine GİRMEZ — gönderme MİP > Kesim Planlama'dan yapılır.
+  const all   = proj ? purchaseItems.filter(i=>i.project_name===proj) : purchaseItems;
+  const items = all.filter(i=>i.sent_to_purchasing!==false);
+  const mipBekleyen = all.length - items.length;
 
   // Durum özet çipleri + para toplamı (birim fiyatı olan kalemler)
   if(sumEl){
@@ -9877,13 +9945,14 @@ function renderPurchaseList(){
     });
     const totalTxt = Object.entries(totals)
       .map(([c,t])=>`${purFmtMoney(t)} ${c}`).join(' + ');
-    sumEl.innerHTML = h`${chips}${totalTxt
+    sumEl.innerHTML = h`${chips}${mipBekleyen
+      ? h`<span class="chipk" style="font-size:10.5px;padding:3px 10px;cursor:pointer" onclick="switchTab('mip');switchMipTab('mrp')" title="Satın almaya gönderilmemiş MİP kalemleri — göndermek için MİP > Kesim Planlama > MİP'te Bekleyenler">MİP'te bekleyen: <b style="color:var(--ink)">${mipBekleyen}</b></span>` : ''}${totalTxt
       ? h`<span class="chipk" style="font-size:10.5px;padding:3px 10px;margin-left:auto">Tahmini toplam: <b style="color:var(--ink)">${totalTxt}</b></span>` : ''}`;
     if(typeof purUpdateSub==='function') purUpdateSub(items, proj);
   }
 
   if(!items.length){
-    listEl.innerHTML = h`<div class="empty-state"><span class="emoji"></span>${proj?'Bu projede satın alma kalemi yok':'Henüz satın alma kalemi eklenmedi'}<br><span style="font-size:12px;color:var(--muted)">Ürün ağacından aktarın veya elle ekleyin</span></div>`;
+    listEl.innerHTML = h`<div class="empty-state"><span class="emoji"></span>${proj?'Bu projede satın alma kalemi yok':'Henüz satın alma kalemi eklenmedi'}${mipBekleyen?h`<br><span style="font-size:12px;color:var(--muted)">MİP'te bekleyen ${mipBekleyen} kalem var — göndermek için MİP > Kesim Planlama</span>`:h`<br><span style="font-size:12px;color:var(--muted)">Ürün ağacından aktarın veya elle ekleyin</span>`}</div>`;
     return;
   }
 

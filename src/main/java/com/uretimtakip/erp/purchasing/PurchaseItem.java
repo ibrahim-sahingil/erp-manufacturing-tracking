@@ -52,6 +52,10 @@ import java.util.UUID;
  *                                     kalemin bagli oldugu toplu siparis grubu)
  *   notes               text          NULL
  *   needs_planning      boolean       DEFAULT false NOT NULL (#10 MRP havuzu isareti)
+ *   sent_to_purchasing  boolean       DEFAULT true NOT NULL (13. tur madde 2:
+ *                                     Satin Alma listesinde gorunur mu; MIP havuz/
+ *                                     MRP plan kalemleri false baslar, kullanici
+ *                                     MIP'ten gonderince true olur)
  *   stock_plan_id       uuid          NULL (FK -> purchase_items self, ON DELETE SET NULL;
  *                                     kaynak kalemin baglandigi plaka/profil kalemi)
  *   ordered_at          timestamp     NULL
@@ -124,6 +128,16 @@ public class PurchaseItem extends BaseEntity {
     @Column(name = "needs_planning", nullable = false)
     @Builder.Default
     private Boolean needsPlanning = false;
+
+    /**
+     * (13. tur madde 2) Satin Alma listesinde gorunur mu? MIP havuz karari ve
+     * MRP plan kalemleri false ile olusur (hammadde satin almaya OTOMATIK
+     * dusmez); kullanici MIP'ten "Satin Almaya Gonder" deyince true olur.
+     * Elle giris ve "Satin Almaya Gonder" akislari default true.
+     */
+    @Column(name = "sent_to_purchasing", nullable = false)
+    @Builder.Default
+    private Boolean sentToPurchasing = true;
 
     /** Bu kalemin malzemesinin cikacagi plaka/profil kalemi (self-referans). */
     @Column(name = "stock_plan_id")

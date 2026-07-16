@@ -627,6 +627,28 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
       !sacFreed.stock_plan_id && sacFreed.needs_planning===true,
       JSON.stringify({sp:sacFreed.stock_plan_id, np:sacFreed.needs_planning}));
 
+    console.log('═══ 13.TUR m2: HAMMADDE SATIN ALMAYA OTOMATİK DÜŞMEZ ═══');
+    // sent_to_purchasing: verilmezse TRUE (elle giriş eski davranış);
+    // MİP havuz/MRP plan akışları false gönderir; MİP'ten "Satın Almaya
+    // Gönder" PUT ile true yapar. CREATE hem UPDATE DTO'da (needs_planning dersi).
+    const spVarsayilan = (await dbInsert('purchase_items',{project_name:PROJ,
+      name:'E2E SP Varsayılan', quantity:1, unit:'adet', created_by:'E2E'}))[0];
+    created.pi.push(spVarsayilan?.id);
+    check('alan verilmeden oluşan kalem sent_to_purchasing=TRUE (eski davranış)',
+      spVarsayilan?.sent_to_purchasing===true, JSON.stringify(spVarsayilan?.sent_to_purchasing));
+    const spBekleyen = (await dbInsert('purchase_items',{project_name:PROJ,
+      name:'E2E SP MİP Bekleyen', quantity:2, unit:'adet',
+      sent_to_purchasing:false, needs_planning:true,
+      notes:'MİP havuz kararı (E2E)', created_by:'E2E'}))[0];
+    created.pi.push(spBekleyen?.id);
+    check('havuz akışı kalemi CREATE ile sent_to_purchasing=FALSE oluşur (create DTO)',
+      spBekleyen?.sent_to_purchasing===false, JSON.stringify(spBekleyen?.sent_to_purchasing));
+    check('MİP\'ten gönderme: PUT sent_to_purchasing=true kabul edilir (update DTO)',
+      await dbUpdate('purchase_items', spBekleyen.id, {sent_to_purchasing:true}));
+    const spSonra = (await dbGet('purchase_items')).find(i=>i.id===spBekleyen.id);
+    check('gönderilen kalem artık satın alma listesinde görünür (true)',
+      spSonra?.sent_to_purchasing===true, JSON.stringify(spSonra?.sent_to_purchasing));
+
     console.log('═══ E2: ONDALIK ADET ÜRETİMDE YUKARI YUVARLANIR ═══');
     // parts.total_qty INTEGER — ondalık BOM adedi eskiden sessizce kesiliyordu.
     // İzole: türsüz ondalık (2.5) parça yayınla → parts qty 3 + rounded uyarısı.

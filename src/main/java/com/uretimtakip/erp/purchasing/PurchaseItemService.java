@@ -96,6 +96,10 @@ public class PurchaseItemService {
                 .createdBy(request.getCreatedBy())
                 // (10. tur M5) MIP havuz karari kalemi dogrudan havuzda olusturur
                 .needsPlanning(Boolean.TRUE.equals(request.getNeedsPlanning()))
+                // (13. tur madde 2) verilmezse TRUE — elle giris eski davranis;
+                // MIP havuz/MRP plan akislari false gonderir (otomatik dusme yok)
+                .sentToPurchasing(request.getSentToPurchasing() == null
+                        || Boolean.TRUE.equals(request.getSentToPurchasing()))
                 .build();
 
         PurchaseItem saved = purchaseItemRepository.save(item);
@@ -143,6 +147,10 @@ public class PurchaseItemService {
         }
         if (request.getNeedsPlanning() != null) {
             item.setNeedsPlanning(request.getNeedsPlanning());
+        }
+        // (13. tur madde 2) MIP'ten "Satin Almaya Gonder" true yollar
+        if (request.getSentToPurchasing() != null) {
+            item.setSentToPurchasing(request.getSentToPurchasing());
         }
         // Mal kabul bilgileri (4. tur #3)
         if (request.isReceivedByPresent()) {

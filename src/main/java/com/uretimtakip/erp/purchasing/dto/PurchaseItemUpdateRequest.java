@@ -129,6 +129,12 @@ public class PurchaseItemUpdateRequest {
     private Boolean needsPlanning;
 
     /**
+     * (13. tur madde 2) Satin Alma listesi gorunurlugu. null = dokunma;
+     * MIP'teki "Satin Almaya Gonder" true yollar.
+     */
+    private Boolean sentToPurchasing;
+
+    /**
      * Mal kabul bilgileri (4. tur #3). received_by presence takipli:
      * whUndo geri alirken explicit null ile temizler.
      */

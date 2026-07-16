@@ -40,6 +40,7 @@ public class PurchaseItemResponse {
     private UUID purchaseOrderId;
     private String notes;
     private Boolean needsPlanning;
+    private Boolean sentToPurchasing;
     private UUID stockPlanId;
     private LocalDateTime orderedAt;
     private LocalDateTime receivedAt;
@@ -68,6 +69,7 @@ public class PurchaseItemResponse {
                 .purchaseOrderId(e.getPurchaseOrderId())
                 .notes(e.getNotes())
                 .needsPlanning(e.getNeedsPlanning())
+                .sentToPurchasing(e.getSentToPurchasing())
                 .stockPlanId(e.getStockPlanId())
                 .orderedAt(e.getOrderedAt())
                 .receivedAt(e.getReceivedAt())
