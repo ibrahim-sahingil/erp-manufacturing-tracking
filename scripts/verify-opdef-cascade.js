@@ -1,11 +1,14 @@
-// (7. tur #1 + #3) Islem tanimi: bolum alani + kod degisince agac kodlarinin
-// otomatik guncellenmesi.
+// (7. tur #3) Islem tanimi: kod degisince agac kodlarinin otomatik guncellenmesi.
 //
 // #3: Islem kodu -PW -> -XZ degisince, bu islemi tasiyan TUM parcalarin
 //     (bom_parts sablonlari + project_bom_parts yayinlanmis agaclar) hem
 //     operations dizisi hem KODU guncellenmeli. Kod yeniden insa edilir:
 //     ortadaki islem degisse bile kalinti kalmaz.
-// #1: bom_operations.department_name saklanmali ve API'de donmeli.
+// (13. tur madde 1) BOLUM CASCADE'I TERSINE CEVRILDI: islem tanimindaki bolum
+//     degisikligi artik proje parcalarina DOKUNMAZ ve projede bolum OLUSTURMAZ
+//     (bolum atamasi %100 elle). Eski 8. tur cascade senaryosu ters kontrole
+//     donusturuldu. department_name kolonu veri kaybi olmasin diye duruyor;
+//     update bu alana dokunmaz (eski deger korunur).
 //
 // Kullanim: node scripts/verify-opdef-cascade.js   (sunucu 8080'de calismali)
 const BASE = 'http://localhost:8080/api/';
@@ -86,7 +89,9 @@ async function call(m, p, b) {
     const upd = await call('PUT', '/bom-operations/' + opId,
       { name: 'CASC Kaynak', code: yeniKod, department_name: 'Kaynakhane' });
     chk('islem kodu guncellendi', upd.ok, upd.msg);
-    chk('department_name guncellendi', upd.body.data.department_name === 'Kaynakhane');
+    chk('(13. tur) update department_name alanina DOKUNMADI (eski deger korundu)',
+        upd.body.data.department_name === 'Kaynak',
+        JSON.stringify(upd.body.data.department_name));
 
     const partSonra = await call('GET', '/bom-parts/' + partId);
     const kod = partSonra.body.data.code;
@@ -153,31 +158,29 @@ async function call(m, p, b) {
     chk('bekleyen rezervasyonun kod snapshot\'i duzeltildi',
         rezSonra && rezSonra.item_code === etkinYeni, rezSonra && rezSonra.item_code);
 
-    // ── (8. tur duzeltme — arkadas raporu) BOLUM SONRADAN eklenince/degisince
-    //    bu islemi ZATEN tasiyan proje parcalarinin dept_id'si de dolmali
-    //    ("islemin bolumu her yere girilecek"). Eskiden yalniz kopyalama/elle
-    //    ekleme aninda ataniyordu; mevcut parcalarin Bolum alani bos kaliyordu.
-    const yeniBolum = 'CASC Bolum ' + sfx;
+    // ── (13. tur madde 1 — TERS KONTROL) Islem tanimina bolum gonderilse bile
+    //    proje parcalarina DOKUNULMAMALI ve projede bolum OLUSTURULMAMALI.
+    //    Once parcaya ELLE bolum atanir; opdef guncellemesi bunu EZMEMELI.
+    const elleBolum = await call('POST', '/departments',
+      { order_id: orderId, name: 'CASC Elle Bolum ' + sfx, sort_order: 1 });
+    const elleBolumId = elleBolum.body.data.id;
+    await call('PUT', '/project-bom-parts/' + pbpId, { dept_id: elleBolumId });
+    const yeniBolum = 'CASC Cascade Bolum ' + sfx;
     const updD = await call('PUT', '/bom-operations/' + opId,
       { name: 'CASC Kaynak', code: geriKod, department_name: yeniBolum });
-    chk('bolum degisikligi kabul edildi', updD.ok, updD.msg);
+    chk('bolumlu update istegi kabul edildi', updD.ok, updD.msg);
     const depts = (await call('GET', '/departments')).body.data
       .filter(d => d.order_id === orderId);
-    const hedefDept = depts.find(d => d.name === yeniBolum);
-    chk('bolum projede otomatik olusturuldu (cascade)', !!hedefDept,
+    chk('(13. tur) projede bolum OLUSTURULMADI (cascade yok)',
+        !depts.some(d => d.name === yeniBolum),
         JSON.stringify(depts.map(d => d.name)));
     const pbpD  = (await call('GET', '/project-bom-parts/' + pbpId)).body.data;
     const ozelD = (await call('GET', '/project-bom-parts/' + ozelId)).body.data;
-    chk('kopya parcanin dept_id backfill edildi', !!hedefDept && pbpD.dept_id === hedefDept.id,
-        JSON.stringify({ dept: pbpD.dept_id }));
-    chk('ozel parcanin dept_id backfill edildi', !!hedefDept && ozelD.dept_id === hedefDept.id,
+    chk('(13. tur) elle atanan bolum EZILMEDI', pbpD.dept_id === elleBolumId,
+        JSON.stringify({ dept: pbpD.dept_id, beklenen: elleBolumId }));
+    chk('(13. tur) bolumsuz parcaya bolum YAZILMADI', !ozelD.dept_id,
         JSON.stringify({ dept: ozelD.dept_id }));
-    // Bolum SILINIRSE parcalara dokunulmaz (null'a cekilmez)
-    await call('PUT', '/bom-operations/' + opId,
-      { name: 'CASC Kaynak', code: geriKod, department_name: null });
-    const pbpD2 = (await call('GET', '/project-bom-parts/' + pbpId)).body.data;
-    chk('bolum silinince parca bolumu KORUNDU', pbpD2.dept_id === (hedefDept && hedefDept.id),
-        JSON.stringify({ dept: pbpD2.dept_id }));
+    await call('DELETE', '/departments/' + elleBolumId);
 
     // temizlik sirasi: rezervasyon/kalem/depo -> proje -> sablon
     // (K1 guard: bagli pi/rezervasyon varken proje silinemez)

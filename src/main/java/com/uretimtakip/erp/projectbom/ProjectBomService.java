@@ -55,10 +55,6 @@ public class ProjectBomService {
     private final ProjectBomPartRepository projectBomPartRepository;
     private final BomProductRepository bomProductRepository;
     private final BomPartRepository bomPartRepository;
-    // (7. tur #1) Islem tanimindaki bolum, kopyalanan parcaya atanir
-    private final com.uretimtakip.erp.bom.BomOperationRepository bomOperationRepository;
-    private final com.uretimtakip.erp.department.DepartmentRepository departmentRepository;
-    private final com.uretimtakip.erp.order.OrderRepository orderRepository;
 
     @Transactional(readOnly = true)
     public List<ProjectBomResponse> listAll() {
@@ -227,69 +223,9 @@ public class ProjectBomService {
 
     // ============ AUTO-POPULATE HELPER ============
 
-    /**
-     * (7. tur #1) Parcanin operations dizisinden bolum adini turetir:
-     * SON islemden geriye dogru, bolumu tanimli ILK islem kazanir. (Islem kodlari
-     * parca koduna sirayla eklenir; son islem parcanin guncel durumudur.)
-     * Frontend'deki opsDeptName ile AYNI mantik.
-     */
-    private String resolveDeptName(List<Map<String, Object>> operations,
-                                   Map<String, String> opCodeToDept) {
-        if (operations == null || operations.isEmpty()) {
-            return null;
-        }
-        for (int i = operations.size() - 1; i >= 0; i--) {
-            Object code = operations.get(i).get("code");
-            if (code instanceof String s) {
-                String dept = opCodeToDept.get(s);
-                if (dept != null) {
-                    return dept;
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * (7. tur #1) Projenin ayni isimli bolumunu bulur, YOKSA OLUSTURUR
-     * (kullanici karari). Bolumler projeye ozeldir (departments.order_id).
-     * Proje kaydi (orders) bulunamazsa bolum atanmaz (null).
-     */
-    private UUID ensureProjectDept(String projectName, String deptName,
-                                   Map<String, UUID> cache) {
-        String key = deptName.toLowerCase(java.util.Locale.forLanguageTag("tr"));
-        if (cache.containsKey(key)) {
-            return cache.get(key);
-        }
-        UUID orderId = orderRepository.findByProjectName(projectName)
-                .map(com.uretimtakip.erp.order.Order::getId)
-                .orElse(null);
-        if (orderId == null) {
-            cache.put(key, null);
-            return null;
-        }
-        List<com.uretimtakip.erp.department.Department> mevcut =
-                departmentRepository.findByOrderId(orderId);
-        UUID found = mevcut.stream()
-                .filter(d -> d.getName() != null
-                        && d.getName().toLowerCase(java.util.Locale.forLanguageTag("tr")).equals(key))
-                .map(com.uretimtakip.erp.department.Department::getId)
-                .findFirst()
-                .orElse(null);
-        if (found == null) {
-            com.uretimtakip.erp.department.Department yeni =
-                    com.uretimtakip.erp.department.Department.builder()
-                            .orderId(orderId)
-                            .name(deptName)
-                            .sortOrder(mevcut.size() + 1)
-                            .build();
-            found = departmentRepository.save(yeni).getId();
-            log.info("Islem bolumu projede olusturuldu: project='{}', dept='{}'",
-                    projectName, deptName);
-        }
-        cache.put(key, found);
-        return found;
-    }
+    // (13. tur madde 1) resolveDeptName + ensureProjectDept KALDIRILDI —
+    // bolum islem tanimindan TURETILMEZ ve otomatik OLUSTURULMAZ; kullanici
+    // bolumleri elle kaydeder, parcaya elle atar (frontend dropdown).
 
     /**
      * BomProduct'un tum BomPart'larini ProjectBomPart olarak kopyalar.
@@ -311,26 +247,12 @@ public class ProjectBomService {
             return 0;
         }
 
-        // (7. tur #1) Islem kodu -> bolum adi haritasi. Parcanin operations'indaki
-        // SON bolumlu islem parcanin bolumunu belirler; bolum bu projede yoksa
-        // olusturulur (bolumler projeye ozeldir: departments.order_id).
-        Map<String, String> opCodeToDept = new HashMap<>();
-        for (com.uretimtakip.erp.bom.BomOperation op : bomOperationRepository.findAll()) {
-            if (op.getCode() != null && op.getDepartmentName() != null
-                    && !op.getDepartmentName().isBlank()) {
-                opCodeToDept.put(op.getCode(), op.getDepartmentName().trim());
-            }
-        }
-        Map<String, UUID> deptCache = new HashMap<>(); // bolumAdi(kucuk) -> id
-
+        // (13. tur madde 1) dept_id her zaman null kopyalanir — bolum elle atanir.
         // 1. Pass: ProjectBomPart'lar olustur (parent_custom_id null)
         Map<UUID, UUID> bomPartIdToProjectBomPartId = new HashMap<>();
         List<ProjectBomPart> created = new ArrayList<>();
 
         for (BomPart bp : bomParts) {
-            String deptName = resolveDeptName(bp.getOperations(), opCodeToDept);
-            UUID deptId = deptName == null ? null
-                    : ensureProjectDept(projectName, deptName, deptCache);
             ProjectBomPart pbp = ProjectBomPart.builder()
                     .projectBomId(projectBomId)
                     .bomPartId(bp.getId())
@@ -341,7 +263,7 @@ public class ProjectBomService {
                     .customUnit(null)
                     .customWeight(null)
                     .customMaterial(null)
-                    .deptId(deptId)
+                    .deptId(null)
                     .parentCustomId(null)   // 2. pass'te doldurulacak
                     .operations(bp.getOperations() != null
                             ? new ArrayList<>(bp.getOperations())

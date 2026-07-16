@@ -1,12 +1,15 @@
-// (7. tur #1) İşlem tanımındaki BÖLÜM, bölümün olduğu her yere gitmeli.
+// (13. tur madde 1) Bölümler MANUEL — işlem tanımındaki bölüm hiçbir yere
+// otomatik gitmez, projede bölüm otomatik OLUŞMAZ.
 //
-// Zincir: İşlem Tanımı (department_name)
-//   → şablon ağacındaki işlemli parça projeye KOPYALANIRKEN dept_id atanır
-//   → yayınlanınca üretim parçasına (parts.department_id) taşınır
+// Zincir (yeni):
+//   → şablon ağacındaki işlemli parça projeye kopyalanırken dept_id NULL kalır
+//   → kullanıcı bölümü elle kaydeder (pbomeAddDeptQuick / Bölümler modalı)
+//     ve parçaya elle atar (pbomeSetDept)
+//   → yayınlanınca ELLE atanan bölüm üretim parçasına (parts.department_id)
+//     taşınır; republish boş bölümü doldurur (fill-only), doluyu ezmez.
 //
-// Eskiden kopyalama `dept_id: null` yazıyordu; bölüm YALNIZCA proje editöründe
-// ELLE işlem eklenirken atanıyordu, yayınlanan ağaç bölümsüz kalıyordu.
-// Bölüm projeye özel bir kayıttır (departments.order_id) → yoksa oluşturulur.
+// (7. tur #1 otomatik türetme davranışı bilinçli geri alındı — arkadaş:
+// "bölümler manuel liste olsun, kişi bölüm kaydetsin sonra parçaya atasın".)
 const { test, expect } = require('@playwright/test');
 
 async function login(page) {
@@ -27,11 +30,11 @@ async function api(page, method, path, body) {
   }, [method, path, body || null]);
 }
 
-test('işlem tanımındaki bölüm: şablondan projeye kopyalanınca parçaya atanır', async ({ page }) => {
+test('bölümler manuel: kopyalamada otomatik bölüm yok; elle atama yayına taşınır', async ({ page }) => {
   await login(page);
   const sfx = Date.now().toString(36);
   const projeAdi = 'DEPT-PROJE-' + sfx;
-  const bolumAdi = 'Kaynakhane-' + sfx;   // projede HENÜZ YOK → oluşturulmalı
+  const bolumAdi = 'Kaynakhane-' + sfx;   // opdef'te duran MİRAS değer — hiçbir yere gitmemeli
   const opKodu = 'DW' + sfx.slice(-3).toUpperCase();
 
   const opdef = await api(page, 'POST', '/bom-operations',
@@ -44,14 +47,13 @@ test('işlem tanımındaki bölüm: şablondan projeye kopyalanınca parçaya at
   await page.evaluate(() => invalidateRef('orders'));
   const prod = await api(page, 'POST', '/bom-products', { name: 'DEPT Ürün', code: 'DEPT-' + sfx });
   const prodId = prod.body.data.id;
-  // Şablonda işlemli parça (işlem zaten tanımlı — kullanıcı elle eklemeyecek)
+  // Şablonda işlemli parça (işlem tanımında bölüm adı DURUYOR — inert olmalı)
   const islemli = await api(page, 'POST', '/bom-parts', {
     product_id: prodId, name: 'DEPT Gövde', code: 'DEPTG-' + sfx + opKodu,
     quantity: 2, unit: 'adet', level: 0, material_kind: 'YARI_MAMUL',
     operations: [{ name: 'DEPT Kaynak', code: opKodu, desc: '', duration_per_unit: 0, total_duration: 0 }]
   });
   const islemliId = islemli.body.data.id;
-  // İşlemsiz parça → bölümsüz kalmalı
   const sade = await api(page, 'POST', '/bom-parts', {
     product_id: prodId, name: 'DEPT Sade', code: 'DEPTS-' + sfx,
     quantity: 1, unit: 'adet', level: 0, material_kind: 'YARI_MAMUL'
@@ -62,68 +64,64 @@ test('işlem tanımındaki bölüm: şablondan projeye kopyalanınca parçaya at
   const pbomId = pbom.body.data.id;
 
   try {
-    // Editörü aç → şablon parçaları kopyalanır (dept ataması burada olmalı)
+    // Editörü aç → şablon parçaları kopyalanır (dept_id NULL kalmalı)
     await page.evaluate(() => switchTab('bom'));
     await page.waitForTimeout(1200);
     await page.evaluate(id => openPbomEditor(id), pbomId);
     await page.waitForTimeout(2500);
 
-    // Bölüm projede oluşturuldu mu?
+    // (13. tur) İşlem tanımındaki bölüm projede OLUŞTURULMAMALI
     const bolumler = (await api(page, 'GET', '/departments')).body.data
       .filter(d => d.order_id === orderId);
-    console.log('  projede oluşan bölümler:', JSON.stringify(bolumler.map(d => d.name)));
-    const bolum = bolumler.find(d => d.name === bolumAdi);
-    expect(bolum, 'işlem tanımındaki bölüm projede otomatik oluşturulmalı').toBeTruthy();
+    console.log('  projede bölümler (boş olmalı):', JSON.stringify(bolumler.map(d => d.name)));
+    expect(bolumler.find(d => d.name === bolumAdi),
+      'işlem tanımındaki bölüm projede OTOMATİK OLUŞMAMALI').toBeFalsy();
 
-    // Kopyalanan parçalarda dept_id doğru mu?
+    // Kopyalanan parçalarda dept_id NULL olmalı
     const pbps = (await api(page, 'GET', '/project-bom-parts')).body.data
       .filter(x => x.project_bom_id === pbomId);
-    // Backend kopyalamasında custom_code NULL bırakılır (override yok) → etkin
-    // kod şablondan gelir: resolved_code.
     const etkinKod = p => p.custom_code || p.resolved_code || '';
     const pIslemli = pbps.find(p => etkinKod(p).includes(opKodu));
     const pSade = pbps.find(p => etkinKod(p).startsWith('DEPTS-'));
     expect(pbps.length, 'iki parça kopyalanmalı').toBe(2);
-    console.log('  işlemli parça dept_id:', pIslemli && pIslemli.dept_id);
-    console.log('  sade parça dept_id:', pSade && pSade.dept_id);
-    expect(pIslemli.dept_id, 'işlemli parça bölüme atanmalı').toBe(bolum.id);
+    expect(pIslemli.dept_id, 'işlemli parça da bölümsüz kopyalanmalı').toBeFalsy();
     expect(pSade.dept_id, 'işlemsiz parça bölümsüz kalmalı').toBeFalsy();
 
+    // ELLE bölüm kaydet (pbomeAddDeptQuick — "+ Yeni bölüm…" / Bölümler modalı çekirdeği)
+    const elleDeptId = await page.evaluate(async ad => await pbomeAddDeptQuick(ad), bolumAdi);
+    expect(elleDeptId, 'elle bölüm kaydı oluşmalı').toBeTruthy();
+    // ELLE parçaya ata (pbomeSetDept — satırdaki dropdown çekirdeği)
+    await page.evaluate(([pid, did]) => pbomeSetDept(pid, did), [pIslemli.id, elleDeptId]);
+    await page.waitForTimeout(800);
+    const pIslemli2 = (await api(page, 'GET', '/project-bom-parts/' + pIslemli.id)).body.data;
+    expect(pIslemli2.dept_id, 'elle atama kaydolmalı').toBe(elleDeptId);
+
     // (9. tur M4) Yayın öncesi karar: her iki parça YARI_MAMUL → PRODUCE
-    // (kararsız parça artık hiçbir yere yazılmaz)
     await api(page, 'POST', '/project-bom-parts/decisions',
       { items: pbps.map(p => ({ id: p.id, decision: 'PRODUCE' })), decided_by: 'TEST' });
 
-    // Yayınla → üretim parçası bölümü devralmalı.
-    // pbomePublish() confirm() sorar; burada yayınlama ÇEKİRDEĞİNİ doğrudan
-    // çağırıyoruz (dialog yarışı olmasın).
+    // Yayınla → üretim parçası ELLE atanan bölümü devralmalı
     const yayinSonuc = await page.evaluate(async () => {
       const pb = projectBoms.find(p => p.id === _activePbomId);
       const prod = bomProducts.find(p => p.id === pb.bom_product_id);
       const fresh = await dbGet('project_bom_parts', 'project_bom_id=eq.' + _activePbomId);
       const tpl = await dbGet('bom_parts', 'product_id=eq.' + prod.id);
-      const r = await pbomPublishParts(pb, fresh, tpl);
-      return { r, freshSayi: fresh.length, ilk: fresh[0] && {n: fresh[0].custom_name, k: fresh[0].material_kind} };
+      return await pbomPublishParts(pb, fresh, tpl);
     });
     console.log('  yayınlama sonucu:', JSON.stringify(yayinSonuc));
     await page.waitForTimeout(2000);
 
-    // NOT: /api/parts projeyi order_id olarak döner (adapter 'project' adına çevirir)
     const uretim = (await api(page, 'GET', '/parts')).body.data
       .filter(p => (p.code || '').includes(sfx));
-    console.log('  üretime çıkan parçalar:', JSON.stringify(uretim.map(p =>
-      ({code: p.code, order_id: p.order_id, dept: p.department_id}))));
     expect(uretim.length, 'iki parça üretime çıkmalı').toBe(2);
     expect(uretim[0].order_id, 'üretim parçası projeye bağlanmalı').toBe(orderId);
     const uIslemli = uretim.find(p => (p.code || '').includes(opKodu));
-    console.log('  üretim parçası department_id:', uIslemli && uIslemli.department_id);
     expect(uIslemli, 'işlemli parça üretime çıkmalı').toBeTruthy();
-    expect(uIslemli.department_id, 'üretim parçası bölümü devralmalı').toBe(bolum.id);
+    expect(uIslemli.department_id, 'üretim parçası ELLE atanan bölümü devralmalı').toBe(elleDeptId);
     const uSade = uretim.find(p => (p.code || '').startsWith('DEPTS-'));
-    expect(uSade && uSade.department_id, 'işlemsiz parça bölümsüz kalmalı').toBeFalsy();
+    expect(uSade && uSade.department_id, 'atanmamış parça bölümsüz kalmalı').toBeFalsy();
 
-    // (8. tur taraması) Bölüm SONRADAN gelirse: üretim parçasının bölümü
-    // boşaltılır, yeniden yayınlama BOŞ bölümü doldurmalı (dolu olsa EZMEZDİ).
+    // Republish fill-only backfill KORUNDU: boşaltılan bölüm yeniden dolmalı
     await api(page, 'PUT', '/parts/' + uIslemli.id, { department_id: null });
     const yayin2 = await page.evaluate(async () => {
       const pb = projectBoms.find(p => p.id === _activePbomId);
@@ -135,8 +133,7 @@ test('işlem tanımındaki bölüm: şablondan projeye kopyalanınca parçaya at
     });
     console.log('  republish sonucu:', JSON.stringify(yayin2));
     const uIslemli2 = (await api(page, 'GET', '/parts')).body.data.find(p => p.id === uIslemli.id);
-    console.log('  republish sonrası department_id:', uIslemli2 && uIslemli2.department_id);
-    expect(uIslemli2.department_id, 'republish boş bölümü doldurmalı (fill-only)').toBe(bolum.id);
+    expect(uIslemli2.department_id, 'republish boş bölümü doldurmalı (fill-only)').toBe(elleDeptId);
   } finally {
     for (const p of (await api(page, 'GET', '/parts')).body.data.filter(x => (x.code || '').includes(sfx)))
       await api(page, 'DELETE', '/parts/' + p.id);

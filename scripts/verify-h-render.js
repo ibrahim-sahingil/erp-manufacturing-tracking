@@ -474,17 +474,16 @@ chk('bomTree: parça adı/kodu/malzemesi kaçırıldı', bts.includes('BN&lt;img
 chk('bomTree: operasyon adı kaçırıldı', bts.includes('Op&lt;b&gt;(OC&lt;i&gt;)'));
 chk('bomTree: kök ürün adı kaçırıldı', bts.includes('P&lt;i&gt; — Prod&lt;b&gt;'));
 
-// ── renderBomList (şablon parça listesi — 9. tur M1: türetilmiş bölüm rozeti) ──
-// Bölüm adı işlem tanımından türetilir (opsDeptName) — kullanıcı verisidir.
+// ── renderBomList (şablon parça listesi) ──
+// (13. tur madde 1) opsDeptName kaldırıldı — türetilmiş bölüm rozeti yok;
+// şablon listesinde bölüm gösterilmez, atama proje editöründe elle yapılır.
 global.kindBadge=()=>'<span class="KB">k</span>';
-global.bomOpDefs=[{id:'od1', code:'OC<i>', name:'Op<b>', department_name:'Böl'+EVIL}];
-eval(grab('opsDeptName'));
+global.bomOpDefs=[{id:'od1', code:'OC<i>', name:'Op<b>'}];
 eval(grab('buildSortedTree'));
 eval(grab('renderBomList'));
 renderBomList();
 const bl=store['bom-parts-list']||'';
 console.log('\nrenderBomList (şablon parça listesi):');
-chk('bomList: türetilmiş bölüm rozeti kaçırıldı', bl.includes('Böl&lt;img') && !bl.includes('Böl'+EVIL));
 chk('bomList: parça adı/kodu/malzemesi kaçırıldı', bl.includes('BN&lt;img') && bl.includes('BC&lt;b&gt;') && bl.includes('M&lt;script&gt;'));
 chk('bomList: kindBadge + butonlar (raw) korundu', bl.includes('<span class="KB">k</span>') && bl.includes("editBomPart('b1')"));
 
