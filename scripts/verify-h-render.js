@@ -800,6 +800,7 @@ global.PUR_STATUS = global.PUR_STATUS || {PLANNED:{label:'Planlandı',icon:'',co
 global.SHIP_PKG_STATUS = {OPEN:{label:'Açık',color:'#f5a623'}, CLOSED:{label:'Kapatıldı',color:'#3498db'}, LOADED:{label:'Araca yüklü',color:'#8e44ad'}, SHIPPED:{label:'Sevk edildi',color:'#2ecc71'}};
 eval(grab('shipPackedMap'));
 eval(grab('shipRowKey'));
+eval(grab('shipTargetQty')); // (14. tur S1)
 eval(grab('_shipRows'));
 eval(grab('shipPartStatus'));
 eval(grab('woMatChip'));

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict lDYvvlnu5OAZulKJAYvQFxMzgUaYKqGfJi9gUVi5SkI29yx3VTTzPnwzbpqJ5Tb
+\restrict tncryqi1bY0sLEwpcNkEqrR9bSWknA6LsOQ021HlPPLgL5qAgXWrlfbIEJRcsKK
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -353,6 +353,7 @@ CREATE TABLE public.project_bom_parts (
     decided_by character varying(150),
     decided_at timestamp without time zone,
     ship_planned boolean DEFAULT false NOT NULL,
+    ship_planned_qty numeric(15,4),
     CONSTRAINT project_bom_parts_material_form_chk CHECK (((material_form IS NULL) OR ((material_form)::text = ANY ((ARRAY['SAC'::character varying, 'PROFIL'::character varying, 'MIL'::character varying, 'BORU'::character varying, 'DELRIN'::character varying, 'COK_KOMPONENTLI'::character varying])::text[])))),
     CONSTRAINT project_bom_parts_material_kind_chk CHECK (((material_kind IS NULL) OR ((material_kind)::text = ANY ((ARRAY['TEDARIK'::character varying, 'HAMMADDE'::character varying, 'YARI_MAMUL'::character varying, 'MAMUL'::character varying, 'SARF'::character varying])::text[])))),
     CONSTRAINT project_bom_parts_proc_decision_chk CHECK (((procurement_decision IS NULL) OR ((procurement_decision)::text = ANY (ARRAY[('PURCHASE'::character varying)::text, ('PRODUCE'::character varying)::text, ('POOL'::character varying)::text]))))
@@ -1752,5 +1753,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lDYvvlnu5OAZulKJAYvQFxMzgUaYKqGfJi9gUVi5SkI29yx3VTTzPnwzbpqJ5Tb
+\unrestrict tncryqi1bY0sLEwpcNkEqrR9bSWknA6LsOQ021HlPPLgL5qAgXWrlfbIEJRcsKK
 

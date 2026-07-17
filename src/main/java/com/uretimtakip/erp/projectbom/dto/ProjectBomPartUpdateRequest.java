@@ -126,4 +126,20 @@ public class ProjectBomPartUpdateRequest {
 
     /** (13. tur madde 4) Paket Planlamasi isareti; null = dokunma. */
     private Boolean shipPlanned;
+
+    /**
+     * (14. tur S1) Plan adedi. PRESENCE takipli: explicit null = adedi
+     * temizle (plandan cikarirken); gelmezse dokunulmaz.
+     */
+    @Setter(lombok.AccessLevel.NONE)
+    @PositiveOrZero(message = "Plan adedi 0 veya pozitif olmali")
+    private BigDecimal shipPlannedQty;
+
+    @Setter(lombok.AccessLevel.NONE)
+    private boolean shipPlannedQtyPresent;
+
+    public void setShipPlannedQty(BigDecimal shipPlannedQty) {
+        this.shipPlannedQty = shipPlannedQty;
+        this.shipPlannedQtyPresent = true;
+    }
 }

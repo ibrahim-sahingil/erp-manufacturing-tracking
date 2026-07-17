@@ -6574,17 +6574,22 @@ function _shipRows(proj){
   const codeKey = c=>(c||'').trim().toLowerCase();
   const pbomIds = new Set(projectBoms.filter(b=>b.project_name===proj).map(b=>b.id));
   const projPbps = projectBomParts.filter(p=>pbomIds.has(p.project_bom_id));
-  const plannedCodes = new Set(projPbps.filter(p=>p.ship_planned)
-    .map(p=>codeKey(p.custom_code||p.resolved_code)).filter(Boolean));
   const pbpByCode = {};
   projPbps.forEach(p=>{ const k=codeKey(p.custom_code||p.resolved_code); if(k && !pbpByCode[k]) pbpByCode[k]=p; });
-  const partRows = bucket.map(p=>({
-    kind:'part', id:p.id, partId:p.id,
-    pbpId:(pbpByCode[codeKey(p.code)]||{}).id||null,
-    name:p.name, code:p.code, qty:Number(p.qty)||0, unit:'adet',
-    parentId:p.parent_part_id||null, part:p,
-    planned: plannedCodes.has(codeKey(p.code))
-  }));
+  // (14. tur S1) Plan ADET bazlı: plannedQty pbp'den; null = belirtilmemiş
+  // (eski kayıt) → tamamı sayılır. Paketleme hedefi de bu adettir.
+  const planOf = pbp => !pbp||!pbp.ship_planned ? {planned:false, plannedQty:null}
+    : {planned:true, plannedQty: pbp.ship_planned_qty!=null ? Number(pbp.ship_planned_qty) : null};
+  const partRows = bucket.map(p=>{
+    const pbp = pbpByCode[codeKey(p.code)]||null;
+    return {
+      kind:'part', id:p.id, partId:p.id,
+      pbpId:(pbp||{}).id||null,
+      name:p.name, code:p.code, qty:Number(p.qty)||0, unit:'adet',
+      parentId:p.parent_part_id||null, part:p,
+      ...planOf(pbp)
+    };
+  });
   const partCodes = new Set(bucket.map(p=>codeKey(p.code)).filter(Boolean));
   const purRows = purchaseItems
     .filter(i=>(i.project_name||'')===proj && i.status!=='CANCELLED'
@@ -6593,11 +6598,14 @@ function _shipRows(proj){
       kind:'pur', id:i.id, partId:null, pbpId:i.project_bom_part_id||null,
       name:i.name, code:i.code, qty:Number(i.quantity)||0, unit:i.unit||'adet',
       parentId:null, pur:i,
-      planned: i.project_bom_part_id
-        ? !!(projPbps.find(p=>p.id===i.project_bom_part_id)||{}).ship_planned
-        : false
+      ...planOf(i.project_bom_part_id ? projPbps.find(p=>p.id===i.project_bom_part_id) : null)
     }));
   return {partRows, purRows};
+}
+
+// (14. tur S1) Satırın sevk hedefi: planlıysa plan adedi (null=tamamı), değilse tamamı
+function shipTargetQty(r){
+  return (r.planned && r.plannedQty!=null) ? Math.min(r.plannedQty, r.qty) : r.qty;
 }
 
 // Üretim parçasının sevkiyat gözünden durumu (PDF madde 1: üretildi /
@@ -6641,13 +6649,13 @@ function shipRenderTree(){
     if(onlyPlanned && !hasPlannedDesc(r)) return '';
     const st = shipPartStatus(r.part);
     const pk = packed.get(shipRowKey(r))||0;
-    const kalan = Math.max(0, r.qty - pk);
+    const kalan = Math.max(0, shipTargetQty(r) - pk); // (14. tur S1) hedef = plan adedi
     return h`<div style="margin:3px 0 3px ${depth*22}px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;display:flex;gap:10px;align-items:center">
       ${depth>0?raw('<span style="color:var(--muted);font-size:10px">└─</span>'):''}
       <div style="min-width:0;flex:1">
         <span style="font-weight:600;font-size:13px">${r.name}</span>
         <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent);margin-left:8px">${r.code}</span>
-        ${r.planned?h`<span style="font-family:var(--font-mono);font-size:9px;padding:1px 7px;border-radius:9px;border:1px solid var(--accent);color:var(--accent);margin-left:6px" title="Paket Planlaması: sevk edilecek diye işaretli (ürün ağacı düzenleyicisinden)">SEVK PLANINDA</span>`:''}
+        ${r.planned?h`<span style="font-family:var(--font-mono);font-size:9px;padding:1px 7px;border-radius:9px;border:1px solid var(--accent);color:var(--accent);margin-left:6px" title="Paket Planlaması: sevk edilecek diye işaretli — adet ürün ağacı düzenleyicisinden (14. tur S1)">SEVK PLANINDA${r.plannedQty!=null?' ×'+mipNum(r.plannedQty):''}</span>`:''}
         <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">
           ${r.qty} ${r.unit}
           <span style="color:${raw(st.color)}"> · ${st.lbl}</span>
@@ -6665,7 +6673,7 @@ function shipRenderTree(){
       ${r.code?h`<span style="color:var(--accent)">${r.code}</span>${raw(' — ')}`:''}${r.name}
       · ${mipNum(r.qty)} ${r.unit}
       <span style="color:${raw(m.color)}">${m.label}</span>${r.pur.status==='IN_WAREHOUSE'&&whName(r.pur.warehouse_id)?h` · ${whName(r.pur.warehouse_id)}`:''}
-      ${r.planned?h`<span style="font-size:9px;padding:1px 6px;border-radius:8px;border:1px solid var(--accent);color:var(--accent);margin-left:4px">SEVK PLANINDA</span>`:''}
+      ${r.planned?h`<span style="font-size:9px;padding:1px 6px;border-radius:8px;border:1px solid var(--accent);color:var(--accent);margin-left:4px">SEVK PLANINDA${r.plannedQty!=null?' ×'+mipNum(r.plannedQty):''}</span>`:''}
       ${pk>0?h`<span style="color:#16a085"> · paketlenen ${mipNum(pk)}</span>`:''}
     </div>`;
   };
@@ -6691,16 +6699,17 @@ function shipRenderPacking(){
   // Sol panel: sürüklenebilir satırlar (kalan 0 → soluk, sürüklenmez)
   srcEl.innerHTML = rows.length ? h`${rows.map((r,i)=>{
     const pk = packed.get(shipRowKey(r))||0;
-    const kalan = Math.max(0, r.qty - pk);
+    const hedef = shipTargetQty(r); // (14. tur S1) planlıysa plan adedi
+    const kalan = Math.max(0, hedef - pk);
     return h`<div draggable="${raw(String(kalan>0))}" data-shiprow="${i}"
       ondragstart="shipDragStart(event,${i})" ondragend="shipDragEnd()"
       style="display:flex;gap:8px;align-items:center;padding:6px 10px;margin:3px 0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;${raw(kalan>0?'cursor:grab':'opacity:.45')}">
       <span style="color:var(--muted)">⠿</span>
       <span style="font-family:var(--font-mono);font-size:11px;min-width:0;flex:1">
         ${r.code?h`<span style="color:var(--accent)">${r.code}</span>${raw(' — ')}`:''}${r.name}
-        ${r.planned?h`<span style="font-size:9px;padding:1px 6px;border-radius:8px;border:1px solid var(--accent);color:var(--accent);margin-left:4px">PLAN</span>`:''}
+        ${r.planned?h`<span style="font-size:9px;padding:1px 6px;border-radius:8px;border:1px solid var(--accent);color:var(--accent);margin-left:4px" title="Sevk planı hedefi — paketleme kalan hesabı bu adedi kullanır">PLAN${r.plannedQty!=null?' ×'+mipNum(r.plannedQty):''}</span>`:''}
       </span>
-      <span style="font-family:var(--font-mono);font-size:10px;color:${raw(kalan>0?'var(--muted)':'#2ecc71')}">${kalan>0?h`kalan ${mipNum(kalan)} / ${mipNum(r.qty)}`:h`tamamı paketlendi`}</span>
+      <span style="font-family:var(--font-mono);font-size:10px;color:${raw(kalan>0?'var(--muted)':'#2ecc71')}">${kalan>0?h`kalan ${mipNum(kalan)} / ${mipNum(hedef)}${hedef!==r.qty?h` (parça ${mipNum(r.qty)})`:''}`:h`hedef paketlendi`}</span>
     </div>`;
   })}` : h`<div class="empty-state"><span class="emoji"></span>Bu projede sevk edilecek satır yok</div>`;
   window._shipPackRows = rows; // drop anında indeks → satır
@@ -6762,8 +6771,9 @@ async function shipPkgDrop(e, pkgId, card){
   if(!r) return;
   const proj = document.getElementById('ship-project-sel')?.value || '';
   const packed = shipPackedMap(proj);
-  const kalan = Math.max(0, r.qty - (packed.get(shipRowKey(r))||0));
-  if(kalan<=0){ toast('Bu satırın tamamı zaten paketlendi.','error'); return; }
+  // (14. tur S1) hedef = planlıysa plan adedi
+  const kalan = Math.max(0, shipTargetQty(r) - (packed.get(shipRowKey(r))||0));
+  if(kalan<=0){ toast('Bu satırın sevk hedefi zaten paketlendi.','error'); return; }
   const cevap = prompt('Kaç '+ (r.unit||'adet') +' bu pakete konsun? (kalan: '+mipNum(kalan)+')', String(kalan));
   if(cevap===null) return;
   const q = parseFloat(String(cevap).replace(',','.'));
@@ -16423,19 +16433,29 @@ function pbomeRenderKpis(){
     </div>`;
 }
 
-// (13. tur madde 4) Paket Planlaması: sevk edilecek parçayı işaretle/çıkar —
-// işaret sevkiyat ekranındaki ağaçta "SEVK PLANINDA" rozeti olarak görünür.
+// (13. tur madde 4 + 14. tur S1) Paket Planlaması ADET BAZLI (arkadaş kararı):
+// plana alırken kaç adedin sevk edileceği sorulur ("5'in 3'ü"); işaret + adet
+// sevkiyat ağacında "SEVK PLANINDA ×N" rozeti olur, paketleme hedefi bu adettir.
 async function pbomeToggleShipPlan(partId){
   const p = _pbomeParts.find(x=>x.id===partId);
   if(!p) return;
   const yeni = !p.ship_planned;
-  const ok = await dbUpdate('project_bom_parts', partId, {ship_planned: yeni});
+  let planQty = null;
+  if(yeni){
+    const tam = Number(p.custom_qty)||1;
+    const cevap = prompt('Kaç adet sevk edilecek? (parça adedi: '+mipNum(tam)+')', String(tam));
+    if(cevap===null) return;
+    planQty = parseFloat(String(cevap).replace(',','.'));
+    if(!(planQty>0)){ toast('Geçerli bir adet girin!','error'); return; }
+    if(planQty > tam + 1e-9){ toast('Plan adedi parça adedini ('+mipNum(tam)+') aşamaz!','error'); return; }
+  }
+  const ok = await dbUpdate('project_bom_parts', partId, {ship_planned: yeni, ship_planned_qty: planQty});
   if(!ok) return; // hata toast'ı adapter'dan geldi
-  p.ship_planned = yeni;
+  p.ship_planned = yeni; p.ship_planned_qty = planQty;
   const g = projectBomParts.find(x=>x.id===partId);
-  if(g) g.ship_planned = yeni;
+  if(g){ g.ship_planned = yeni; g.ship_planned_qty = planQty; }
   pbomeRenderList();
-  toast(yeni ? '"'+(p.custom_name||'')+'" sevk planına alındı.' : '"'+(p.custom_name||'')+'" sevk planından çıkarıldı.','success');
+  toast(yeni ? '"'+(p.custom_name||'')+'" sevk planına alındı ('+mipNum(planQty)+' adet).' : '"'+(p.custom_name||'')+'" sevk planından çıkarıldı.','success');
 }
 
 // Bölüm ata

@@ -122,4 +122,8 @@ public class ProjectBomPartRequest {
      * DTO'larinin IKISINDE de olmali (needs_planning dersi).
      */
     private Boolean shipPlanned;
+
+    /** (14. tur S1) Plan adedi ("5'in 3'u sevk edilecek"). */
+    @PositiveOrZero(message = "Plan adedi 0 veya pozitif olmali")
+    private BigDecimal shipPlannedQty;
 }

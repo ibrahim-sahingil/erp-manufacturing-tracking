@@ -205,6 +205,7 @@ public class ProjectBomPartService {
                         ? request.getSortOrder() : 0)
                 // (13. tur madde 4) CREATE'te de islenir (needs_planning dersi)
                 .shipPlanned(Boolean.TRUE.equals(request.getShipPlanned()))
+                .shipPlannedQty(request.getShipPlannedQty())
                 .build();
 
         ProjectBomPart saved = projectBomPartRepository.save(pbp);
@@ -321,6 +322,10 @@ public class ProjectBomPartService {
         // (13. tur madde 4) Paket Planlamasi isareti
         if (request.getShipPlanned() != null) {
             pbp.setShipPlanned(request.getShipPlanned());
+        }
+        // (14. tur S1) Plan adedi — presence takipli (explicit null = temizle)
+        if (request.isShipPlannedQtyPresent()) {
+            pbp.setShipPlannedQty(request.getShipPlannedQty());
         }
 
         ProjectBomPart saved = projectBomPartRepository.save(pbp);

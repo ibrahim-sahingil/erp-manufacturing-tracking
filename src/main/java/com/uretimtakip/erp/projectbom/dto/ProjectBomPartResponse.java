@@ -69,6 +69,9 @@ public class ProjectBomPartResponse {
     /** (13. tur madde 4) Paket Planlamasi isareti. */
     private Boolean shipPlanned;
 
+    /** (14. tur S1) Plan adedi (null = belirtilmemis, tamami sayilir). */
+    private BigDecimal shipPlannedQty;
+
     // ============ RESOLVED ALANLAR (coalesce edilmis) ============
     private String resolvedName;
     private String resolvedCode;
@@ -127,6 +130,7 @@ public class ProjectBomPartResponse {
                 .decidedBy(e.getDecidedBy())
                 .decidedAt(e.getDecidedAt())
                 .shipPlanned(e.getShipPlanned())
+                .shipPlannedQty(e.getShipPlannedQty())
                 .build();
 
         // RESOLVED alanlar - custom oncelikli, yoksa sablondan

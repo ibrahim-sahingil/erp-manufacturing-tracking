@@ -173,10 +173,17 @@ public class ProjectBomPart extends BaseEntity {
     /**
      * (13. tur madde 4) "Paket Planlamasi" isareti: agac duzenleyicisinde
      * sevk edilecek diye isaretlenen parca sevkiyatcinin agacinda
-     * "SEVK PLANINDA" rozetiyle gorunur. v1 parca basina isaret (adet degil —
-     * arkadas sorusu A1); paketlemedeki fiili adet shipment_package_items'ta.
+     * "SEVK PLANINDA" rozetiyle gorunur.
      */
     @Column(name = "ship_planned", nullable = false)
     @Builder.Default
     private Boolean shipPlanned = false;
+
+    /**
+     * (14. tur S1 — arkadas karari) Plan ADET bazli: "5 adedin 3'u sevk
+     * edilecek". ship_planned=true iken kac adet planlandigi; null = eski
+     * kayit/belirtilmemis (tamami sayilir). Paketleme hedefi bu adettir.
+     */
+    @Column(name = "ship_planned_qty", precision = 15, scale = 4)
+    private BigDecimal shipPlannedQty;
 }
