@@ -96,6 +96,16 @@ public class Order extends BaseEntity {
     @Column(name = "approval_note", columnDefinition = "TEXT")
     private String approvalNote;
 
+    /**
+     * (14. tur S4 — arkadas karari) KALICI sevkiyat zinciri SIPARIS uzerinde:
+     * hazirlaniyor -> yuklendi -> sevk_edildi -> teslim_edildi (DB CHECK
+     * orders_shipping_status_chk; null = sevkiyat sureci baslamadi).
+     * Otomatik gecisler frontend'de (paket olustu/yuklendi/irsaliye sevk);
+     * teslim_edildi ELLE isaretlenir (siparis kartindaki buton).
+     */
+    @Column(name = "shipping_status", length = 20)
+    private String shippingStatus;
+
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 

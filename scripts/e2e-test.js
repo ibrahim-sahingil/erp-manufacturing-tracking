@@ -714,6 +714,24 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     check('bağ gerçekten kalktı', pk2Son && !pk2Son.delivery_note_id, JSON.stringify(pk2Son?.delivery_note_id));
     check('irsaliye temizliği', await dbDelete('delivery_notes', spkDn.id));
 
+    console.log('═══ 14.TUR S4: SİPARİŞ SEVKİYAT ZİNCİRİ (orders.shipping_status) ═══');
+    // Kalıcı zincir sipariş üzerinde; null=dokunma, ""=temizle (tam-gövde
+    // PUT'lar zinciri sıfırlamamalı); değerler ÜÇLÜ kural (CHECK+@Pattern+service)
+    const ordZ0 = await api('GET','/orders/'+orderId);
+    check('varsayılan zincir boş', !ordZ0?.shipping_status, JSON.stringify(ordZ0?.shipping_status));
+    check('geçersiz zincir değeri reddedilir (@Pattern)',
+      !(await api('PUT','/orders/'+orderId,{project_name:PROJ, customer_name:'E2E Müşteri', shipping_status:'HACK'})));
+    check('yuklendi yazılır',
+      !!(await api('PUT','/orders/'+orderId,{project_name:PROJ, customer_name:'E2E Müşteri', shipping_status:'yuklendi'})));
+    check('zincir kalıcı (yuklendi)',
+      (await api('GET','/orders/'+orderId))?.shipping_status==='yuklendi');
+    check('alan gönderilmezse DOKUNULMAZ (tam-gövde PUT sıfırlamaz)',
+      !!(await api('PUT','/orders/'+orderId,{project_name:PROJ, customer_name:'E2E Müşteri'}))
+      && (await api('GET','/orders/'+orderId))?.shipping_status==='yuklendi');
+    check('boş string zinciri temizler',
+      !!(await api('PUT','/orders/'+orderId,{project_name:PROJ, customer_name:'E2E Müşteri', shipping_status:''}))
+      && !(await api('GET','/orders/'+orderId))?.shipping_status);
+
     console.log('═══ E2: ONDALIK ADET ÜRETİMDE YUKARI YUVARLANIR ═══');
     // parts.total_qty INTEGER — ondalık BOM adedi eskiden sessizce kesiliyordu.
     // İzole: türsüz ondalık (2.5) parça yayınla → parts qty 3 + rounded uyarısı.

@@ -34,6 +34,7 @@ public class OrderResponse {
     private BigDecimal totalPrice;
     private String currency;
     private String status;
+    private String shippingStatus;
     private UUID approvedBy;
     private LocalDateTime approvedAt;
     private String approvalNote;
@@ -53,6 +54,7 @@ public class OrderResponse {
                 .totalPrice(order.getTotalPrice())
                 .currency(order.getCurrency())
                 .status(order.getStatus())
+                .shippingStatus(order.getShippingStatus())
                 .approvedBy(order.getApprovedBy())
                 .approvedAt(order.getApprovedAt())
                 .approvalNote(order.getApprovalNote())

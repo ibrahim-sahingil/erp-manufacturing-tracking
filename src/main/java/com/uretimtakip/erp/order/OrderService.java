@@ -166,6 +166,12 @@ public class OrderService {
             order.setStatus(newStatus);
         }
         if (request.getApprovalNote() != null) order.setApprovalNote(request.getApprovalNote());
+        // (14. tur S4) null = dokunma (eski tam-govde PUT'lar zinciri sifirlamasin),
+        // "" = temizle; degerler @Pattern + DB CHECK ile ayni listede
+        if (request.getShippingStatus() != null) {
+            order.setShippingStatus(request.getShippingStatus().isBlank()
+                    ? null : request.getShippingStatus().toLowerCase());
+        }
         order.setApprovedBy(request.getApprovedBy());
         order.setNotes(request.getNotes());
 

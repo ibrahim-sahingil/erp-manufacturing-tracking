@@ -105,9 +105,12 @@ global.purchaseItems=[];
 global.workOrders=[]; // tasarım 2026: kartta iş emri sayısı
 global._orderFormOpen=false; // index.html'de top-level let — shim'e elle verilir
 global.parts=[{project:'Prj'+EVIL, qty:4, qty_done:2}]; // pstats/ilerleme gerçek parçadan
+// (14. tur S4) kalıcı sevkiyat zinciri — renderOrders SHIP_CHAIN'e bakar
+global.SHIP_CHAIN={hazirlaniyor:{lbl:'Hazırlanıyor',rank:1}, yuklendi:{lbl:'Yüklendi',rank:2}, sevk_edildi:{lbl:'Sevk Edildi',rank:3}, teslim_edildi:{lbl:'Teslim Edildi',rank:4}};
 const _fakeOrder={id:'o1', project_name:'Prj'+EVIL, customer_name:'Müş<b>',
   customer_email:'a@b<i>', customer_phone:'555<script>', location:'Loc<img>', approved_by:'Ap<b>',
   notes:'Not'+EVIL, price:100, currency:'TRY', status:'active', delivery_days:30,
+  shipping_status:'sevk_edildi', // zincir rozeti + Teslim Edildi butonu render'a girsin
   items:[{name:'İt'+EVIL, desc:'Ds<script>x', qty:2}], created_at:'2026-01-01'};
 global.dbGet=async(t)=> t==='orders'?[_fakeOrder] : [];
 eval(grab('loadOrders'));   // gerçek: orders = dbGet('orders') → sahte order
@@ -122,6 +125,8 @@ chk('orders: not kaçırıldı', ord.includes('Not&lt;img'));
 chk('orders: onaylayan option kaçırıldı', appr.includes('Onay&lt;b&gt;'));
 chk('orders: kart yapısı/buton (raw) korundu', ord.includes('class="order-card') && ord.includes("editOrder('o1')") && ord.includes("togglePin('order','o1'"));
 chk('orders: pstats/ilerleme/termin (tasarım 2026) çıktı', ord.includes('class="pstats"') && ord.includes('class="wbar"') && ord.includes('%50 tamamlandı') && ord.includes('Termin:'));
+chk('orders: sevkiyat zinciri rozeti + Teslim Edildi butonu (14. tur S4)',
+  ord.includes('Sevk Edildi · 3/4') && ord.includes("orderMarkDelivered('o1')"));
 
 // ── renderReceiving (mal kabul) ──
 global._rcvActiveProj='PROJ'; // grup açık → satırlar + bulkBar render olsun

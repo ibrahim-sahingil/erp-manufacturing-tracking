@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict FWtpwBxyLZsLHF4Sctw2OyyoglrOseM1vCnA4kEQyfqVPtbfjvhbVQadp4JVerG
+\restrict JUdvfuEg3Avc3lWtimGFOH3bzDdbooru96zXFBnHDCc2qn1tje3Bj9v4Ge6XCug
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -259,6 +259,8 @@ CREATE TABLE public.orders (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     approved_at timestamp without time zone,
     approval_note text,
+    shipping_status character varying(20),
+    CONSTRAINT orders_shipping_status_chk CHECK (((shipping_status IS NULL) OR ((shipping_status)::text = ANY ((ARRAY['hazirlaniyor'::character varying, 'yuklendi'::character varying, 'sevk_edildi'::character varying, 'teslim_edildi'::character varying])::text[])))),
     CONSTRAINT orders_status_chk CHECK (((status)::text = ANY ((ARRAY['quote'::character varying, 'quote_lost'::character varying, 'active'::character varying, 'pending'::character varying, 'completed'::character varying, 'cancelled'::character varying])::text[])))
 );
 
@@ -1765,5 +1767,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FWtpwBxyLZsLHF4Sctw2OyyoglrOseM1vCnA4kEQyfqVPtbfjvhbVQadp4JVerG
+\unrestrict JUdvfuEg3Avc3lWtimGFOH3bzDdbooru96zXFBnHDCc2qn1tje3Bj9v4Ge6XCug
 

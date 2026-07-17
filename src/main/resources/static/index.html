@@ -5288,14 +5288,10 @@ async function renderOrders() {
 
   // (#2 arkadaş isteği) Proje kartındaki "Malzeme bedeli" satırı için
   // satın alma kalemleri (iptaller hariç, para birimi bazında toplanır)
-  // (13. tur m4/F) + sevkiyat rozeti için irsaliyeler (türetilmiş durum —
-  // orders'a kolon YOK; kalıcı zincir arkadaş A4 cevabına göre sonraki tur)
-  const [freshPi, freshDn] = await Promise.all([
-    dbGet('purchase_items'),
-    dbGet('delivery_notes')
-  ]);
+  // (14. tur S4) sevkiyat rozeti artık KALICI orders.shipping_status'tan —
+  // irsaliye fetch'i gerekmez (13F türetmesi kaldırıldı)
+  const freshPi = await dbGet('purchase_items');
   if(Array.isArray(freshPi)) purchaseItems = freshPi;
-  if(Array.isArray(freshDn)) deliveryNotes = freshDn;
 
   // (12. tur m1) Teklif/Onaylanan ayrımı: alt sekme görünürlüğü orders_quotes
   // yetkisine bağlı (API listesi de yetkisize quote döndürmez — çift katman)
@@ -5384,12 +5380,13 @@ async function renderOrders() {
         </div>
         <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           ${terminStr?h`<span style="font-size:11px;color:var(--muted)">Termin: <b class="num" style="color:${raw(terminLate?'var(--err)':'var(--text)')}">${terminStr}</b></span>`:''}
-          ${(()=>{ // (13. tur m4/F) sevkiyat rozeti — bağlı irsaliyelerden türetilir
-            const dns = deliveryNotes.filter(d=>d.order_id===o.id && d.status!=='CANCELLED');
-            if(!dns.length) return '';
-            const sevk = dns.some(d=>d.status==='SHIPPED');
-            const c = sevk ? '#2ecc71' : '#f5a623';
-            return h`<span title="Bağlı irsaliyelerden türetilir (Depo > İrsaliye)" style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${raw(c)}44;color:${raw(c)};background:${raw(c)}11">${sevk?'Sevk Edildi':'Sevkiyat Hazırlanıyor'}</span>`;
+          ${(()=>{ // (14. tur S4) KALICI sevkiyat zinciri — orders.shipping_status
+            const cur = SHIP_CHAIN[o.shipping_status];
+            if(!cur) return '';
+            const c = o.shipping_status==='teslim_edildi' ? '#2ecc71'
+                    : o.shipping_status==='sevk_edildi' ? '#16a085'
+                    : o.shipping_status==='yuklendi' ? '#8e44ad' : '#f5a623';
+            return h`<span title="Sevkiyat zinciri sipariş üzerinde izlenir: paket açılınca Hazırlanıyor, araca yüklenince Yüklendi, irsaliye sevkinde Sevk Edildi; Teslim Edildi elle işaretlenir (14. tur S4)" style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${raw(c)}44;color:${raw(c)};background:${raw(c)}11">${cur.lbl} · ${SHIP_CHAIN[o.shipping_status].rank}/4</span>`;
           })()}
           <span class="order-status-badge ${st.cls}"><span class="dot" style="background:currentColor"></span>${st.lbl}</span>
         </span>
@@ -5420,6 +5417,8 @@ async function renderOrders() {
           ${o.status==='quote'&&canEdit?h`<button class="btn btn-primary btn-sm" onclick="orderQuoteApprove('${raw(o.id)}')">✔ Onayla → Siparişe Çevir</button>
           <button class="btn btn-ghost btn-sm" onclick="orderQuoteLost('${raw(o.id)}')" style="color:var(--red)">Kabul Edilmedi</button>`:''}
           ${o.status==='quote_lost'&&canEdit?h`<button class="btn btn-ghost btn-sm" onclick="orderQuoteReopen('${raw(o.id)}')">↩ Teklife Geri Al</button>`:''}
+          ${o.shipping_status==='sevk_edildi'&&canEdit?h`<button class="btn btn-primary btn-sm" onclick="orderMarkDelivered('${raw(o.id)}')" title="Sevkiyat zincirinin son adımı — elle işaretlenir (14. tur S4)">Teslim Edildi</button>`:''}
+          ${o.shipping_status==='teslim_edildi'&&canEdit?h`<button class="btn btn-ghost btn-sm" onclick="orderUndoDelivered('${raw(o.id)}')" title="Teslim işaretini geri al (Sevk Edildi'ye döner)">↩ Teslimi Geri Al</button>`:''}
           ${(canEdit||canQuotes)?h`<button class="btn btn-ghost btn-sm" onclick="orderDocsToggle('${raw(o.id)}')" title="Teklif/sipariş dosyaları — PDF, sözleşme, revizyon (12. tur m1)">${raw(ico('folder',12))} Dosyalar</button>`:''}
           <button class="btn btn-ghost btn-sm" onclick="editOrder('${raw(o.id)}')" style="${canEdit?'':'display:none'}">${raw(ico('edit',12))} Düzenle</button>
           <button class="btn btn-ghost btn-sm" onclick="deleteOrder('${raw(o.id)}')" style="color:var(--red);border-color:transparent;${canEdit?'':'display:none'}">${raw(ico('trash',12))} Sil</button>
@@ -5444,6 +5443,68 @@ function _orderFullPayload(o, patch){
     approval_note:o.approval_note||null,
     items: items.map(it=>({name:it.name, desc:it.desc, qty:it.qty}))
   }, patch);
+}
+
+// ═══ (14. tur S4 — arkadaş kararı) SEVKİYAT ZİNCİRİ SİPARİŞ ÜZERİNDE ═══
+// Kalıcı kolon orders.shipping_status: hazırlanıyor→yüklendi→sevk edildi→
+// teslim edildi. Otomatik geçişler YALNIZ YÜKSELTİR (raise); geri almalarda
+// gerçek veriden yeniden türetilir (recompute). Teslim Edildi ELLE işaretlenir.
+const SHIP_CHAIN = {
+  hazirlaniyor:  {lbl:'Hazırlanıyor',  rank:1},
+  yuklendi:      {lbl:'Yüklendi',      rank:2},
+  sevk_edildi:   {lbl:'Sevk Edildi',   rank:3},
+  teslim_edildi: {lbl:'Teslim Edildi', rank:4}
+};
+
+async function orderShippingRaise(orderId, status){
+  const o = orders.find(x=>x.id===orderId);
+  if(!o || !SHIP_CHAIN[status]) return;
+  if((SHIP_CHAIN[o.shipping_status]?.rank||0) >= SHIP_CHAIN[status].rank) return;
+  const ok = await dbUpdate('orders', o.id, _orderFullPayload(o, {shipping_status: status}));
+  if(ok) o.shipping_status = status;
+}
+
+// Geri almalar (paket indir/sevk geri al/paket sil): zincir gerçek durumdan
+// yeniden türetilir — teslim_edildi elle olduğundan türetme onu HİÇ döndürmez
+// (sevk geri alınırsa teslim işareti de düşer; bilinçli). Veri TAZE çekilir:
+// Sevkiyat sekmesinde deliveryNotes, İrsaliye'de shipmentPackages bayat olabilir.
+async function orderShippingRecompute(orderId){
+  const o = orders.find(x=>x.id===orderId);
+  if(!o) return;
+  const [dn, sp] = await Promise.all([dbGet('delivery_notes'), dbGet('shipment_packages')]);
+  if(Array.isArray(dn)) deliveryNotes = dn;
+  if(Array.isArray(sp)) shipmentPackages = sp;
+  const notes = deliveryNotes.filter(d=>d.order_id===o.id && d.status!=='CANCELLED');
+  const pkgs = shipmentPackages.filter(k=>k.project_name===o.project_name);
+  let st = null;
+  if(notes.some(d=>d.status==='SHIPPED')) st = 'sevk_edildi';
+  else if(pkgs.some(k=>k.status==='LOADED'||k.status==='SHIPPED')) st = 'yuklendi';
+  else if(pkgs.length) st = 'hazirlaniyor';
+  if((o.shipping_status||null)===(st||null)) return;
+  const ok = await dbUpdate('orders', o.id, _orderFullPayload(o, {shipping_status: st||''}));
+  if(ok) o.shipping_status = st;
+}
+
+// Sipariş kartındaki elle işaretleme (canEdit): sevk edildikten sonra
+async function orderMarkDelivered(orderId){
+  const o = orders.find(x=>x.id===orderId);
+  if(!o) return;
+  if(!confirm('"'+(o.project_name||'')+'" TESLİM EDİLDİ olarak işaretlensin mi?')) return;
+  const ok = await dbUpdate('orders', o.id, _orderFullPayload(o, {shipping_status:'teslim_edildi'}));
+  if(!ok) return;
+  o.shipping_status = 'teslim_edildi';
+  toast('Sipariş teslim edildi olarak işaretlendi.','success');
+  renderOrders();
+}
+
+async function orderUndoDelivered(orderId){
+  const o = orders.find(x=>x.id===orderId);
+  if(!o) return;
+  const ok = await dbUpdate('orders', o.id, _orderFullPayload(o, {shipping_status:'sevk_edildi'}));
+  if(!ok) return;
+  o.shipping_status = 'sevk_edildi';
+  toast('Teslim işareti geri alındı.','success');
+  renderOrders();
 }
 
 let _ordersView = 'orders';
@@ -6835,6 +6896,9 @@ async function shipPkgCreate(){
     shipmentPackages.push(d[0]);
     ['ship-pk-name','ship-pk-l','ship-pk-w','ship-pk-h','ship-pk-kg','ship-pk-net'].forEach(id=>{ if(g(id)) g(id).value=''; });
     toast('Paket açıldı: '+d[0].package_no,'success');
+    // (14. tur S4) ilk paket → sipariş zinciri "Hazırlanıyor"a yükselir
+    const ord = orders.find(x=>x.project_name===proj);
+    if(ord) await orderShippingRaise(ord.id, 'hazirlaniyor');
     shipRenderPacking();
   } finally { bitti(); }
 }
@@ -6873,6 +6937,9 @@ async function shipPkgDelete(pkgId){
   if(!ok) return;
   shipmentPackages = shipmentPackages.filter(x=>x.id!==pkgId);
   shipmentPackageItems = shipmentPackageItems.filter(it=>it.package_id!==pkgId);
+  // (14. tur S4) son paket silindiyse zincir gerçek durumdan türetilir (null'a döner)
+  const ordSil = orders.find(x=>x.project_name===(k?.project_name||''));
+  if(ordSil) await orderShippingRecompute(ordSil.id);
   toast('Paket silindi.','success');
   shipRenderPacking();
 }
@@ -12365,15 +12432,23 @@ async function dnPkgLoad(noteId, pkgId){
   if(!ok) return; // hata toast'ı adapter'dan geldi (irsaliye bağı zorunluluğu backend'de)
   const k = shipmentPackages.find(x=>x.id===pkgId);
   if(k){ k.delivery_note_id = noteId; k.status='LOADED'; }
+  // (14. tur S4) paket araca yüklendi → sipariş zinciri "Yüklendi"
+  const n = deliveryNotes.find(x=>x.id===noteId);
+  if(n?.order_id) await orderShippingRaise(n.order_id, 'yuklendi');
   toast('Paket araca yüklendi.','success');
   renderDnDetail(); renderDnList();
 }
 
 async function dnPkgUnload(pkgId){
+  const k0 = shipmentPackages.find(x=>x.id===pkgId);
+  const noteId = k0?.delivery_note_id || null;
   const ok = await dbUpdate('shipment_packages', pkgId, {status:'CLOSED', delivery_note_id: null});
   if(!ok) return;
   const k = shipmentPackages.find(x=>x.id===pkgId);
   if(k){ k.status='CLOSED'; k.delivery_note_id=null; }
+  // (14. tur S4) geri alma → zincir gerçek durumdan türetilir
+  const n = noteId ? deliveryNotes.find(x=>x.id===noteId) : null;
+  if(n?.order_id) await orderShippingRecompute(n.order_id);
   toast('Paket araçtan indirildi.','success');
   renderDnDetail(); renderDnList();
 }
@@ -12487,6 +12562,8 @@ async function dnShip(id){
     const okP = await dbUpdate('shipment_packages', k.id, {status:'SHIPPED'});
     if(okP) k.status='SHIPPED';
   }
+  // (14. tur S4) sipariş zinciri "Sevk Edildi"ye yükselir
+  if(n?.order_id) await orderShippingRaise(n.order_id, 'sevk_edildi');
   toast('Sevk edildi!'+(bagli.length?' '+bagli.length+' paket SHIPPED oldu.':''),'success');
   renderDelivery();
 }
@@ -12504,6 +12581,9 @@ async function dnUnship(id){
     const okP = await dbUpdate('shipment_packages', k.id, {status:'LOADED'});
     if(okP) k.status='LOADED';
   }
+  // (14. tur S4) geri alma → zincir gerçek durumdan türetilir
+  const nGeri = deliveryNotes.find(x=>x.id===id);
+  if(nGeri?.order_id) await orderShippingRecompute(nGeri.order_id);
   toast('↩ Sevk geri alındı, depo çıkışları silindi.','success');
   renderDelivery();
 }

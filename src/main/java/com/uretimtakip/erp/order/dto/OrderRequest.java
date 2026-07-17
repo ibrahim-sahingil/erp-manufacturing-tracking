@@ -80,6 +80,16 @@ public class OrderRequest {
 
     private UUID approvedBy;
 
+    /**
+     * (14. tur S4) Sevkiyat zinciri. UCLU KURAL: DB CHECK
+     * (orders_shipping_status_chk) + bu @Pattern + service normalizasyonu.
+     * null = dokunma (tam-govde PUT'lar zinciri sifirlamasin);
+     * "" (bos) = temizle.
+     */
+    @Pattern(regexp = "^(hazirlaniyor|yuklendi|sevk_edildi|teslim_edildi)?$",
+            message = "Gecersiz sevkiyat durumu (hazirlaniyor/yuklendi/sevk_edildi/teslim_edildi)")
+    private String shippingStatus;
+
     /** (12. tur m1) Teklif sureci / onay notu. */
     @Size(max = 4000)
     private String approvalNote;
