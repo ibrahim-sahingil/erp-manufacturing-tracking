@@ -1340,10 +1340,11 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
     </div>
     <div class="form-card" id="mrp-params" style="margin-bottom:16px"></div>
     <div id="mrp-result"></div>
-    <!-- (13. tur madde 2) Hammadde satın almaya OTOMATİK düşmez: havuz kararı ve
-         MRP plan kalemleri burada bekler; kullanıcı isterse tek tuşla gönderir -->
+    <!-- (13. tur madde 2 + 14. tur S5) Havuza aktarılan hammadde satın almaya
+         OTOMATİK düşmez, burada bekler; plan onayı (MRP planı) ise doğrudan
+         satın almaya düşer (arkadaş kararı: yalnız havuz beklesin) -->
     <div class="form-card" id="mrp-pending-send-card" style="margin-bottom:16px">
-      <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:10px">MİP'te Bekleyenler <span style="text-transform:none">(satın almaya gönderilmemiş kalemler — arkadaş isteği: otomatik düşmesin)</span></div>
+      <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:10px">MİP'te Bekleyenler <span style="text-transform:none">(havuza aktarılan, satın almaya gönderilmemiş kalemler)</span></div>
       <div id="mrp-pending-send"></div>
     </div>
   </div>
@@ -9700,16 +9701,16 @@ async function renderMrp(){
   if(!pool.length){ document.getElementById('mrp-result').innerHTML=''; _mrpResult=null; }
 }
 
-// ─── (13. tur madde 2) MİP'te Bekleyenler — satın almaya gönderilmemiş kalemler ───
-// Hammadde satın almaya OTOMATİK düşmez (arkadaş isteği, ses kaydı): havuz
-// kararı ve MRP plan kalemleri sent_to_purchasing=false ile oluşur, burada
-// listelenir; kullanıcı isterse "Satın Almaya Gönder" ile düşürür.
+// ─── (13. tur madde 2 + 14. tur S5) MİP'te Bekleyenler ───
+// YALNIZ "Havuza Aktar" kalemleri sent_to_purchasing=false ile oluşur ve
+// burada bekler (arkadaş S5 kararı: plan onayı doğrudan satın almaya düşer);
+// kullanıcı isterse "Satın Almaya Gönder" ile düşürür.
 function renderMrpPendingSend(){
   const el = document.getElementById('mrp-pending-send');
   if(!el) return;
   const rows = purchaseItems.filter(i=>i.sent_to_purchasing===false && i.status!=='CANCELLED');
   if(!rows.length){
-    el.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:8px;text-align:center">Bekleyen kalem yok — havuz kararı ve plan kalemleri burada birikir, satın almaya buradan gönderilir</div>`;
+    el.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:8px;text-align:center">Bekleyen kalem yok — "Havuza Aktar" kalemleri burada birikir, satın almaya buradan gönderilir</div>`;
     return;
   }
   el.innerHTML = h`${rows.map(i=>{
@@ -9796,12 +9797,13 @@ function renderMrpLeftovers(){
   const inp = INP('4px 6px','11px','width:76px;');
   // (13. tur madde 3) Sahiplik: başka projeye atanmış plakada "Bunu Kullan"
   // ÇIKMAZ, hangi projede olduğu yazılır. Sahip projeler havuzdaki SEÇİLİ
-  // kalemlerin projeleriyle örtüşüyorsa (kendi plakası) buton kalır;
-  // 'ORTAK (MRP)' ortak havuzdur, kilitlemez (A6 varsayılanı).
+  // kalemlerin projeleriyle örtüşüyorsa (kendi plakası) buton kalır.
+  // (14. tur S6 — arkadaş kararı) 'ORTAK (MRP)' da KİLİTLER: ortak plaka
+  // yalnız bilgi olarak görünür, "Bunu Kullan" çıkmaz.
   const seciliProjeler = new Set(mrpSelectedItems().map(s=>s.item.project_name).filter(Boolean));
   el.innerHTML = _mrpLeftovers.map((r,i)=>{
     const owners = mrpLeftoverOwners(r, purchaseItems);
-    const kilitleyen = owners.map(o=>o.project_name).filter(p=>p && p!=='ORTAK (MRP)');
+    const kilitleyen = owners.map(o=>o.project_name).filter(Boolean);
     const kilitli = kilitleyen.length>0 && !kilitleyen.every(p=>seciliProjeler.has(p));
     const ownerHTML = owners.length
       ? `<span style="font-size:9px;padding:1px 6px;border-radius:8px;border:1px solid ${kilitli?'rgba(231,76,60,.4)':'#16a08544'};color:${kilitli?'var(--red,#e74c3c)':'#16a085'};margin-left:4px" title="Bu stok şu proje kalemlerine bağlı (IN_WAREHOUSE): kilitliyse başka projede kullanılamaz">${owners.map(o=>o.project_name==='ORTAK (MRP)'?'Ortak havuz':'Proje: '+esc(o.project_name)).join(' · ')}</span>`
@@ -9832,12 +9834,13 @@ async function mrpUseLeftover(idx){
   if(!sel.length){ toast('Önce havuzdan kalem seçin!','error'); return; }
   // (13. tur madde 3) Guard: render'ı baypas eden bayat DOM'a karşı — plaka
   // başka projeye atanmışsa ve seçili kalemler o projelerin değilse kullanılamaz.
+  // (14. tur S6) ORTAK (MRP) da kilitler — istisna kaldırıldı.
   {
     const owners = mrpLeftoverOwners(r, purchaseItems);
-    const kilitleyen = owners.map(o=>o.project_name).filter(p=>p && p!=='ORTAK (MRP)');
+    const kilitleyen = owners.map(o=>o.project_name).filter(Boolean);
     const secili = new Set(sel.map(s=>s.item.project_name).filter(Boolean));
     if(kilitleyen.length>0 && !kilitleyen.every(p=>secili.has(p))){
-      toast('Bu plaka "'+kilitleyen.join(', ')+'" projesine atanmış — başka projede kullanılamaz.','error');
+      toast('Bu plaka "'+kilitleyen.map(p=>p==='ORTAK (MRP)'?'Ortak havuz':p).join(', ')+'" kaydına atanmış — kullanılamaz.','error');
       return;
     }
   }
@@ -9875,20 +9878,20 @@ async function mrpUseLeftover(idx){
   if(!bitti) return;
   try{
     // 1) Plan-parent: malzeme ZATEN depoda → PLANNED değil IN_WAREHOUSE
+    // (14. tur S5) sent=true kalır — yalnız havuz kalemleri MİP'te bekler
     const d = await dbInsert('purchase_items',{
       project_name: [...new Set(tamYerlesen.map(s=>s.item.project_name))].length===1 ? tamYerlesen[0].item.project_name : 'ORTAK (MRP)',
       name: r.name, code: r.code || null,
       quantity: kullanilacak, unit: r.unit || 'adet',
-      sent_to_purchasing: false, // (13. tur madde 2) satın alma değil, depo kullanımı
       notes: `Depo artığından — ${tamYerlesen.length} kalem: ${tamYerlesen.map(s=>s.item.code||s.item.name).join(', ')} · ${whName(r.wh)||''}`,
       created_by: currentUser?.display_name || currentUser?.username || null
     });
     if(!Array.isArray(d)||!d[0]){ toast('Plan kalemi oluşturulamadı!','error'); return; }
     const planItem = d[0];
     purchaseItems.push(planItem);
-    const okSt = await dbUpdate('purchase_items', planItem.id, {status:'IN_WAREHOUSE', warehouse_id: r.wh, sent_to_purchasing:false});
+    const okSt = await dbUpdate('purchase_items', planItem.id, {status:'IN_WAREHOUSE', warehouse_id: r.wh});
     if(!okSt){ await dbDelete('purchase_items', planItem.id); purchaseItems = purchaseItems.filter(x=>x.id!==planItem.id); toast('Plan kalemi depoya bağlanamadı — geri alındı.','error'); return; }
-    planItem.status='IN_WAREHOUSE'; planItem.warehouse_id=r.wh; planItem.sent_to_purchasing=false;
+    planItem.status='IN_WAREHOUSE'; planItem.warehouse_id=r.wh;
     // 2) Depodan otomatik düşüm (source_type CHECK'li — MANUAL + açıklayıcı not)
     const mv = await mvInsert({whId:r.wh, type:'OUT', qty:kullanilacak, unit:r.unit, name:r.name, code:r.code,
       sourceType:'MANUAL', notes:'Kesim planı artık kullanımı: '+tamYerlesen.map(s=>s.item.code||s.item.name).join(', ')});
@@ -10303,26 +10306,22 @@ async function mrpApprove(){
   const calcTxt = r.type==='SAC'
     ? `hesap: ${r.plates.length} plaka, ort. verim %${r.ortVerim.toFixed(1)}`
     : `hesap: ${r.kons.toplamProfil} profil (${r.L}mm, fire %${r.fire})`;
-  if(!confirm(`"${r.sheetName}" için ${qty} adet plan kalemi oluşturulacak — MİP'te bekler, satın almaya GÖNDERİLMEZ (aşağıdaki "MİP'te Bekleyenler"den gönderirsiniz);\n${sources.length} kaynak kalem bu plana bağlanacak (havuzdan düşer). Devam?`)) return;
+  if(!confirm(`"${r.sheetName}" için ${qty} adet satın alma kalemi (PLANNED) oluşturulacak;\n${sources.length} kaynak kalem bu plana bağlanacak (havuzdan düşer). Devam?`)) return;
 
+  // (14. tur S5 — arkadaş kararı) Plan kalemi DOĞRUDAN satın almaya düşer;
+  // yalnız "Havuza Aktar" kalemleri MİP'te bekler (13. tur m2 kapsamı daraltıldı).
   const d = await dbInsert('purchase_items',{
     project_name: projName,
     name: r.sheetName,
     code: null,
     quantity: qty, unit: 'adet',
     material: r.material || null,
-    sent_to_purchasing: false, // (13. tur madde 2) kullanıcı isterse gönderir
     notes: `MRP planı — ${sources.length} kalem: ${sources.map(s=>s.code||s.name).join(', ')} · ${calcTxt}`,
     created_by: currentUser?.display_name || currentUser?.username || null
   });
   if(!Array.isArray(d)||!d[0]){ toast('Plan kalemi oluşturulamadı!','error'); return; }
   const planItem = d[0];
   purchaseItems.push(planItem);
-  // Eski backend'e karşı garanti (needs_planning PUT deseni)
-  if(planItem.sent_to_purchasing!==false){
-    const okSp = await dbUpdate('purchase_items', planItem.id, {sent_to_purchasing:false});
-    if(okSp) planItem.sent_to_purchasing = false;
-  }
   let linked = 0;
   for(const s of sources){
     const ok = await dbUpdate('purchase_items', s.id, {stock_plan_id: planItem.id, needs_planning: false});
