@@ -1389,7 +1389,14 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
   <div class="planning-section" id="ship-tab-pack">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
       <div class="form-card" style="margin-bottom:0">
-        <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:10px">Sevk Edilecekler <span style="text-transform:none">(satırı sağdaki AÇIK pakete sürükleyin — adet bölünebilir)</span></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em">Sevk Edilecekler <span style="text-transform:none">(satırı sağdaki AÇIK pakete sürükleyin — adet bölünebilir)</span></div>
+          <!-- (14. tur arkadaş notu) plansız satırlar listeyi kirletiyordu — proje
+               planlıysa varsayılan YALNIZ plandakiler; kullanıcı değiştirirse dokunulmaz -->
+          <label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-left:auto">
+            <input type="checkbox" id="ship-pack-only-planned" onchange="this.dataset.user='1';shipRenderPacking()" style="accent-color:var(--accent)"> Yalnız sevk planındakiler
+          </label>
+        </div>
         <div id="ship-pack-source"></div>
       </div>
       <div>
@@ -6771,7 +6778,17 @@ function shipRenderPacking(){
   }
   const {partRows, purRows} = _shipRows(proj);
   const packed = shipPackedMap(proj);
-  const rows = [...partRows, ...purRows];
+  // (14. tur arkadaş notu) Ham plaka/profil PLAN-PARENT kayıtları (başka
+  // kalemler stock_plan_id ile ona bağlı — mrpApprove/mrpUseLeftover ürünü)
+  // sevk edilecek şey değildir; kaynak listeye girmez (ağaç görünümünde
+  // bilgi olarak durmaya devam eder).
+  const shippablePur = purRows.filter(r=>!purchaseItems.some(x=>x.stock_plan_id===r.id));
+  const tumu = [...partRows, ...shippablePur];
+  // Filtre varsayılanı: projede plan varsa YALNIZ plandakiler (arkadaş
+  // beklentisi); kullanıcı kutuyu elledikten sonra (data-user) dokunulmaz.
+  const filtreEl = document.getElementById('ship-pack-only-planned');
+  if(filtreEl && filtreEl.dataset.user!=='1') filtreEl.checked = tumu.some(r=>r.planned);
+  const rows = (filtreEl && filtreEl.checked) ? tumu.filter(r=>r.planned) : tumu;
   // Sol panel: sürüklenebilir satırlar (kalan 0 → soluk, sürüklenmez)
   srcEl.innerHTML = rows.length ? h`${rows.map((r,i)=>{
     const pk = packed.get(shipRowKey(r))||0;
@@ -6787,7 +6804,7 @@ function shipRenderPacking(){
       </span>
       <span style="font-family:var(--font-mono);font-size:10px;color:${raw(kalan>0?'var(--muted)':'#2ecc71')}">${kalan>0?h`kalan ${mipNum(kalan)} / ${mipNum(hedef)}${hedef!==r.qty?h` (parça ${mipNum(r.qty)})`:''}`:h`hedef paketlendi`}</span>
     </div>`;
-  })}` : h`<div class="empty-state"><span class="emoji"></span>Bu projede sevk edilecek satır yok</div>`;
+  })}` : h`<div class="empty-state"><span class="emoji"></span>${(filtreEl&&filtreEl.checked&&tumu.length)?h`Sevk planında satır yok — Ürün Ağacı düzenleyicisinden parçaları plana alın veya filtreyi kapatıp tümünü görün`:h`Bu projede sevk edilecek satır yok`}</div>`;
   window._shipPackRows = rows; // drop anında indeks → satır
   // Sağ panel: paket kartları
   const pkgs = shipmentPackages.filter(k=>k.project_name===proj)

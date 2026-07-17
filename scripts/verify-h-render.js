@@ -32,7 +32,7 @@ const store={};
 // Elementler id başına önbelleklenir ki test .value atayabilsin (stat-start vb.)
 const els={};
 global.window = global;
-global.document={ getElementById:id=> els[id] || (els[id]={ value:'', addEventListener(){}, style:{}, textContent:'', scrollIntoView(){}, classList:{add(){},remove(){}}, set innerHTML(v){store[id]=String(v);}, get innerHTML(){return store[id]||'';} }) };
+global.document={ getElementById:id=> els[id] || (els[id]={ value:'', checked:false, dataset:{}, addEventListener(){}, style:{}, textContent:'', scrollIntoView(){}, classList:{add(){},remove(){}}, set innerHTML(v){store[id]=String(v);}, get innerHTML(){return store[id]||'';} }) };
 global.parts=[];
 const EVIL='<img src=x onerror=alert(1)>';
 
@@ -822,6 +822,8 @@ shipRenderPacking();
 const shps=store['ship-pack-source']||'', shpc=store['ship-pack-cards']||'';
 console.log('\nshipRenderPacking (paketleme):');
 chk('packSource: satır adı kaçırıldı + draggable korundu', shps.includes('SevkParça&lt;img') && shps.includes('draggable="true"'));
+chk('packSource: plansız satır varsayılan filtreyle GİZLİ (14. tur arkadaş notu)',
+  !shps.includes('SevkMalzeme&lt;img') && els['ship-pack-only-planned'].checked===true);
 chk('packCards: paket adı/paketleyen kaçırıldı', shpc.includes('Paket&lt;img') && shpc.includes('Paketçi&lt;b&gt;'));
 chk('packCards: satır snapshot kaçırıldı', shpc.includes('SevkParça&lt;img') && shpc.includes('SVK&lt;b&gt;'));
 chk('packCards: paket no + aksiyon butonları (raw) korundu', shpc.includes('PKT-2026-0001') && shpc.includes("shipPkgClose('pk1')") && shpc.includes("shipItemRemove('it1')"));
