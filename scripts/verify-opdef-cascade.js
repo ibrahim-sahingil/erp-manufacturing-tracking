@@ -5,10 +5,10 @@
 //     operations dizisi hem KODU guncellenmeli. Kod yeniden insa edilir:
 //     ortadaki islem degisse bile kalinti kalmaz.
 // (13. tur madde 1) BOLUM CASCADE'I TERSINE CEVRILDI: islem tanimindaki bolum
-//     degisikligi artik proje parcalarina DOKUNMAZ ve projede bolum OLUSTURMAZ
-//     (bolum atamasi %100 elle). Eski 8. tur cascade senaryosu ters kontrole
-//     donusturuldu. department_name kolonu veri kaybi olmasin diye duruyor;
-//     update bu alana dokunmaz (eski deger korunur).
+//     degisikligi proje parcalarina DOKUNMAZ ve projede bolum OLUSTURMAZ.
+// (14. tur S7) department_name alani ONERI olarak geri geldi: update alani
+//     YAZAR (cascade hala YOK); oneri yalniz frontend'de, islem eklenirken
+//     parca bolumu BOSSA ve ad projede MEVCUT bolumle eslesiyorsa atanir.
 //
 // Kullanim: node scripts/verify-opdef-cascade.js   (sunucu 8080'de calismali)
 const BASE = 'http://localhost:8080/api/';
@@ -89,8 +89,8 @@ async function call(m, p, b) {
     const upd = await call('PUT', '/bom-operations/' + opId,
       { name: 'CASC Kaynak', code: yeniKod, department_name: 'Kaynakhane' });
     chk('islem kodu guncellendi', upd.ok, upd.msg);
-    chk('(13. tur) update department_name alanina DOKUNMADI (eski deger korundu)',
-        upd.body.data.department_name === 'Kaynak',
+    chk('(14. tur S7) update department_name alanini YAZAR (oneri etiketi)',
+        upd.body.data.department_name === 'Kaynakhane',
         JSON.stringify(upd.body.data.department_name));
 
     const partSonra = await call('GET', '/bom-parts/' + partId);

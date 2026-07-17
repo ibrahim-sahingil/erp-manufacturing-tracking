@@ -145,13 +145,14 @@ public class BomOperationService {
             cascadeNameChange(oldCode, newName);
         }
 
-        // (13. tur madde 1) Bolum cascade'i KALDIRILDI — bolumler islem
-        // tanimindan turetilmez, parcaya elle atanir. department_name kolonu
-        // ve mevcut degerleri veri kaybi olmasin diye DB'de duruyor; update
-        // artik bu alana DOKUNMAZ (frontend gondermiyor, eski deger korunur).
+        // (13. tur madde 1) Bolum CASCADE'i kaldirildi — mevcut parcalara asla
+        // dokunulmaz, bolum otomatik olusturulmaz. (14. tur S7) Alanin kendisi
+        // ONERI etiketi olarak geri geldi: islem eklenirken parca bolumu BOSSA
+        // ve ad projede MEVCUT bolumle eslesiyorsa frontend atar.
         op.setName(newName);
         op.setCode(newCode);
         op.setDescription(request.getDescription());
+        op.setDepartmentName(trimToNull(request.getDepartmentName()));
         if (request.getSortOrder() != null) {
             op.setSortOrder(request.getSortOrder());
         }
