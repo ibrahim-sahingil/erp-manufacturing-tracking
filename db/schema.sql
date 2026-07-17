@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict tncryqi1bY0sLEwpcNkEqrR9bSWknA6LsOQ021HlPPLgL5qAgXWrlfbIEJRcsKK
+\restrict FWtpwBxyLZsLHF4Sctw2OyyoglrOseM1vCnA4kEQyfqVPtbfjvhbVQadp4JVerG
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -500,7 +500,11 @@ CREATE TABLE public.shipment_packages (
     notes text,
     created_by character varying(150),
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT shipment_packages_status_chk CHECK (((status)::text = ANY ((ARRAY['OPEN'::character varying, 'CLOSED'::character varying, 'LOADED'::character varying, 'SHIPPED'::character varying])::text[])))
+    warehouse_id uuid,
+    package_type character varying(30) DEFAULT 'PACKAGE'::character varying NOT NULL,
+    net_weight_kg numeric(12,3),
+    CONSTRAINT shipment_packages_status_chk CHECK (((status)::text = ANY ((ARRAY['OPEN'::character varying, 'CLOSED'::character varying, 'LOADED'::character varying, 'SHIPPED'::character varying])::text[]))),
+    CONSTRAINT shipment_packages_type_chk CHECK (((package_type)::text = ANY ((ARRAY['PACKAGE'::character varying, 'BOX'::character varying, 'PALLET'::character varying, 'CRATE'::character varying])::text[])))
 );
 
 
@@ -1606,6 +1610,14 @@ ALTER TABLE ONLY public.shipment_packages
 
 
 --
+-- Name: shipment_packages shipment_packages_warehouse_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.shipment_packages
+    ADD CONSTRAINT shipment_packages_warehouse_id_fkey FOREIGN KEY (warehouse_id) REFERENCES public.warehouses(id) ON DELETE SET NULL;
+
+
+--
 -- Name: user_pins user_pins_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1753,5 +1765,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tncryqi1bY0sLEwpcNkEqrR9bSWknA6LsOQ021HlPPLgL5qAgXWrlfbIEJRcsKK
+\unrestrict FWtpwBxyLZsLHF4Sctw2OyyoglrOseM1vCnA4kEQyfqVPtbfjvhbVQadp4JVerG
 

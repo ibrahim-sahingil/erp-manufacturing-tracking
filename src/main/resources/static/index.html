@@ -1397,10 +1397,17 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
           <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:10px">+ Yeni Paket <span style="text-transform:none">(kod otomatik: PKT-yıl-sıra)</span></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
             <input type="text" id="ship-pk-name" placeholder="Paket adı (örn. Çelik Konstrüksiyon)" style="flex:1;min-width:150px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none">
+            <select id="ship-pk-type" title="Paket tipi — çeki listesindeki PACKAGE TYPE kolonu (14. tur S3)" style="width:96px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none">
+              <option value="PACKAGE">Paket</option><option value="BOX">Kutu</option><option value="PALLET">Palet</option><option value="CRATE">Kasa</option>
+            </select>
             <input type="number" id="ship-pk-l" placeholder="Uzunluk cm" min="0" style="width:92px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none">
             <input type="number" id="ship-pk-w" placeholder="Genişlik cm" min="0" style="width:92px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none">
             <input type="number" id="ship-pk-h" placeholder="Yükseklik cm" min="0" style="width:94px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none">
-            <input type="number" id="ship-pk-kg" placeholder="Ağırlık kg" min="0" step="0.001" style="width:88px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none">
+            <input type="number" id="ship-pk-kg" placeholder="Brüt kg" min="0" step="0.001" style="width:80px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none">
+            <input type="number" id="ship-pk-net" placeholder="Net kg" min="0" step="0.001" title="Net ağırlık — çeki listesinde brüt/net ayrımı (14. tur S3)" style="width:76px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none">
+            <select id="ship-pk-wh" title="Paketin duracağı depo — arkadaş kararı: paketlenen parçalar istenilen depoda dursun (14. tur S2)" style="width:130px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;outline:none">
+              <option value="">— Depo yok —</option>
+            </select>
             <button class="btn btn-primary btn-sm" id="ship-pk-add-btn" onclick="shipPkgCreate()">+ Paket</button>
           </div>
         </div>
@@ -6514,13 +6521,14 @@ async function renderShipping(){
   const projs = [...new Set(activeOrders().map(o=>o.project_name).filter(Boolean))].sort();
   sel.innerHTML = h`<option value="">— Proje seçin —</option>${projs.map(p=>h`<option value="${p}"${p===cur?raw(' selected'):''}>${p}</option>`)}`;
   // Taze veri: durum bileşimi 5 kaynaktan (üretim/satın alma/iş emri/paket)
-  const [pr, pi, wop, wo, sp, spi] = await Promise.all([
+  const [pr, pi, wop, wo, sp, spi, ws] = await Promise.all([
     dbGet('parts'),
     dbGet('purchase_items','order=created_at.asc'),
     dbGet('work_order_parts'),
     dbGet('work_orders'),
     dbGet('shipment_packages'),
     dbGet('shipment_package_items'),
+    dbGet('warehouses'), // (14. tur S2) paket deposu seçici
     loadProjectBoms()
   ]);
   if(Array.isArray(pr))  parts = pr;
@@ -6529,6 +6537,13 @@ async function renderShipping(){
   if(Array.isArray(wo))  workOrders = wo;
   if(Array.isArray(sp))  shipmentPackages = sp;
   if(Array.isArray(spi)) shipmentPackageItems = spi;
+  if(Array.isArray(ws))  warehouses = ws;
+  // (14. tur S2) paket deposu seçici — aktif depolar
+  const whSel = document.getElementById('ship-pk-wh');
+  if(whSel){
+    const curWh = whSel.value;
+    whSel.innerHTML = h`<option value="">— Depo yok —</option>${warehouses.filter(w=>w.is_active!==false).map(w=>h`<option value="${w.id}"${w.id===curWh?raw(' selected'):''}>${w.name}</option>`)}`;
+  }
   shipRenderActive();
 }
 
@@ -6732,7 +6747,9 @@ function shipRenderPacking(){
             <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${raw(st.color)}44;color:${raw(st.color)};background:${raw(st.color)}11">${st.label}</span>
           </div>
           <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">
-            ${dims}${k.weight_kg!=null?h`${dims?raw(' · '):''}${Number(k.weight_kg)} kg`:''}
+            ${({PACKAGE:'Paket',BOX:'Kutu',PALLET:'Palet',CRATE:'Kasa'})[k.package_type]||'Paket'}
+            ${dims?h` · ${dims}`:''}${k.weight_kg!=null?h` · brüt ${Number(k.weight_kg)} kg`:''}${k.net_weight_kg!=null?h` · net ${Number(k.net_weight_kg)} kg`:''}
+            ${k.warehouse_id&&whName(k.warehouse_id)?h` · depo: ${whName(k.warehouse_id)}`:''}
             ${k.packed_by?h` · paketleyen: ${k.packed_by}${k.packed_at?' ('+new Date(k.packed_at).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+')':''}`:''}
           </div>
           ${items.length?h`<div style="margin-top:6px">${items.map(it=>h`
@@ -6809,11 +6826,14 @@ async function shipPkgCreate(){
       project_name: proj, name: (g('ship-pk-name')?.value||'').trim()||null,
       length_cm: num('ship-pk-l'), width_cm: num('ship-pk-w'),
       height_cm: num('ship-pk-h'), weight_kg: num('ship-pk-kg'),
+      net_weight_kg: num('ship-pk-net'),                       // (14. tur S3)
+      package_type: g('ship-pk-type')?.value || 'PACKAGE',     // (14. tur S3)
+      warehouse_id: g('ship-pk-wh')?.value || null,            // (14. tur S2)
       created_by: currentUser?.display_name||currentUser?.username||null
     });
     if(!Array.isArray(d)||!d[0]) return;
     shipmentPackages.push(d[0]);
-    ['ship-pk-name','ship-pk-l','ship-pk-w','ship-pk-h','ship-pk-kg'].forEach(id=>{ if(g(id)) g(id).value=''; });
+    ['ship-pk-name','ship-pk-l','ship-pk-w','ship-pk-h','ship-pk-kg','ship-pk-net'].forEach(id=>{ if(g(id)) g(id).value=''; });
     toast('Paket açıldı: '+d[0].package_no,'success');
     shipRenderPacking();
   } finally { bitti(); }
@@ -12657,7 +12677,9 @@ function pkgPrint(id){
   </div>
   <div class="meta">
     <b>Proje:</b> ${esc(k.project_name)}${k.name?` · <b>Paket:</b> ${esc(k.name)}`:''}
-    · <b>Ölçü:</b> ${esc(_pkgDims(k))}${k.weight_kg!=null?` · <b>Ağırlık:</b> ${Number(k.weight_kg)} kg`:''}
+    · <b>Tip:</b> ${esc(k.package_type||'PACKAGE')}
+    · <b>Ölçü:</b> ${esc(_pkgDims(k))}${k.weight_kg!=null?` · <b>Brüt:</b> ${Number(k.weight_kg)} kg`:''}${k.net_weight_kg!=null?` · <b>Net:</b> ${Number(k.net_weight_kg)} kg`:''}
+    ${k.warehouse_id&&whName(k.warehouse_id)?` · <b>Depo:</b> ${esc(whName(k.warehouse_id))}`:''}
     ${k.packed_by?`<br><b>Paketleyen:</b> ${esc(k.packed_by)}${k.packed_at?` · <b>Paketleme zamanı:</b> ${new Date(k.packed_at).toLocaleString('tr-TR')}`:''}`:''}
     ${dn?`<br><b>İrsaliye:</b> ${esc(dn.note_no)}${dn.vehicle_plate?` · <b>Araç:</b> ${esc(dn.vehicle_plate)}`:''}${dn.driver_name?` · <b>Şoför:</b> ${esc(dn.driver_name)}`:''}`:''}
   </div>
@@ -12681,8 +12703,8 @@ function dnPackingList(dnId){
   let body = '';
   pkgs.forEach((k,pi)=>{
     const items = shipmentPackageItems.filter(it=>it.package_id===k.id);
-    body += `<tr class="pk-head"><td colspan="2">KOLİ ${pi+1} — ${esc(k.package_no)}${k.name?' · '+esc(k.name):''}</td>
-      <td colspan="3">${esc(_pkgDims(k))}${k.weight_kg!=null?' · '+Number(k.weight_kg)+' kg':''}</td></tr>`;
+    body += `<tr class="pk-head"><td colspan="2">KOLİ ${pi+1} — ${esc(k.package_no)}${k.name?' · '+esc(k.name):''} · ${esc(k.package_type||'PACKAGE')}</td>
+      <td colspan="3">${esc(_pkgDims(k))}${k.weight_kg!=null?' · brüt '+Number(k.weight_kg)+' kg':''}${k.net_weight_kg!=null?' · net '+Number(k.net_weight_kg)+' kg':''}</td></tr>`;
     body += items.length ? items.map((it,ix)=>`<tr>
         <td style="text-align:center">${pi+1}.${ix+1}</td>
         <td>${esc(it.item_code||'—')}</td>
@@ -12711,44 +12733,78 @@ function dnPackingList(dnId){
   _sevkPdfOpen(html);
 }
 
-// Çeki Listesi — koli başına ölçü/hacim/brüt ağırlık + toplamlar
-// (kolon seti varsayılan — arkadaş A3 cevabına göre genişletilebilir)
+// Çeki Listesi — (14. tur S3) arkadaşın gerçek ihracat şablonuna göre
+// (Downloads/Çeki Listesi.xlsx): iki dilli başlıklar, üst bilgi bloğu
+// (gönderen/alıcı/plaka/tarih), paket başına İÇERİK satırları (rowspan'lı
+// paket kolonları: no/tip/ölçü/brüt/net), TOTAL satırı.
 function dnWeighList(dnId){
   const n = deliveryNotes.find(x=>x.id===dnId);
   if(!n) return;
   const pkgs = shipmentPackages.filter(k=>k.delivery_note_id===dnId)
     .sort((a,b)=>(a.package_no||'').localeCompare(b.package_no||''));
   if(!pkgs.length){ toast('Bu irsaliyeye yüklü paket yok — önce Paket Yükle.','error'); return; }
-  const printDate = new Date().toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
-  let topKg = 0, topM3 = 0;
-  const rows = pkgs.map((k,ix)=>{
-    const kg = Number(k.weight_kg)||0, m3 = _pkgVolM3(k);
-    topKg += kg; topM3 += m3;
-    const adet = shipmentPackageItems.filter(it=>it.package_id===k.id).length;
-    return `<tr>
-      <td style="text-align:center">${ix+1}</td>
-      <td>${esc(k.package_no)}</td>
-      <td>${esc(k.name||'—')}</td>
-      <td style="text-align:center">${adet}</td>
-      <td>${esc(_pkgDims(k))}</td>
-      <td style="text-align:right">${m3?m3.toFixed(3):'—'}</td>
-      <td style="text-align:right">${kg?kg.toLocaleString('tr-TR'):'—'}</td>
-    </tr>`;
+  const proj = n.order_id ? (orders.find(o=>o.id===n.order_id)||{}).project_name : null;
+  const printDate = new Date().toLocaleDateString('tr-TR');
+  let topBrut = 0, topNet = 0;
+  const govde = pkgs.map((k,pi)=>{
+    const items = shipmentPackageItems.filter(it=>it.package_id===k.id);
+    topBrut += Number(k.weight_kg)||0;
+    topNet  += Number(k.net_weight_kg)||0;
+    const span = Math.max(1, items.length);
+    // Paket kolonları ilk içerik satırında rowspan'la (şablondaki merge taklidi)
+    const pkCols = `
+      <td rowspan="${span}" style="text-align:center;vertical-align:middle">${pi+1}<br><span style="font-size:8px;color:#888">${esc(k.package_no)}</span></td>
+      <td rowspan="${span}" style="text-align:center;vertical-align:middle">${esc(k.package_type||'PACKAGE')}</td>
+      <td rowspan="${span}" style="text-align:center;vertical-align:middle">${esc(_pkgDims(k))}</td>`;
+    const kiloCols = `
+      <td rowspan="${span}" style="text-align:right;vertical-align:middle">${k.weight_kg!=null?Number(k.weight_kg).toLocaleString('tr-TR'):'—'}</td>
+      <td rowspan="${span}" style="text-align:right;vertical-align:middle">${k.net_weight_kg!=null?Number(k.net_weight_kg).toLocaleString('tr-TR'):'—'}</td>`;
+    if(!items.length){
+      return `<tr><td style="color:#999;text-align:center">içerik yok</td>${pkCols}<td style="text-align:right">—</td><td>—</td>${kiloCols}</tr>`;
+    }
+    return items.map((it,ix)=>`<tr>
+      <td>${esc(it.item_name)}${it.item_code?` <span style="color:#888">(${esc(it.item_code)})</span>`:''}</td>
+      ${ix===0?pkCols:''}
+      <td style="text-align:right">${Number(it.quantity)}</td>
+      <td>${esc(it.unit||'adet')}</td>
+      ${ix===0?kiloCols:''}
+    </tr>`).join('');
   }).join('');
   const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
-<title>${esc(n.note_no)} — Çeki Listesi</title>
-<style>${_SEVK_PDF_CSS}</style></head><body>
+<title>${esc(n.note_no)} — Çeki Listesi / Packing &amp; Weight List</title>
+<style>${_SEVK_PDF_CSS}
+  .topblok { width:100%; border-collapse:collapse; margin-bottom:12px; }
+  .topblok td { padding:3px 6px; font-size:10px; border:1px solid #eee; vertical-align:top; }
+  .topblok td:first-child { width:210px; font-weight:700; color:#555; background:#fafafa; }
+</style></head><body>
   <div class="hd">
     <div><div class="logo">ÜretimTakip</div><div style="font-size:10px;color:#666;margin-top:4px">Düzenleme: ${printDate}</div></div>
-    <div><div class="doc-title">ÇEKİ LİSTESİ</div><div class="doc-no">${esc(n.note_no)} · ${pkgs.length} koli</div></div>
+    <div><div class="doc-title">ÇEKİ LİSTESİ / WEIGHT LIST</div><div class="doc-no">${esc(n.note_no)} · ${pkgs.length} koli</div></div>
   </div>
-  <div class="meta"><b>Alıcı:</b> ${esc(n.recipient_name)}${n.vehicle_plate?` · <b>Araç:</b> ${esc(n.vehicle_plate)}`:''}${n.tir_no?` · <b>TIR:</b> ${esc(n.tir_no)}`:''}${n.container_no?` · <b>Konteyner:</b> ${esc(n.container_no)}`:''}</div>
-  <table class="items">
-    <thead><tr><th style="width:30px">#</th><th style="width:120px">Koli No</th><th>Paket Adı</th><th style="width:50px;text-align:center">Satır</th><th style="width:110px">Ölçü (cm)</th><th style="width:70px;text-align:right">Hacim m³</th><th style="width:80px;text-align:right">Brüt kg</th></tr></thead>
-    <tbody>${rows}</tbody>
-    <tfoot><tr><td colspan="5">TOPLAM — ${pkgs.length} koli</td><td style="text-align:right">${topM3?topM3.toFixed(3):'—'}</td><td style="text-align:right">${topKg?topKg.toLocaleString('tr-TR'):'—'}</td></tr></tfoot>
+  <table class="topblok">
+    <tr><td>Gönderen / Consignor:</td><td></td></tr>
+    <tr><td>Alıcı / Consignee:</td><td>${esc(n.recipient_name)}${n.address?` — ${esc(n.address)}`:''}${n.city?` ${esc([n.district,n.city].filter(Boolean).join('/'))}`:''}</td></tr>
+    <tr><td>Proje / Project:</td><td>${esc(proj||'—')}</td></tr>
+    <tr><td>Araç Plaka / Truck Plate:</td><td>${esc(n.vehicle_plate||'—')}${n.tir_no?` · TIR: ${esc(n.tir_no)}`:''}${n.container_no?` · Konteyner: ${esc(n.container_no)}`:''}</td></tr>
+    <tr><td>Tarih / Date:</td><td>${n.ship_date?new Date(n.ship_date).toLocaleDateString('tr-TR'):printDate}</td></tr>
   </table>
-  <div class="foot">Bu belge ÜretimTakip ile düzenlenmiş çeki listesidir · ${esc(n.note_no)} · ${printDate}</div>
+  <table class="items">
+    <thead>
+      <tr>
+        <th rowspan="2">Parça Tanımı / Part Name</th>
+        <th rowspan="2" style="width:60px;text-align:center">Paket No / Package No</th>
+        <th rowspan="2" style="width:70px;text-align:center">Paket Tipi / Package Type</th>
+        <th rowspan="2" style="width:100px;text-align:center">Ölçü (cm) / Dimensions</th>
+        <th rowspan="2" style="width:55px;text-align:right">Adet / Qty</th>
+        <th rowspan="2" style="width:45px">Birim / Unit</th>
+        <th colspan="2" style="text-align:center">Ağırlık / Weight (kg)</th>
+      </tr>
+      <tr><th style="width:60px;text-align:right">Brüt / Gross</th><th style="width:60px;text-align:right">Net</th></tr>
+    </thead>
+    <tbody>${govde}</tbody>
+    <tfoot><tr><td colspan="6">TOTAL — ${pkgs.length} ${pkgs.length===1?'PC':'PCS'} PACKING</td><td style="text-align:right">${topBrut?topBrut.toLocaleString('tr-TR'):'—'}</td><td style="text-align:right">${topNet?topNet.toLocaleString('tr-TR'):'—'}</td></tr></tfoot>
+  </table>
+  <div class="foot">Bu belge ÜretimTakip ile düzenlenmiş çeki listesidir (şablon: arkadaş Çeki Listesi.xlsx) · ${esc(n.note_no)} · ${printDate}</div>
 </body></html>`;
   _sevkPdfOpen(html);
 }
@@ -12759,11 +12815,13 @@ async function renderPackageView(id){
   const content=document.getElementById('scan-content');
   if(!content) return;
   content.innerHTML=h`<div class="empty-state"><div class="spinner" style="margin:0 auto"></div><p style="margin-top:16px">Yükleniyor...</p></div>`;
-  const [pk, items, dns]=await Promise.all([
+  const [pk, items, dns, ws]=await Promise.all([
     dbGet('shipment_packages','id=eq.'+id),
     dbGet('shipment_package_items'),
-    dbGet('delivery_notes')
+    dbGet('delivery_notes'),
+    dbGet('warehouses') // (14. tur S2) paket deposu adı için
   ]);
+  if(Array.isArray(ws)) warehouses = ws;
   const k=Array.isArray(pk)?pk.find(x=>x.id===id):null;
   if(!k){ content.innerHTML=h`<div class="not-found"><div class="icon">⚠</div><h2>Paket Bulunamadı</h2><p>Bu QR koda ait paket kaydı mevcut değil (silinmiş olabilir).</p></div>`; return; }
   const rows=(Array.isArray(items)?items:[]).filter(it=>it.package_id===id);
@@ -12774,8 +12832,10 @@ async function renderPackageView(id){
   const bilgi=[
     ['Proje', k.project_name||'—'],
     ['Durum', st.label],
+    ['Tip', ({PACKAGE:'Paket',BOX:'Kutu',PALLET:'Palet',CRATE:'Kasa'})[k.package_type]||'Paket'],
     ['Ölçü', dims],
-    ['Ağırlık', k.weight_kg!=null?Number(k.weight_kg)+' kg':'—'],
+    ['Brüt / Net', (k.weight_kg!=null?Number(k.weight_kg)+' kg':'—')+' / '+(k.net_weight_kg!=null?Number(k.net_weight_kg)+' kg':'—')],
+    ['Depo', k.warehouse_id?(whName(k.warehouse_id)||'—'):'—'],
     ['Paketleyen', k.packed_by||'—'],
     ['Paketleme zamanı', k.packed_at?new Date(k.packed_at).toLocaleString('tr-TR'):'—'],
     ['İrsaliye / Araç', dn?(dn.note_no+(dn.vehicle_plate?' · '+dn.vehicle_plate:'')+(dn.driver_name?' · '+dn.driver_name:'')):'—']

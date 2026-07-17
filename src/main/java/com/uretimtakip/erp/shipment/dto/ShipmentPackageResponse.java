@@ -27,6 +27,9 @@ public class ShipmentPackageResponse {
     private BigDecimal widthCm;
     private BigDecimal heightCm;
     private BigDecimal weightKg;
+    private BigDecimal netWeightKg;
+    private String packageType;
+    private UUID warehouseId;
     private String status;
     private UUID deliveryNoteId;
     private String packedBy;
@@ -45,6 +48,9 @@ public class ShipmentPackageResponse {
                 .widthCm(e.getWidthCm())
                 .heightCm(e.getHeightCm())
                 .weightKg(e.getWeightKg())
+                .netWeightKg(e.getNetWeightKg())
+                .packageType(e.getPackageType())
+                .warehouseId(e.getWarehouseId())
                 .status(e.getStatus())
                 .deliveryNoteId(e.getDeliveryNoteId())
                 .packedBy(e.getPackedBy())

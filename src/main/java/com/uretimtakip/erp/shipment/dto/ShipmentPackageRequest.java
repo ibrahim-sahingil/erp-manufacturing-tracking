@@ -1,6 +1,7 @@
 package com.uretimtakip.erp.shipment.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -10,6 +11,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 /**
  * ShipmentPackage CREATE request DTO (13. tur madde 4).
@@ -44,6 +46,17 @@ public class ShipmentPackageRequest {
 
     @PositiveOrZero(message = "Agirlik 0 veya pozitif olmali")
     private BigDecimal weightKg;
+
+    @PositiveOrZero(message = "Net agirlik 0 veya pozitif olmali")
+    private BigDecimal netWeightKg;
+
+    /** (14. tur S3) UCLU kural: DB CHECK + @Pattern + entity default. */
+    @Pattern(regexp = "PACKAGE|BOX|PALLET|CRATE",
+            message = "Paket tipi PACKAGE, BOX, PALLET veya CRATE olabilir")
+    private String packageType;
+
+    /** (14. tur S2) Paketin duracagi depo. */
+    private UUID warehouseId;
 
     private String notes;
 

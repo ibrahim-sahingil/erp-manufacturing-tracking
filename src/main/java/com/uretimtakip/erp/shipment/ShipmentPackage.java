@@ -39,7 +39,12 @@ import java.util.UUID;
  *   length_cm        numeric(10,2) NULL — uzunluk
  *   width_cm         numeric(10,2) NULL — genislik
  *   height_cm        numeric(10,2) NULL — yukseklik
- *   weight_kg        numeric(12,3) NULL — agirlik
+ *   weight_kg        numeric(12,3) NULL — BRUT agirlik
+ *   net_weight_kg    numeric(12,3) NULL — NET agirlik (14. tur S3, ceki listesi)
+ *   package_type     varchar(30)   DEFAULT 'PACKAGE' (CHECK: PACKAGE/BOX/PALLET/CRATE —
+ *                                  14. tur S3, arkadasin ceki sablonundaki PACKAGE TYPE)
+ *   warehouse_id     uuid          NULL (FK -> warehouses SET NULL; 14. tur S2:
+ *                                  paketlenen parcalar istenilen depoda durur)
  *   status           varchar(20)   DEFAULT 'OPEN' (CHECK: OPEN/CLOSED/LOADED/SHIPPED)
  *   delivery_note_id uuid          NULL (FK -> delivery_notes SET NULL; araca yukleme bagi)
  *   packed_by        varchar(150)  NULL (paketleyen personel — CLOSED'da zorunlu)
@@ -77,6 +82,19 @@ public class ShipmentPackage extends BaseEntity {
 
     @Column(name = "weight_kg", precision = 12, scale = 3)
     private BigDecimal weightKg;
+
+    /** (14. tur S3) NET agirlik — ceki listesinde brut/net ayrimi. */
+    @Column(name = "net_weight_kg", precision = 12, scale = 3)
+    private BigDecimal netWeightKg;
+
+    /** (14. tur S3) Paket tipi (arkadasin sablonu: PACKAGE/BOX/...). */
+    @Column(name = "package_type", nullable = false, length = 30)
+    @Builder.Default
+    private String packageType = "PACKAGE";
+
+    /** (14. tur S2) Paketin durdugu depo — arkadas karari: "istenilen depoda dursun". */
+    @Column(name = "warehouse_id")
+    private UUID warehouseId;
 
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default

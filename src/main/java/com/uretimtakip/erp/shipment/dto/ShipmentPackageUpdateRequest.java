@@ -46,6 +46,29 @@ public class ShipmentPackageUpdateRequest {
     @PositiveOrZero(message = "Agirlik 0 veya pozitif olmali")
     private BigDecimal weightKg;
 
+    @PositiveOrZero(message = "Net agirlik 0 veya pozitif olmali")
+    private BigDecimal netWeightKg;
+
+    /** (14. tur S3) UCLU kural (CHECK + @Pattern + service alan-kilidi). */
+    @Pattern(regexp = "PACKAGE|BOX|PALLET|CRATE",
+            message = "Paket tipi PACKAGE, BOX, PALLET veya CRATE olabilir")
+    private String packageType;
+
+    /**
+     * (14. tur S2) Paketin durdugu depo. PRESENCE takipli: explicit null =
+     * depodan cikar; gelmezse dokunulmaz.
+     */
+    @Setter(lombok.AccessLevel.NONE)
+    private UUID warehouseId;
+
+    @Setter(lombok.AccessLevel.NONE)
+    private boolean warehouseIdPresent;
+
+    public void setWarehouseId(UUID warehouseId) {
+        this.warehouseId = warehouseId;
+        this.warehouseIdPresent = true;
+    }
+
     @Pattern(regexp = "OPEN|CLOSED|LOADED|SHIPPED",
             message = "Durum OPEN, CLOSED, LOADED veya SHIPPED olabilir")
     private String status;

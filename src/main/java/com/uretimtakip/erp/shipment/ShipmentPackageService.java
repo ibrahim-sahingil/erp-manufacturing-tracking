@@ -66,6 +66,11 @@ public class ShipmentPackageService {
                 .widthCm(request.getWidthCm())
                 .heightCm(request.getHeightCm())
                 .weightKg(request.getWeightKg())
+                // (14. tur S2+S3) net agirlik + tip + depo
+                .netWeightKg(request.getNetWeightKg())
+                .packageType(request.getPackageType() != null && !request.getPackageType().isBlank()
+                        ? request.getPackageType() : "PACKAGE")
+                .warehouseId(request.getWarehouseId())
                 .notes(blankToNull(request.getNotes()))
                 .createdBy(blankToNull(request.getCreatedBy()))
                 .build();
@@ -108,6 +113,8 @@ public class ShipmentPackageService {
         boolean fieldsTouched = request.getName() != null
                 || request.getLengthCm() != null || request.getWidthCm() != null
                 || request.getHeightCm() != null || request.getWeightKg() != null
+                || request.getNetWeightKg() != null || request.getPackageType() != null
+                || request.isWarehouseIdPresent()
                 || request.getNotes() != null;
         if (fieldsTouched
                 && !("OPEN".equals(pkg.getStatus()) || "CLOSED".equals(pkg.getStatus()))) {
@@ -120,6 +127,12 @@ public class ShipmentPackageService {
         if (request.getWidthCm() != null) pkg.setWidthCm(request.getWidthCm());
         if (request.getHeightCm() != null) pkg.setHeightCm(request.getHeightCm());
         if (request.getWeightKg() != null) pkg.setWeightKg(request.getWeightKg());
+        if (request.getNetWeightKg() != null) pkg.setNetWeightKg(request.getNetWeightKg());
+        if (request.getPackageType() != null && !request.getPackageType().isBlank()) {
+            pkg.setPackageType(request.getPackageType());
+        }
+        // (14. tur S2) depo — presence takipli (explicit null = depodan cikar)
+        if (request.isWarehouseIdPresent()) pkg.setWarehouseId(request.getWarehouseId());
         if (request.getNotes() != null) pkg.setNotes(blankToNull(request.getNotes()));
 
         ShipmentPackage saved = shipmentPackageRepository.save(pkg);
