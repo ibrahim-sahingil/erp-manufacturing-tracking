@@ -828,6 +828,27 @@ chk('packCards: paket adı/paketleyen kaçırıldı', shpc.includes('Paket&lt;im
 chk('packCards: satır snapshot kaçırıldı', shpc.includes('SevkParça&lt;img') && shpc.includes('SVK&lt;b&gt;'));
 chk('packCards: paket no + aksiyon butonları (raw) korundu', shpc.includes('PKT-2026-0001') && shpc.includes("shipPkgClose('pk1')") && shpc.includes("shipItemRemove('it1')"));
 
+// ── (15. tur Y2) shipRenderLoad — Yükleme sekmesi ──
+// Bekleyen paket satırları + araç/irsaliye kartları kullanıcı verisi taşır
+// (paket adı, alıcı, nakliyeci, adres, teslim koşulu, menşei) — h`` disiplinli.
+document.querySelectorAll = document.querySelectorAll || (()=>[]);
+els['ship-load-proj'] = { value:'', addEventListener(){}, style:{}, classList:{add(){},remove(){}}, set innerHTML(v){store['ship-load-proj']=String(v);}, get innerHTML(){return store['ship-load-proj']||'';} };
+global.shipmentPackages.push(
+  {id:'pk2', project_name:'SPrj<b>', package_no:'PKT-2026-0002', name:'Yüklenecek'+EVIL, status:'CLOSED', warehouse_id:'w1', packed_by:'P2', packed_at:'2026-01-02T10:00:00'},
+  {id:'pk3', project_name:'SPrj<b>', package_no:'PKT-2026-0003', name:'Araçta'+EVIL, status:'LOADED', delivery_note_id:'nd1', warehouse_id:'w1'});
+global.deliveryNotes=[{id:'nd1', status:'DRAFT', note_no:'IRS-9', recipient_name:'Alıcı'+EVIL, carrier:'Nakliye<i>',
+  vehicle_plate:'34<x>', driver_name:'Şoför<b>', address:'Adres'+EVIL, city:'İl<c>', district:'İlçe<d>',
+  delivery_terms:'DPU<t>', origin_country:'Turkey<o>'}];
+eval(grab('shipRenderLoad'));
+eval(grab('shipLoadCount'));
+shipRenderLoad();
+const shl=store['ship-load-content']||'';
+console.log('\nshipRenderLoad (yükleme):');
+chk('load: paket adı kaçırıldı + seçilebilir checkbox çıktı', shl.includes('Yüklenecek&lt;img') && shl.includes('data-pkg="pk2"'));
+chk('load: alıcı/nakliyeci/adres kaçırıldı', shl.includes('Alıcı&lt;img') && shl.includes('Nakliye&lt;i&gt;') && shl.includes('Adres&lt;img'));
+chk('load: teslim koşulu + menşei kaçırıldı', shl.includes('DPU&lt;t&gt;') && shl.includes('Turkey&lt;o&gt;'));
+chk('load: aksiyon butonları (raw) korundu', shl.includes("shipLoadShipNote('nd1')") && shl.includes("dnWeighList('nd1')") && shl.includes("shipLoadUnloadPkg('pk3')"));
+
 // ── GENEL SIZINTI BEKÇİSİ (2026-07-15): ico() h`` içinde raw'sız kullanılırsa
 // SVG markup'ı ekrana METİN olarak basılır (gerçek olay: çalışma alanı kartları).
 // Tüm render çıktıları taranır — '&lt;svg' görünüyorsa bir yerde raw() unutulmuştur.

@@ -1376,6 +1376,7 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
   <div class="planning-tabs" id="ship-tabs">
     <button class="planning-tab active" data-shiptab="tree" onclick="switchShippingTab('tree')">Ağaç & Durum</button>
     <button class="planning-tab" data-shiptab="pack" onclick="switchShippingTab('pack')">Paketleme</button>
+    <button class="planning-tab" data-shiptab="load" onclick="switchShippingTab('load')" title="Sevk edilmemiş paketler + araç/irsaliye yönetimi (15. tur Y2)">Yükleme</button>
   </div>
 
   <div class="planning-section active" id="ship-tab-tree">
@@ -1421,6 +1422,23 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
         <div id="ship-pack-cards"></div>
       </div>
     </div>
+  </div>
+
+  <!-- (15. tur Y2) YÜKLEME: sevk edilmemiş paketlerin tümü (proje filtresi
+       isteğe bağlı — arkadaş: "aktif sevk edilmemiş paketlerin tümü gözüksün,
+       istenilirse projeye göre filtreleme de yapılsın") + araç/irsaliye kartları -->
+  <div class="planning-section" id="ship-tab-load">
+    <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap">
+      <div class="form-group" style="min-width:200px;max-width:340px;margin-bottom:0"><label>Proje filtresi</label>
+        <select id="ship-load-proj" onchange="shipRenderLoad()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;outline:none">
+          <option value="">Tümü</option>
+        </select>
+      </div>
+      <div class="grow"></div>
+      <button class="hbtn" onclick="openCompanyModal()" title="Çeki listesi/irsaliye başlığında basılan Gönderen firma bilgileri (ad/adres/logo) — bir kere girilir">Firma Ayarları</button>
+      <button class="hbtn" onclick="openCarriersModal()" title="Nakliye firması kartoteki — irsaliyedeki Nakliye Firması alanı buradan önerilir">Nakliye Firmaları</button>
+    </div>
+    <div id="ship-load-content"></div>
   </div>
 </div>
 
@@ -1653,7 +1671,7 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
           <select id="dn-order"><option value="">— Proje yok —</option></select>
         </div>
         <div class="form-group"><label>Sevk Tarihi</label><input type="date" id="dn-shipdate"></div>
-        <div class="form-group"><label>Nakliye Firması</label><input type="text" id="dn-carrier" placeholder="Opsiyonel"></div>
+        <div class="form-group"><label>Nakliye Firması</label><input type="text" id="dn-carrier" list="carrier-datalist" placeholder="Opsiyonel — kartotekten önerilir"></div>
       </div>
       <!-- (13. tur m4/F) Araç bilgileri — Sistem.pdf "5. Araç bilgileri girilir" -->
       <div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr">
@@ -1663,6 +1681,11 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
         <div class="form-group"><label>TIR No</label><input type="text" id="dn-tir" placeholder="Opsiyonel"></div>
         <div class="form-group"><label>Kargo Takip No</label><input type="text" id="dn-tracking" placeholder="Opsiyonel"></div>
         <div class="form-group"><label>Tahmini Varış</label><input type="date" id="dn-eta"></div>
+      </div>
+      <!-- (15. tur Y2a) Çeki listesi üst bloğu — irsaliye başına -->
+      <div class="form-row" style="grid-template-columns:1fr 1fr">
+        <div class="form-group"><label>Teslim Koşulu</label><input type="text" id="dn-terms" placeholder="örn. DPU - Dnipro"></div>
+        <div class="form-group"><label>Menşei</label><input type="text" id="dn-origin" placeholder="örn. Turkey"></div>
       </div>
       <div class="form-group"><label>Not</label><input type="text" id="dn-notes" placeholder="Opsiyonel açıklama"></div>
       <div style="display:flex;gap:10px;margin-top:8px">
@@ -6587,7 +6610,8 @@ async function renderShipping(){
   const projs = [...new Set(activeOrders().map(o=>o.project_name).filter(Boolean))].sort();
   sel.innerHTML = h`<option value="">— Proje seçin —</option>${projs.map(p=>h`<option value="${p}"${p===cur?raw(' selected'):''}>${p}</option>`)}`;
   // Taze veri: durum bileşimi 5 kaynaktan (üretim/satın alma/iş emri/paket)
-  const [pr, pi, wop, wo, sp, spi, ws] = await Promise.all([
+  // (15. tur Y2) + irsaliyeler ve nakliyeci kartoteki (Yükleme sekmesi)
+  const [pr, pi, wop, wo, sp, spi, ws, dns, crs] = await Promise.all([
     dbGet('parts'),
     dbGet('purchase_items','order=created_at.asc'),
     dbGet('work_order_parts'),
@@ -6595,6 +6619,8 @@ async function renderShipping(){
     dbGet('shipment_packages'),
     dbGet('shipment_package_items'),
     dbGet('warehouses'), // (14. tur S2) paket deposu seçici
+    dbGet('delivery_notes'),
+    dbGet('carriers'),
     loadProjectBoms()
   ]);
   if(Array.isArray(pr))  parts = pr;
@@ -6604,6 +6630,8 @@ async function renderShipping(){
   if(Array.isArray(sp))  shipmentPackages = sp;
   if(Array.isArray(spi)) shipmentPackageItems = spi;
   if(Array.isArray(ws))  warehouses = ws;
+  if(Array.isArray(dns)) deliveryNotes = dns;
+  if(Array.isArray(crs)) carriers = crs;
   // (14. tur S2) paket deposu seçici — aktif depolar
   const whSel = document.getElementById('ship-pk-wh');
   if(whSel){
@@ -6623,7 +6651,9 @@ function switchShippingTab(tab){
 
 function shipRenderActive(){
   const aktif = document.querySelector('#view-shipping .planning-tab.active')?.dataset.shiptab || 'tree';
-  if(aktif==='tree') shipRenderTree(); else shipRenderPacking();
+  if(aktif==='tree') shipRenderTree();
+  else if(aktif==='load') shipRenderLoad(); // (15. tur Y2) Yükleme
+  else shipRenderPacking();
 }
 
 // ── Ortak yardımcılar ──
@@ -6968,6 +6998,215 @@ async function shipPkgDelete(pkgId){
   if(ordSil) await orderShippingRecompute(ordSil.id);
   toast('Paket silindi.','success');
   shipRenderPacking();
+}
+
+// ═══ (15. tur Y2) Ekran 3 — YÜKLEME: sevk edilmemiş paketler + araç kartları ═══
+// Arkadaş: "aktif sevk edilmemiş paketlerin tümü gözüksün, istenilirse projeye
+// göre filtreleme de yapılsın; araç bilgileri + varış adresi + hangi şirkete +
+// hangi şirket üzerinden". Araç = MEVCUT irsaliye altyapısı (yeni varlık yok).
+function shipRenderLoad(){
+  const el = document.getElementById('ship-load-content');
+  if(!el) return;
+  const projSel = document.getElementById('ship-load-proj');
+  const filtProj = projSel?.value || '';
+  if(projSel){
+    const pj = [...new Set(shipmentPackages.map(k=>k.project_name).filter(Boolean))].sort();
+    projSel.innerHTML = h`<option value="">Tümü</option>${pj.map(p=>h`<option value="${p}"${p===filtProj?raw(' selected'):''}>${p}</option>`)}`;
+  }
+  const bekleyen = shipmentPackages
+    .filter(k=>k.status!=='SHIPPED' && (!filtProj || k.project_name===filtProj))
+    .sort((a,b)=>(a.package_no||'').localeCompare(b.package_no||''));
+  const drafts = deliveryNotes.filter(n=>n.status==='DRAFT');
+  const shipped = deliveryNotes.filter(n=>n.status==='SHIPPED')
+    .sort((a,b)=>new Date(b.shipped_at||b.created_at)-new Date(a.shipped_at||a.created_at)).slice(0,5);
+  const pkgRow = k=>{
+    const st = SHIP_PKG_STATUS[k.status]||SHIP_PKG_STATUS.OPEN;
+    const secilebilir = k.status==='CLOSED' && !k.delivery_note_id;
+    const dn = k.delivery_note_id ? deliveryNotes.find(n=>n.id===k.delivery_note_id) : null;
+    return h`<div style="display:flex;gap:10px;align-items:center;padding:7px 10px;border-bottom:1px dashed var(--border)">
+      ${secilebilir
+        ? h`<input type="checkbox" class="ship-load-cb" data-pkg="${k.id}" onchange="shipLoadCount()" style="accent-color:var(--accent)">`
+        : h`<span style="width:13px"></span>`}
+      <span style="font-family:var(--font-mono);font-size:12px;color:var(--accent);white-space:nowrap">${k.package_no}</span>
+      <span style="font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${k.name||''}</span>
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);white-space:nowrap">${k.project_name}</span>
+      ${k.warehouse_id?h`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);white-space:nowrap">· ${whName(k.warehouse_id)||''}</span>`:''}
+      <span style="margin-left:auto;font-family:var(--font-mono);font-size:9px;padding:1px 8px;border-radius:9px;border:1px solid ${raw(st.color)}44;color:${raw(st.color)};background:${raw(st.color)}11;white-space:nowrap">${st.label}${dn?h` · ${dn.note_no}`:''}</span>
+    </div>`;
+  };
+  const noteCard = n=>{
+    const pks = shipmentPackages.filter(k=>k.delivery_note_id===n.id);
+    const arac = [n.vehicle_plate, n.driver_name, n.container_no?'Knt: '+n.container_no:'', n.tir_no?'TIR: '+n.tir_no:'']
+      .filter(Boolean).join(' · ');
+    const draft = n.status==='DRAFT';
+    return h`<div class="form-card" style="margin-bottom:10px;border-left:3px solid ${raw(draft?'#8e44ad':'#2ecc71')}">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--ink)">${n.note_no}</span>
+        <span style="font-size:12px">${n.recipient_name||''}</span>
+        ${n.carrier?h`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">Nakliyeci: ${n.carrier}</span>`:''}
+        <span style="font-family:var(--font-mono);font-size:9px;padding:1px 8px;border-radius:9px;border:1px solid var(--border);color:var(--muted)">${draft?'Taslak':'Sevk edildi'}</span>
+        <span style="margin-left:auto;display:flex;gap:5px;flex-wrap:wrap">
+          ${draft&&pks.length?h`<button class="btn btn-primary btn-sm" id="ship-note-ship-${n.id}" onclick="shipLoadShipNote('${n.id}')">Sevk Et</button>`:''}
+          ${!draft?h`<button class="btn btn-ghost btn-sm" onclick="shipLoadUnshipNote('${n.id}')">Sevki Geri Al</button>`:''}
+          ${pks.length?h`<button class="btn btn-ghost btn-sm" onclick="dnPackingList('${n.id}')">Packing List</button><button class="btn btn-ghost btn-sm" onclick="dnWeighList('${n.id}')">Çeki Listesi</button>`:''}
+          <button class="btn btn-ghost btn-sm" onclick="dnPrint('${n.id}')">İrsaliye PDF</button>
+        </span>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:4px">
+        ${arac||'Araç bilgisi girilmedi'}
+        ${n.address?h` · ${n.address}${n.district?h` / ${n.district}`:''}${n.city?h` / ${n.city}`:''}`:''}
+        ${n.delivery_terms?h` · Teslim: ${n.delivery_terms}`:''}
+        ${n.origin_country?h` · Menşei: ${n.origin_country}`:''}
+      </div>
+      ${pks.length?h`<div style="margin-top:6px">${pks.map(k=>h`<span style="display:inline-flex;gap:5px;align-items:center;font-family:var(--font-mono);font-size:10px;border:1px solid var(--border);border-radius:9px;padding:2px 8px;margin:2px 4px 2px 0">${k.package_no}${draft&&k.status==='LOADED'?h`<a href="javascript:void(0)" onclick="shipLoadUnloadPkg('${k.id}')" style="color:var(--red,#e74c3c);text-decoration:none" title="Araçtan indir">×</a>`:''}</span>`)}</div>`
+        :h`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:6px">Henüz paket yüklenmedi — üstteki listeden seçip "Araca Yükle"</div>`}
+    </div>`;
+  };
+  el.innerHTML = h`
+    <div class="form-card" style="margin-bottom:16px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px">
+        <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em">Bekleyen Paketler (${bekleyen.length})</div>
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">yalnız KAPALI ve araca bağlı olmayan paketler seçilebilir</span>
+        <button class="btn btn-primary btn-sm" id="ship-load-go-btn" style="margin-left:auto" onclick="shipLoadModal()">Araca Yükle (0)</button>
+      </div>
+      ${bekleyen.length?bekleyen.map(pkgRow):h`<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:14px;text-align:center">Sevk bekleyen paket yok — Paketleme sekmesinden paket oluşturup kapatın</div>`}
+    </div>
+    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:8px">Araçlar / İrsaliyeler</div>
+    ${drafts.length||shipped.length
+      ? h`${drafts.map(noteCard)}${shipped.map(noteCard)}`
+      : h`<div class="empty-state"><span class="emoji"></span>Henüz irsaliye yok — paket seçip "Araca Yükle" ile ilk aracı oluşturun</div>`}`;
+  shipLoadCount();
+}
+
+function shipLoadCount(){
+  const n = document.querySelectorAll('.ship-load-cb:checked').length;
+  const b = document.getElementById('ship-load-go-btn');
+  if(b) b.textContent = 'Araca Yükle ('+n+')';
+}
+
+// Sevk/geri alma sarmalayıcıları: dnShip/dnUnship deliveryItems + whMovements
+// globallerine dayanır — Yükleme sekmesi Depo>İrsaliye hiç açılmadan kullanılabilir,
+// bu yüzden önce bağımlılıklar TAZE çekilir (sessiz eksik-stok-düşümü tuzağı).
+async function shipLoadRefreshDeps(){
+  const [di, mv] = await Promise.all([dbGet('delivery_note_items'), dbGet('warehouse_movements')]);
+  if(Array.isArray(di)) deliveryItems = di;
+  if(Array.isArray(mv)) whMovements = mv;
+}
+async function shipLoadShipNote(id){
+  const bitti = btnBusy('ship-note-ship-'+id,'...');
+  if(!bitti) return;
+  try{
+    await shipLoadRefreshDeps();
+    await dnShip(id);
+    const sp = await dbGet('shipment_packages');
+    if(Array.isArray(sp)) shipmentPackages = sp;
+    shipRenderLoad();
+  } finally { bitti(); }
+}
+async function shipLoadUnshipNote(id){
+  await shipLoadRefreshDeps();
+  await dnUnship(id);
+  const sp = await dbGet('shipment_packages');
+  if(Array.isArray(sp)) shipmentPackages = sp;
+  shipRenderLoad();
+}
+async function shipLoadUnloadPkg(id){
+  await dnPkgUnload(id); // Y1 çıkış hareketini backend siler; kendi tazelemesi var
+  shipRenderLoad();
+}
+
+// "Araca Yükle" modalı: mevcut TASLAK irsaliye seç VEYA araç bilgileriyle yeni oluştur
+let _shipLoadIds = [];
+function shipLoadModal(){
+  _shipLoadIds = [...document.querySelectorAll('.ship-load-cb:checked')].map(c=>c.dataset.pkg);
+  if(!_shipLoadIds.length){ toast('Yüklenecek KAPALI paket seçin!','error'); return; }
+  if(!suppliers.length) loadSuppliers(); else refreshSupplierDatalist();
+  if(!carriers.length) loadCarriers(); else refreshCarrierDatalist();
+  const drafts = deliveryNotes.filter(n=>n.status==='DRAFT');
+  const inp = INP('8px 10px');
+  document.getElementById('ship-load-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'ship-load-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:620px;max-height:88vh;overflow-y:auto;text-align:left">
+    <h3 style="margin-bottom:4px">Araca Yükle — ${_shipLoadIds.length} paket</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">Paketler seçilen irsaliyeye bağlanır ve depodan araca devredilir (depo çıkışı yazılır).</p>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Araç / İrsaliye</label>
+      <select id="ship-load-note" onchange="document.getElementById('ship-load-new').style.display=this.value==='NEW'?'':'none'" style="${inp};width:100%">
+        <option value="NEW">+ Yeni irsaliye (araç bilgileriyle)</option>
+        ${drafts.map(n=>`<option value="${esc(n.id)}">${esc(n.note_no)} — ${esc(n.recipient_name||'')}${n.vehicle_plate?' — '+esc(n.vehicle_plate):''}</option>`).join('')}
+      </select>
+    </div>
+    <div id="ship-load-new" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="grid-column:1/-1"><label style="font-size:11px;color:var(--muted)">Alıcı Firma * <span style="text-transform:none">(nakliyat hangi şirkete)</span></label><input type="text" id="sl-recipient" list="sup-datalist" style="${inp}"></div>
+      <div style="grid-column:1/-1"><label style="font-size:11px;color:var(--muted)">Nakliye Firması <span style="text-transform:none">(hangi şirket üzerinden)</span></label><input type="text" id="sl-carrier" list="carrier-datalist" style="${inp}"></div>
+      <div style="grid-column:1/-1"><label style="font-size:11px;color:var(--muted)">Varış Adresi</label><input type="text" id="sl-address" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">İl</label><input type="text" id="sl-city" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">İlçe</label><input type="text" id="sl-district" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Araç Plakası</label><input type="text" id="sl-plate" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Şoför</label><input type="text" id="sl-driver" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Konteyner No</label><input type="text" id="sl-container" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">TIR No</label><input type="text" id="sl-tir" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Kargo Takip No</label><input type="text" id="sl-tracking" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Tahmini Varış</label><input type="date" id="sl-eta" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Teslim Koşulu <span style="text-transform:none">(örn. DPU - Dnipro)</span></label><input type="text" id="sl-terms" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Menşei</label><input type="text" id="sl-origin" value="Turkey" style="${inp}"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="document.getElementById('ship-load-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" id="ship-load-go" onclick="shipLoadConfirm()">Yükle</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(()=>document.getElementById('sl-recipient')?.focus(),100);
+}
+
+async function shipLoadConfirm(){
+  const ids = _shipLoadIds;
+  const selv = document.getElementById('ship-load-note')?.value;
+  const bitti = btnBusy('ship-load-go','...');
+  if(!bitti) return;
+  try{
+    let noteId = selv;
+    if(selv==='NEW'){
+      const val=id=>document.getElementById(id)?.value.trim()||'';
+      const recipient = val('sl-recipient');
+      if(!recipient){ toast('Alıcı firma zorunlu!','error'); return; }
+      const body = {
+        recipient_name: recipient,
+        address: val('sl-address')||null, city: val('sl-city')||null, district: val('sl-district')||null,
+        carrier: val('sl-carrier')||null, vehicle_plate: val('sl-plate')||null, driver_name: val('sl-driver')||null,
+        container_no: val('sl-container')||null, tir_no: val('sl-tir')||null, cargo_tracking_no: val('sl-tracking')||null,
+        eta_date: val('sl-eta')||null, delivery_terms: val('sl-terms')||null, origin_country: val('sl-origin')||null,
+        created_by: currentUser?.display_name||currentUser?.username||null
+      };
+      const d = await dbInsert('delivery_notes', body);
+      if(!Array.isArray(d)||!d[0]){ toast('İrsaliye oluşturulamadı!','error'); return; }
+      deliveryNotes.unshift(d[0]);
+      noteId = d[0].id;
+      ensureSupplier(recipient);
+      ensureCarrier(val('sl-carrier'));
+    }
+    if(!noteId){ toast('İrsaliye seçin!','error'); return; }
+    let ok = 0;
+    for(const id of ids){
+      const r = await dbUpdate('shipment_packages', id, {delivery_note_id: noteId, status:'LOADED'});
+      if(!r) continue;
+      const k = shipmentPackages.find(x=>x.id===id);
+      if(k){ k.delivery_note_id = noteId; k.status='LOADED'; }
+      ok++;
+      // (14. tur S4) zincir: paketin KENDİ projesinin siparişi yükseltilir —
+      // çapraz-proje yükleme serbest (bir araç birden çok projenin paketini taşır)
+      const ord = orders.find(o=>o.project_name===(k?.project_name||''));
+      if(ord) await orderShippingRaise(ord.id, 'yuklendi');
+    }
+    const tazeMv = await dbGet('warehouse_movements'); // (15. tur Y1) araca devir çıkışları
+    if(Array.isArray(tazeMv)) whMovements = tazeMv;
+    document.getElementById('ship-load-overlay')?.remove();
+    toast(ok+' paket araca yüklendi'+(ok<ids.length?' ('+(ids.length-ok)+' başarısız)':''),'success');
+    shipRenderLoad();
+  } finally { bitti(); }
 }
 
 function woTogglePart(id, name, code) {
@@ -9405,6 +9644,250 @@ async function supDelete(id){
   refreshSupplierDatalist();
   renderSuppliersModalList();
   toast('Tedarikçi silindi','success');
+}
+
+// ═══ (15. tur Y2) NAKLİYE FİRMASI KARTOTEKİ — suppliers deseninin klonu ═══
+// İrsaliye/Yükleme'deki "Nakliye Firması" alanı bu listeden önerilir;
+// delivery_notes.carrier SERBEST METİN kalır (snapshot, FK yok).
+let carriers = [];
+
+async function loadCarriers(){
+  const c = await dbGet('carriers','order=name.asc');
+  if(Array.isArray(c)) carriers = c;
+  refreshCarrierDatalist();
+}
+
+function refreshCarrierDatalist(){
+  let dl = document.getElementById('carrier-datalist');
+  if(!dl){ dl = document.createElement('datalist'); dl.id = 'carrier-datalist'; document.body.appendChild(dl); }
+  dl.innerHTML = carriers.filter(c=>c.is_active!==false)
+    .map(c=>`<option value="${esc(c.name)}">`).join('');
+}
+
+async function ensureCarrier(name){
+  const n = (name||'').trim();
+  if(!n) return;
+  if(carriers.some(c=>(c.name||'').trim().toLowerCase()===n.toLowerCase())) return;
+  try{
+    const data = await dbInsert('carriers', {name:n});
+    if(Array.isArray(data)&&data[0]){
+      carriers.push(data[0]);
+      refreshCarrierDatalist();
+      toast(`"${n}" nakliye firması kartoteğine eklendi`,'success');
+    }
+  }catch(e){ /* kartotek eklenemese de asıl kayıt devam etsin */ }
+}
+
+function openCarriersModal(){
+  document.getElementById('car-modal-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'car-modal-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:700px;max-height:85vh;display:flex;flex-direction:column;text-align:left">
+    <h3 style="margin-bottom:4px">Nakliye Firmaları</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px">İrsaliye ve Yükleme'deki "Nakliye Firması" alanı bu listeden önerilir; kayıtta yazılan yeni ad otomatik eklenir.</p>
+    <div id="car-modal-list" style="overflow-y:auto;flex:1;border:1px solid var(--border);border-radius:6px;padding:6px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-primary" onclick="carEdit(null)">+ Yeni Nakliyeci</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('car-modal-overlay').remove()">Kapat</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  loadCarriers().then(renderCarriersModalList);
+  renderCarriersModalList();
+}
+
+function renderCarriersModalList(){
+  const el = document.getElementById('car-modal-list');
+  if(!el) return;
+  if(!carriers.length){
+    el.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:16px;text-align:center">Henüz nakliye firması yok — irsaliyede yazılan adlar otomatik buraya düşer.</div>`;
+    return;
+  }
+  el.innerHTML = h`${carriers.map(c=>{
+    const passive = c.is_active===false;
+    const meta = [
+      c.contact_person ? ''+c.contact_person : '',
+      c.phone ? ''+c.phone : '',
+      c.email ? ''+c.email : '',
+      c.address ? ''+c.address : '',
+      c.notes ? ''+c.notes : ''
+    ].filter(Boolean).join(' · ');
+    return h`<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px dashed var(--border);${passive?raw('opacity:.45'):''}">
+      <div style="min-width:0">
+        <div style="font-family:var(--font-mono);font-size:12px"><b>${c.name}</b>${passive?raw(' <span style="font-size:10px;color:var(--muted)">(pasif)</span>'):''}</div>
+        ${meta?h`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px">${meta}</div>`:''}
+      </div>
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        <button class="btn btn-ghost btn-sm" onclick="carEdit('${c.id}')" title="Düzenle">${raw(ico('edit',13))}</button>
+        <button class="btn btn-ghost btn-sm" onclick="carToggleActive('${c.id}')" title="${passive?'Aktifleştir':'Pasife al'}">${passive?'▶':'⏸'}</button>
+        <button class="btn btn-ghost btn-sm" onclick="carDelete('${c.id}')" style="color:var(--red,#e74c3c)">${raw(ico('trash',13))}</button>
+      </div>
+    </div>`;
+  })}`;
+}
+
+function carEdit(id){
+  const c = id ? carriers.find(x=>x.id===id) : {};
+  if(id && !c) return;
+  document.getElementById('car-edit-overlay')?.remove();
+  const inp = INP('9px 11px');
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'car-edit-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:520px;text-align:left">
+    <h3 style="margin-bottom:14px">${id?'Nakliyeciyi Düzenle':'+ Yeni Nakliyeci'}</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="grid-column:1/-1"><label style="font-size:11px;color:var(--muted)">Ad *</label><input type="text" id="ce-name" value="${esc(c.name)}" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Yetkili</label><input type="text" id="ce-contact" value="${esc(c.contact_person)}" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Telefon</label><input type="text" id="ce-phone" value="${esc(c.phone)}" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">E-posta</label><input type="text" id="ce-email" value="${esc(c.email)}" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Adres</label><input type="text" id="ce-address" value="${esc(c.address)}" style="${inp}"></div>
+      <div style="grid-column:1/-1"><label style="font-size:11px;color:var(--muted)">Not</label><input type="text" id="ce-notes" value="${esc(c.notes)}" style="${inp}"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="document.getElementById('car-edit-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" onclick="carSave(${id?`'${id}'`:'null'})">Kaydet</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(()=>document.getElementById('ce-name')?.focus(),100);
+}
+
+async function carSave(id){
+  const name = document.getElementById('ce-name').value.trim();
+  if(!name){ toast('Nakliyeci adı zorunlu!','error'); return; }
+  const body = {
+    name,
+    contact_person: document.getElementById('ce-contact').value.trim() || null,
+    phone:   document.getElementById('ce-phone').value.trim() || null,
+    email:   document.getElementById('ce-email').value.trim() || null,
+    address: document.getElementById('ce-address').value.trim() || null,
+    notes:   document.getElementById('ce-notes').value.trim() || null
+  };
+  const ok = id ? await dbUpdate('carriers', id, body)
+                : await dbInsert('carriers', body);
+  if(!ok || (Array.isArray(ok)&&!ok[0])){ toast('Kaydedilemedi!','error'); return; }
+  document.getElementById('car-edit-overlay')?.remove();
+  toast(id?'Nakliyeci güncellendi':'Nakliyeci eklendi','success');
+  await loadCarriers();
+  renderCarriersModalList();
+}
+
+async function carToggleActive(id){
+  const c = carriers.find(x=>x.id===id);
+  if(!c) return;
+  const ok = await dbUpdate('carriers', id, {is_active: c.is_active===false});
+  if(!ok){ toast('Güncellenemedi!','error'); return; }
+  c.is_active = c.is_active===false;
+  refreshCarrierDatalist();
+  renderCarriersModalList();
+}
+
+async function carDelete(id){
+  const c = carriers.find(x=>x.id===id);
+  if(!c) return;
+  if(!confirm(`"${c.name}" kartotekten silinsin mi?\n(Eski irsaliyelerdeki adlar etkilenmez.)`)) return;
+  const ok = await dbDelete('carriers', id);
+  if(!ok){ toast('Silinemedi!','error'); return; }
+  carriers = carriers.filter(x=>x.id!==id);
+  refreshCarrierDatalist();
+  renderCarriersModalList();
+  toast('Nakliyeci silindi','success');
+}
+
+// ═══ (15. tur Y2a) FİRMA AYARLARI — tek satır (Gönderen bloğunun kaynağı) ═══
+// company_settings TEK SATIR ucundadır (dizi değil nesne) — apiFetch ile.
+let companySettings = null;
+
+async function loadCompanySettings(force){
+  if(companySettings && !force) return companySettings;
+  try{ companySettings = await apiFetch('/api/company-settings'); }
+  catch(e){ /* okunamazsa PDF'ler Gönderen'i boş basar (eski davranış) */ }
+  return companySettings;
+}
+
+function openCompanyModal(){
+  document.getElementById('comp-overlay')?.remove();
+  const inp = INP('9px 11px');
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'comp-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:560px;text-align:left">
+    <h3 style="margin-bottom:4px">Firma Ayarları</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:14px">Bir kere girilir; çeki listesi / packing list / irsaliye başlığındaki GÖNDEREN bloğunda basılır.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="grid-column:1/-1"><label style="font-size:11px;color:var(--muted)">Firma Adı *</label><input type="text" id="cmp-name" style="${inp}"></div>
+      <div style="grid-column:1/-1"><label style="font-size:11px;color:var(--muted)">Adres</label><input type="text" id="cmp-address" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Telefon</label><input type="text" id="cmp-phone" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">E-posta</label><input type="text" id="cmp-email" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Vergi Dairesi</label><input type="text" id="cmp-taxoffice" style="${inp}"></div>
+      <div><label style="font-size:11px;color:var(--muted)">Vergi No</label><input type="text" id="cmp-taxno" style="${inp}"></div>
+      <div style="grid-column:1/-1">
+        <label style="font-size:11px;color:var(--muted)">Logo (küçük antet görseli, en fazla 500KB)</label>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:4px">
+          <img id="cmp-logo-preview" alt="" style="max-height:44px;max-width:160px;display:none;border:1px solid var(--border);border-radius:4px;background:#fff;padding:2px">
+          <input type="file" id="cmp-logo-file" accept="image/*" onchange="compLogoPick()" style="font-size:11px;color:var(--muted)">
+          <button class="btn btn-ghost btn-sm" id="cmp-logo-clear" onclick="compLogoClear()" style="display:none">Logoyu Kaldır</button>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="document.getElementById('comp-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" id="cmp-save-btn" onclick="compSave()">Kaydet</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  loadCompanySettings(true).then(cs=>{
+    if(!cs) return;
+    const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
+    set('cmp-name',cs.name); set('cmp-address',cs.address); set('cmp-phone',cs.phone);
+    set('cmp-email',cs.email); set('cmp-taxoffice',cs.tax_office); set('cmp-taxno',cs.tax_number);
+    _compLogo = cs.logo_base64 ? {b64:cs.logo_base64, type:cs.logo_content_type||'image/png'} : null;
+    compLogoRefresh();
+  });
+}
+
+// Logonun modal içi durumu: null=yok, {b64,type}=mevcut/yeni, 'CLEAR'=silinecek
+let _compLogo = null;
+function compLogoRefresh(){
+  const img = document.getElementById('cmp-logo-preview');
+  const clr = document.getElementById('cmp-logo-clear');
+  const has = _compLogo && _compLogo!=='CLEAR';
+  if(img){ img.style.display = has?'':'none'; if(has) img.src = 'data:'+_compLogo.type+';base64,'+_compLogo.b64; }
+  if(clr) clr.style.display = has?'':'none';
+}
+function compLogoPick(){
+  const f = document.getElementById('cmp-logo-file')?.files?.[0];
+  if(!f) return;
+  if(f.size > 500*1024){ toast('Logo en fazla 500KB olabilir!','error'); return; }
+  const rd = new FileReader();
+  rd.onload = ()=>{
+    const b64 = String(rd.result).split(',')[1]||'';
+    _compLogo = {b64, type:f.type||'image/png'};
+    compLogoRefresh();
+  };
+  rd.readAsDataURL(f);
+}
+function compLogoClear(){ _compLogo = 'CLEAR'; compLogoRefresh(); }
+
+async function compSave(){
+  const bitti = btnBusy('cmp-save-btn','...');
+  if(!bitti) return;
+  try{
+    const val=id=>document.getElementById(id)?.value.trim()||'';
+    const body = {
+      name: val('cmp-name'), address: val('cmp-address'), phone: val('cmp-phone'),
+      email: val('cmp-email'), tax_office: val('cmp-taxoffice'), tax_number: val('cmp-taxno')
+    };
+    if(_compLogo==='CLEAR') body.logo_base64 = '';
+    else if(_compLogo && _compLogo.b64){ body.logo_base64 = _compLogo.b64; body.logo_content_type = _compLogo.type; }
+    try{
+      companySettings = await apiFetch('/api/company-settings', {method:'PUT', body: JSON.stringify(body)});
+    }catch(e){ toast('Kaydedilemedi: '+e.message,'error'); return; }
+    document.getElementById('comp-overlay')?.remove();
+    toast('Firma ayarları kaydedildi','success');
+  } finally { bitti(); }
 }
 
 // ═══ SATIN ALMA PLANLAMASI ═══
@@ -12249,6 +12732,7 @@ async function renderDelivery(){
   warehouses    = Array.isArray(ws) ? ws : warehouses;
   if(Array.isArray(sp))  shipmentPackages = sp;
   if(Array.isArray(spi)) shipmentPackageItems = spi;
+  loadCarriers(); // (15. tur Y2) dn-carrier datalist'i — beklemeden doldurulur
   // Proje dropdown'u
   const sel = document.getElementById('dn-order');
   if(sel){
@@ -12298,6 +12782,8 @@ async function dnCreate(){
     tir_no:            document.getElementById('dn-tir').value.trim() || null,
     cargo_tracking_no: document.getElementById('dn-tracking').value.trim() || null,
     eta_date:          document.getElementById('dn-eta').value || null,
+    delivery_terms:    document.getElementById('dn-terms').value.trim() || null,   // (15. tur Y2a)
+    origin_country:    document.getElementById('dn-origin').value.trim() || null,  // (15. tur Y2a)
     notes:       document.getElementById('dn-notes').value.trim() || null,
     created_by:  currentUser?.display_name || currentUser?.username || null
   };
@@ -12305,7 +12791,8 @@ async function dnCreate(){
   if(!Array.isArray(data)||!data[0]){ toast('İrsaliye oluşturulamadı!','error'); return; }
   deliveryNotes.unshift(data[0]);
   ensureSupplier(recipient);
-  ['dn-recipient','dn-taxno','dn-taxoffice','dn-address','dn-city','dn-district','dn-shipdate','dn-carrier','dn-plate','dn-driver','dn-container','dn-tir','dn-tracking','dn-eta','dn-notes']
+  ensureCarrier(document.getElementById('dn-carrier').value); // (15. tur Y2) kartoteğe düşür
+  ['dn-recipient','dn-taxno','dn-taxoffice','dn-address','dn-city','dn-district','dn-shipdate','dn-carrier','dn-plate','dn-driver','dn-container','dn-tir','dn-tracking','dn-eta','dn-terms','dn-origin','dn-notes']
     .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   dnToggleForm();
   _dnActive = data[0].id;
@@ -12868,13 +13355,14 @@ function pkgPrint(id){
 }
 
 // Packing List — irsaliyeye yüklü paketler, paket başına içerik dökümü
-function dnPackingList(dnId){
+async function dnPackingList(dnId){
   const n = deliveryNotes.find(x=>x.id===dnId);
   if(!n) return;
   const pkgs = shipmentPackages.filter(k=>k.delivery_note_id===dnId)
     .sort((a,b)=>(a.package_no||'').localeCompare(b.package_no||''));
   if(!pkgs.length){ toast('Bu irsaliyeye yüklü paket yok — önce Paket Yükle.','error'); return; }
   const printDate = new Date().toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const cs = await loadCompanySettings(); // (15. tur Y2a) başlıkta Gönderen firma
   let body = '';
   pkgs.forEach((k,pi)=>{
     const items = shipmentPackageItems.filter(it=>it.package_id===k.id);
@@ -12894,10 +13382,10 @@ function dnPackingList(dnId){
 <title>${esc(n.note_no)} — Paket Listesi (Packing List)</title>
 <style>${_SEVK_PDF_CSS}</style></head><body>
   <div class="hd">
-    <div><div class="logo">ÜretimTakip</div><div style="font-size:10px;color:#666;margin-top:4px">Düzenleme: ${printDate}</div></div>
+    <div><div class="logo">${cs&&cs.name?esc(cs.name):'ÜretimTakip'}</div><div style="font-size:10px;color:#666;margin-top:4px">Düzenleme: ${printDate}</div></div>
     <div><div class="doc-title">PAKET LİSTESİ / PACKING LIST</div><div class="doc-no">${esc(n.note_no)} · ${pkgs.length} koli</div></div>
   </div>
-  <div class="meta"><b>Alıcı:</b> ${esc(n.recipient_name)}${n.vehicle_plate?` · <b>Araç:</b> ${esc(n.vehicle_plate)}`:''}${n.driver_name?` · <b>Şoför:</b> ${esc(n.driver_name)}`:''}${n.carrier?` · <b>Nakliye:</b> ${esc(n.carrier)}`:''}</div>
+  <div class="meta">${cs&&cs.name?`<b>Gönderen:</b> ${esc(cs.name)} · `:''}<b>Alıcı:</b> ${esc(n.recipient_name)}${n.vehicle_plate?` · <b>Araç:</b> ${esc(n.vehicle_plate)}`:''}${n.driver_name?` · <b>Şoför:</b> ${esc(n.driver_name)}`:''}${n.carrier?` · <b>Nakliye:</b> ${esc(n.carrier)}`:''}</div>
   <table class="items">
     <thead><tr><th style="width:40px">#</th><th style="width:110px">Kod</th><th>Parça / Malzeme</th><th style="width:60px;text-align:right">Miktar</th><th style="width:50px">Birim</th></tr></thead>
     <tbody>${body}</tbody>
@@ -12912,7 +13400,7 @@ function dnPackingList(dnId){
 // (Downloads/Çeki Listesi.xlsx): iki dilli başlıklar, üst bilgi bloğu
 // (gönderen/alıcı/plaka/tarih), paket başına İÇERİK satırları (rowspan'lı
 // paket kolonları: no/tip/ölçü/brüt/net), TOTAL satırı.
-function dnWeighList(dnId){
+async function dnWeighList(dnId){
   const n = deliveryNotes.find(x=>x.id===dnId);
   if(!n) return;
   const pkgs = shipmentPackages.filter(k=>k.delivery_note_id===dnId)
@@ -12920,6 +13408,13 @@ function dnWeighList(dnId){
   if(!pkgs.length){ toast('Bu irsaliyeye yüklü paket yok — önce Paket Yükle.','error'); return; }
   const proj = n.order_id ? (orders.find(o=>o.id===n.order_id)||{}).project_name : null;
   const printDate = new Date().toLocaleDateString('tr-TR');
+  // (15. tur Y2a) Gönderen bloğu firma ayarlarından (bir kere girilir)
+  const cs = await loadCompanySettings();
+  const gonderen = cs && cs.name
+    ? esc(cs.name)+(cs.address?` — ${esc(cs.address)}`:'')+(cs.phone?` · ${esc(cs.phone)}`:'')
+    : '';
+  const csLogo = cs && cs.logo_base64
+    ? `<img src="data:${esc(cs.logo_content_type||'image/png')};base64,${cs.logo_base64}" style="max-height:36px;max-width:150px;display:block;margin-bottom:3px" alt="">` : '';
   let topBrut = 0, topNet = 0;
   const govde = pkgs.map((k,pi)=>{
     const items = shipmentPackageItems.filter(it=>it.package_id===k.id);
@@ -12953,13 +13448,15 @@ function dnWeighList(dnId){
   .topblok td:first-child { width:210px; font-weight:700; color:#555; background:#fafafa; }
 </style></head><body>
   <div class="hd">
-    <div><div class="logo">ÜretimTakip</div><div style="font-size:10px;color:#666;margin-top:4px">Düzenleme: ${printDate}</div></div>
+    <div>${csLogo}<div class="logo">${cs&&cs.name?esc(cs.name):'ÜretimTakip'}</div><div style="font-size:10px;color:#666;margin-top:4px">Düzenleme: ${printDate}</div></div>
     <div><div class="doc-title">ÇEKİ LİSTESİ / WEIGHT LIST</div><div class="doc-no">${esc(n.note_no)} · ${pkgs.length} koli</div></div>
   </div>
   <table class="topblok">
-    <tr><td>Gönderen / Consignor:</td><td></td></tr>
+    <tr><td>Gönderen / Consignor:</td><td>${gonderen}</td></tr>
     <tr><td>Alıcı / Consignee:</td><td>${esc(n.recipient_name)}${n.address?` — ${esc(n.address)}`:''}${n.city?` ${esc([n.district,n.city].filter(Boolean).join('/'))}`:''}</td></tr>
     <tr><td>Proje / Project:</td><td>${esc(proj||'—')}</td></tr>
+    <tr><td>Teslim Koşulları / Delivery Terms:</td><td>${esc(n.delivery_terms||'—')}</td></tr>
+    <tr><td>Menşei / Country of Origin:</td><td>${esc(n.origin_country||'—')}</td></tr>
     <tr><td>Araç Plaka / Truck Plate:</td><td>${esc(n.vehicle_plate||'—')}${n.tir_no?` · TIR: ${esc(n.tir_no)}`:''}${n.container_no?` · Konteyner: ${esc(n.container_no)}`:''}</td></tr>
     <tr><td>Tarih / Date:</td><td>${n.ship_date?new Date(n.ship_date).toLocaleDateString('tr-TR'):printDate}</td></tr>
   </table>
