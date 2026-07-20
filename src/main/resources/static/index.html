@@ -3205,8 +3205,9 @@ async function init(){
       showQrLoginMode(null);
     }
   } else if(pkid){
-    // (13. tur m4/F) QR PAKET GÖRÜNÜMÜ — paketleme zamanı + paketleyen + içerik
-    // (?part=/?receive= üçüz deseni; login-gated — halka açık uç İSTENMEDİ)
+    // (13. tur m4/F → 15. tur T1) QR PAKET GÖRÜNÜMÜ — GİRİŞSİZ (arkadaş kararı).
+    // Halka açık uç TEK paketi sınırlı alanlarla döner (PublicPackageResponse);
+    // login ekranı hiç açılmaz. ?part=/?receive= GİRİŞLİ kalır (yazma yapıyorlar).
     document.getElementById('nav-tabs').style.display='none';
     const sideEl3 = document.querySelector('.side'); if(sideEl3) sideEl3.style.display='none';
     const ubEl3 = document.getElementById('user-badge'), tbEl3 = document.getElementById('topbar');
@@ -3214,17 +3215,10 @@ async function init(){
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     document.getElementById('view-scan').classList.add('active');
     const savedQr = sessionStorage.getItem('ut_user');
-    if(savedQr && sessionStorage.getItem('ut_token')){
-      currentUser = JSON.parse(savedQr);
-      document.getElementById('login-screen').style.display='none';
-      hideLoading();
-      renderPackageView(pkid);
-    } else {
-      hideLoading();
-      document.getElementById('login-screen').style.display='flex';
-      _qrPaketId = pkid;
-      showQrLoginMode(null);
-    }
+    if(savedQr && sessionStorage.getItem('ut_token')) currentUser = JSON.parse(savedQr);
+    document.getElementById('login-screen').style.display='none';
+    hideLoading();
+    renderPackageView(pkid);
   } else {
     // Session kontrolü
     const saved = sessionStorage.getItem('ut_user');
@@ -7996,7 +7990,7 @@ function loadRemembered() {
 let _qrPartId = null; // QR mod için part ID sakla
 
 let _qrReceiveId = null; // ?receive= akışında login sonrası açılacak kalem
-let _qrPaketId = null;   // (13. tur m4/F) ?paket= akışında login sonrası açılacak paket
+// (15. tur T1) _qrPaketId KALDIRILDI — ?paket= artık girişsiz, login replay'i yok
 
 function showQrLoginMode(pid) {
   _qrPartId = pid;
@@ -8083,10 +8077,6 @@ async function doLogin() {
     // QR mal kabul — sayfa kendi verisini çeker, loadAll gerekmez
     renderReceive(_qrReceiveId);
     _qrReceiveId = null;
-  } else if(_qrPaketId) {
-    // (13. tur m4/F) QR paket görünümü — sayfa kendi verisini çeker
-    renderPackageView(_qrPaketId);
-    _qrPaketId = null;
   } else if(_qrPartId) {
     // QR girisinden sonra veriler yuklenmeli (init'te artik yuklenmiyor)
     showLoading();
@@ -12906,23 +12896,20 @@ function dnWeighList(dnId){
   _sevkPdfOpen(html);
 }
 
-// ═══ (13. tur m4/F) QR PAKET GÖRÜNÜMÜ — paket PDF'indeki QR okutulunca ═══
+// ═══ (13. tur m4/F + 15. tur T1) QR PAKET GÖRÜNÜMÜ — GİRİŞSİZ halka açık ═══
 // Paketleme zamanı, paketleyen personel ve paket içeriği (Sistem.pdf madde 4).
+// (15. tur T1) 4 liste çağrısı yerine TEK halka açık uç: token'sız çalışır,
+// yalnız bu paketin sınırlı alan kümesi döner (depo adı + araç özeti dahil).
 async function renderPackageView(id){
   const content=document.getElementById('scan-content');
   if(!content) return;
   content.innerHTML=h`<div class="empty-state"><div class="spinner" style="margin:0 auto"></div><p style="margin-top:16px">Yükleniyor...</p></div>`;
-  const [pk, items, dns, ws]=await Promise.all([
-    dbGet('shipment_packages','id=eq.'+id),
-    dbGet('shipment_package_items'),
-    dbGet('delivery_notes'),
-    dbGet('warehouses') // (14. tur S2) paket deposu adı için
-  ]);
-  if(Array.isArray(ws)) warehouses = ws;
-  const k=Array.isArray(pk)?pk.find(x=>x.id===id):null;
+  let k=null;
+  try { k=await apiFetch('/api/shipment-packages/'+encodeURIComponent(id)+'/public'); }
+  catch(e){ k=null; }
   if(!k){ content.innerHTML=h`<div class="not-found"><div class="icon">⚠</div><h2>Paket Bulunamadı</h2><p>Bu QR koda ait paket kaydı mevcut değil (silinmiş olabilir).</p></div>`; return; }
-  const rows=(Array.isArray(items)?items:[]).filter(it=>it.package_id===id);
-  const dn=k.delivery_note_id?(Array.isArray(dns)?dns:[]).find(n=>n.id===k.delivery_note_id):null;
+  const rows=Array.isArray(k.items)?k.items:[];
+  const dn=k.delivery_note||null;
   const st=SHIP_PKG_STATUS[k.status]||SHIP_PKG_STATUS.OPEN;
   const dims=[k.length_cm,k.width_cm,k.height_cm].some(x=>x!=null)
     ?[k.length_cm,k.width_cm,k.height_cm].map(x=>x!=null?Number(x):'?').join('×')+' cm':'—';
@@ -12932,7 +12919,7 @@ async function renderPackageView(id){
     ['Tip', ({PACKAGE:'Paket',BOX:'Kutu',PALLET:'Palet',CRATE:'Kasa'})[k.package_type]||'Paket'],
     ['Ölçü', dims],
     ['Brüt / Net', (k.weight_kg!=null?Number(k.weight_kg)+' kg':'—')+' / '+(k.net_weight_kg!=null?Number(k.net_weight_kg)+' kg':'—')],
-    ['Depo', k.warehouse_id?(whName(k.warehouse_id)||'—'):'—'],
+    ['Depo', k.warehouse_name||'—'],
     ['Paketleyen', k.packed_by||'—'],
     ['Paketleme zamanı', k.packed_at?new Date(k.packed_at).toLocaleString('tr-TR'):'—'],
     ['İrsaliye / Araç', dn?(dn.note_no+(dn.vehicle_plate?' · '+dn.vehicle_plate:'')+(dn.driver_name?' · '+dn.driver_name:'')):'—']

@@ -2,9 +2,14 @@ package com.uretimtakip.erp.shipment;
 
 import com.uretimtakip.erp.common.exception.BusinessException;
 import com.uretimtakip.erp.common.exception.ResourceNotFoundException;
+import com.uretimtakip.erp.delivery.DeliveryNote;
+import com.uretimtakip.erp.delivery.DeliveryNoteRepository;
+import com.uretimtakip.erp.shipment.dto.PublicPackageResponse;
 import com.uretimtakip.erp.shipment.dto.ShipmentPackageRequest;
 import com.uretimtakip.erp.shipment.dto.ShipmentPackageResponse;
 import com.uretimtakip.erp.shipment.dto.ShipmentPackageUpdateRequest;
+import com.uretimtakip.erp.warehouse.Warehouse;
+import com.uretimtakip.erp.warehouse.WarehouseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,6 +47,9 @@ public class ShipmentPackageService {
 
     private final ShipmentPackageRepository shipmentPackageRepository;
     private final ShipmentPackageItemRepository shipmentPackageItemRepository;
+    // (15. tur T1) halka acik gorunum icin depo adi + irsaliye arac ozeti join'i
+    private final WarehouseRepository warehouseRepository;
+    private final DeliveryNoteRepository deliveryNoteRepository;
 
     @Transactional(readOnly = true)
     public List<ShipmentPackageResponse> listAll() {
@@ -54,6 +62,23 @@ public class ShipmentPackageService {
     @Transactional(readOnly = true)
     public ShipmentPackageResponse getById(UUID id) {
         return ShipmentPackageResponse.fromEntity(findEntityById(id));
+    }
+
+    /**
+     * (15. tur T1) Halka acik tek-paket gorunumu — SecurityConfig'te GET permitAll.
+     * Sinirli alan kumesi + icerik + depo adi + arac ozeti TEK istekte
+     * (liste uclari kilitli kalir; ayrintili gerekce PublicPackageResponse doc'unda).
+     */
+    @Transactional(readOnly = true)
+    public PublicPackageResponse getPublicView(UUID id) {
+        ShipmentPackage pkg = findEntityById(id);
+        var items = shipmentPackageItemRepository.findByPackageIdOrderByCreatedAtAsc(id);
+        String warehouseName = pkg.getWarehouseId() == null ? null
+                : warehouseRepository.findById(pkg.getWarehouseId())
+                        .map(Warehouse::getName).orElse(null);
+        DeliveryNote note = pkg.getDeliveryNoteId() == null ? null
+                : deliveryNoteRepository.findById(pkg.getDeliveryNoteId()).orElse(null);
+        return PublicPackageResponse.of(pkg, items, warehouseName, note);
     }
 
     @Transactional

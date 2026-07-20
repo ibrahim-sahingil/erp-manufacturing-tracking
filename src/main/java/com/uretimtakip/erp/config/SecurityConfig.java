@@ -63,6 +63,15 @@ public class SecurityConfig {
                     // API cagrilari yine JWT ister
                     auth.requestMatchers("/", "/index.html", "/favicon.ico").permitAll();
 
+                    // (15. tur T1) Paket QR sayfasi girissiz — arkadas karari.
+                    // YALNIZ bu GET acilir: tek paketi sinirli alan kumesiyle
+                    // doner (PublicPackageResponse; notes/created_by yok).
+                    // Liste uclari authenticated kalir — onlari acmak TUM
+                    // paket/irsaliye/depo verisini sizdirirdi. Yazma uclarina
+                    // etkisi yok (writeRule yalniz POST/PUT/DELETE esler).
+                    auth.requestMatchers(HttpMethod.GET,
+                            "/api/shipment-packages/*/public").permitAll();
+
                     // (K3) Yikici uclar frontend'deki gorunurluk kurallariyla
                     // AYNI sartla backend'de de denetlenir — JWT'si olan
                     // herkes API'ye dogrudan istek atabilir (tunel acik).

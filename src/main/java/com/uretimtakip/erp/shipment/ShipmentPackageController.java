@@ -1,6 +1,7 @@
 package com.uretimtakip.erp.shipment;
 
 import com.uretimtakip.erp.common.ApiResponse;
+import com.uretimtakip.erp.shipment.dto.PublicPackageResponse;
 import com.uretimtakip.erp.shipment.dto.ShipmentPackageRequest;
 import com.uretimtakip.erp.shipment.dto.ShipmentPackageResponse;
 import com.uretimtakip.erp.shipment.dto.ShipmentPackageUpdateRequest;
@@ -45,6 +46,15 @@ public class ShipmentPackageController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ShipmentPackageResponse>> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(shipmentPackageService.getById(id)));
+    }
+
+    /**
+     * (15. tur T1) HALKA ACIK tek-paket gorunumu — QR etiketi girissiz acilir.
+     * SecurityConfig'te bu path GET-only permitAll; sinirli alan kumesi doner.
+     */
+    @GetMapping("/{id}/public")
+    public ResponseEntity<ApiResponse<PublicPackageResponse>> publicView(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(shipmentPackageService.getPublicView(id)));
     }
 
     @PostMapping

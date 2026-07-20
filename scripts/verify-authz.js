@@ -127,6 +127,41 @@ function izinVerilmeli(ad, r) {
   izinVerilmeli('GET /warehouses',   await lim('GET', '/warehouses'));
   izinVerilmeli('GET /shipment-packages', await lim('GET', '/shipment-packages'));
 
+  console.log('\n═══ (15. tur T1) HALKA ACIK PAKET UCU — yalniz o, yalniz GET ═══');
+  // Token'siz cagri: Authorization basligi HIC gonderilmez ("Bearer null" degil).
+  const anon = async (method, path, body) => {
+    const r = await fetch(BASE + path.replace(/^\//, ''), { method,
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined });
+    let j = null; try { j = await r.json(); } catch (e) {}
+    return { status: r.status, ok: r.ok && !(j && j.success === false), msg: (j && j.message) || '', data: j && j.data };
+  };
+  // Gercek paket kur (dev) — public ucun 200 donmesi icin
+  await dev('POST', '/shipment-packages', { project_name: 'AUTHZ Paket ' + sfx });
+  const pkList = await fetch(BASE + 'shipment-packages', { headers: { Authorization: 'Bearer ' + DEV } })
+    .then(r => r.json());
+  const pkId = (pkList.data || []).find(p => p.project_name === 'AUTHZ Paket ' + sfx)?.id;
+  if (pkId) created.push(['/shipment-packages', pkId]);
+  {
+    const pub = await anon('GET', '/shipment-packages/' + pkId + '/public');
+    const pubOk = pub.ok && pub.data && pub.data.package_no;
+    console.log((pubOk ? '  ✅ 200 acik' : `  ❌ KAPALI [${pub.status}] ${pub.msg}`) + '  GET /shipment-packages/{id}/public (token yok)');
+    if (!pubOk) fail++;
+    // Sinirli alan kumesi: ic alanlar sizmamali
+    const sizinti = pub.data && ('notes' in pub.data || 'created_by' in pub.data
+      || 'warehouse_id' in pub.data || 'delivery_note_id' in pub.data);
+    console.log((!sizinti ? '  ✅ ic alanlar yok' : '  ❌ SIZDI — notes/created_by/ic UUID donuyor') + '  public govde sinirli mi');
+    if (sizinti) fail++;
+    const anonList = await anon('GET', '/shipment-packages');
+    const listKapali = anonList.status === 401 || anonList.status === 403;
+    console.log((listKapali ? `  ✅ liste kapali [${anonList.status}]` : `  ❌ ACIK [${anonList.status}]`) + '  GET /shipment-packages (token yok)');
+    if (!listKapali) fail++;
+    const anonWrite = await anon('PUT', '/shipment-packages/' + pkId, { name: 'HACK' });
+    const yazKapali = anonWrite.status === 401 || anonWrite.status === 403;
+    console.log((yazKapali ? `  ✅ yazma kapali [${anonWrite.status}]` : `  ❌ ACIK [${anonWrite.status}]`) + '  PUT /shipment-packages (token yok)');
+    if (!yazKapali) fail++;
+  }
+
   console.log('\n═══ (12. tur m1) TEKLIF GIZLILIGI ═══');
   // Teklif kaydi: orders_quotes'suz kullaniciya LISTEDE de TEK KAYITTA da donmemeli
   const qOrder = await dev('POST', '/orders',
