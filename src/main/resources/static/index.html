@@ -11696,15 +11696,18 @@ function renderPurchaseOrders(){
     // (B7) Bölünen kalemler purchase_order_id bağını taşıyamaz (sipariş
     // kilidi); grup teslimatı izlenebilsin diye kod eşleşmesiyle listelenir
     const memberKey = new Set(items.map(i=>i.project_name+'|'+(i.code||'').toLowerCase()));
-    const splitRows = h`${purchaseItems.filter(i=>!i.purchase_order_id && i.code
+    // (15. tur kullanıcı bildirimi) DİKKAT: h`` BOŞ sonuçta da truthy String
+    // nesnesi döndürür — etiket "altı boşken de" basılıyordu. Önce dizi, sonra koşul.
+    const splitItems = purchaseItems.filter(i=>!i.purchase_order_id && i.code
       && ['RECEIVED','IN_WAREHOUSE'].includes(i.status)
-      && memberKey.has(i.project_name+'|'+i.code.toLowerCase()))
+      && memberKey.has(i.project_name+'|'+i.code.toLowerCase()));
+    const splitRows = splitItems.length ? h`${splitItems
       .map(i=>h`<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px dashed var(--border)">
         <span style="font-family:var(--font-mono);font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">
           ${i.code?h`<span style="color:var(--accent)">${i.code}</span> — `:''}${i.name}
           <span style="color:var(--muted)"> · ${Number(i.quantity||1)} ${i.unit||'adet'} · ${i.status==='IN_WAREHOUSE'?''+(whName(i.warehouse_id)||'Depoda'):'Teslim alındı'}</span>
         </span>
-      </div>`)}`;
+      </div>`)}` : '';
     // Kalem fiyatları toplamı (girilenlerden; teklif toplamıyla kıyas için)
     const itemTotals = {};
     items.forEach(i=>{ if(i.unit_price!=null){ const c=i.currency||'TRY'; itemTotals[c]=(itemTotals[c]||0)+Number(i.unit_price)*Number(i.quantity||1); }});
@@ -11787,18 +11790,23 @@ function renderPurchaseOrders(){
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${actions}</div>
       </div>
-      <div style="margin-top:10px">
-        <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:4px">Kalemler</div>
-        ${itemRows}
-        ${splitRows?`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:6px" title="Bölme sırasında grup bağı taşınamaz; kod eşleşmesiyle bulunur">Bölünmüş kalemler (kod eşleşmesi):</div>${splitRows}`:''}
-        ${itemTotalStr?`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:6px 0 0;text-align:right">Kalem fiyatları toplamı: <b style="color:var(--accent)">${itemTotalStr}</b></div>`:''}
+      <!-- (15. tur kullanıcı bildirimi) .pbom-card'ın kendisi dolgusuz — yatay
+           dolguyu başlık taşıyor (14px 18px). Gövde bölümleri kartın kenarına
+           yapışmasın diye başlıkla AYNI hizada tek sarmalayıcıda toplanır. -->
+      <div style="padding:0 18px 14px">
+        <div>
+          <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:4px">Kalemler</div>
+          ${itemRows}
+          ${splitRows?`<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:6px" title="Bölme sırasında grup bağı taşınamaz; kod eşleşmesiyle bulunur">Bölünmüş kalemler (kod eşleşmesi):</div>${splitRows}`:''}
+          ${itemTotalStr?`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:6px 0 0;text-align:right">Kalem fiyatları toplamı: <b style="color:var(--accent)">${itemTotalStr}</b></div>`:''}
+        </div>
+        <div style="margin-top:12px">
+          <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:6px">Teklifler</div>
+          ${quoteRows}
+          ${quoteForm}
+        </div>
+        ${approvalInfo}
       </div>
-      <div style="margin-top:12px">
-        <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:6px">Teklifler</div>
-        ${quoteRows}
-        ${quoteForm}
-      </div>
-      ${approvalInfo}
     </div>`;
   }).join('');
 }
