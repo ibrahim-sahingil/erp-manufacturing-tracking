@@ -12,4 +12,7 @@ public interface WarehouseMovementRepository extends JpaRepository<WarehouseMove
     List<WarehouseMovement> findByWarehouseIdOrderByCreatedAtDesc(UUID warehouseId);
 
     boolean existsByWarehouseId(UUID warehouseId);
+
+    // (15. tur Y1) paket akisi hareketleri — ShipmentPackageService uzlastirir
+    List<WarehouseMovement> findByShipmentPackageId(UUID shipmentPackageId);
 }

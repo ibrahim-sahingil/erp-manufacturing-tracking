@@ -37,6 +37,13 @@ import java.util.UUID;
  *   RESERVATION_ADJUST- rezervasyon kismi onayinda kayip miktarin envanter
  *                       duzeltme OUT'u (sayimda cikmayan hayalet stok).
  *                       O da yalniz approve icinden yazilir.
+ *   PACKAGE           - (15. tur Y1) sevkiyat paketi depo akisi: paket
+ *                       KAPATILINCA depoya IN, araca YUKLENINCE OUT
+ *                       (arkadas: "paketler depoda cekilip araclara
+ *                       devredilir ve cikis yapilmis olur"). YALNIZ
+ *                       ShipmentPackageService.reconcilePackageMovements
+ *                       yazar/siler — disaridan POST reddedilir; paket
+ *                       silinirse FK CASCADE hareketleri de goturur.
  *
  * item_name/item_code SNAPSHOT'tir: kaynak satin alma kalemi silinse de
  * (purchase_item_id SET NULL olur) hareket gecmisi anlamli kalir.
@@ -46,6 +53,8 @@ import java.util.UUID;
  *   warehouse_id     uuid          NOT NULL (FK -> warehouses, ON DELETE RESTRICT)
  *   purchase_item_id uuid          NULL (FK -> purchase_items, ON DELETE SET NULL)
  *   reservation_id   uuid          NULL (FK -> warehouse_reservations, ON DELETE SET NULL)
+ *   shipment_package_id uuid       NULL (FK -> shipment_packages, ON DELETE CASCADE —
+ *                                  paket silinince hareketi de kalkar, hayalet stok olmaz)
  *   item_name        varchar(200)  NOT NULL (snapshot)
  *   item_code        varchar(100)  NULL (snapshot)
  *   movement_type    varchar(10)   NOT NULL CHECK (IN/OUT)
@@ -77,6 +86,9 @@ public class WarehouseMovement extends BaseEntity {
 
     @Column(name = "reservation_id")
     private UUID reservationId;
+
+    @Column(name = "shipment_package_id")
+    private UUID shipmentPackageId;
 
     @Column(name = "item_name", nullable = false, length = 200)
     private String itemName;

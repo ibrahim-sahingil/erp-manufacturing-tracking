@@ -9,7 +9,11 @@ import com.uretimtakip.erp.shipment.dto.ShipmentPackageRequest;
 import com.uretimtakip.erp.shipment.dto.ShipmentPackageResponse;
 import com.uretimtakip.erp.shipment.dto.ShipmentPackageUpdateRequest;
 import com.uretimtakip.erp.warehouse.Warehouse;
+import com.uretimtakip.erp.warehouse.WarehouseMovement;
+import com.uretimtakip.erp.warehouse.WarehouseMovementRepository;
 import com.uretimtakip.erp.warehouse.WarehouseRepository;
+
+import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -50,6 +54,8 @@ public class ShipmentPackageService {
     // (15. tur T1) halka acik gorunum icin depo adi + irsaliye arac ozeti join'i
     private final WarehouseRepository warehouseRepository;
     private final DeliveryNoteRepository deliveryNoteRepository;
+    // (15. tur Y1) paket depo hareketleri — reconcilePackageMovements yazar
+    private final WarehouseMovementRepository warehouseMovementRepository;
 
     @Transactional(readOnly = true)
     public List<ShipmentPackageResponse> listAll() {
@@ -161,9 +167,66 @@ public class ShipmentPackageService {
         if (request.getNotes() != null) pkg.setNotes(blankToNull(request.getNotes()));
 
         ShipmentPackage saved = shipmentPackageRepository.save(pkg);
+        // (15. tur Y1) durum/depo degisikligi sonrasi defter uzlastirilir
+        // (ayni transaction — hareket yazilamazsa gecis de geri sarilir)
+        reconcilePackageMovements(saved);
         log.info("ShipmentPackage updated: id={}, packageNo={}, status={}",
                 saved.getId(), saved.getPackageNo(), saved.getStatus());
         return ShipmentPackageResponse.fromEntity(saved);
+    }
+
+    /**
+     * (15. tur Y1 — arkadas karari) Paketin depo defteri izdusumu:
+     *   OPEN               : hareket yok
+     *   CLOSED             : depoya GIRIS (IN) — "paketler sevkiyat deposunda durur"
+     *   LOADED / SHIPPED   : GIRIS + CIKIS (OUT) — "araclara devredilir ve
+     *                        cikis yapilmis olur" (cikis YUKLEME aninda; sevk
+     *                        durumu defteri degistirmez, paket zaten cikmis)
+     * Depo secilmemis pakete (warehouse_id NULL) hareket yazilmaz.
+     *
+     * Yontem UZLASTIRMA: beklenen durum mevcut PACKAGE hareketleriyle
+     * kiyaslanir; eksik eklenir, fazla/uyusmayan (or. depo degismis) silinip
+     * yeniden yazilir. Boylece kapat/ac, yukle/indir, depo degistir ve tum
+     * geri almalar TEK yerden tutarli kalir (idempotent). Miktar hep 1 'adet',
+     * ad = paket no (+ adi) — icerik zaten shipment_package_items'ta, parca
+     * bazli cift defter tutulmaz.
+     */
+    private void reconcilePackageMovements(ShipmentPackage pkg) {
+        List<WarehouseMovement> existing =
+                warehouseMovementRepository.findByShipmentPackageId(pkg.getId());
+        boolean inWarehouse = pkg.getWarehouseId() != null && !"OPEN".equals(pkg.getStatus());
+        boolean wantIn = inWarehouse;
+        boolean wantOut = inWarehouse
+                && ("LOADED".equals(pkg.getStatus()) || "SHIPPED".equals(pkg.getStatus()));
+
+        reconcileOne(pkg, existing, "IN", wantIn,
+                "Paket kapatildi — sevkiyat deposuna giris", pkg.getPackedBy());
+        reconcileOne(pkg, existing, "OUT", wantOut,
+                "Paket araca devredildi — depodan cikis", null);
+    }
+
+    private void reconcileOne(ShipmentPackage pkg, List<WarehouseMovement> existing,
+                              String type, boolean wanted, String note, String by) {
+        List<WarehouseMovement> current = existing.stream()
+                .filter(m -> type.equals(m.getMovementType())).toList();
+        boolean matches = wanted && current.size() == 1
+                && current.get(0).getWarehouseId().equals(pkg.getWarehouseId());
+        if (matches) return;
+        if (!current.isEmpty()) warehouseMovementRepository.deleteAll(current);
+        if (!wanted) return;
+        String label = pkg.getPackageNo()
+                + (pkg.getName() != null && !pkg.getName().isBlank() ? " — " + pkg.getName() : "");
+        warehouseMovementRepository.save(WarehouseMovement.builder()
+                .warehouseId(pkg.getWarehouseId())
+                .shipmentPackageId(pkg.getId())
+                .itemName(label.length() > 200 ? label.substring(0, 200) : label)
+                .movementType(type)
+                .quantity(BigDecimal.ONE)
+                .unit("adet")
+                .sourceType("PACKAGE")
+                .performedBy(by)
+                .notes(note)
+                .build());
     }
 
     private void applyStatusChange(ShipmentPackage pkg, String target) {

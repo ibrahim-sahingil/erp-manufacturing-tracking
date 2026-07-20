@@ -6917,6 +6917,9 @@ async function shipPkgCreate(){
 async function shipPkgClose(pkgId){
   const k = shipmentPackages.find(x=>x.id===pkgId);
   if(!k) return;
+  // (15. tur Y1) Kapatilan paket depo defterine GİRİŞ yazar (backend
+  // reconcile) — depo seçilmemişse hareket yazılmaz, kullanıcı uyarılır.
+  if(!k.warehouse_id && !confirm('Pakette depo seçilmedi — kapatılınca depo hareketi YAZILMAYACAK (paket depo sayımlarında görünmez). Yine de kapat?')) return;
   const varsayilan = currentUser?.display_name||currentUser?.username||'';
   const paketleyen = prompt('Paketleyen personel (QR/PDF çıktısında görünür):', varsayilan);
   if(paketleyen===null || !paketleyen.trim()){ if(paketleyen!==null) toast('Paketleyen zorunlu!','error'); return; }
@@ -6927,7 +6930,9 @@ async function shipPkgClose(pkgId){
     if(!ok) return;
     const taze = await dbGet('shipment_packages');
     if(Array.isArray(taze)) shipmentPackages = taze; // packed_at damgası backend'den
-    toast(k.package_no+' kapatıldı.','success');
+    const tazeMv = await dbGet('warehouse_movements'); // (15. tur Y1) paket GİRİŞ hareketi
+    if(Array.isArray(tazeMv)) whMovements = tazeMv;
+    toast(k.package_no+' kapatıldı'+(k.warehouse_id?' — depoya giriş yazıldı.':'.'),'success');
     shipRenderPacking();
   } finally { bitti(); }
 }
@@ -6937,6 +6942,9 @@ async function shipPkgReopen(pkgId){
   if(!ok) return;
   const k = shipmentPackages.find(x=>x.id===pkgId);
   if(k){ k.status='OPEN'; k.packed_by=null; k.packed_at=null; }
+  // (15. tur Y1) yeniden açma = depo GİRİŞ hareketi silindi (backend reconcile)
+  const tazeMv = await dbGet('warehouse_movements');
+  if(Array.isArray(tazeMv)) whMovements = tazeMv;
   shipRenderPacking();
 }
 
@@ -6948,6 +6956,9 @@ async function shipPkgDelete(pkgId){
   if(!ok) return;
   shipmentPackages = shipmentPackages.filter(x=>x.id!==pkgId);
   shipmentPackageItems = shipmentPackageItems.filter(it=>it.package_id!==pkgId);
+  // (15. tur Y1) paket hareketleri FK CASCADE ile silindi — önbellek tazele
+  const tazeMv = await dbGet('warehouse_movements');
+  if(Array.isArray(tazeMv)) whMovements = tazeMv;
   // (14. tur S4) son paket silindiyse zincir gerçek durumdan türetilir (null'a döner)
   const ordSil = orders.find(x=>x.project_name===(k?.project_name||''));
   if(ordSil) await orderShippingRecompute(ordSil.id);
@@ -12506,10 +12517,13 @@ async function dnPkgLoad(noteId, pkgId){
   if(!ok) return; // hata toast'ı adapter'dan geldi (irsaliye bağı zorunluluğu backend'de)
   const k = shipmentPackages.find(x=>x.id===pkgId);
   if(k){ k.delivery_note_id = noteId; k.status='LOADED'; }
+  // (15. tur Y1) araca devir = depodan ÇIKIŞ (backend reconcile yazdı) — önbellek tazele
+  const tazeMv = await dbGet('warehouse_movements');
+  if(Array.isArray(tazeMv)) whMovements = tazeMv;
   // (14. tur S4) paket araca yüklendi → sipariş zinciri "Yüklendi"
   const n = deliveryNotes.find(x=>x.id===noteId);
   if(n?.order_id) await orderShippingRaise(n.order_id, 'yuklendi');
-  toast('Paket araca yüklendi.','success');
+  toast('Paket araca yüklendi'+(k?.warehouse_id?' — depodan çıkış yazıldı.':'.'),'success');
   renderDnDetail(); renderDnList();
 }
 
@@ -12520,6 +12534,9 @@ async function dnPkgUnload(pkgId){
   if(!ok) return;
   const k = shipmentPackages.find(x=>x.id===pkgId);
   if(k){ k.status='CLOSED'; k.delivery_note_id=null; }
+  // (15. tur Y1) indirme = ÇIKIŞ hareketi silindi (backend reconcile) — önbellek tazele
+  const tazeMv = await dbGet('warehouse_movements');
+  if(Array.isArray(tazeMv)) whMovements = tazeMv;
   // (14. tur S4) geri alma → zincir gerçek durumdan türetilir
   const n = noteId ? deliveryNotes.find(x=>x.id===noteId) : null;
   if(n?.order_id) await orderShippingRecompute(n.order_id);
@@ -13151,7 +13168,7 @@ function printGoodsReceiptPDF(itemIds){
 }
 
 // ─── Depo Yönetimi alt sekmesi ───
-const WH_SOURCE_LABELS = { MANUAL:'Manuel', PURCHASE_TRANSFER:'Satın Alma', GOODS_RECEIPT:'QR Mal Kabul', DELIVERY:'İrsaliye', WAREHOUSE_TRANSFER:'Depolar Arası' };
+const WH_SOURCE_LABELS = { MANUAL:'Manuel', PURCHASE_TRANSFER:'Satın Alma', GOODS_RECEIPT:'QR Mal Kabul', DELIVERY:'İrsaliye', WAREHOUSE_TRANSFER:'Depolar Arası', PACKAGE:'Sevkiyat Paketi' }; // (15. tur Y1)
 
 async function renderWarehouseManage(){
   const us = await getRef('users');

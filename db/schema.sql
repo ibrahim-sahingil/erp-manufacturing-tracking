@@ -1,8 +1,8 @@
-﻿--
+--
 -- PostgreSQL database dump
 --
 
-\restrict JUdvfuEg3Avc3lWtimGFOH3bzDdbooru96zXFBnHDCc2qn1tje3Bj9v4Ge6XCug
+\restrict XwK6VLIV9paa9OyMcVehlgJ4VOlGjGzHgECbqm3nSUxrngzzZ5PExW2PW0zgx42
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -599,8 +599,9 @@ CREATE TABLE public.warehouse_movements (
     created_at timestamp without time zone DEFAULT now(),
     delivery_note_id uuid,
     reservation_id uuid,
+    shipment_package_id uuid,
     CONSTRAINT warehouse_movements_quantity_check CHECK ((quantity > (0)::numeric)),
-    CONSTRAINT warehouse_movements_source_check CHECK (((source_type)::text = ANY ((ARRAY['MANUAL'::character varying, 'PURCHASE_TRANSFER'::character varying, 'GOODS_RECEIPT'::character varying, 'DELIVERY'::character varying, 'WAREHOUSE_TRANSFER'::character varying, 'RESERVATION'::character varying, 'RESERVATION_ADJUST'::character varying])::text[]))),
+    CONSTRAINT warehouse_movements_source_check CHECK (((source_type)::text = ANY ((ARRAY['MANUAL'::character varying, 'PURCHASE_TRANSFER'::character varying, 'GOODS_RECEIPT'::character varying, 'DELIVERY'::character varying, 'WAREHOUSE_TRANSFER'::character varying, 'RESERVATION'::character varying, 'RESERVATION_ADJUST'::character varying, 'PACKAGE'::character varying])::text[]))),
     CONSTRAINT warehouse_movements_type_check CHECK (((movement_type)::text = ANY ((ARRAY['IN'::character varying, 'OUT'::character varying])::text[])))
 );
 
@@ -1262,6 +1263,13 @@ CREATE INDEX idx_warehouse_movements_created ON public.warehouse_movements USING
 
 
 --
+-- Name: idx_warehouse_movements_shipment_package; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_warehouse_movements_shipment_package ON public.warehouse_movements USING btree (shipment_package_id) WHERE (shipment_package_id IS NOT NULL);
+
+
+--
 -- Name: idx_warehouse_movements_warehouse; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1652,6 +1660,14 @@ ALTER TABLE ONLY public.warehouse_movements
 
 
 --
+-- Name: warehouse_movements warehouse_movements_shipment_package_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.warehouse_movements
+    ADD CONSTRAINT warehouse_movements_shipment_package_id_fkey FOREIGN KEY (shipment_package_id) REFERENCES public.shipment_packages(id) ON DELETE CASCADE;
+
+
+--
 -- Name: warehouse_movements warehouse_movements_warehouse_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1767,5 +1783,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JUdvfuEg3Avc3lWtimGFOH3bzDdbooru96zXFBnHDCc2qn1tje3Bj9v4Ge6XCug
+\unrestrict XwK6VLIV9paa9OyMcVehlgJ4VOlGjGzHgECbqm3nSUxrngzzZ5PExW2PW0zgx42
 

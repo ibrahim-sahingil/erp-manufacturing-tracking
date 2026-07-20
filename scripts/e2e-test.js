@@ -714,6 +714,48 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     check('bağ gerçekten kalktı', pk2Son && !pk2Son.delivery_note_id, JSON.stringify(pk2Son?.delivery_note_id));
     check('irsaliye temizliği', await dbDelete('delivery_notes', spkDn.id));
 
+    console.log('═══ 15.TUR Y1: PAKET DEPO HAREKETLERİ (kapat=GİRİŞ, yükle=ÇIKIŞ) ═══');
+    // Arkadaş kararı: paketler sevkiyat deposunda DURUR (fiili hareket), araca
+    // devirde çıkış. Backend reconcile: CLOSED→IN, LOADED/SHIPPED→IN+OUT,
+    // geri almalar siler, depo değişimi taşır; PACKAGE kaynağı dışarıdan
+    // yazılamaz/silinemez; paket silinince FK CASCADE hareketleri götürür.
+    const y1WhA = (await dbInsert('warehouses',{name:'E2E Y1 Depo A '+PROJ}))[0];
+    const y1WhB = (await dbInsert('warehouses',{name:'E2E Y1 Depo B '+PROJ}))[0];
+    const y1Pk = (await dbInsert('shipment_packages',{project_name:PROJ, name:'E2E Y1 Paket', warehouse_id:y1WhA.id}))[0];
+    const y1Mv = async () => (await dbGet('warehouse_movements')).filter(m=>m.shipment_package_id===y1Pk.id);
+    check('OPEN pakette hareket yok', (await y1Mv()).length===0);
+    check('kapat → GİRİŞ', await dbUpdate('shipment_packages', y1Pk.id, {status:'CLOSED', packed_by:'E2E'}));
+    let y1m = await y1Mv();
+    check('CLOSED: tek IN (PACKAGE, doğru depo, adet 1)',
+      y1m.length===1 && y1m[0].movement_type==='IN' && y1m[0].source_type==='PACKAGE'
+      && y1m[0].warehouse_id===y1WhA.id && Number(y1m[0].quantity)===1,
+      JSON.stringify(y1m.map(m=>({t:m.movement_type,s:m.source_type}))));
+    check('PACKAGE hareketi defterden elle silinemez', !(await dbDelete('warehouse_movements', y1m[0].id)));
+    // DİKKAT: dbInsert reddedilince BOŞ DİZİ döner (truthy!) — uzunlukla ölç
+    check('dışarıdan PACKAGE POST reddedilir',
+      (await dbInsert('warehouse_movements',{warehouse_id:y1WhA.id, item_name:'HACK', movement_type:'IN', quantity:1, source_type:'PACKAGE'})).length===0
+      && /backend akisinda/i.test(_lastApiError||''), _lastApiError||'kabul edildi!');
+    check('CLOSED\'da depo değişir', await dbUpdate('shipment_packages', y1Pk.id, {warehouse_id:y1WhB.id}));
+    y1m = await y1Mv();
+    check('IN hareketi yeni depoya taşındı', y1m.length===1 && y1m[0].warehouse_id===y1WhB.id);
+    const y1Dn = (await dbInsert('delivery_notes',{recipient_name:'E2E Y1 Alıcı', created_by:'E2E'}))[0];
+    check('araca yükle → ÇIKIŞ', await dbUpdate('shipment_packages', y1Pk.id, {delivery_note_id:y1Dn.id, status:'LOADED'}));
+    y1m = await y1Mv();
+    check('LOADED: IN + OUT (net stok 0)',
+      y1m.length===2 && y1m.some(m=>m.movement_type==='IN') && y1m.some(m=>m.movement_type==='OUT'),
+      JSON.stringify(y1m.map(m=>m.movement_type)));
+    check('araçtan indir → ÇIKIŞ silinir', await dbUpdate('shipment_packages', y1Pk.id, {status:'CLOSED', delivery_note_id:null}));
+    y1m = await y1Mv();
+    check('geri CLOSED: yalnız IN kaldı', y1m.length===1 && y1m[0].movement_type==='IN');
+    check('yeniden aç → GİRİŞ de silinir', await dbUpdate('shipment_packages', y1Pk.id, {status:'OPEN'}));
+    check('OPEN: hareket kalmadı', (await y1Mv()).length===0);
+    check('tekrar kapat (silme testi için)', await dbUpdate('shipment_packages', y1Pk.id, {status:'CLOSED', packed_by:'E2E'}));
+    check('CLOSED paket silinir', await dbDelete('shipment_packages', y1Pk.id));
+    check('CASCADE: paket hareketi kalmadı',
+      (await dbGet('warehouse_movements')).filter(m=>m.shipment_package_id===y1Pk.id).length===0);
+    check('Y1 irsaliye temizliği', await dbDelete('delivery_notes', y1Dn.id));
+    check('Y1 depo temizliği', (await dbDelete('warehouses', y1WhA.id)) && (await dbDelete('warehouses', y1WhB.id)));
+
     console.log('═══ 14.TUR S4: SİPARİŞ SEVKİYAT ZİNCİRİ (orders.shipping_status) ═══');
     // Kalıcı zincir sipariş üzerinde; null=dokunma, ""=temizle (tam-gövde
     // PUT'lar zinciri sıfırlamamalı); değerler ÜÇLÜ kural (CHECK+@Pattern+service)

@@ -34,15 +34,17 @@ public class WarehouseMovementService {
     /** DB'deki warehouse_movements_source_check ile ayni liste. */
     private static final Set<String> VALID_SOURCES = Set.of(
             "MANUAL", "PURCHASE_TRANSFER", "GOODS_RECEIPT", "DELIVERY",
-            "WAREHOUSE_TRANSFER", "RESERVATION", "RESERVATION_ADJUST");
+            "WAREHOUSE_TRANSFER", "RESERVATION", "RESERVATION_ADJUST", "PACKAGE");
 
     /**
-     * Yalniz WarehouseReservationService.approve'un ayni transaction'da
-     * yazdigi kaynaklar — disaridan POST kabul edilmez (reservation_id'siz
-     * sahte rezervasyon cikisi engellenir).
+     * Yalniz backend akislarinin ayni transaction'da yazdigi kaynaklar —
+     * disaridan POST kabul edilmez: RESERVATION* rezervasyon onayindan
+     * (sahte rezervasyon cikisi engeli), PACKAGE (15. tur Y1) paket durum
+     * gecislerinden (ShipmentPackageService.reconcilePackageMovements —
+     * elle PACKAGE hareketi stok/paket tutarliligini bozar).
      */
     private static final Set<String> INTERNAL_SOURCES = Set.of(
-            "RESERVATION", "RESERVATION_ADJUST");
+            "RESERVATION", "RESERVATION_ADJUST", "PACKAGE");
 
     private final WarehouseMovementRepository warehouseMovementRepository;
     private final WarehouseRepository warehouseRepository;
@@ -87,7 +89,8 @@ public class WarehouseMovementService {
         }
         if (INTERNAL_SOURCES.contains(sourceType)) {
             throw new BusinessException(
-                    "Bu kaynak tipi yalnizca rezervasyon onay akisinda yazilir: " + sourceType,
+                    "Bu kaynak tipi yalnizca ilgili backend akisinda yazilir "
+                            + "(rezervasyon onayi / paket durum gecisi): " + sourceType,
                     "WAREHOUSE_MOVEMENT_INVALID_SOURCE");
         }
 
@@ -142,6 +145,15 @@ public class WarehouseMovementService {
             throw new BusinessException(
                     "Bu hareket bir depo rezervasyonuna bagli, defterden silinemez. "
                             + "Once rezervasyon kaydini silin.",
+                    "WAREHOUSE_MOVEMENT_LINKED");
+        }
+        // (15. tur Y1) Paket akisi hareketleri paket durumuyla yonetilir:
+        // paket yasarken defterden silinirse stok sessizce kayar. Paket
+        // silinirse FK CASCADE zaten hareketleri de goturur.
+        if ("PACKAGE".equals(src) && movement.getShipmentPackageId() != null) {
+            throw new BusinessException(
+                    "Bu hareket bir sevkiyat paketine bagli, defterden silinemez. "
+                            + "Duzeltme icin paketi yeniden acin / yuklemeyi geri alin.",
                     "WAREHOUSE_MOVEMENT_LINKED");
         }
         if ("DELIVERY".equals(src) && movement.getDeliveryNoteId() != null) {
