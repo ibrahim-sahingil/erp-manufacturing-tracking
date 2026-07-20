@@ -39,6 +39,8 @@ public class DeliveryNoteResponse {
     private String tirNo;
     private String cargoTrackingNo;
     private LocalDate etaDate;
+    private String deliveryTerms;   // (15. tur Y2a)
+    private String originCountry;   // (15. tur Y2a)
     private String status;
     private LocalDate shipDate;
     private String notes;
@@ -66,6 +68,8 @@ public class DeliveryNoteResponse {
                 .tirNo(e.getTirNo())
                 .cargoTrackingNo(e.getCargoTrackingNo())
                 .etaDate(e.getEtaDate())
+                .deliveryTerms(e.getDeliveryTerms())
+                .originCountry(e.getOriginCountry())
                 .status(e.getStatus())
                 .shipDate(e.getShipDate())
                 .notes(e.getNotes())

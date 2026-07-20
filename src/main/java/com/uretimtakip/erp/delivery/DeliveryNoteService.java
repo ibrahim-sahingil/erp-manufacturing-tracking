@@ -71,6 +71,8 @@ public class DeliveryNoteService {
                 .tirNo(blankToNull(request.getTirNo()))
                 .cargoTrackingNo(blankToNull(request.getCargoTrackingNo()))
                 .etaDate(request.getEtaDate())
+                .deliveryTerms(blankToNull(request.getDeliveryTerms()))
+                .originCountry(blankToNull(request.getOriginCountry()))
                 .shipDate(request.getShipDate())
                 .notes(blankToNull(request.getNotes()))
                 .createdBy(blankToNull(request.getCreatedBy()))
@@ -102,6 +104,7 @@ public class DeliveryNoteService {
                         || request.getVehiclePlate() != null || request.getDriverName() != null
                         || request.getContainerNo() != null || request.getTirNo() != null
                         || request.getCargoTrackingNo() != null || request.getEtaDate() != null
+                        || request.getDeliveryTerms() != null || request.getOriginCountry() != null
                         || request.getNotes() != null;
         if (fieldsTouched && !"DRAFT".equals(note.getStatus())) {
             throw new BusinessException(
@@ -130,6 +133,8 @@ public class DeliveryNoteService {
         if (request.getTirNo() != null) note.setTirNo(blankToNull(request.getTirNo()));
         if (request.getCargoTrackingNo() != null) note.setCargoTrackingNo(blankToNull(request.getCargoTrackingNo()));
         if (request.getEtaDate() != null) note.setEtaDate(request.getEtaDate());
+        if (request.getDeliveryTerms() != null) note.setDeliveryTerms(blankToNull(request.getDeliveryTerms()));
+        if (request.getOriginCountry() != null) note.setOriginCountry(blankToNull(request.getOriginCountry()));
         if (request.getShipDate() != null) note.setShipDate(request.getShipDate());
         if (request.getNotes() != null) note.setNotes(blankToNull(request.getNotes()));
 

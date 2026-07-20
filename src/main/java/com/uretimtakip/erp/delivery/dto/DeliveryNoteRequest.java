@@ -71,6 +71,13 @@ public class DeliveryNoteRequest {
 
     private LocalDate etaDate;
 
+    // (15. tur Y2a) ceki listesi ust blogu
+    @Size(max = 100, message = "Teslim kosulu en fazla 100 karakter olabilir")
+    private String deliveryTerms;
+
+    @Size(max = 100, message = "Mensei en fazla 100 karakter olabilir")
+    private String originCountry;
+
     private LocalDate shipDate;
 
     private String notes;

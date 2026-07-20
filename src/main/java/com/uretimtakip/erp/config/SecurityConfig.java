@@ -145,6 +145,15 @@ public class SecurityConfig {
                             "ROLE_DEVELOPER", "bom", "purchasing", "warehouse");
                     writeRule(auth, new String[]{"/api/suppliers/**"},
                             "ROLE_DEVELOPER", "purchasing", "delivery", "warehouse");
+                    // (15. tur Y2) Nakliye firmasi kartoteki: irsaliye + sevkiyat
+                    // ekranlarindan "listede yoksa ekle" (ensureCarrier)
+                    writeRule(auth, new String[]{"/api/carriers/**"},
+                            "ROLE_DEVELOPER", "delivery", "shipping");
+                    // (15. tur Y2a) Sabit firma ayarlari (tek satir; ceki listesi
+                    // Gonderen blogu): okumaya herkes (PDF basan her yetkili),
+                    // yazma delivery/shipping
+                    writeRule(auth, new String[]{"/api/company-settings/**"},
+                            "ROLE_DEVELOPER", "delivery", "shipping");
                     // Yonetimsel tanimlar: yalnizca gelistirici
                     writeRule(auth, new String[]{"/api/departments/**", "/api/workspaces/**",
                                     "/api/workspace-members/**"},

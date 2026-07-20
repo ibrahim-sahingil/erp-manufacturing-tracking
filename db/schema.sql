@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict XwK6VLIV9paa9OyMcVehlgJ4VOlGjGzHgECbqm3nSUxrngzzZ5PExW2PW0zgx42
+\restrict hjMaojhYSM3Cb7uzzDwMVaz2ze1XHZPI343ExCqBV5WyyMghIWWcajtJV6QAfIR
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -132,6 +132,44 @@ CREATE TABLE public.bom_products (
 
 
 --
+-- Name: carriers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.carriers (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying(150) NOT NULL,
+    contact_person character varying(150),
+    phone character varying(50),
+    email character varying(150),
+    address character varying(300),
+    tax_office character varying(100),
+    tax_number character varying(50),
+    notes text,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: company_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.company_settings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying(200) DEFAULT ''::character varying NOT NULL,
+    address text,
+    phone character varying(50),
+    email character varying(150),
+    tax_office character varying(100),
+    tax_number character varying(50),
+    logo bytea,
+    logo_content_type character varying(100),
+    updated_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
 -- Name: delivery_note_items; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -178,6 +216,8 @@ CREATE TABLE public.delivery_notes (
     tir_no character varying(50),
     cargo_tracking_no character varying(100),
     eta_date date,
+    delivery_terms character varying(100),
+    origin_country character varying(100),
     CONSTRAINT delivery_notes_status_check CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'SHIPPED'::character varying, 'CANCELLED'::character varying])::text[])))
 );
 
@@ -767,6 +807,22 @@ ALTER TABLE ONLY public.bom_parts
 
 ALTER TABLE ONLY public.bom_products
     ADD CONSTRAINT bom_products_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: carriers carriers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.carriers
+    ADD CONSTRAINT carriers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: company_settings company_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_settings
+    ADD CONSTRAINT company_settings_pkey PRIMARY KEY (id);
 
 
 --
@@ -1783,5 +1839,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict XwK6VLIV9paa9OyMcVehlgJ4VOlGjGzHgECbqm3nSUxrngzzZ5PExW2PW0zgx42
+\unrestrict hjMaojhYSM3Cb7uzzDwMVaz2ze1XHZPI343ExCqBV5WyyMghIWWcajtJV6QAfIR
 

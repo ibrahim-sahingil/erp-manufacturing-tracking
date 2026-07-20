@@ -127,6 +127,15 @@ function izinVerilmeli(ad, r) {
   izinVerilmeli('GET /warehouses',   await lim('GET', '/warehouses'));
   izinVerilmeli('GET /shipment-packages', await lim('GET', '/shipment-packages'));
 
+  console.log('\n═══ (15. tur Y2) NAKLIYECI KARTOTEKI + FIRMA AYARLARI YAZMA KILIDI ═══');
+  reddedilmeli('POST /carriers (nakliye firmasi)',
+      await lim('POST', '/carriers', { name: 'HACK Nakliyat' }));
+  reddedilmeli('PUT /company-settings (firma ayarlari)',
+      await lim('PUT', '/company-settings', { name: 'HACK AS' }));
+  izinVerilmeli('GET /carriers (okuma acik)', await lim('GET', '/carriers'));
+  izinVerilmeli('GET /company-settings (okuma acik — PDF basan herkes)',
+      await lim('GET', '/company-settings'));
+
   console.log('\n═══ (15. tur T1) HALKA ACIK PAKET UCU — yalniz o, yalniz GET ═══');
   // Token'siz cagri: Authorization basligi HIC gonderilmez ("Bearer null" degil).
   const anon = async (method, path, body) => {

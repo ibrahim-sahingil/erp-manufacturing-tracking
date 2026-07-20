@@ -50,6 +50,8 @@ import java.util.UUID;
  *   tir_no         varchar(50)   NULL (TIR no)
  *   cargo_tracking_no varchar(100) NULL (kargo takip no)
  *   eta_date       date          NULL (tahmini varis)
+ *   delivery_terms varchar(100)  NULL (15. tur Y2a: teslim kosulu, orn. "DPU - Dnipro")
+ *   origin_country varchar(100)  NULL (15. tur Y2a: mensei, orn. "Turkey")
  *   status         varchar(20)   DEFAULT 'DRAFT' (CHECK: DRAFT/SHIPPED/CANCELLED)
  *   ship_date      date          NULL (fiili sevk tarihi)
  *   notes          text          NULL
@@ -119,6 +121,14 @@ public class DeliveryNote extends BaseEntity {
 
     @Column(name = "eta_date")
     private LocalDate etaDate;
+
+    // (15. tur Y2a) ceki listesi ust blogu: teslim kosulu + mensei irsaliye
+    // basina girilir (Gonderen bloku company_settings'ten gelir)
+    @Column(name = "delivery_terms", length = 100)
+    private String deliveryTerms;
+
+    @Column(name = "origin_country", length = 100)
+    private String originCountry;
 
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default

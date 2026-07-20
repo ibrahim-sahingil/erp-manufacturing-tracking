@@ -2259,10 +2259,14 @@ const TABLE_ENDPOINTS = {
   shipment_packages: 'shipment-packages',
   shipment_package_items: 'shipment-package-items',
   suppliers: 'suppliers',
+  carriers: 'carriers', // (15. tur Y2) nakliye firmasi kartoteki
   materials: 'materials',
   bom_documents: 'bom-documents',
   stock_sheets: 'stock-sheets'
 };
+// NOT (15. tur Y2a): company_settings TEK SATIR ucundadir (GET/PUT
+// /api/company-settings, dizi DEĞİL nesne döner) — TABLE_ENDPOINTS'e
+// bilinçli EKLENMEDİ; apiFetch ile doğrudan çağrılır.
 
 // ─── Ortak fetch: JWT header + ApiResponse unwrap + 401 yönetimi ───
 let _authRedirecting = false;
