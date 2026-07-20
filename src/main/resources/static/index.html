@@ -9895,7 +9895,7 @@ function renderMrpLeftovers(){
   if(!el) return;
   _mrpLeftovers = _mrpLeftoverList();
   if(!_mrpLeftovers.length){
-    el.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:8px;text-align:center">Ölçüsü bilinen depo stoğu yok — artık plakayı "Parça Ekle"den adında ölçüyle (örn. "Artık Saç 1000x1000") girin</div>`;
+    el.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:8px;text-align:center">Ölçüsü bilinen depo stoğu yok — artık plakayı plan sonucundaki "Depoya Gir" ile tek tuşla, ya da "Parça Ekle"den adında ölçüyle (örn. "Artık Saç 1000x1000") girin</div>`;
     return;
   }
   const inp = INP('4px 6px','11px','width:76px;');
@@ -9964,9 +9964,9 @@ async function mrpUseLeftover(idx){
   let kalan = [...all];
   for(let p=0; p<adet && kalan.length; p++){
     const result = mrpPackBest(kalan, W, H, gap, 40);
-    if(!result.length) break;
-    plates.push(result);
-    const placedIdx = new Set(result.map(x=>x._idx)); // _idx = kalan içindeki sıra (mrpCalcSac deseni)
+    if(!result.placed.length) break;
+    plates.push(result.placed);
+    const placedIdx = new Set(result.placed.map(x=>x._idx)); // _idx = kalan içindeki sıra (mrpCalcSac deseni)
     kalan = kalan.filter((x,xi)=>!placedIdx.has(xi));
   }
   const yerlesenSayac = {};
@@ -10016,6 +10016,56 @@ async function mrpUseLeftover(idx){
     }
     toast(`"${r.name}" ×${kullanilacak} depodan kullanıldı, ${linked} kalem bağlandı${sigmayan.length?', '+sigmayan.length+' kalem havuzda kaldı':''}`,'success');
     renderMrp();
+  } finally { bitti(); }
+}
+
+// ═══ (15. tur T2) FIRE PLAKAYI DEPOYA GİR — arkadaş: "Plakalar kullanıldıktan
+// sonra fire plaka kalabilir. Bu plaka depoya girilip tekrar kullanılabilir." ═══
+// Plan sonucundaki artık dikdörtgeni TEK TUŞLA depo defterine IN yazar.
+// Ad konvansiyonu "Artık Saç <G>x<Y>" — _mrpLeftoverList regex'i bu adı çözer;
+// artık MİP artık panelinde otomatik görünür ve mrpUseLeftover ile kullanılır.
+function mrpOffcutStore(pi, oi){
+  const r = _mrpResult;
+  const a = (r && r.type==='SAC' && r.plates[pi]) ? mrpSheetOffcuts(r.plates[pi].free)[oi] : null;
+  if(!a){ toast('Artık bulunamadı — planı yeniden hesaplayın.','error'); return; }
+  const act = activeWarehousesOrWarn();
+  if(!act) return;
+  if(act.length===1) return mrpOffcutDo(a, act[0].id, `mrp-off-${pi}-${oi}`);
+  const inp = INP();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'mrp-off-overlay';
+  overlay.innerHTML = `<div class="modal" style="width:380px;text-align:left">
+    <h3 style="margin-bottom:4px">Artığı Depoya Gir</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:18px">Artık Saç ${a.w}x${a.h}${r.T?' · '+r.T+'mm':''} · ${esc(r.sheetName||'')}</p>
+    <div class="form-group" style="margin-bottom:18px">
+      <label>Depo</label>
+      <select id="mrp-off-sel" style="${inp}">${whOptionsHTML(act)}</select>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('mrp-off-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" onclick="mrpOffcutConfirm(${pi},${oi})">Depoya Gir</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+function mrpOffcutConfirm(pi, oi){
+  const whId = document.getElementById('mrp-off-sel')?.value;
+  document.getElementById('mrp-off-overlay')?.remove();
+  const r = _mrpResult;
+  const a = (r && r.plates[pi]) ? mrpSheetOffcuts(r.plates[pi].free)[oi] : null;
+  if(whId && a) mrpOffcutDo(a, whId, `mrp-off-${pi}-${oi}`);
+}
+async function mrpOffcutDo(a, whId, btnId){
+  const ad = `Artık Saç ${a.w}x${a.h}`;
+  const bitti = btnBusy(btnId, '…');
+  if(!bitti) return;
+  try{
+    const mv = await mvInsert({whId, type:'IN', qty:1, unit:'adet', name:ad, code:null,
+      sourceType:'MANUAL', notes:'Kesim planı artığı — '+(_mrpResult?.sheetName||'SAC')});
+    if(!Array.isArray(mv)||!mv[0]){ toast('Depo hareketi yazılamadı!','error'); return; }
+    whMovements.unshift(mv[0]);
+    toast(`"${ad}" → ${whName(whId)||'depo'} girildi — MİP artık panelinde görünür`,'success');
   } finally { bitti(); }
 }
 
@@ -10140,14 +10190,25 @@ function mrpRunGuillotine(items, W, H, gap){
     if(r.h - ph > 0) free.push({x:r.x,   y:r.y+ph, w:r.w,    h:r.h-ph});
     free = free.filter(f=>f.w>=1 && f.h>=1);
   }
-  return placed;
+  // (15. tur T2) free listesi de döner — artık (fire) plakayı depoya girmek için
+  return {placed, free};
+}
+// (15. tur T2) SAF: guillotine free listesinden KULLANILABİLİR artıkları çıkarır.
+// Her iki kenarı >= minMm dikdörtgenler, alan büyükten küçüğe, en çok `cap` adet
+// (UI kalabalık sınırı). Dönüş: [{w,h}] tam mm (floor). verify-mip senaryolu.
+function mrpSheetOffcuts(free, minMm=100, cap=2){
+  return (Array.isArray(free)?free:[])
+    .map(f=>({w:Math.floor(f.w), h:Math.floor(f.h)}))
+    .filter(f=>f.w>=minMm && f.h>=minMm)
+    .sort((a,b)=>b.w*b.h - a.w*a.h)
+    .slice(0, cap);
 }
 function mrpPackBest(items, W, H, gap, passes){
-  let best = [];
+  let best = {placed:[], free:[]};
   for(let i=0;i<passes;i++){
     const shuffled = mrpShuffle([...items].map((it,idx)=>({...it,_idx:idx})));
     const result = mrpRunGuillotine(shuffled, W, H, gap);
-    if(result.length > best.length) best = result;
+    if(result.placed.length > best.placed.length) best = result;
   }
   return best;
 }
@@ -10185,9 +10246,9 @@ function mrpCalcSac(){
   let kalan = [...all];
   while(kalan.length > 0){
     const result = mrpPackBest(kalan, netW, netH, gap, 40);
-    if(result.length === 0) break;
-    plates.push({placed: result});
-    const placedIdx = new Set(result.map(p=>p._idx));
+    if(result.placed.length === 0) break;
+    plates.push({placed: result.placed, free: result.free}); // (15. tur T2) free saklanır
+    const placedIdx = new Set(result.placed.map(p=>p._idx));
     kalan = kalan.filter((_,i)=>!placedIdx.has(i));
   }
 
@@ -10227,11 +10288,17 @@ function mrpRenderSacResult(){
       ${r.plates.map((pl,i)=>{
         const alan = pl.placed.reduce((s,p)=>s+p.w*p.h,0);
         const fire = r.netW*r.netH>0 ? (1-alan/(r.netW*r.netH))*100 : 0;
+        // (15. tur T2) kullanılabilir artıklar — arkadaş: "fire plaka depoya
+        // girilip tekrar kullanılabilir". Sayılar guillotine'den, XSS riski yok.
+        const arts = mrpSheetOffcuts(pl.free);
         return `<div>
           <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:4px">
             <span>Plaka ${i+1}</span><span style="color:${fire<20?'var(--green)':fire<40?'var(--yellow)':'var(--red)'}">%${fire.toFixed(1)} fire · ${pl.placed.length} parça</span>
           </div>
           <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden"><canvas id="${canvasIds[i]}" style="width:100%;display:block"></canvas></div>
+          ${arts.length?`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:5px;font-family:var(--font-mono);font-size:10px">
+            ${arts.map((a,oi)=>`<span style="display:inline-flex;gap:6px;align-items:center"><span style="color:var(--muted)">Artık ${a.w}×${a.h}</span><button class="btn btn-ghost btn-sm" id="mrp-off-${i}-${oi}" style="padding:2px 8px;font-size:10px" onclick="mrpOffcutStore(${i},${oi})">Depoya Gir</button></span>`).join('')}
+          </div>`:''}
         </div>`;
       }).join('')}
     </div>

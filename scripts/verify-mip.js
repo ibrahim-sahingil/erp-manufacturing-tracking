@@ -64,6 +64,8 @@ eval(grab('mrpKonsolideProfil')); // (12. tur m8 bağımlılığı)
 eval(grab('mrpOptimumProfil'));   // (12. tur m8)
 eval(grab('mrpItemDims'));        // (12. tur m7)
 eval(grab('mrpLeftoverOwners'));  // (13. tur madde 3)
+eval(grab('mrpRunGuillotine'));   // (15. tur T2 — {placed, free} dönüş şekli)
+eval(grab('mrpSheetOffcuts'));    // (15. tur T2)
 
 const WH = [{id: 'A', name: 'A-Depo'}, {id: 'B', name: 'B-Depo'}];
 const mv = (whId, name, code, type, qty) =>
@@ -425,6 +427,23 @@ chk('farkli kod sahiplik yaratmaz',
 chk('ayni kod sahiplik yaratir (ad farkli olsa da)',
     mrpLeftoverOwners({name:'FARKLI AD', code:'KOD-A', wh:'W1'},
       [{name:'SAC 500x1000x5', code:'KOD-A', status:'IN_WAREHOUSE', warehouse_id:'W1', project_name:'X', quantity:1}]).length === 1);
+
+console.log('\n═══ (15. tur T2) mrpRunGuillotine {placed,free} + mrpSheetOffcuts ═══');
+// 300×200 plakaya 100×100 tek parça, gap 0: yerleşim (0,0); free = sağ şerit
+// 200×100 + üst şerit 300×100 (deterministik — shuffle mrpPackBest'te, burada yok)
+const gRes = mrpRunGuillotine([{w:100, h:100, kod:'X', cid:'1', ci:0, _idx:0}], 300, 200, 0);
+chk('placed 1 parça', Array.isArray(gRes.placed) && gRes.placed.length === 1);
+chk('free dizisi döner', Array.isArray(gRes.free) && gRes.free.length === 2, JSON.stringify(gRes.free));
+const offs = mrpSheetOffcuts(gRes.free);
+chk('artıklar alan sırasıyla (300×100 önce)',
+    offs.length === 2 && offs[0].w === 300 && offs[0].h === 100 && offs[1].w === 200 && offs[1].h === 100,
+    JSON.stringify(offs));
+chk('minMm eşiği eler (150mm → tek artık)',
+    mrpSheetOffcuts(gRes.free, 150).length === 0); // iki şeridin de kısa kenarı 100 < 150
+chk('cap sınırı uygulanır',
+    mrpSheetOffcuts([{w:500,h:500},{w:400,h:400},{w:300,h:300}], 100, 2).length === 2);
+chk('küsurat floor + null girdi boş dizi',
+    mrpSheetOffcuts([{w:150.9, h:120.7}])[0].w === 150 && mrpSheetOffcuts(null).length === 0);
 
 console.log('\n' + '─'.repeat(60));
 if(fail){ console.log(`❌ ${fail} kontrol BASARISIZ.`); process.exit(1); }
