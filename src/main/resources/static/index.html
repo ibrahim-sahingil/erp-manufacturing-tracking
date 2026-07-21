@@ -1781,6 +1781,14 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
     <button class="hbtn pri" onclick="openAddProduct()">+ Yeni Ürün</button>
   </div>
 
+  <!-- (16. tur M3.1) Alt sekmeler — arkadaş: "proje bağlama kısmı ürün
+       ağacının içinde AYRI bir kısım olsun" (mantık aynı, yalnız yer değişti) -->
+  <div class="planning-tabs" id="bom-tabs">
+    <button class="planning-tab active" data-bomtab="edit" onclick="switchBomTab('edit')">Ağaç Düzenleme</button>
+    <button class="planning-tab" data-bomtab="attach" onclick="switchBomTab('attach')">Proje Bağlama</button>
+  </div>
+
+  <div class="planning-section active" id="bom-tab-edit">
   <!-- Ana Ürün Seçimi -->
   <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:flex-end">
     <div class="form-group" style="flex:1;min-width:220px;max-width:420px;margin-bottom:0">
@@ -1923,9 +1931,10 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
     </div>
     <div id="bom-tree-container" style="overflow:auto;background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;padding:24px;min-height:300px"></div>
   </div>
+  </div><!-- /bom-tab-edit -->
 
-  <!-- PROJE BAĞLAMA BÖLÜMÜ -->
-  <div style="margin-top:32px;border-top:1px solid var(--line-soft);padding-top:24px">
+  <!-- (16. tur M3.1) PROJE BAĞLAMA — artık ayrı alt sekme -->
+  <div class="planning-section" id="bom-tab-attach">
     <div style="font-weight:650;font-size:17px;letter-spacing:-.01em;color:var(--ink);margin-bottom:4px">Projeye Ürün Ağacı Bağla</div>
     <div style="font-size:12.5px;color:var(--muted);margin-bottom:20px">Ürün ağacını bir projeye bağlayın · Parçaları özelleştirin · Yayınlayın → Parçalar otomatik üretime çıkar</div>
 
@@ -15244,6 +15253,16 @@ function pbomeOpFor(id){
 
 // ─── Init ───
 let bomOpDefs = []; // İşlem tanımları
+
+// (16. tur M3.1) Ürün Ağacı alt sekmeleri: Ağaç Düzenleme / Proje Bağlama
+// (arkadaş: "proje bağlama kısmı ayrı bir kısım olsun" — mantık değişmedi)
+function switchBomTab(tab){
+  document.querySelectorAll('#view-bom .planning-tab').forEach(t=>
+    t.classList.toggle('active', t.dataset.bomtab===tab));
+  document.querySelectorAll('#view-bom > .planning-section').forEach(s=>
+    s.classList.toggle('active', s.id==='bom-tab-'+tab));
+  if(tab==='attach') renderProjectBomList();
+}
 
 async function initBom() {
   const [prodData, opDefData] = await Promise.all([
