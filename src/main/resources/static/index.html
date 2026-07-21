@@ -2114,6 +2114,14 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
     <button class="hbtn pri" onclick="docsUpload('URETIM')">⬆ Üretim Resmi Yükle</button>
   </div>
 
+  <!-- (16. tur M3.2b) Alt sekmeler: ürün(şablon) bazlı mevcut sistem + PROJE
+       bazlı yeni katman (K4: ikisi yan yana) -->
+  <div class="planning-tabs" id="docs-tabs">
+    <button class="planning-tab active" data-docstab="product" onclick="switchDocsTab('product')">Ürün (Şablon) Resimleri</button>
+    <button class="planning-tab" data-docstab="project" onclick="switchDocsTab('project')" title="Projeye özgü resimler: Sipariş / İmalat / Diğer — parçalara bağlanır, diğer ekranlardan indirilir">Proje Resimleri</button>
+  </div>
+
+  <div class="planning-section active" id="docs-tab-product">
   <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap">
     <div class="form-group" style="margin-bottom:0;min-width:320px;max-width:420px;flex:1"><label>Ürün</label>
       <div id="docs-product-ss"></div>
@@ -2134,6 +2142,23 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
     </div>
   </div>
   <div id="docs-empty" class="empty-state"><span class="emoji"></span>Ürün seçin — dosyalar ürün ağacına bağlı saklanır.</div>
+  </div><!-- /docs-tab-product -->
+
+  <!-- (16. tur M3.2b) PROJE RESİMLERİ -->
+  <div class="planning-section" id="docs-tab-project">
+    <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap">
+      <div class="form-group" style="margin-bottom:0;min-width:260px;max-width:420px;flex:1"><label>Proje</label>
+        <select id="pdocs-project-sel" onchange="pdocsProjChange()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+          <option value="">— Proje seçin —</option>
+        </select>
+      </div>
+      <div class="grow"></div>
+      <button class="hbtn sec" onclick="pdocsUpload('SIPARIS')">⬆ Sipariş Resmi</button>
+      <button class="hbtn sec" onclick="pdocsUpload('IMALAT')">⬆ İmalat Resmi</button>
+      <button class="hbtn sec" onclick="pdocsUpload('DIGER')">⬆ Diğer Resim</button>
+    </div>
+    <div id="pdocs-content"></div>
+  </div>
 </div>
 
 <!-- SCAN -->
@@ -15200,6 +15225,244 @@ async function refreshDocPartIds(){
     const docs = await apiFetch('/bom-documents?product_id='+_activeBomProduct.id) || [];
     docs.forEach(d=>(d.part_ids||[]).forEach(id=>_docPartIds.add(id)));
   }catch(e){ /* meta çekilemezse yeşil vurgusuz devam */ }
+}
+
+// ═══ (16. tur M3.2b) PROJE RESİMLERİ — proje bazlı teknik resim katmanı ═══
+// Arkadaş: "resimler ürünlere değil her bir projeye özgü depolanacak;
+// Sipariş / İmalat / Diğer yükleme seçenekleri; parçalara bağlansın."
+// Ürün(şablon) bazlı sistem AYNEN kaldı (K4) — bu blok docs* ailesinin
+// project_documents'a uyarlanmış klonudur.
+const PDOC_CATS = {SIPARIS:'Sipariş Resimleri', IMALAT:'İmalat Resimleri', DIGER:'Diğer Resimler'};
+let _pdocsProj = '';
+let projDocs = [];
+let _pdocsParts = [];
+
+function switchDocsTab(tab){
+  document.querySelectorAll('#view-docs .planning-tab').forEach(t=>
+    t.classList.toggle('active', t.dataset.docstab===tab));
+  document.querySelectorAll('#view-docs > .planning-section').forEach(s=>
+    s.classList.toggle('active', s.id==='docs-tab-'+tab));
+  if(tab==='project') pdocsInit();
+}
+
+async function pdocsInit(){
+  const sel = document.getElementById('pdocs-project-sel');
+  if(!sel) return;
+  const cur = sel.value || _pdocsProj;
+  const projs = [...new Set(activeOrders().map(o=>o.project_name).filter(Boolean))].sort();
+  sel.innerHTML = h`<option value="">— Proje seçin —</option>${projs.map(p=>h`<option value="${p}"${p===cur?raw(' selected'):''}>${p}</option>`)}`;
+  if(sel.value){ _pdocsProj = sel.value; await pdocsLoad(); }
+  renderProjDocs();
+}
+async function pdocsProjChange(){
+  _pdocsProj = document.getElementById('pdocs-project-sel')?.value || '';
+  if(_pdocsProj) await pdocsLoad();
+  renderProjDocs();
+}
+async function pdocsLoad(){
+  let docs = [];
+  try{ docs = await apiFetch('/project-documents?project='+encodeURIComponent(_pdocsProj)) || []; }
+  catch(e){ /* liste çekilemezse boş gösterilir */ }
+  projDocs = Array.isArray(docs) ? docs : [];
+  await loadProjectBoms();
+  const ids = new Set(projectBoms.filter(b=>b.project_name===_pdocsProj).map(b=>b.id));
+  const pbps = await dbGet('project_bom_parts');
+  _pdocsParts = (Array.isArray(pbps)?pbps:[]).filter(p=>ids.has(p.project_bom_id));
+}
+function pdocsCodeOf(p){ return p.custom_code||p.resolved_code||''; }
+function pdocsNameOf(p){ return p.custom_name||p.resolved_name||''; }
+
+function renderProjDocs(){
+  const el = document.getElementById('pdocs-content');
+  if(!el) return;
+  if(!_pdocsProj){
+    el.innerHTML = h`<div class="empty-state"><span class="emoji"></span>Proje seçin — resimler projeye özgü saklanır (Sipariş / İmalat / Diğer) ve parçalara bağlanır; bağlı resim diğer ekranlarda parça üstünden indirilir.</div>`;
+    return;
+  }
+  const partById = new Map(_pdocsParts.map(p=>[p.id,p]));
+  el.innerHTML = h`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+    ${Object.entries(PDOC_CATS).map(([cat,lbl])=>{
+      const list = projDocs.filter(d=>d.category===cat);
+      return h`<div>
+        <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:10px">${lbl} (${list.length})</div>
+        <div class="draws">${list.length?list.map(d=>{
+          const linked = (d.part_ids||[]).map(pid=>partById.get(pid)).filter(Boolean);
+          const ext = (d.filename||'').includes('.') ? d.filename.split('.').pop().toUpperCase().slice(0,6) : 'DOSYA';
+          return h`<div class="draw">
+            <div class="thumb">${raw(ico('file',22))}<span class="ext">${ext}</span></div>
+            <div class="dmeta">
+              <b>${d.filename}</b>
+              <span>${fmtBytes(d.size_bytes)} · ${(d.created_at||'').slice(0,10)}${d.uploaded_by?' · '+d.uploaded_by:''}</span>
+              ${linked.length?h`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px">${linked.map(p=>h`
+                <span class="chipk" style="color:var(--green);border-color:color-mix(in srgb,var(--green) 35%,transparent);background:var(--ok-soft)">${pdocsCodeOf(p)} — ${pdocsNameOf(p)}</span>`)}</div>`
+              :h`<div style="font-size:10px;color:var(--muted);margin-top:8px">Parça bağlanmamış — Parçalar ile bağlayın.</div>`}
+              <div style="display:flex;gap:4px;margin-top:10px;flex-wrap:wrap">
+                <button class="btn btn-ghost btn-sm" onclick="pdocsDownload('${raw(d.id)}')" title="İndir">${raw(ico('download',13))} İndir</button>
+                <button class="btn btn-ghost btn-sm" onclick="pdocsEditParts('${raw(d.id)}')" title="Kapsadığı parçaları / kategoriyi düzenle">Parçalar</button>
+                <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="pdocsDelete('${raw(d.id)}')" title="Sil">${raw(ico('trash',13))}</button>
+              </div>
+            </div>
+          </div>`;
+        }):h`<div style="font-size:12px;color:var(--muted);padding:20px;text-align:center;border:1px dashed var(--line);border-radius:14px">Henüz dosya yok — yukarıdan yükleyin.</div>`}</div>
+      </div>`;
+    })}
+  </div>`;
+}
+
+// Parça seçim listesi — pbp ağacı (parent_custom_id hiyerarşisi; birden çok
+// makine ağacı = birden çok kök, hepsi listelenir)
+function pdocsPartRowsHTML(selectedIds){
+  const sel = selectedIds||new Set();
+  const kids = pid=>_pdocsParts.filter(p=>(p.parent_custom_id||null)===(pid||null))
+    .sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+  const out=[];
+  const walk=(pid,lv)=>kids(pid).forEach(p=>{ out.push({p,lv}); walk(p.id,lv+1); });
+  walk(null,0);
+  return h`<input type="text" placeholder="Parça ara..." oninput="pdocsPartFilter(this.value)" style="${raw(INP('8px 10px','12px'))};margin-bottom:8px">
+    <div style="max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:6px;padding:6px">
+    ${out.map(({p,lv})=>h`<label class="pdocs-part-row" data-search="${(pdocsCodeOf(p)+' '+pdocsNameOf(p)).toLowerCase()}" style="display:flex;gap:8px;align-items:center;cursor:pointer;padding:3px 4px;margin-left:${lv*18}px;font-family:var(--font-mono);font-size:11px">
+      <input type="checkbox" class="pdocs-part-chk" data-id="${raw(p.id)}" ${sel.has(p.id)?raw('checked'):''}>
+      <span style="color:var(--accent)">${pdocsCodeOf(p)}</span><span>${pdocsNameOf(p)}</span>
+    </label>`)}
+    ${!out.length?h`<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:10px">Bu projede ağaç parçası yok — önce ürün ağacı bağlayın.</div>`:''}
+  </div>`;
+}
+function pdocsPartFilter(q){
+  const ql=(q||'').toLowerCase();
+  document.querySelectorAll('.pdocs-part-row').forEach(r=>{
+    r.style.display = !ql||r.dataset.search.includes(ql) ? 'flex' : 'none';
+  });
+}
+
+function pdocsUpload(cat){
+  if(!document.getElementById('docs-tab-project')?.classList.contains('active')){ switchDocsTab('project'); }
+  if(!_pdocsProj){ toast('Önce proje seçin!','error'); return; }
+  document.getElementById('pdocs-upload-overlay')?.remove();
+  const ov=document.createElement('div');
+  ov.className='modal-overlay open'; ov.id='pdocs-upload-overlay';
+  ov.innerHTML = h`<div class="modal" style="width:560px;max-width:95vw;text-align:left;max-height:90vh;display:flex;flex-direction:column">
+    <h3 style="margin-bottom:4px">⬆ ${PDOC_CATS[cat]||'Resim'} Yükle</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px">${_pdocsProj} projesine · DWG, resim, PDF... (en fazla 50MB). Birden çok dosya seçilebilir; seçilen parçalar hepsine bağlanır.</p>
+    <input type="file" id="pdocs-file" multiple style="margin-bottom:12px;font-family:var(--font-mono);font-size:12px">
+    <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:6px">Kapsadığı Parçalar</div>
+    <div style="overflow:auto;flex:1">${raw(pdocsPartRowsHTML())}</div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost" onclick="document.getElementById('pdocs-upload-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" id="pdocs-upload-btn" onclick="pdocsUploadDo('${raw(cat)}')">⬆ Yükle</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+async function pdocsUploadDo(cat){
+  const inp=document.getElementById('pdocs-file');
+  const files=[...(inp?.files||[])];
+  if(!files.length){ toast('Dosya seçin!','error'); return; }
+  const ids=[...document.querySelectorAll('#pdocs-upload-overlay .pdocs-part-chk:checked')].map(c=>c.dataset.id);
+  const btn=document.getElementById('pdocs-upload-btn');
+  btn.disabled=true;
+  let ok=0, fail=0, failMsg='';
+  for(let i=0;i<files.length;i++){
+    btn.textContent=`Yükleniyor... (${i+1}/${files.length})`;
+    const fd=new FormData();
+    fd.append('file', files[i]);
+    fd.append('project_name', _pdocsProj);
+    fd.append('category', cat);
+    if(ids.length) fd.append('part_ids', ids.join(','));
+    fd.append('uploaded_by', currentUser?.display_name||currentUser?.username||'');
+    try{
+      // apiFetch kullanılamaz: multipart boundary'yi tarayıcı kendisi koymalı
+      const r=await fetch(API_BASE_URL+'/project-documents',{method:'POST',headers:authToken?{Authorization:'Bearer '+authToken}:{},body:fd});
+      if(r.status===401||r.status===403){ if(authToken) handleUnauthorized(); return; }
+      const body=await r.json().catch(()=>null);
+      if(!r.ok||(body&&body.success===false)){ fail++; failMsg=(body&&body.message)||('HTTP '+r.status); continue; }
+      ok++;
+    }catch(e){ fail++; failMsg=e.message; }
+  }
+  document.getElementById('pdocs-upload-overlay')?.remove();
+  await pdocsLoad();
+  renderProjDocs();
+  _projDocsCache.delete(_pdocsProj); // (M3.2c) parça-üstü indirme önbelleği tazelensin
+  toast(fail?`⚠ ${ok} dosya yüklendi, ${fail} başarısız: ${failMsg}`:`${ok} dosya yüklendi`, fail?'error':'success');
+}
+
+async function pdocsDownload(docId){
+  const d=projDocs.find(x=>x.id===docId) || _projDocsCacheFind(docId);
+  try{
+    const r=await fetch(API_BASE_URL+'/project-documents/'+docId+'/download',{headers:authToken?{Authorization:'Bearer '+authToken}:{}});
+    if(r.status===401||r.status===403){ if(authToken) handleUnauthorized(); return; }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const blob=await r.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=(d&&d.filename)||'dosya'; a.click();
+    URL.revokeObjectURL(url);
+  }catch(e){ toast('İndirilemedi: '+e.message,'error'); }
+}
+
+function pdocsEditParts(docId){
+  const d=projDocs.find(x=>x.id===docId);
+  if(!d) return;
+  document.getElementById('pdocs-edit-overlay')?.remove();
+  const ov=document.createElement('div');
+  ov.className='modal-overlay open'; ov.id='pdocs-edit-overlay';
+  ov.innerHTML = h`<div class="modal" style="width:560px;max-width:95vw;text-align:left;max-height:90vh;display:flex;flex-direction:column">
+    <h3 style="margin-bottom:4px">${d.filename}</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px">Dosyanın kapsadığı parçaları işaretleyin.</p>
+    <div class="form-group" style="margin-bottom:12px"><label>Kategori</label>
+      <select id="pdocs-edit-cat" style="${raw(INP())}">
+        ${Object.entries(PDOC_CATS).map(([c,l])=>h`<option value="${c}" ${d.category===c?raw('selected'):''}>${l}</option>`)}
+      </select>
+    </div>
+    <div style="overflow:auto;flex:1">${raw(pdocsPartRowsHTML(new Set(d.part_ids||[])))}</div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost" onclick="document.getElementById('pdocs-edit-overlay').remove()">İptal</button>
+      <button class="btn btn-primary" onclick="pdocsSaveParts('${raw(docId)}')">Kaydet</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+async function pdocsSaveParts(docId){
+  const ids=[...document.querySelectorAll('#pdocs-edit-overlay .pdocs-part-chk:checked')].map(c=>c.dataset.id);
+  const cat=document.getElementById('pdocs-edit-cat').value;
+  const ok=await dbUpdate('project_documents', docId, {part_ids:ids, category:cat});
+  if(!ok) return;
+  const d=projDocs.find(x=>x.id===docId);
+  if(d){ d.part_ids=ids; d.category=cat; }
+  document.getElementById('pdocs-edit-overlay')?.remove();
+  renderProjDocs();
+  _projDocsCache.delete(_pdocsProj);
+  toast('Parça bağları güncellendi.','success');
+}
+
+async function pdocsDelete(docId){
+  const d=projDocs.find(x=>x.id===docId);
+  if(!d) return;
+  // Backend guard'ı (PDOC_LINKED) bağlı dokümanı silmez — bağlar önce kaldırılır
+  const bagli=(d.part_ids||[]).length;
+  if(!confirm(`"${d.filename}" silinsin mi?\n\nDosya içeriği veritabanından kalıcı olarak silinir.${bagli?`\n⚠ ${bagli} parça bağı var — silmeden önce bağlar kaldırılacak.`:''}`)) return;
+  if(bagli){
+    const ok0=await dbUpdate('project_documents', docId, {part_ids: []});
+    if(!ok0) return;
+    d.part_ids=[];
+  }
+  const ok=await dbDelete('project_documents', docId);
+  if(!ok) return;
+  projDocs=projDocs.filter(x=>x.id!==docId);
+  renderProjDocs();
+  _projDocsCache.delete(_pdocsProj);
+  toast('Dosya silindi.','success');
+}
+
+// (M3.2c ön hazırlık) Parça-üstü indirme için proje→meta önbelleği
+const _projDocsCache = new Map();
+function _projDocsCacheFind(docId){
+  for(const docs of _projDocsCache.values()){
+    const d = (docs||[]).find(x=>x.id===docId);
+    if(d) return d;
+  }
+  return null;
 }
 
 // ═══ ÜRÜN AĞACI (BOM) ═══

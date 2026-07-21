@@ -889,6 +889,29 @@ chk('load: alıcı/nakliyeci/adres kaçırıldı', shl.includes('Alıcı&lt;img'
 chk('load: teslim koşulu + menşei kaçırıldı', shl.includes('DPU&lt;t&gt;') && shl.includes('Turkey&lt;o&gt;'));
 chk('load: aksiyon butonları (raw) korundu', shl.includes("shipLoadShipNote('nd1')") && shl.includes("dnWeighList('nd1')") && shl.includes("shipLoadUnloadPkg('pk3')"));
 
+// ── (16. tur M3.2b) renderProjDocs + pdocsPartRowsHTML (proje resimleri) ──
+// Dosya adı / yükleyen / parça kod-ad kullanıcı verisidir — h`` disiplinli olmalı.
+global.PDOC_CATS = {SIPARIS:'Sipariş Resimleri', IMALAT:'İmalat Resimleri', DIGER:'Diğer Resimler'};
+global._pdocsProj = 'PDPrj<b>';
+global._pdocsParts = [{id:'pb1', project_bom_id:'pbm1', parent_custom_id:null, sort_order:1,
+  custom_code:'PDK'+EVIL, custom_name:'PDAd'+EVIL, resolved_code:null, resolved_name:null}];
+global.projDocs = [{id:'pd1', category:'IMALAT', filename:'Çizim'+EVIL+'.dwg', size_bytes:1234,
+  uploaded_by:'Yükleyen<b>', created_at:'2026-07-22T10:00:00', part_ids:['pb1']}];
+eval(grab('fmtBytes'));
+eval(grab('pdocsCodeOf'));
+eval(grab('pdocsNameOf'));
+eval(grab('renderProjDocs'));
+eval(grab('pdocsPartRowsHTML'));
+renderProjDocs();
+const pdc=store['pdocs-content']||'';
+console.log('\nrenderProjDocs (proje resimleri):');
+chk('projDocs: dosya adı onerror kaçırıldı', pdc.includes('Çizim&lt;img') && !pdc.includes('Çizim'+EVIL));
+chk('projDocs: yükleyen + bağlı parça çipi kaçırıldı', pdc.includes('Yükleyen&lt;b&gt;') && pdc.includes('PDK&lt;img'));
+chk('projDocs: aksiyon butonları (raw) korundu',
+  pdc.includes("pdocsDownload('pd1')") && pdc.includes("pdocsEditParts('pd1')") && pdc.includes("pdocsDelete('pd1')"));
+const pdr=String(pdocsPartRowsHTML(new Set(['pb1'])));
+chk('pdocsPartRows: kod/ad kaçırıldı + checkbox seçili', pdr.includes('PDK&lt;img') && pdr.includes('checked'));
+
 // ── GENEL SIZINTI BEKÇİSİ (2026-07-15): ico() h`` içinde raw'sız kullanılırsa
 // SVG markup'ı ekrana METİN olarak basılır (gerçek olay: çalışma alanı kartları).
 // Tüm render çıktıları taranır — '&lt;svg' görünüyorsa bir yerde raw() unutulmuştur.
