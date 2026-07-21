@@ -258,6 +258,23 @@ Dosyalar: index.html (+ verify-h-render)
 - V5: Şablon bölümü republish/yeniden-yayında MEVCUT bağlara dokunmaz (yalnız yeni
   bağlanan projelere taşınır); mevcut projelerde bölüm yine elle/S7.
 
+## SONUÇ (2026-07-22 — TAMAMLANDI)
+8 paketin tamamı kodlandı, her paket ayrı commit + doğrulama kapısı 14/14:
+- **A `ec510a2`** — M1b: purchase_orders.code (SIP-yıl-sıra, 4 gruba backfill) + iki arama kutusu
+- **B `a80f3d3`** — M1a: Satın Alma "Projeler" giriş dashboard'u (KPI + kartlar yeniden→eskiye)
+- **C `48f480a`** — M1c: Depo "Özet" dashboard alt sekmesi (whAllowedSubTabs + spec 6 sekme)
+- **D `e0ef14a`** — M2: bom_parts.department_name + autoPopulate ad çözümü/K3 oluşturma
+- **E `5a7ac91`** — M3.1: Proje Bağlama ayrı alt sekme (taşıma, mantık aynı)
+- **F `bd09bca`** — M3.2a: project_documents backend (3 kategori + pbp bağları + 50MB)
+- **G `d86423d`** — M3.2b: Docs > "Proje Resimleri" sekmesi (pdocs* ailesi)
+- **H `3ff809d`** — M3.2c: parça üstü indirme (wo/satın alma/pbome + partDocsOpen)
+
+DB yedekleri: 2026-07-21_2325 (A), _2350 (D), 2026-07-22_0013 (F).
+Dersler: harness EP haritasında olmayan tablo dbGet'te sessizce [] döner
+(departments eklendi); harness dbGet HAM API döner (FIELD_XLATE yok — 'project'
+değil 'order_id'); onclick'e kullanıcı verisi gömme yerine kayıt defteri +
+indeks deseni (_purProjCards, _partDocsReg).
+
 ## Doğrulama (her paket sonunda)
 1. taskkill java → mvnw compile → detached run → sağlık 200
 2. `node scripts/verify-all.js` ÖN PLANDA (timeout 600000) → EXIT + BAŞARISIZ grep
