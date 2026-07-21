@@ -1456,12 +1456,20 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 
   <!-- Alt sekmeler (planning-tab deseni; switchPurchasingTab #view-purchasing'e scope'ludur) -->
   <div class="planning-tabs" id="purchasing-tabs">
-    <button class="planning-tab active" onclick="switchPurchasingTab('items')">Kalemler</button>
+    <button class="planning-tab active" onclick="switchPurchasingTab('projects')" title="Proje kartlı giriş — girmeden sipariş durumu sayıları (16. tur M1a)">Projeler</button>
+    <button class="planning-tab" onclick="switchPurchasingTab('items')">Kalemler</button>
     <button class="planning-tab" onclick="switchPurchasingTab('orders')">Toplu Sipariş &amp; Teklif</button>
   </div>
 
+  <!-- (16. tur M1a) PROJELER — varsayılan giriş: kartlar yeniden→eskiye,
+       girmeden "verilmiş/verilecek/beklenen/planlanan" sayıları -->
+  <div class="planning-section active" id="pur-tab-projects">
+    <div id="pur-kpis" class="stats-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;display:none"></div>
+    <div id="pur-projects"></div>
+  </div>
+
   <!-- Kalemler -->
-  <div class="planning-section active" id="pur-tab-items">
+  <div class="planning-section" id="pur-tab-items">
 
   <!-- Proje seçimi + arama + durum özeti -->
   <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end">
@@ -9957,6 +9965,8 @@ async function renderPurchasing(){
   }
   renderPurchaseList();
   if(document.getElementById('pur-tab-orders')?.classList.contains('active')) renderPurchaseOrders();
+  // (16. tur M1a) Projeler giriş dashboard'u — varsayılan açılış sekmesi
+  if(document.getElementById('pur-tab-projects')?.classList.contains('active')) renderPurProjects();
 }
 
 // Alt sekme geçişi (#view-purchasing'e scope'lu — depo/planlama ile CSS ortak)
@@ -9967,6 +9977,7 @@ function _purActivateTab(tab){
     s.classList.toggle('active', s.id==='pur-tab-'+tab));
   if(tab==='orders') renderPurchaseOrders();
   if(tab==='items') renderPurchaseList();
+  if(tab==='projects') renderPurProjects(); // (16. tur M1a)
   // 'mrp' MİP'e (switchMipTab), 'receiving' Depo'ya (switchWarehouseTab)
   // taşındı — Satın Alma sadece sipariş verir (8. tur #3)
 }
@@ -11112,6 +11123,92 @@ function purUpdateSub(items, proj){
   el.textContent = (proj||'Tüm projeler') + ' · ' + acik + ' açık kalem'
     + (teklif ? ' · ' + teklif + ' grup teklif bekliyor' : '')
     + ' — mal kabul Depo\'da, kesim planlama MİP\'te';
+}
+
+// ═══ (16. tur M1a) SATIN ALMA "PROJELER" GİRİŞ DASHBOARD'U — arkadaş: "içine
+// girmeden kaç sipariş verilmiş verilecek beklenen planlanan gözüksün;
+// yeniden eskiye" · kart tıklanınca Kalemler o proje filtreli açılır (V1) ═══
+function purOpenProject(proj){
+  const sel = document.getElementById('pur-project-sel');
+  if(sel) sel.value = proj;
+  _purActivateTab('items');
+}
+// Kart tıklaması İNDEKSLE çağrılır — proje adı onclick JS'ine hiç gömülmez
+// (tırnaksız EVIL bile DOM'a ham girmesin; ea() gerektiren bağlam kalmaz).
+let _purProjCards = [];
+function purOpenProjectIdx(i){ if(_purProjCards[i]!=null) purOpenProject(_purProjCards[i]); }
+function renderPurProjects(){
+  const el = document.getElementById('pur-projects');
+  const kEl = document.getElementById('pur-kpis');
+  if(!el) return;
+  const items = purchaseItems.filter(i=>i.sent_to_purchasing!==false);
+  // ── KPI şeridi (gerçek veri; kıyas satırı her koşulda dolu — tasarım 2026) ──
+  if(kEl){
+    const acik = items.filter(i=>['PLANNED','ORDERED','RECEIVED'].includes(i.status));
+    const draftGrup = purchaseOrders.filter(o=>o.status==='DRAFT');
+    const draftTeklif = poQuotes.filter(q=>draftGrup.some(o=>o.id===q.purchase_order_id)).length;
+    const ayBasi = new Date(); ayBasi.setDate(1); ayBasi.setHours(0,0,0,0);
+    const gecenAyBasi = new Date(ayBasi); gecenAyBasi.setMonth(gecenAyBasi.getMonth()-1);
+    const buAy = purchaseOrders.filter(o=>o.status==='ORDERED' && o.ordered_at && new Date(o.ordered_at)>=ayBasi).length;
+    const gecenAy = purchaseOrders.filter(o=>o.status==='ORDERED' && o.ordered_at && new Date(o.ordered_at)>=gecenAyBasi && new Date(o.ordered_at)<ayBasi).length;
+    const depoda = items.filter(i=>i.status==='IN_WAREHOUSE').length;
+    const buAyKabul = items.filter(i=>i.received_at && new Date(i.received_at)>=ayBasi).length;
+    const projSay = new Set(acik.map(i=>i.project_name).filter(Boolean)).size;
+    kEl.style.display = '';
+    kEl.innerHTML = h`
+      <div class="stat-card"><div class="stat-label">Açık Kalem</div>
+        <div class="stat-value">${acik.length}<span class="un"> kalem</span></div>
+        <div class="stat-sub">${acik.length?h`<span class="delta wa">${projSay} projede</span>`:h`<span class="delta nd">açık kalem yok</span>`}</div></div>
+      <div class="stat-card"><div class="stat-label">Teklif Bekleyen</div>
+        <div class="stat-value">${draftGrup.length}<span class="un"> grup</span></div>
+        <div class="stat-sub">${draftGrup.length?h`<span class="delta in">${draftTeklif} teklif girildi</span>`:h`<span class="delta nd">bekleyen grup yok</span>`}</div></div>
+      <div class="stat-card"><div class="stat-label">Bu Ay Sipariş</div>
+        <div class="stat-value">${buAy}<span class="un"> grup</span></div>
+        <div class="stat-sub">${gecenAy?h`<span class="delta ${raw(buAy>=gecenAy?'up':'dn')}">geçen ay ${gecenAy}</span>`:h`<span class="delta nd">geçen ay veri yok</span>`}</div></div>
+      <div class="stat-card"><div class="stat-label">Depodaki Kalem</div>
+        <div class="stat-value">${depoda}<span class="un"> kalem</span></div>
+        <div class="stat-sub">${buAyKabul?h`<span class="delta in">bu ay ${buAyKabul} kabul</span>`:h`<span class="delta nd">bu ay kabul yok</span>`}</div></div>`;
+  }
+  // ── Proje kartları: SON HAREKETE göre yeniden→eskiye (arkadaş isteği) ──
+  const gruplar = new Map();
+  items.forEach(i=>{
+    const p = i.project_name||'(Proje Yok)';
+    if(!gruplar.has(p)) gruplar.set(p, []);
+    gruplar.get(p).push(i);
+  });
+  if(!gruplar.size){
+    el.innerHTML = h`<div class="empty-state"><span class="emoji"></span>Henüz satın alma kalemi yok — Kalemler sekmesinden ekleyin veya ürün ağacından aktarın</div>`;
+    return;
+  }
+  const projeler = [...gruplar.entries()].map(([p,list])=>({
+    p, list,
+    son: Math.max(...list.map(i=>new Date(i.created_at||0).getTime()))
+  })).sort((a,b)=>b.son-a.son);
+  _purProjCards = projeler.map(x=>x.p);
+  el.innerHTML = h`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
+    ${projeler.map(({p,list,son},pi)=>{
+      const chips = Object.entries(PUR_STATUS).map(([st,m])=>{
+        const n = list.filter(i=>i.status===st).length;
+        if(!n) return '';
+        return h`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:9px;color:${raw(m.color)};background:${raw(m.color)}15;white-space:nowrap">${m.label}: ${n}</span>`;
+      });
+      const grpN = new Set(list.map(i=>i.purchase_order_id).filter(Boolean)).size;
+      const totals = {};
+      list.forEach(i=>{ if(i.unit_price!=null && i.status!=='CANCELLED'){ const c=i.currency||'TRY'; totals[c]=(totals[c]||0)+Number(i.unit_price)*Number(i.quantity||1); }});
+      const totalTxt = Object.entries(totals).map(([c,t])=>purFmtMoney(t)+' '+c).join(' + ');
+      return h`<div class="pbom-card" style="cursor:pointer;padding:14px 18px;margin-bottom:0" onclick="purOpenProjectIdx(${pi})" title="Kalemleri bu proje filtresiyle aç">
+        <div style="display:flex;gap:8px;align-items:baseline;justify-content:space-between">
+          <span style="font-weight:700;font-size:14px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p}</span>
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);white-space:nowrap">${list.length} kalem${grpN?' · '+grpN+' grup':''}</span>
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">${chips}</div>
+        <div style="display:flex;justify-content:space-between;gap:8px;font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:8px">
+          <span>son hareket ${son>0?new Date(son).toLocaleDateString('tr-TR'):'—'}</span>
+          ${totalTxt?h`<span>Tahmini: <b style="color:var(--ink)">${totalTxt}</b></span>`:''}
+        </div>
+      </div>`;
+    })}
+  </div>`;
 }
 
 function renderPurchaseList(){

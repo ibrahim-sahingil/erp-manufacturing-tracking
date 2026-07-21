@@ -214,6 +214,31 @@ chk('po: teklif firma/iletişim kaçırıldı', po.includes('Firma&lt;img') && p
 chk('po: teklif not/red gerekçesi <script> kaçırıldı', po.includes('QNot&lt;script&gt;') && po.includes('Red&lt;img'));
 chk('po: butonlar (raw) korundu', po.includes("poDeleteQuote('q1')") && po.includes("poRemoveItem('i1')") && po.includes("poAddQuote('po1')"));
 
+// ── (16. tur M1a) renderPurProjects (satın alma proje kartlı giriş) ──
+// Kart proje adı + durum çipleri + tahmini toplam taşır; onclick JS-in-attr
+// bağlamında ea() ile kaçırılmalı (h'nin HTML-esc'i yetmez).
+global.purchaseItems=[
+  {id:'pp1', status:'PLANNED', code:'PK1', name:'Kalem1', project_name:'PrjX'+EVIL,
+   unit:'ad', quantity:1, unit_price:10, currency:'TRY', created_at:'2026-07-01T10:00:00'},
+  {id:'pp2', status:'IN_WAREHOUSE', code:'PK2', name:'Kalem2', project_name:'PrjX'+EVIL,
+   unit:'ad', quantity:2, purchase_order_id:'po1', created_at:'2026-07-02T10:00:00', received_at:'2026-07-02T11:00:00'}];
+global.purchaseOrders=[{id:'po1', code:'SIP-2026-0001', name:'G', status:'DRAFT', ordered_at:null}];
+global.purFmtMoney = global.purFmtMoney || (n=>String(n));
+// Şim bölüm bölüm farklı PUR_STATUS tanımlıyor — bu senaryonun beklediği etiketleri sabitle
+global.PUR_STATUS={PLANNED:{icon:'',label:'Planlandı',color:'#f5a623'}, IN_WAREHOUSE:{icon:'',label:'Depoda',color:'#2ecc71'}};
+eval(grab('renderPurProjects'));
+eval(grab('purOpenProjectIdx'));
+global._purProjCards = [];
+renderPurProjects();
+const ppj=store['pur-projects']||'';
+console.log('\nrenderPurProjects (proje kartlı giriş):');
+chk('purProj: proje adı onerror kaçırıldı (ham EVIL hiçbir yerde yok)',
+  ppj.includes('PrjX&lt;img') && !ppj.includes('PrjX'+EVIL));
+chk('purProj: durum çipleri + kalem sayısı çıktı', ppj.includes('Planlandı: 1') && ppj.includes('2 kalem'));
+chk('purProj: onclick indeksli (ad JS\'e gömülmez) + kart listesi dolu',
+  ppj.includes('purOpenProjectIdx(0)') && _purProjCards.length===1);
+chk('purProj: KPI şeridi doldu (Açık Kalem)', (store['pur-kpis']||'').includes('Açık Kalem'));
+
 // ── renderWorkOrders (iş emirleri) ──
 global.workOrders=[{id:'w1', project_name:'Prj<b>', status:'planned', assigned_user:'Kişi'+EVIL,
   workspace_name:'WS<script>', notes:'Not'+EVIL, start_datetime:null, department_name:'Dep<i>'}];
