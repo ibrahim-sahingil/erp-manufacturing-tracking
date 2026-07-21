@@ -6620,6 +6620,8 @@ function woRenderPartsGrid() {
             ${raw(woMatChip(p, matByCode))}
           </div>
         </div>
+        ${(()=>{const di=_partDocsReg.push({proj:p.project, code:p.code, name:p.name, pref:'IMALAT'})-1;
+          return h`<button class="btn btn-ghost btn-sm" style="padding:2px 7px;flex-shrink:0" onclick="event.stopPropagation();partDocsOpenIdx(${di})" title="Parçanın proje teknik resimleri (16. tur M3.2c — İmalat resimleri önde)">${raw(ico('file',12))}</button>`;})()}
       </div>`;
       return h`${row}${(purByPart[p.id]||[]).map(i=>purRow(i, depth+1))}${kidsOf(p.id).map(k=>nodeRow(k, depth+1))}`;
     };
@@ -11369,6 +11371,8 @@ function renderPurchaseList(){
           ${i.status==='ORDERED'?h`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)" title="10. tur M1: teslim alma ve fiş satın almadan kaldırıldı">mal kabul Depo'dan</span>`:''}
           ${i.status==='PLANNED' && !i.stock_plan_id && !i.purchase_order_id ? h`<button class="btn btn-ghost btn-sm" onclick="purTogglePlanning('${raw(i.id)}')" title="${i.needs_planning?'Planlama havuzundan çıkar':'MİP kesim planlaması havuzuna at (plaka/profil yerleşimi)'}" ${i.needs_planning?raw('style="color:var(--accent);border-color:rgba(245,166,35,.4)"'):''}>${raw(ico('push',13))}</button>`:''}
           ${purPriceHistoryOf(i.name, i.code, i.id).length?h`<button class="btn btn-ghost btn-sm" onclick="purPriceHistoryModal('${raw(i.id)}')" title="Bu malzemenin geçmiş alış fiyatları (10. tur M11)">${raw(ico('coins',13))}</button>`:''}
+          ${(()=>{const di=_partDocsReg.push({proj:i.project_name, pbpId:i.project_bom_part_id||null, code:i.code, name:i.name, pref:'SIPARIS'})-1;
+            return h`<button class="btn btn-ghost btn-sm" onclick="partDocsOpenIdx(${di})" title="Parçanın proje teknik resimleri (16. tur M3.2c — Sipariş resimleri önde)">${raw(ico('file',13))}</button>`;})()}
           <button class="btn btn-ghost btn-sm" onclick="editPurchaseItem('${raw(i.id)}')" title="Düzenle">${raw(ico('edit',13))}</button>
           <button class="btn btn-ghost btn-sm" onclick="deletePurchaseItem('${raw(i.id)}')" style="color:var(--red,#e74c3c);border-color:rgba(231,76,60,.3)">${raw(ico('trash',13))}</button>
         </div>
@@ -15465,6 +15469,63 @@ function _projDocsCacheFind(docId){
   return null;
 }
 
+// ═══ (16. tur M3.2c) PARÇA ÜSTÜ İNDİRME — arkadaş: "resimleri siparişçi
+// kontrol etmesi gerekiyorsa satın almacı görecek, imalatçı veya iş emrini
+// yapan kendi görevi ile ilgili resmi görebilecek." Küçük dosya ikonu →
+// modal: parçaya bağlı PROJE resimleri (ilgili kategori önde) + İndir. ═══
+let _projDocsPbps = new Map(); // proje → pbp listesi (kod eşleşmesi köprüsü)
+async function projDocsEnsure(proj){
+  if(_projDocsCache.has(proj)) return _projDocsCache.get(proj);
+  let docs=[];
+  try{ docs = await apiFetch('/project-documents?project='+encodeURIComponent(proj)) || []; }
+  catch(e){ /* meta çekilemezse boş liste */ }
+  _projDocsCache.set(proj, docs);
+  return docs;
+}
+async function projPbpsEnsure(proj){
+  if(_projDocsPbps.has(proj)) return _projDocsPbps.get(proj);
+  await loadProjectBoms();
+  const ids = new Set(projectBoms.filter(b=>b.project_name===proj).map(b=>b.id));
+  const all = await dbGet('project_bom_parts');
+  const list = (Array.isArray(all)?all:[]).filter(p=>ids.has(p.project_bom_id));
+  _projDocsPbps.set(proj, list);
+  return list;
+}
+// Kayıt defteri: proje/kod adları onclick JS'ine gömülmez (indeksle çağrı —
+// renderPurProjects deseni); her render push'lar, eski indeksler eski DOM'la ölür.
+let _partDocsReg = [];
+function partDocsOpenIdx(i){ const x=_partDocsReg[i]; if(x) partDocsOpen(x); }
+async function partDocsOpen({proj, pbpId, code, name, pref}){
+  if(!proj){ toast('Proje bilgisi yok.','error'); return; }
+  const [docs, pbps] = await Promise.all([projDocsEnsure(proj), projPbpsEnsure(proj)]);
+  const key = s=>(s||'').trim().toLocaleLowerCase('tr');
+  // pbp kimliği varsa doğrudan; yoksa KOD köprüsü (üretim parçası / satın alma
+  // kalemi pbp id taşımaz — pbpByCode deseni)
+  const hedefIds = new Set(pbpId ? [pbpId]
+    : (key(code) ? pbps.filter(p=>key(p.custom_code||p.resolved_code)===key(code)).map(p=>p.id) : []));
+  const list = docs.filter(d=>(d.part_ids||[]).some(id=>hedefIds.has(id)))
+    .sort((a,b)=>((b.category===pref)-(a.category===pref)) || (b.created_at||'').localeCompare(a.created_at||''));
+  document.getElementById('partdocs-overlay')?.remove();
+  const ov=document.createElement('div');
+  ov.className='modal-overlay open'; ov.id='partdocs-overlay';
+  ov.innerHTML = h`<div class="modal" style="width:480px;max-width:95vw;text-align:left;max-height:85vh;display:flex;flex-direction:column">
+    <h3 style="margin-bottom:4px">Teknik Resimler</h3>
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px">${name||''}${code?h` · ${code}`:''} · ${proj}</p>
+    <div style="overflow:auto;flex:1">
+    ${list.length?list.map(d=>h`<div style="display:flex;gap:10px;align-items:center;padding:7px 4px;border-bottom:1px dashed var(--border)">
+      <span style="font-family:var(--font-mono);font-size:9px;padding:1px 7px;border-radius:8px;border:1px solid var(--border);color:var(--muted);white-space:nowrap">${(PDOC_CATS[d.category]||d.category||'').replace(' Resimleri','')}</span>
+      <span style="font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${d.filename}</span>
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);white-space:nowrap">${fmtBytes(d.size_bytes)}</span>
+      <button class="btn btn-ghost btn-sm" onclick="pdocsDownload('${raw(d.id)}')" title="İndir">${raw(ico('download',13))}</button>
+    </div>`):h`<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:16px;text-align:center">Bu parçaya bağlı proje resmi yok.<br><span style="font-size:10px">Teknik Resimler &gt; Proje Resimleri'nden yükleyip parçaya bağlayın.</span></div>`}
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-ghost" onclick="document.getElementById('partdocs-overlay').remove()">Kapat</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
 // ═══ ÜRÜN AĞACI (BOM) ═══
 let bomProducts = [];
 let bomParts    = [];
@@ -17645,6 +17706,8 @@ function pbomeRenderList() {
               ${p.dept_id && !_pbomeProjDepts.some(d=>d.id===p.dept_id)?h`<option value="${p.dept_id}" selected disabled>⚠ ${(depts.find(d=>d.id===p.dept_id)||{}).name||'?'} (başka proje)</option>`:''}
               <option value="__yeni__">+ Yeni bölüm…</option>
             </select>
+            ${(()=>{const di=_partDocsReg.push({proj:(_pbomePb?_pbomePb.project_name:''), pbpId:p.id, code:p.custom_code||p.resolved_code, name:p.custom_name||p.resolved_name, pref:'IMALAT'})-1;
+              return h`<button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="partDocsOpenIdx(${di})" title="Parçanın proje teknik resimleri (16. tur M3.2c)">${raw(ico('file',13))}</button>`;})()}
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeEditPart('${raw(p.id)}')" title="Ad / kod / malzeme düzenle">${raw(ico('edit',13))}</button>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px${raw(p.ship_planned?';color:var(--accent);border-color:rgba(245,166,35,.4)':'')}" onclick="pbomeToggleShipPlan('${raw(p.id)}')" title="${p.ship_planned?'Sevk planından çıkar':'Sevk planına al (Paket Planlaması) — sevkiyatçının ağacında SEVK PLANINDA rozetiyle görünür'}">${raw(ico('push',13))}</button>
             <button class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:11px" onclick="pbomeCopyBranch('${raw(p.id)}')" title="Dalı alt ağacıyla kopyala (aynalama parça)">${raw(ico('list',13))}</button>

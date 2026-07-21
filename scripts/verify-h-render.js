@@ -34,6 +34,7 @@ const els={};
 global.window = global;
 global.document={ getElementById:id=> els[id] || (els[id]={ value:'', checked:false, dataset:{}, addEventListener(){}, style:{}, textContent:'', scrollIntoView(){}, classList:{add(){},remove(){}}, set innerHTML(v){store[id]=String(v);}, get innerHTML(){return store[id]||'';} }) };
 global.parts=[];
+global._partDocsReg=[]; // (16. tur M3.2c) parça-üstü resim butonu kayıt defteri — wo/pur/pbome render'ları push'lar
 const EVIL='<img src=x onerror=alert(1)>';
 
 let fail=0;
