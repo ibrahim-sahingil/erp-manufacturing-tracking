@@ -1556,11 +1556,19 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 
   <!-- Alt sekmeler (planning-tab deseni; switchWarehouseTab #view-warehouse'a scope'ludur) -->
   <div class="planning-tabs" id="warehouse-tabs">
+    <button class="planning-tab" data-whtab="dash" onclick="switchWarehouseTab('dash')" title="Depo özet dashboard'u (16. tur M1c) — bilgi amaçlı, aksiyonlar diğer sekmelerde">Özet</button>
     <button class="planning-tab active" data-whtab="view" onclick="switchWarehouseTab('view')">Depo Görünümü</button>
     <button class="planning-tab" data-whtab="receiving" onclick="switchWarehouseTab('receiving')">Mal Kabul</button>
     <button class="planning-tab" data-whtab="additem" onclick="switchWarehouseTab('additem')">+ Parça Ekle</button>
     <button class="planning-tab" data-whtab="manage" onclick="switchWarehouseTab('manage')">Depo Yönetimi</button>
     <button class="planning-tab" data-whtab="delivery" onclick="switchWarehouseTab('delivery')">İrsaliye</button>
+  </div>
+
+  <!-- (16. tur M1c) ÖZET — depo dashboard'u (bilgi amaçlı; varsayılan sekme
+       Depo Görünümü KALIR, Özet'e tıklamayla girilir) -->
+  <div class="planning-section" id="wh-tab-dash">
+    <div id="whd-kpis" class="stats-row" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px;display:none"></div>
+    <div id="whd-content"></div>
   </div>
 
   <!-- Depo Görünümü (#5 arkadaş isteği: proje bazlı / depo bazlı iki mod) -->
@@ -12151,6 +12159,7 @@ function _whActivateTab(tab){
   if(tab==='receiving') renderReceiving(); // 8. tur #3: Satın Alma'dan taşındı
   if(tab==='additem') renderWhAddItem();   // 10. tur M12: Depo Yönetimi'nden ayrıldı
   if(tab==='delivery') renderDelivery();   // 10. tur M8: üst tabdan taşındı
+  if(tab==='dash') renderWhDash();         // (16. tur M1c) Özet dashboard
 }
 function switchWarehouseTab(tab){ _whActivateTab(tab); }
 
@@ -12162,11 +12171,12 @@ function whAllowedSubTabs(){
   // (11. tur F1) 'additem' developer listesinde UNUTULMUŞTU — Parça Ekle
   // sekmesi (arama + aktarım dahil) geliştiriciye görünmüyordu; normal depo
   // kullanıcısı görüyordu. tests/warehouse-tabs.spec.js bekçisi eklendi.
-  if(!currentUser || currentUser.role==='developer') return ['view','receiving','additem','manage','delivery'];
+  if(!currentUser || currentUser.role==='developer') return ['dash','view','receiving','additem','manage','delivery'];
   const perms = Array.isArray(currentUser.permissions)
     ? currentUser.permissions : JSON.parse(currentUser.permissions||'[]');
   const out = [];
-  if(perms.includes('warehouse')) out.push('view','receiving','additem','manage');
+  // (16. tur M1c) Özet dashboard'u depo yetkisiyle görünür (bilgi amaçlı)
+  if(perms.includes('warehouse')) out.push('dash','view','receiving','additem','manage');
   if(perms.includes('delivery')) out.push('delivery');
   return out;
 }
@@ -12452,6 +12462,84 @@ function whvSetMode(mode){
   const sel = document.getElementById('whv-wh-sel');
   if(sel) sel.style.display = mode==='warehouse' ? '' : 'none';
   renderWarehouseList();
+}
+
+// ═══ (16. tur M1c) DEPO "ÖZET" DASHBOARD'U — arkadaş: "Depo bölümü için ayrı
+// bir dashboard yapılacak" · bilgi amaçlı (V3: aksiyonlar mevcut sekmelerde) ═══
+function renderWhDash(){
+  const kEl = document.getElementById('whd-kpis');
+  const el = document.getElementById('whd-content');
+  if(!el) return;
+  const aktifWhs = warehouses.filter(w=>w.is_active!==false);
+  const rows = whStockRows();
+  const bekleyenKabul = purchaseItems.filter(i=>['ORDERED','RECEIVED'].includes(i.status)).length;
+  const bekleyenRez = (whReservations||[]).filter(r=>r.status==='REQUESTED').length;
+  const depodaKalem = purchaseItems.filter(i=>i.status==='IN_WAREHOUSE').length;
+  // Depoda duran paketler: PACKAGE hareket neti (paket × depo bazında IN−OUT)
+  const pkgWh = new Map(); // 'pkgId|whId' → net
+  (whMovements||[]).forEach(x=>{
+    if(x.source_type!=='PACKAGE' || !x.shipment_package_id) return;
+    const k = x.shipment_package_id+'|'+x.warehouse_id;
+    pkgWh.set(k, (pkgWh.get(k)||0) + (x.movement_type==='IN'?1:-1));
+  });
+  const pkgToplam = [...pkgWh.values()].filter(v=>v>0).length;
+  if(kEl){
+    kEl.style.display='';
+    kEl.innerHTML = h`
+      <div class="stat-card"><div class="stat-label">Depo</div>
+        <div class="stat-value">${aktifWhs.length}<span class="un"> aktif</span></div>
+        <div class="stat-sub">${warehouses.length>aktifWhs.length?h`<span class="delta nd">${warehouses.length-aktifWhs.length} pasif</span>`:h`<span class="delta nd">pasif depo yok</span>`}</div></div>
+      <div class="stat-card"><div class="stat-label">Depodaki Kalem</div>
+        <div class="stat-value">${depodaKalem}<span class="un"> kalem</span></div>
+        <div class="stat-sub">${rows.length?h`<span class="delta in">${rows.length} stok satırı</span>`:h`<span class="delta nd">stok satırı yok</span>`}</div></div>
+      <div class="stat-card"><div class="stat-label">Mal Kabul Bekleyen</div>
+        <div class="stat-value">${bekleyenKabul}<span class="un"> kalem</span></div>
+        <div class="stat-sub">${bekleyenKabul?h`<span class="delta wa">sipariş/teslim aşamasında</span>`:h`<span class="delta nd">bekleyen yok</span>`}</div></div>
+      <div class="stat-card"><div class="stat-label">Rezervasyon Talebi</div>
+        <div class="stat-value">${bekleyenRez}<span class="un"> talep</span></div>
+        <div class="stat-sub">${bekleyenRez?h`<span class="delta wa">depocu onayı bekliyor</span>`:h`<span class="delta nd">bekleyen talep yok</span>`}</div></div>
+      <div class="stat-card"><div class="stat-label">Depodaki Paket</div>
+        <div class="stat-value">${pkgToplam}<span class="un"> paket</span></div>
+        <div class="stat-sub">${pkgToplam?h`<span class="delta in">sevk bekliyor</span>`:h`<span class="delta nd">depoda paket yok</span>`}</div></div>`;
+  }
+  if(!aktifWhs.length){
+    el.innerHTML = h`<div class="empty-state"><span class="emoji"></span>Aktif depo yok — Depo Yönetimi'nden ekleyin</div>`;
+    return;
+  }
+  // Depo başına doluluk kartları
+  const whCards = aktifWhs.map(w=>{
+    const wr = rows.filter(r=>r.wh===w.id);
+    const net = wr.reduce((s,r)=>s+r.net,0);
+    const kalem = purchaseItems.filter(i=>i.status==='IN_WAREHOUSE' && i.warehouse_id===w.id).length;
+    const pkg = [...pkgWh.entries()].filter(([k,v])=>v>0 && k.endsWith('|'+w.id)).length;
+    return h`<div class="pbom-card" style="padding:12px 16px;margin-bottom:0">
+      <div style="display:flex;gap:8px;align-items:baseline;justify-content:space-between">
+        <span style="font-weight:700;font-size:13px;color:var(--ink)">${w.name}</span>
+        ${w.location?h`<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${w.location}</span>`:''}
+      </div>
+      <div style="display:flex;gap:12px;font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:6px;flex-wrap:wrap">
+        <span>${wr.length} çeşit</span><span>net ${mipNum(net)}</span>
+        <span>${kalem} bağlı kalem</span>${pkg?h`<span>${pkg} paket</span>`:''}
+      </div>
+    </div>`;
+  });
+  // Proje bazlı özet (whvProjectHTML verisinin sayaç hâli)
+  const projMap = new Map();
+  purchaseItems.filter(i=>['ORDERED','RECEIVED','IN_STOCK','IN_WAREHOUSE'].includes(i.status)).forEach(i=>{
+    const p = i.project_name||'(Proje Yok)';
+    if(!projMap.has(p)) projMap.set(p, {depoda:0, bekleyen:0});
+    const g = projMap.get(p);
+    if(i.status==='IN_WAREHOUSE') g.depoda++; else g.bekleyen++;
+  });
+  const projRows = [...projMap.entries()].sort((a,b)=>(b[1].depoda+b[1].bekleyen)-(a[1].depoda+a[1].bekleyen));
+  el.innerHTML = h`
+    <div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:8px">Depolar</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:18px">${whCards}</div>
+    ${projRows.length?h`<div style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;font-weight:650;color:var(--muted);letter-spacing:.07em;margin-bottom:8px">Proje Bazlı</div>
+    ${projRows.map(([p,g])=>h`<div style="display:flex;gap:10px;align-items:center;padding:6px 10px;border-bottom:1px dashed var(--border)">
+      <span style="font-size:12.5px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p}</span>
+      <span style="margin-left:auto;font-family:var(--font-mono);font-size:10.5px;white-space:nowrap"><span style="color:#2ecc71">depoda ${g.depoda}</span> · <span style="color:var(--muted)">beklenen ${g.bekleyen}</span></span>
+    </div>`)}`:''}`;
 }
 
 function renderWarehouseList(){

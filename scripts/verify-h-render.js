@@ -479,6 +479,21 @@ chk('whvProj: whRow + aksiyonlar (raw) korundu', wpv.includes("whXferItem('x1')"
 chk('whvWh: proje grubu / münferit adı kaçırıldı', wwv.includes("Pj&#39;&lt;img") && wwv.includes("Ln&#39;&lt;img") && wwv.includes('LC&lt;b&gt;'));
 chk('whvWh: whXferLoose onclick ea tırnak kaçışı', wwv.includes("whXferLoose('w1','Ln\\'"));
 
+// ── (16. tur M1c) renderWhDash (Depo Özet dashboard'u) ──
+global.warehouses=[{id:'w1', name:'Depo'+EVIL, location:'Konum<b>', is_active:true}];
+global.whReservations=[{id:'r1', status:'REQUESTED'}];
+global.shipmentPackages = global.shipmentPackages||[];
+global.whMovements.push({warehouse_id:'w1', shipment_package_id:'pkX', source_type:'PACKAGE',
+  item_name:'PKT-2026-0009', movement_type:'IN', quantity:1, unit:'adet'});
+eval(grab('whStockRows'));
+eval(grab('renderWhDash'));
+renderWhDash();
+const whd=(store['whd-content']||'')+(store['whd-kpis']||'');
+console.log('\nrenderWhDash (depo özet):');
+chk('whDash: depo adı/konum kaçırıldı', whd.includes('Depo&lt;img') && whd.includes('Konum&lt;b&gt;'));
+chk('whDash: KPI şeridi doldu (paket dahil)', (store['whd-kpis']||'').includes('Depodaki Paket'));
+chk('whDash: proje bazlı satır kaçırıldı', whd.includes("Pj&#39;&lt;img"));
+
 // ── renderAppUsers (uygulama kullanıcıları) ──
 global.loadAppUsers=async()=>{};
 global.appUsers=[{id:'u1', role:'user', username:'usr<b>', display_name:"Dn'"+EVIL,

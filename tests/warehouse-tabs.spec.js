@@ -14,10 +14,10 @@ async function login(page) {
   await expect(page.locator('#user-badge')).toBeVisible({ timeout: 15000 });
 }
 
-test('depo: geliştirici 5 alt sekmenin 5\'ini de görür (Parça Ekle dahil)', async ({ page }) => {
+test('depo: geliştirici 6 alt sekmenin 6\'sını da görür (Özet + Parça Ekle dahil)', async ({ page }) => {
   await login(page);
   await page.click('.nav-tab[data-tab="warehouse"]');
-  const tabs = ['view', 'receiving', 'additem', 'manage', 'delivery'];
+  const tabs = ['dash', 'view', 'receiving', 'additem', 'manage', 'delivery']; // (16. tur M1c) dash eklendi
   for (const t of tabs) {
     await expect(page.locator(`#warehouse-tabs .planning-tab[data-whtab="${t}"]`),
       `data-whtab="${t}" görünür olmalı`).toBeVisible();
