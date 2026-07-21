@@ -16130,6 +16130,7 @@ function renderBomList() {
           ${isCollapsed&&kids?h`<span style="color:var(--accent);cursor:pointer" onclick="bomToggle('${raw(part.id)}')">▸ ${kids} alt parça gizli</span>`:''}
           ${part.weight_kg?h`<span>${part.weight_kg} kg</span>`:''}
           ${part.material?h`<span>${part.material}</span>`:''}
+          ${part.department_name?h`<span style="color:var(--accent)" title="Şablon bölümü (16. tur M2) — projeye bağlanınca aynı adlı bölüm atanır, yoksa oluşturulur">${part.department_name}</span>`:''}
           ${partDimLabel(part)?h`<span>${partDimLabel(part)}${part.material_form?' · '+MATERIAL_FORMS[part.material_form]:''}</span>`:(part.material_form?h`<span>${MATERIAL_FORMS[part.material_form]}</span>`:'')}
         </div>
         ${opsHTML}
@@ -16326,9 +16327,20 @@ async function saveBomQty(partId) {
 }
 
 // ─── Ad / Kod / Malzeme Düzenle ───
+// (16. tur M2) Bölüm adı önerileri: şablonda kullanılmış adlar + işlem tanımı bölümleri
+function refreshBomDeptDatalist(){
+  let dl = document.getElementById('bom-dept-datalist');
+  if(!dl){ dl = document.createElement('datalist'); dl.id='bom-dept-datalist'; document.body.appendChild(dl); }
+  const adlar = new Set();
+  bomParts.forEach(p=>{ if(p.department_name) adlar.add(p.department_name); });
+  (bomOpDefs||[]).forEach(o=>{ if(o.department_name) adlar.add(o.department_name); });
+  dl.innerHTML = [...adlar].sort().map(a=>`<option value="${esc(a)}">`).join('');
+}
+
 function editBomPart(partId) {
   const part = bomParts.find(p=>p.id===partId);
   if(!part) return;
+  refreshBomDeptDatalist(); // (16. tur M2) bölüm önerileri
 
   const inStyle = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none';
   const overlay = document.createElement('div');
@@ -16353,9 +16365,15 @@ function editBomPart(partId) {
           onkeydown="if(event.key==='Enter')saveBomPartEdit('${partId}')">
       </div>
     </div>
-    <div class="form-group" style="margin-bottom:12px">
-      <label>Tür</label>
-      <select id="bom-edit-kind" style="${inStyle}">${kindOptions(part.material_kind)}</select>
+    <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+      <div class="form-group">
+        <label>Tür</label>
+        <select id="bom-edit-kind" style="${inStyle}">${kindOptions(part.material_kind)}</select>
+      </div>
+      <div class="form-group">
+        <label>Bölüm (ad)</label>
+        <input type="text" id="bom-edit-dept" list="bom-dept-datalist" value="${esc(part.department_name)}" placeholder="örn. Kaynak — projeye bağlanınca taşınır" title="Şablon bölüm ADI (16. tur M2): projeye bağlanırken aynı adlı bölüm atanır, yoksa projede OLUŞTURULUR. Boş bırakılabilir." style="${inStyle}">
+      </div>
     </div>
     <div class="form-row" style="grid-template-columns:1fr 2fr;margin-bottom:18px">
       <div class="form-group"><label>Malzeme Formu</label>
@@ -16394,12 +16412,15 @@ async function saveBomPartEdit(partId) {
   const material_form = document.getElementById('bom-edit-form').value; // ''=formu temizle
   const dims = collectFormDims('bom-edit', material_form);
   const material_kind = document.getElementById('bom-edit-kind').value; // ''=türü temizle
+  // (16. tur M2) şablon bölüm adı — ''=temizle (backend blankToNull)
+  const department_name = document.getElementById('bom-edit-dept')?.value.trim() ?? '';
   // PARTIAL update'te null "dokunma" demek — malzemeyi temizlemek icin bos string gonderilir
-  const ok = await dbUpdate('bom_parts', partId, { name, code, material, material_kind, material_form, ...dims });
+  const ok = await dbUpdate('bom_parts', partId, { name, code, material, material_kind, material_form, department_name, ...dims });
   if(!ok) return;
   part.name=name; part.code=code; part.material=material;
   part.material_kind=material_kind||null;
   part.material_form=material_form||null;
+  part.department_name=department_name||null;
   DIM_FIELDS.forEach(f=>part[f]=dims[f]);
   document.getElementById('bom-edit-overlay')?.remove();
   renderBomContent();

@@ -159,6 +159,7 @@ function partToApi(b){
 const EP = {parts:'parts', purchase_items:'purchase-items', project_bom:'project-bom',
   project_bom_parts:'project-bom-parts', bom_products:'bom-products', bom_parts:'bom-parts',
   work_orders:'work-orders', work_order_parts:'work-order-parts', orders:'orders',
+  departments:'departments', // (16. tur M2)
   warehouses:'warehouses', warehouse_movements:'warehouse-movements',
   warehouse_reservations:'warehouse-reservations',
   shipment_packages:'shipment-packages', shipment_package_items:'shipment-package-items',
@@ -275,6 +276,15 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     const mvBack = await api('PUT','/bom-parts/'+brk2.id,{parent_id:plt2.id});
     check('geri taşındı', !!mvBack && mvBack.parent_id===plt2.id);
 
+    console.log('═══ 16.TUR M2: ŞABLON BÖLÜMÜ PROJEYE TAŞINIR (K3: yoksa OLUŞUR) ═══');
+    // İki şablon parçasına AYNI bölüm adı yazılır → tek bağlamada projede TEK
+    // bölüm oluşmalı (cache dedup) ve her iki pbp'nin dept_id'si dolu olmalı.
+    const dBrk1 = await api('PUT','/bom-parts/'+brk.id, {department_name:'E2E Kaynak Bölümü'});
+    const dBrk2 = await api('PUT','/bom-parts/'+brk2.id,{department_name:'E2E Kaynak Bölümü'});
+    check('şablon parçasına bölüm adı yazıldı (UpdateRequest)',
+      dBrk1?.department_name==='E2E Kaynak Bölümü' && dBrk2?.department_name==='E2E Kaynak Bölümü',
+      JSON.stringify({d1:dBrk1?.department_name}));
+
     const pbm = await api('POST','/project-bom',{project_name:PROJ, bom_product_id:prod.id, status:'draft', created_by:'E2E'});
     check('project_bom bağlantısı oluştu', !!pbm);
 
@@ -283,6 +293,26 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     let pbps = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm.id);
     check('8 pbp otomatik kopyalandı', pbps.length===8,
       pbps.length + ' → ' + pbps.map(codeOf).join(','));
+    {
+      // DİKKAT: harness dbGet'i HAM API döner — FIELD_XLATE yok, 'project' değil
+      // 'order_id' alanı vardır (frontend adapter çevirisi burada koşmaz)
+      const e2eDepts = (await dbGet('departments')).filter(d=>d.order_id===orderId && d.name==='E2E Kaynak Bölümü');
+      check('projede bölüm TEK sefer OLUŞTU (K3 + cache dedup)', e2eDepts.length===1, e2eDepts.length+' adet');
+      const pbpBrks = pbps.filter(p=>codeOf(p)==='E2E-BRK');
+      check('her iki BRK pbp aynı bölüme atandı', pbpBrks.length===2
+        && pbpBrks.every(p=>p.dept_id===e2eDepts[0]?.id), JSON.stringify(pbpBrks.map(p=>p.dept_id)));
+      const pbpGvd = pbps.find(p=>codeOf(p)==='E2E-GVD');
+      check('bölümsüz şablon parçası null kaldı (eski davranış)', pbpGvd && !pbpGvd.dept_id);
+      // FİKSTÜR SIFIRLAMA: sonraki senaryolar (publish/bölüm guard'ları) bölümsüz
+      // fikstür varsayar — şablon adı temizlenir, iki pbp dept_id null'a çekilir
+      // (dept satırı kalır; order silinince CASCADE temizler).
+      await api('PUT','/bom-parts/'+brk.id, {department_name:''});
+      await api('PUT','/bom-parts/'+brk2.id,{department_name:''});
+      for(const p of pbpBrks) await api('PUT','/project-bom-parts/'+p.id,{dept_id:null});
+      pbps = (await dbGet('project_bom_parts')).filter(p=>p.project_bom_id===pbm.id);
+      check('fikstür sıfırlandı (BRK pbp dept_id null)',
+        pbps.filter(p=>codeOf(p)==='E2E-BRK').every(p=>!p.dept_id));
+    }
     // Hiyerarşi bağları backend 2. pass'te kurulmuş olmalı (parent_custom_id)
     const pbpSacs = pbps.filter(p=>codeOf(p)==='E2E-SAC');
     check('aynı kodlu 2 SAC pbp FARKLI parent altında',

@@ -94,6 +94,10 @@ public class BomPartUpdateRequest {
             message = "Malzeme formu SAC/PROFIL/MIL/BORU/DELRIN/COK_KOMPONENTLI olmali")
     private String materialForm;
 
+    // (16. tur M2) sablon bolum adi — null=dokunma, ""=temizle (service blankToNull)
+    @Size(max = 100, message = "Bolum adi en fazla 100 karakter olabilir")
+    private String departmentName;
+
     /** Esnek jsonb yapisi - BomPartRequest.operations ile ayni format. */
     private List<Map<String, Object>> operations;
 

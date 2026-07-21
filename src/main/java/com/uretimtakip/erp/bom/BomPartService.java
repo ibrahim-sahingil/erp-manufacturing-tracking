@@ -150,6 +150,9 @@ public class BomPartService {
                         ? request.getMaterialKind() : null)
                 .materialForm(request.getMaterialForm() != null && !request.getMaterialForm().isBlank()
                         ? request.getMaterialForm() : null)
+                // (16. tur M2) sablon bolum adi
+                .departmentName(request.getDepartmentName() != null && !request.getDepartmentName().isBlank()
+                        ? request.getDepartmentName().trim() : null)
                 .operations(request.getOperations() != null
                         ? request.getOperations() : new ArrayList<>())
                 .level(level)
@@ -222,6 +225,10 @@ public class BomPartService {
         if (request.getMaterialForm() != null) {
             // Bos string = formu temizle (null'a dondur)
             part.setMaterialForm(request.getMaterialForm().isBlank() ? null : request.getMaterialForm());
+        }
+        if (request.getDepartmentName() != null) {
+            // (16. tur M2) bos string = sablon bolumunu temizle
+            part.setDepartmentName(request.getDepartmentName().isBlank() ? null : request.getDepartmentName().trim());
         }
         if (request.getOperations() != null) {
             part.setOperations(request.getOperations());

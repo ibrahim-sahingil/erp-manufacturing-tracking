@@ -40,6 +40,7 @@ public class BomPartResponse {
     private BigDecimal diameterMm;
     private String materialKind;
     private String materialForm;
+    private String departmentName;   // (16. tur M2)
     private List<Map<String, Object>> operations;
     private Integer level;
     private Integer sortOrder;
@@ -63,6 +64,7 @@ public class BomPartResponse {
                 .diameterMm(e.getDiameterMm())
                 .materialKind(e.getMaterialKind())
                 .materialForm(e.getMaterialForm())
+                .departmentName(e.getDepartmentName())
                 .operations(e.getOperations())
                 .level(e.getLevel())
                 .sortOrder(e.getSortOrder())

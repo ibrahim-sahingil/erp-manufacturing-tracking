@@ -52,6 +52,10 @@ import java.util.UUID;
  *   diameter_mm  numeric(15,4) NULL (MIL cap / BORU dis cap — 5. tur #4)
  *   material_kind varchar(20)  NULL (CHECK: TEDARIK/HAMMADDE/YARI_MAMUL/MAMUL/SARF)
  *   material_form varchar(20)  NULL (CHECK: SAC/PROFIL/MIL/BORU/DELRIN/COK_KOMPONENTLI — 5. tur #4)
+ *   department_name varchar(100) NULL (16. tur M2 — SABLON bolum ADI; departments
+ *                   PROJE kapsamli oldugundan UUID degil AD tasinir
+ *                   (bom_operations.department_name emsali). Projeye baglanirken
+ *                   autoPopulateBomParts adla cozer, yoksa OLUSTURUR — K3 karari)
  *   operations  jsonb         DEFAULT '[]'
  *   level       int4          DEFAULT 0
  *   sort_order  int4          DEFAULT 0
@@ -125,6 +129,10 @@ public class BomPart extends BaseEntity {
      */
     @Column(name = "material_form", length = 20)
     private String materialForm;
+
+    // (16. tur M2) sablon bolum ADI — projeye baglanista adla cozulur/olusturulur
+    @Column(name = "department_name", length = 100)
+    private String departmentName;
 
     /**
      * Operasyonlar listesi (PostgreSQL jsonb -> Java List<Map<String, Object>>).

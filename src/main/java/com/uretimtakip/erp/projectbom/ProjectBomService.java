@@ -5,6 +5,9 @@ import com.uretimtakip.erp.bom.BomPartRepository;
 import com.uretimtakip.erp.bom.BomProductRepository;
 import com.uretimtakip.erp.common.exception.BusinessException;
 import com.uretimtakip.erp.common.exception.ResourceNotFoundException;
+import com.uretimtakip.erp.department.Department;
+import com.uretimtakip.erp.department.DepartmentRepository;
+import com.uretimtakip.erp.order.OrderRepository;
 import com.uretimtakip.erp.projectbom.dto.ProjectBomRequest;
 import com.uretimtakip.erp.projectbom.dto.ProjectBomResponse;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +58,9 @@ public class ProjectBomService {
     private final ProjectBomPartRepository projectBomPartRepository;
     private final BomProductRepository bomProductRepository;
     private final BomPartRepository bomPartRepository;
+    // (16. tur M2) sablon bolum adinin projeye tasinmasi icin
+    private final DepartmentRepository departmentRepository;
+    private final OrderRepository orderRepository;
 
     @Transactional(readOnly = true)
     public List<ProjectBomResponse> listAll() {
@@ -223,9 +229,51 @@ public class ProjectBomService {
 
     // ============ AUTO-POPULATE HELPER ============
 
-    // (13. tur madde 1) resolveDeptName + ensureProjectDept KALDIRILDI —
-    // bolum islem tanimindan TURETILMEZ ve otomatik OLUSTURULMAZ; kullanici
-    // bolumleri elle kaydeder, parcaya elle atar (frontend dropdown).
+    // (13. tur madde 1) islem tanimindan bolum TURETME kaldirilmisti.
+    // (16. tur M2 — K3, arkadas istegi: "her projeye aktarildiginda tekrar
+    // bolum atamak gerekiyor") BILINCLI REVIZYON: SABLON PARCASININ KENDI
+    // department_name ALANI projeye tasinir — ad eslesirse atanir, projede
+    // o adla bolum YOKSA OLUSTURULUR. Yalniz bu baglama akisinda; 14. tur S7
+    // onerisi (islem tanimindan, asla olusturmaz) aynen korunur — S7 yalniz
+    // BOS bolume dokundugundan cakismaz.
+
+    /**
+     * (16. tur M2) Sablon bolum adini hedef projede coz: ad eslesmesi
+     * (tr-lowercase) varsa o dept'in id'si; yoksa projeye YENI bolum acilir.
+     * Projenin order kaydi yoksa (adla bulunamadi) null doner — dept olusmaz.
+     * cache: ayni attach icindeki tekrar adlar tek kayit acar.
+     */
+    private UUID resolveOrCreateDept(String deptName, String projectName,
+                                     Map<String, UUID> cache, Map<String, UUID> orderCache) {
+        if (deptName == null || deptName.isBlank()) return null;
+        String key = deptName.trim().toLowerCase(new java.util.Locale("tr", "TR"));
+        if (cache.containsKey(key)) return cache.get(key);
+        UUID orderId = orderCache.computeIfAbsent(projectName, pn ->
+                orderRepository.findByProjectName(pn).map(o -> o.getId()).orElse(null));
+        if (orderId == null) {
+            log.warn("Sablon bolumu '{}' tasinamadi: '{}' projesinin order kaydi yok",
+                    deptName, projectName);
+            cache.put(key, null);
+            return null;
+        }
+        UUID deptId = departmentRepository.findByOrderId(orderId).stream()
+                .filter(d -> d.getName() != null
+                        && d.getName().trim().toLowerCase(new java.util.Locale("tr", "TR")).equals(key))
+                .map(Department::getId)
+                .findFirst()
+                .orElseGet(() -> {
+                    Department yeni = new Department();
+                    yeni.setOrderId(orderId);
+                    yeni.setName(deptName.trim());
+                    yeni.setSortOrder(1);
+                    Department saved = departmentRepository.save(yeni);
+                    log.info("Sablon bolumu projede OLUSTURULDU (16. tur K3): '{}' -> {}",
+                            deptName, projectName);
+                    return saved.getId();
+                });
+        cache.put(key, deptId);
+        return deptId;
+    }
 
     /**
      * BomProduct'un tum BomPart'larini ProjectBomPart olarak kopyalar.
@@ -247,7 +295,11 @@ public class ProjectBomService {
             return 0;
         }
 
-        // (13. tur madde 1) dept_id her zaman null kopyalanir — bolum elle atanir.
+        // (16. tur M2 — K3) sablonun department_name'i projede adla cozulur,
+        // yoksa OLUSTURULUR (13. tur "hep null" kurali bilincli revize edildi;
+        // department_name'siz sablon parcasi eskisi gibi null kalir).
+        Map<String, UUID> deptCache = new HashMap<>();
+        Map<String, UUID> orderCache = new HashMap<>();
         // 1. Pass: ProjectBomPart'lar olustur (parent_custom_id null)
         Map<UUID, UUID> bomPartIdToProjectBomPartId = new HashMap<>();
         List<ProjectBomPart> created = new ArrayList<>();
@@ -263,7 +315,8 @@ public class ProjectBomService {
                     .customUnit(null)
                     .customWeight(null)
                     .customMaterial(null)
-                    .deptId(null)
+                    .deptId(resolveOrCreateDept(bp.getDepartmentName(), projectName,
+                            deptCache, orderCache))
                     .parentCustomId(null)   // 2. pass'te doldurulacak
                     .operations(bp.getOperations() != null
                             ? new ArrayList<>(bp.getOperations())

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict OO6cg0uXOAkg8HgkqKDoe62g70rpd3HjRjCRdJ5qc770rj2bfhEjOupgz0DYs2T
+\restrict decTJE1mEtHFzncHa51wE2CfaB2rgLghmsP3L86tHen6ayR2aUog9T1fLR7XVe8
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -112,6 +112,7 @@ CREATE TABLE public.bom_parts (
     length_mm numeric(15,4),
     diameter_mm numeric(15,4),
     material_form character varying(20),
+    department_name character varying(100),
     CONSTRAINT bom_parts_material_form_chk CHECK (((material_form IS NULL) OR ((material_form)::text = ANY ((ARRAY['SAC'::character varying, 'PROFIL'::character varying, 'MIL'::character varying, 'BORU'::character varying, 'DELRIN'::character varying, 'COK_KOMPONENTLI'::character varying])::text[])))),
     CONSTRAINT bom_parts_material_kind_chk CHECK (((material_kind IS NULL) OR ((material_kind)::text = ANY ((ARRAY['TEDARIK'::character varying, 'HAMMADDE'::character varying, 'YARI_MAMUL'::character varying, 'MAMUL'::character varying, 'SARF'::character varying])::text[]))))
 );
@@ -1848,5 +1849,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OO6cg0uXOAkg8HgkqKDoe62g70rpd3HjRjCRdJ5qc770rj2bfhEjOupgz0DYs2T
+\unrestrict decTJE1mEtHFzncHa51wE2CfaB2rgLghmsP3L86tHen6ayR2aUog9T1fLR7XVe8
 
