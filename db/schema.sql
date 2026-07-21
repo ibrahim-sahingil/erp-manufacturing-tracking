@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hjMaojhYSM3Cb7uzzDwMVaz2ze1XHZPI343ExCqBV5WyyMghIWWcajtJV6QAfIR
+\restrict OO6cg0uXOAkg8HgkqKDoe62g70rpd3HjRjCRdJ5qc770rj2bfhEjOupgz0DYs2T
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -500,6 +500,7 @@ CREATE TABLE public.purchase_orders (
     ordered_at timestamp without time zone,
     created_by character varying(150),
     created_at timestamp without time zone DEFAULT now(),
+    code character varying(30) NOT NULL,
     CONSTRAINT purchase_orders_status_check CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'APPROVED'::character varying, 'ORDERED'::character varying, 'CANCELLED'::character varying])::text[])))
 );
 
@@ -967,6 +968,14 @@ ALTER TABLE ONLY public.purchase_items
 
 ALTER TABLE ONLY public.purchase_order_quotes
     ADD CONSTRAINT purchase_order_quotes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: purchase_orders purchase_orders_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.purchase_orders
+    ADD CONSTRAINT purchase_orders_code_key UNIQUE (code);
 
 
 --
@@ -1839,5 +1848,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hjMaojhYSM3Cb7uzzDwMVaz2ze1XHZPI343ExCqBV5WyyMghIWWcajtJV6QAfIR
+\unrestrict OO6cg0uXOAkg8HgkqKDoe62g70rpd3HjRjCRdJ5qc770rj2bfhEjOupgz0DYs2T
 

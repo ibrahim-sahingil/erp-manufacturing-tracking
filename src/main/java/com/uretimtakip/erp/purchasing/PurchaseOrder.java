@@ -53,6 +53,11 @@ public class PurchaseOrder extends BaseEntity {
     @Column(name = "name", nullable = false, length = 200)
     private String name;
 
+    // (16. tur M1b — arkadas: "her siparise otomatik mukerrersiz kod") backend
+    // uretir: SIP-<yil>-<sira>; asil garanti DB UNIQUE (nextNoteNo deseni)
+    @Column(name = "code", nullable = false, length = 30)
+    private String code;
+
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private String status = "DRAFT";

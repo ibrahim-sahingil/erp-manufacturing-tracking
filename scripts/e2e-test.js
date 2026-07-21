@@ -756,6 +756,26 @@ globalThis.genId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(
     check('Y1 irsaliye temizliği', await dbDelete('delivery_notes', y1Dn.id));
     check('Y1 depo temizliği', (await dbDelete('warehouses', y1WhA.id)) && (await dbDelete('warehouses', y1WhB.id)));
 
+    console.log('═══ 16.TUR M1b: TOPLU SİPARİŞ GRUBUNA OTOMATİK SIP KODU ═══');
+    // Arkadaş: "her siparişe sistem otomatik mükerrersiz kod atasın". Kod backend
+    // üretir (SIP-<yıl>-<sıra>, DB UNIQUE); istekle kod GÖNDERİLMEZ.
+    const sipIt1 = (await dbInsert('purchase_items',{project_name:PROJ, name:'E2E SIP Kalem 1', quantity:1}))[0];
+    const sipIt2 = (await dbInsert('purchase_items',{project_name:PROJ, name:'E2E SIP Kalem 2', quantity:2}))[0];
+    const sipG1 = await api('POST','/purchase-orders',{name:'E2E SIP Grup 1', item_ids:[sipIt1.id], created_by:'E2E'});
+    const sipG2 = await api('POST','/purchase-orders',{name:'E2E SIP Grup 2', item_ids:[sipIt2.id], created_by:'E2E'});
+    check('grup koduna SIP-<yıl>-<sıra> atandı', /^SIP-\d{4}-\d{4}$/.test(sipG1?.code||''), sipG1?.code||_lastApiError);
+    check('ikinci grupta sıra artar (mükerrer yok)',
+      /^SIP-\d{4}-\d{4}$/.test(sipG2?.code||'') && sipG2.code!==sipG1.code,
+      JSON.stringify({g1:sipG1?.code, g2:sipG2?.code}));
+    // EP haritasında purchase_orders yok — ham api() ile sil (hata=_lastApiError)
+    globalThis._lastApiError = null;
+    await api('DELETE','/purchase-orders/'+sipG1.id);
+    check('SIP grup 1 temizliği', !globalThis._lastApiError, globalThis._lastApiError||'');
+    globalThis._lastApiError = null;
+    await api('DELETE','/purchase-orders/'+sipG2.id);
+    check('SIP grup 2 temizliği', !globalThis._lastApiError, globalThis._lastApiError||'');
+    check('SIP kalem temizliği', (await dbDelete('purchase_items', sipIt1.id)) && (await dbDelete('purchase_items', sipIt2.id)));
+
     console.log('═══ 14.TUR S4: SİPARİŞ SEVKİYAT ZİNCİRİ (orders.shipping_status) ═══');
     // Kalıcı zincir sipariş üzerinde; null=dokunma, ""=temizle (tam-gövde
     // PUT'lar zinciri sıfırlamamalı); değerler ÜÇLÜ kural (CHECK+@Pattern+service)

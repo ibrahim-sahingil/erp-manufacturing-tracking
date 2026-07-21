@@ -79,6 +79,7 @@ public class PurchaseOrderService {
 
         PurchaseOrder order = PurchaseOrder.builder()
                 .name(request.getName().trim())
+                .code(nextOrderNo()) // (16. tur M1b) mukerrersiz otomatik kod
                 .createdBy(request.getCreatedBy())
                 .build();
         PurchaseOrder saved = purchaseOrderRepository.save(order);
@@ -239,5 +240,20 @@ public class PurchaseOrderService {
     private PurchaseOrder findEntityById(UUID id) {
         return purchaseOrderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("PurchaseOrder", "id", id));
+    }
+
+    /**
+     * (16. tur M1b) SIP-<yil>-<sira>; asil mukerrer garantisi DB UNIQUE
+     * (DeliveryNoteService.nextNoteNo / ShipmentPackageService.nextPackageNo deseni).
+     */
+    private String nextOrderNo() {
+        String prefix = "SIP-" + java.time.LocalDate.now().getYear() + "-";
+        long seq = purchaseOrderRepository.countByCodeStartingWith(prefix) + 1;
+        String candidate = prefix + String.format("%04d", seq);
+        int guard = 0;
+        while (purchaseOrderRepository.existsByCode(candidate) && guard++ < 1000) {
+            candidate = prefix + String.format("%04d", ++seq);
+        }
+        return candidate;
     }
 }

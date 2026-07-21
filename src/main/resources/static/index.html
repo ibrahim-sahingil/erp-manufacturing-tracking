@@ -1463,12 +1463,16 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
   <!-- Kalemler -->
   <div class="planning-section active" id="pur-tab-items">
 
-  <!-- Proje seçimi + durum özeti -->
+  <!-- Proje seçimi + arama + durum özeti -->
   <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end">
     <div class="form-group" style="flex:1;min-width:220px;max-width:420px;margin-bottom:0"><label>Proje</label>
       <select id="pur-project-sel" onchange="renderPurchaseList()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
         <option value="">— Tüm projeler —</option>
       </select>
+    </div>
+    <!-- (16. tur M1b) koddan anında bulma: kalem adı/kodu + bağlı SIP grup kodu -->
+    <div class="form-group" style="flex:1;min-width:200px;max-width:340px;margin-bottom:0"><label>Ara</label>
+      <input type="text" id="pur-search" placeholder="Kalem adı / kodu / SIP-..." oninput="renderPurchaseList()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
     </div>
     <div id="pur-summary" style="display:flex;gap:8px;flex-wrap:wrap;flex:2;min-width:260px;align-items:center"></div>
   </div>
@@ -1520,6 +1524,10 @@ try{var _v=localStorage.getItem('ut_theme');if(_v)document.documentElement.datas
 
   <!-- Toplu Sipariş & Teklif -->
   <div class="planning-section" id="pur-tab-orders">
+    <!-- (16. tur M1b) koddan anında bulma: SIP kodu + grup adı + üye kalem adı/kodu -->
+    <div class="form-group" style="max-width:360px;margin-bottom:14px"><label>Ara</label>
+      <input type="text" id="po-search" placeholder="SIP-... / grup adı / kalem" oninput="renderPurchaseOrders()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;outline:none">
+    </div>
     <div id="po-list"></div>
   </div>
 
@@ -11114,8 +11122,14 @@ function renderPurchaseList(){
   // (13. tur madde 2) MİP'te bekleyen kalemler (sent_to_purchasing=false)
   // Satın Alma listesine GİRMEZ — gönderme MİP > Kesim Planlama'dan yapılır.
   const all   = proj ? purchaseItems.filter(i=>i.project_name===proj) : purchaseItems;
-  const items = all.filter(i=>i.sent_to_purchasing!==false);
-  const mipBekleyen = all.length - items.length;
+  // (16. tur M1b) arama: kalem adı/kodu + bağlı SIP grup kodu (order-search deseni)
+  const q = (document.getElementById('pur-search')?.value||'').trim().toLowerCase();
+  const poCode = id => id ? ((purchaseOrders.find(o=>o.id===id)||{}).code||'') : '';
+  const items = all.filter(i=>i.sent_to_purchasing!==false)
+    .filter(i=>!q || (i.name||'').toLowerCase().includes(q)
+      || (i.code||'').toLowerCase().includes(q)
+      || poCode(i.purchase_order_id).toLowerCase().includes(q));
+  const mipBekleyen = all.filter(i=>i.sent_to_purchasing===false).length;
 
   // Durum özet çipleri + para toplamı (birim fiyatı olan kalemler)
   if(sumEl){
@@ -11667,8 +11681,20 @@ function renderPurchaseOrders(){
     el.innerHTML = h`<div class="empty-state"><span class="emoji"></span>Henüz sipariş grubu yok<br><span style="font-size:12px;color:var(--muted)">Kalemler sekmesinde Planlandı kalemleri işaretleyip "Toplu Sipariş Oluştur" deyin — tek kalem için satırdaki "Teklifle Sipariş" da aynı akışı açar</span></div>`;
     return;
   }
+  // (16. tur M1b) arama: SIP kodu + grup adı + üye kalem adı/kodu
+  const poq = (document.getElementById('po-search')?.value||'').trim().toLowerCase();
+  const gorunecek = purchaseOrders.filter(o=>{
+    if(!poq) return true;
+    if((o.code||'').toLowerCase().includes(poq) || (o.name||'').toLowerCase().includes(poq)) return true;
+    return purchaseItems.some(i=>i.purchase_order_id===o.id
+      && ((i.name||'').toLowerCase().includes(poq) || (i.code||'').toLowerCase().includes(poq)));
+  });
+  if(!gorunecek.length){
+    el.innerHTML = h`<div class="empty-state"><span class="emoji"></span>Aramayla eşleşen grup yok</div>`;
+    return;
+  }
   const inp = INP('8px 10px','12px');
-  el.innerHTML = purchaseOrders.map(o=>{
+  el.innerHTML = gorunecek.map(o=>{
     const m = PO_STATUS[o.status] || PO_STATUS.DRAFT;
     const items  = purchaseItems.filter(i=>i.purchase_order_id===o.id);
     const quotes = poQuotes.filter(q=>q.purchase_order_id===o.id);
@@ -11781,6 +11807,7 @@ function renderPurchaseOrders(){
       <div class="pbom-card-header">
         <div style="min-width:0">
           <div class="pbom-card-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">${esc(o.code||'')}</span>
             ${esc(o.name)}
             <span style="font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${m.color}44;color:${m.color};background:${m.color}11">${m.icon} ${m.label}</span>
           </div>

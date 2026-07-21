@@ -24,6 +24,7 @@ public class PurchaseOrderResponse {
 
     private UUID id;
     private String name;
+    private String code;   // (16. tur M1b)
     private String status;
     private UUID selectedQuoteId;
     private String approvalNote;
@@ -37,6 +38,7 @@ public class PurchaseOrderResponse {
         return PurchaseOrderResponse.builder()
                 .id(e.getId())
                 .name(e.getName())
+                .code(e.getCode())
                 .status(e.getStatus())
                 .selectedQuoteId(e.getSelectedQuoteId())
                 .approvalNote(e.getApprovalNote())
