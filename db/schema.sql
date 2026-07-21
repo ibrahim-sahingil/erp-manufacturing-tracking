@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict decTJE1mEtHFzncHa51wE2CfaB2rgLghmsP3L86tHen6ayR2aUog9T1fLR7XVe8
+\restrict 26p1fvlkDJ5I3MFcg4A9zBWPZpTU86VlJDz2Fdi3m0VKxr5AmBRRDp3ZMd86Y3i
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -430,6 +430,34 @@ CREATE TABLE public.project_dates (
     start_date date NOT NULL,
     end_date date NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: project_document_parts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.project_document_parts (
+    document_id uuid NOT NULL,
+    project_bom_part_id uuid NOT NULL
+);
+
+
+--
+-- Name: project_documents; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.project_documents (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    project_name character varying(100) NOT NULL,
+    category character varying(20) DEFAULT 'DIGER'::character varying NOT NULL,
+    filename character varying(300) NOT NULL,
+    content_type character varying(150),
+    size_bytes bigint,
+    data bytea NOT NULL,
+    uploaded_by character varying(150),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT project_documents_category_check CHECK (((category)::text = ANY (ARRAY[('SIPARIS'::character varying)::text, ('IMALAT'::character varying)::text, ('DIGER'::character varying)::text])))
 );
 
 
@@ -956,6 +984,22 @@ ALTER TABLE ONLY public.project_dates
 
 
 --
+-- Name: project_document_parts project_document_parts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_document_parts
+    ADD CONSTRAINT project_document_parts_pkey PRIMARY KEY (document_id, project_bom_part_id);
+
+
+--
+-- Name: project_documents project_documents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_documents
+    ADD CONSTRAINT project_documents_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: purchase_items purchase_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1270,6 +1314,20 @@ CREATE INDEX idx_project_bom_product_id ON public.project_bom USING btree (bom_p
 --
 
 CREATE INDEX idx_project_bom_project_name ON public.project_bom USING btree (project_name);
+
+
+--
+-- Name: idx_project_document_parts_part; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_project_document_parts_part ON public.project_document_parts USING btree (project_bom_part_id);
+
+
+--
+-- Name: idx_project_documents_project; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_project_documents_project ON public.project_documents USING btree (project_name);
 
 
 --
@@ -1606,6 +1664,22 @@ ALTER TABLE ONLY public.project_dates
 
 
 --
+-- Name: project_document_parts project_document_parts_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_document_parts
+    ADD CONSTRAINT project_document_parts_document_id_fkey FOREIGN KEY (document_id) REFERENCES public.project_documents(id) ON DELETE CASCADE;
+
+
+--
+-- Name: project_document_parts project_document_parts_project_bom_part_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_document_parts
+    ADD CONSTRAINT project_document_parts_project_bom_part_id_fkey FOREIGN KEY (project_bom_part_id) REFERENCES public.project_bom_parts(id) ON DELETE CASCADE;
+
+
+--
 -- Name: purchase_items purchase_items_pbp_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1849,5 +1923,5 @@ ALTER TABLE ONLY public.workspace_members
 -- PostgreSQL database dump complete
 --
 
-\unrestrict decTJE1mEtHFzncHa51wE2CfaB2rgLghmsP3L86tHen6ayR2aUog9T1fLR7XVe8
+\unrestrict 26p1fvlkDJ5I3MFcg4A9zBWPZpTU86VlJDz2Fdi3m0VKxr5AmBRRDp3ZMd86Y3i
 

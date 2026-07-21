@@ -127,6 +127,12 @@ function izinVerilmeli(ad, r) {
   izinVerilmeli('GET /warehouses',   await lim('GET', '/warehouses'));
   izinVerilmeli('GET /shipment-packages', await lim('GET', '/shipment-packages'));
 
+  console.log('\n═══ (16. tur M3.2) PROJE TEKNIK RESIMLERI YAZMA KILIDI ═══');
+  reddedilmeli('DELETE /project-documents (proje resmi)',
+      await lim('DELETE', '/project-documents/' + prodId)); // id sahte; 403 yetkiden once
+  reddedilmeli('PUT /project-documents (meta)',
+      await lim('PUT', '/project-documents/' + prodId, { category: 'DIGER' }));
+
   console.log('\n═══ (15. tur Y2) NAKLIYECI KARTOTEKI + FIRMA AYARLARI YAZMA KILIDI ═══');
   reddedilmeli('POST /carriers (nakliye firmasi)',
       await lim('POST', '/carriers', { name: 'HACK Nakliyat' }));

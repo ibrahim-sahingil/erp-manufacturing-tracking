@@ -113,6 +113,10 @@ public class SecurityConfig {
                             "ROLE_DEVELOPER", "bom");
                     writeRule(auth, new String[]{"/api/bom-documents/**"},
                             "ROLE_DEVELOPER", "bom", "docs");
+                    // (16. tur M3.2) Proje teknik resimleri: yazma bom/docs;
+                    // okuma acik — satin almaci/imalatci parca ustunden indirir
+                    writeRule(auth, new String[]{"/api/project-documents/**"},
+                            "ROLE_DEVELOPER", "bom", "docs");
                     writeRule(auth, new String[]{"/api/warehouses/**"},
                             "ROLE_DEVELOPER", "warehouse");
                     // MIP Asama 2 — rezervasyon: onay YALNIZ depocu (fiziksel
